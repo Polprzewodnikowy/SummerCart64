@@ -1,0 +1,2 @@
+pyftdi>=0.51.2
+progressbar2>=3.53.1
