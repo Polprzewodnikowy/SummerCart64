@@ -4,7 +4,7 @@
 #include "crc32.h"
 #include "n64_regs.h"
 
-cart_header_t global_cart_header __attribute__((aligned(8)));
+static cart_header_t global_cart_header __attribute__((aligned(8)));
 
 cart_header_t *boot_load_cart_header(void) {
     cart_header_t *cart_header_pointer = &global_cart_header;
@@ -18,17 +18,21 @@ cart_header_t *boot_load_cart_header(void) {
 
 cic_type_t boot_get_cic_type(cart_header_t *cart_header) {
     switch (crc32_calculate(cart_header->boot_code, sizeof(cart_header->boot_code))) {
+        case BOOT_CRC32_5101:
+            return E_CIC_TYPE_5101;
         case BOOT_CRC32_6101:
         case BOOT_CRC32_7102:
-            return E_CIC_TYPE_6101;
+            return E_CIC_TYPE_X101;
         case BOOT_CRC32_X102:
-            return E_CIC_TYPE_6102;
+            return E_CIC_TYPE_X102;
         case BOOT_CRC32_X103:
-            return E_CIC_TYPE_6103;
+            return E_CIC_TYPE_X103;
         case BOOT_CRC32_X105:
-            return E_CIC_TYPE_6105;
+            return E_CIC_TYPE_X105;
         case BOOT_CRC32_X106:
-            return E_CIC_TYPE_6106;
+            return E_CIC_TYPE_X106;
+        case BOOT_CRC32_8303:
+            return E_CIC_TYPE_8303;
         default:
             return E_CIC_TYPE_UNKNOWN;
     }
@@ -67,13 +71,15 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
 
     volatile uint64_t gpr_regs[32];
 
-    const uint8_t cic_seeds[] = {
+    const uint32_t cic_seeds[] = {
         BOOT_SEED_X102,
+        BOOT_SEED_5101,
         BOOT_SEED_X101,
         BOOT_SEED_X102,
         BOOT_SEED_X103,
         BOOT_SEED_X105,
         BOOT_SEED_X106,
+        BOOT_SEED_8303,
     };
 
     while (!(SP->status & SP_STATUS_HALT));
@@ -105,15 +111,11 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
 
     PI->status = PI_STATUS_CLEAR_INTERRUPT | PI_STATUS_RESET_CONTROLLER;
 
-    if (cic_type == E_CIC_TYPE_6105) {
-        OS_BOOT_CONFIG->mem_size_6105 = OS_BOOT_CONFIG->mem_size;
-    }
-
     for (size_t i = 0; i < ARRAY_ITEMS(SP_MEM->imem); i++) {
         SP_MEM->imem[i] = 0;
     }
 
-    if (cic_type == E_CIC_TYPE_6105) {
+    if (cic_type == E_CIC_TYPE_X105) {
         SP_MEM->imem[0] = 0x3C0DBFC0;
         SP_MEM->imem[1] = os_tv_type == E_TV_TYPE_PAL ? 0xBDA807FC : 0x8DA807FC;
         SP_MEM->imem[2] = 0x25AD07C0;
@@ -124,18 +126,22 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
         SP_MEM->imem[7] = 0x3C0BB000;
     }
 
+    if (cic_type == E_CIC_TYPE_X105) {
+        OS_BOOT_CONFIG->mem_size_6105 = OS_BOOT_CONFIG->mem_size;
+    }
+
     for (size_t i = 0; i < ARRAY_ITEMS(gpr_regs); i++) {
         gpr_regs[i] = 0;
     }
 
-    gpr_regs[CPU_REG_T3] = (0xFFFFFFFFLL << 32) | ((uint32_t) &SP_MEM->dmem[16]);
+    gpr_regs[CPU_REG_T3] = CPU_ADDRESS_IN_REG(SP_MEM->dmem[16]);
+    gpr_regs[CPU_REG_S3] = OS_BOOT_ROM_TYPE_GAME_PAK;
     gpr_regs[CPU_REG_S4] = os_tv_type;
-    gpr_regs[CPU_REG_S6] = cic_seeds[cic_type];
-    if (os_tv_type == E_TV_TYPE_PAL) {
-        gpr_regs[CPU_REG_S7] = 6;
-    }
-    gpr_regs[CPU_REG_SP] = (0xFFFFFFFFLL << 32) | ((uint32_t) &SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
-    gpr_regs[CPU_REG_RA] = (0xFFFFFFFFLL << 32) | ((uint32_t) &SP_MEM->imem[(os_tv_type == E_TV_TYPE_PAL) ? 341 : 340]);
+    gpr_regs[CPU_REG_S5] = OS_BOOT_CONFIG->reset_type;
+    gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seeds[cic_type]);
+    gpr_regs[CPU_REG_S7] = (os_tv_type == E_TV_TYPE_PAL) ? OS_BOOT_VERSION_PAL : OS_BOOT_VERSION_NTSC;
+    gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
+    gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == E_TV_TYPE_PAL) ? 341 : 340]);
 
     __asm__ (
         ".set noat \n\t"
@@ -203,7 +209,7 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
         "nop"
         :
         : [gpr_regs] "r" (gpr_regs)
-        : "t0"
+        : "t0", "ra"
     );
 
     while (1);

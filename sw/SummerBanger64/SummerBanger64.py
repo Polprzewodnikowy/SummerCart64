@@ -323,16 +323,18 @@ class SummerBanger64:
 
     def set_cic_type(self, cic_type=0):
         cic_lut = {
-            6101: 0x11,
-            6102: 0x12,
-            6103: 0x13,
-            6105: 0x14,
-            6106: 0x15,
-            7101: 0x02,
-            7102: 0x01,
-            7103: 0x03,
-            7105: 0x04,
-            7106: 0x05,
+            5101: 0x11,
+            6101: 0x12,
+            6102: 0x13,
+            6103: 0x14,
+            6105: 0x15,
+            6106: 0x16,
+            7101: 0x03,
+            7102: 0x02,
+            7103: 0x04,
+            7105: 0x05,
+            7106: 0x06,
+            8303: 0x07,
         }
         self.__write_word(self.__CIC_TYPE_ADDRESS, int(cic_lut.get(cic_type) or 0))
 
