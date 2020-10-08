@@ -8,7 +8,6 @@
 #define BOOT_CRC32_X105     (0x98BC2C86)
 #define BOOT_CRC32_X106     (0xACC8580A)
 
-#define BOOT_SEED_X102      (0x3F)
 #define BOOT_SEED_X101      (0x3F)
 #define BOOT_SEED_X102      (0x3F)
 #define BOOT_SEED_X103      (0x78)
