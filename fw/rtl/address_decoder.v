@@ -5,9 +5,11 @@ module address_decoder (
     output o_flash,
     output o_flash_cfg,
     output o_sdram,
+    output o_eeprom,
 
     input i_flash_enable,
     input i_sdram_enable,
+    input i_eeprom_pi_enable,
 
     output o_address_valid
 );
@@ -32,6 +34,11 @@ module address_decoder (
 
     assign o_sdram = i_sdram_enable && (i_address[31:SDRAM_WIDTH] == SDRAM_ADDR[31:SDRAM_WIDTH]);
 
-    assign o_address_valid = (|{o_cart_config, o_flash, o_flash_cfg, o_sdram});
+    localparam EEPROM_ADDR = 32'h1D00_0000;
+    localparam EEPROM_WIDTH = 11;
+
+    assign o_eeprom = i_eeprom_pi_enable && (i_address[31:EEPROM_WIDTH] == EEPROM_ADDR[31:EEPROM_WIDTH]);
+
+    assign o_address_valid = (|{o_cart_config, o_flash, o_flash_cfg, o_sdram, o_eeprom});
 
 endmodule

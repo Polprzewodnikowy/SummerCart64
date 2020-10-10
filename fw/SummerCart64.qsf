@@ -165,7 +165,7 @@ set_location_assignment PIN_11 -to io_pmod[7]
 set_location_assignment PIN_22 -to io_rtc_sda
 set_location_assignment PIN_21 -to o_rtc_scl
 set_location_assignment PIN_17 -to o_led
-set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
+set_global_assignment -name OPTIMIZATION_MODE BALANCED
 set_global_assignment -name ENABLE_SIGNALTAP ON
 set_global_assignment -name USE_SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED WITH WEAK PULL-UP"
@@ -189,6 +189,7 @@ set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
 set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
 set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name VERILOG_FILE rtl/n64_si.v
 set_global_assignment -name VERILOG_FILE rtl/cart_config.v
 set_global_assignment -name VERILOG_FILE rtl/sdram.v
 set_global_assignment -name VERILOG_FILE rtl/external/wbsdram.v
@@ -204,5 +205,6 @@ set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_bus_to_pc.qip
 set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_pc_to_bus.qip
 set_global_assignment -name SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
+set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 set_global_assignment -name SLD_FILE db/SignalTapLogicAnalyzer_auto_stripped.stp
