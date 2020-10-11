@@ -11,7 +11,9 @@ A FPGA firmware written in Verilog for SummerCart64.
 - **`0x1800 0000 - 0x18FF FFFF`** - [R] *Flash Memory* (remapped)
 - **`0x1C00 0000 - 0x1C00 0000`** - [R/W] *Flash Registers*
 - **`0x1D00 0000 - 0x1D00 07FF`** - [R/W] *EEPROM Memory*
-- **`0x1E00 0000 - 0x1E00 0004`** - [R/W] *Cart Registers*
+- **`0x1D10 0000 - 0x1D10 03FF`** - [R] *Debug RX FIFO* (unimplemented)
+- **`0x1D10 0800 - 0x1D10 0FFF`** - [W] *Debug TX FIFO* (unimplemented)
+- **`0x1E00 0000 - 0x1E00 0010`** - [R/W] *Cart Registers*
 
 ## Memory spaces
 
@@ -33,11 +35,29 @@ Access: Read only, 2 byte (16 bit) aligned
 
 ### EEPROM Memory
 
-Base address **`0x1D00 0000`**\
+Base address: **`0x1D00 0000`**\
 Length: **`2 kB`**\
 Access: Read or Write, 4 byte (32 bit) aligned
 
 2 kB of EEPROM Memory. Available on the bus when **EEPROM_PI** bit in **CART->CR** register is set. Used to upload/download EEPROM contents to/from PC.
+
+### Debug FIFO DMA (unimplemented)
+
+#### RX FIFO DMA Memory (unimplemented)
+
+Base address: **`0x1D100 0000`**\
+Length: **`1kB`**\
+Access: Read only, 4 byte (32 bit) aligned
+
+1 kB of RX FIFO. Available on the bus when **DEBUG** bit in **CART->CR** register is set. Used to receive arbitrary data from PC. Only 4 byte reads are supported, for single byte reads use **CART->DEBUG_RX** register.
+
+#### TX FIFO DMA Memory (unimplemented)
+
+Base address: **`0x1D100 0800`**\
+Length: **`1kB`**\
+Access: Write only, 4 byte (32 bit) aligned
+
+1 kB of TX FIFO. Available on the bus when **DEBUG** bit in **CART->CR** register is set. Used to send arbitrary data to PC. Only 4 byte writes are supported, for single byte writes use **CART->DEBUG_TX** register.
 
 ## Registers
 
@@ -49,17 +69,20 @@ Base address: **`0x1E00 0000`**
 
 Address offset: **`0x00`**\
 Powerup value: **`0b0000 0001`**\
-Soft reset value: **`0b000x x001`**\
+Soft reset value: **`0b00xx x001`**\
 Access: Read or write, 4 byte (32 bit) aligned
 
 This register is used to enable or disable various modules available on the cart.
 
- 31:5   | 4          | 3         | 2         | 1     | 0
---------|------------|-----------|-----------|-------|-------
- 0      | EEPROM_16K | EEPROM_SI | EEPROM_PI | SDRAM | FLASH
- x      | R/W        | R/W       | R/W       | R/W   | R/W
+ 31:6   | 5     | 4          | 3         | 2         | 1     | 0
+--------|-------|------------|-----------|-----------|-------|-------
+ 0      | DEBUG | EEPROM_16K | EEPROM_SI | EEPROM_PI | SDRAM | FLASH
+ x      | R/W   | R/W        | R/W       | R/W       | R/W   | R/W
 
-- Bits 31:5: Reserved. Reads as 0, writes are ignored but it's recommended to be set as 0 for future compatibility
+- Bits 31:6: Reserved. Reads as 0, writes are ignored but it's recommended to be set as 0 for future compatibility.
+- Bit 5 **DEBUG** (unimplemented): Enable debug FIFO access at address base **`0x1D100 0000`** and **`0x1D100 0800`**.
+  - 0: Debug FIFO disabled
+  - 1: Debug FIFO enabled
 - Bit 4 **EEPROM_16K**: Sets ID returned by EEPROM to identify itself as 4k or 16k variant.
   - 0: EEPROM 4k variant
   - 1: EEPROM 16k variant
@@ -89,15 +112,15 @@ This register is used for PC -> bootloader communication.
  0      | SWITCH | TV_TYPE | CIC_TYPE
  x      | R/W    | R/W     | R/W
 
-- Bits 31:8: Reserved. Reads as 0, writes are ignored but it's recommended to be set as 0 for future compatibility
+- Bits 31:8: Reserved. Reads as 0, writes are ignored but it's recommended to be set as 0 for future compatibility.
 - Bits 7:6 **SWITCH**: Additional bits that can be passed to bootloader, currently unused.
 - Bits 5:4 **TV_TYPE**: Overrides TV type in bootloader. Used only when **CIC_TYPE** value is valid (values 1 - 7).
   - 0: PAL TV type
   - 1: NTSC TV type
   - 2: MPAL TV type
-  - 3: No TV type override - use TV type provided by ROM header.
+  - 3: No TV type override - use TV type provided by ROM header
 - Bits 3:0 **CIC_TYPE**: Overrides CIC type in bootloader.
-  - 0: No CIC type override - use CIC type determined from ROM bootcode.
+  - 0: No CIC type override - use CIC type determined from ROM bootcode
   - 1: CIC 5101
   - 2: CIC 6101/7102
   - 3: CIC 6102/7101
@@ -106,6 +129,58 @@ This register is used for PC -> bootloader communication.
   - 6: CIC X106
   - 7: CIC 8303
   - 8 - 15: Same effect as value 0
+
+#### Debug single byte RX FIFO access (**DEBUG_RX**) (unimplemented)
+
+Address offset: **`0x08`**\
+Access: Read only, 4 byte (32 bit) aligned
+
+This register grabs single byte from debug RX FIFO.
+
+ 31:8  | 7:0
+-------|------------
+ 0     | RX_DATA
+ x     | R
+
+- Bits 31:8: Reserved. Reads as 0.
+- Bits 7:0 **RX_DATA**: Data read from debug RX FIFO.
+
+#### Debug single byte TX FIFO access (**DEBUG_TX**) (unimplemented)
+
+Address offset: **`0x0C`**\
+Access: Write only, 4 byte (32 bit) aligned
+
+This register puts single byte on debug TX FIFO.
+
+ 31:8  | 7:0
+-------|------------
+ 0     | TX_DATA
+ x     | W
+
+- Bits 31:8: Reserved. Writes are ignored but it's recommended to be set as 0 for future compatibility.
+- Bits 7:0 **TX_DATA**: Data to be written to debug TX FIFO.
+
+#### Debug status register (**DEBUG_SR**) (unimplemented)
+
+Address offset: **`0x10`**\
+Access: Read or write, 4 byte (32 bit) aligned
+
+This register is used for reading status and flushing debug RX/TX FIFOs.
+
+ 31:24  | 23       | 22       | 21:11      | 10:0
+--------|----------|----------|------------|------------
+ 0      | TX_FLUSH | RX_FLUSH | TX_FIFO_UB | RX_FIFO_UB
+ x      | W        | W        | R          | R
+
+- Bits 31:24: Reserved. Reads as 0, writes are ignored but it's recommended to be set as 0 for future compatibility.
+- Bit 23 **TX_FLUSH**: Flushes TX FIFO.
+  - 0: No action
+  - 1: Flush TX FIFO
+- Bit 22 **RX_FLUSH**: Flushes RX FIFO.
+  - 0: No action
+  - 1: Flush RX FIFO
+- Bits 21:11 **TX_FIFO_UB**: Number of bytes waiting to be read by PC.
+- Bits 10:0 **RX_FIFO_UB**: Number of bytes waiting to be processed by N64.
 
 ### Flash (**FLASH**) registers
 
@@ -145,7 +220,7 @@ This register is used to send arbitrary commands to Flash chip, useful for erasi
 
 PC <-> Cart communication uses SPI as hardware layer. Communication is command based and PC is always responsible for transfer initiation.
 
-Module contains two 1024 word FIFOs used as a gate between SPI clock domain and Cart clock domain.
+Module contains two 1024 word (4 kB) FIFOs used as a gate between SPI clock domain and Cart clock domain. Debug communication uses its own set of FIFOs, 1 kB in size each.
 
 ### Commands
 
@@ -175,8 +250,8 @@ Status word bits:
 - Bit 22  **N64_DISABLE**: Returns current status of **N64_DISABLE** bit in configuration.
   - 0: N64 PI interface enabled, PC bus access disabled
   - 1: N64 PI interface disabled, PC bus access enabled
-- Bits 21:11 **TX_FIFO_UW**: Count of 4 byte (32 bit) words waiting to be processed by bus controller.
-- Bits 10:0 **RX_FIFO_UW**: Count of 4 byte (32 bit) words waiting to be read by PC.
+- Bits 21:11 **TX_FIFO_UW**: Number of 4 byte (32 bit) words waiting to be processed by bus controller.
+- Bits 10:0 **RX_FIFO_UW**: Number of 4 byte (32 bit) words waiting to be read by PC.
 
 Example - read status word:
 
@@ -342,6 +417,93 @@ Example - read 2 words (8 bytes) **`0xDEAD BEEF`**, **`0x0102 0304`** from RX FI
 
 *x = don't care*
 
+#### Read debug FIFO status (**0x60**) (unimplemented)
+
+Reads debug FIFO status.
+
+Command bytes:
+
+ Byte(s)   | 0    | 1:4
+-----------|------|------------------------
+ Value     | 0x00 | Debug FIFO status word
+ Direction | W    | R
+
+Debug FIFO status word bits:
+
+ 31:22 | 21:11      | 10:0
+-------|------------|------------
+ x     | TX_FIFO_UB | RX_FIFO_UB
+
+- Bits 31:22: Reserved. Reads as 0.
+- Bits 21:11 **TX_FIFO_UB**: Number of bytes waiting to be processed by N64.
+- Bits 10:0 **RX_FIFO_UB**: Number of bytes waiting to be read by PC.
+
+Example - read debug FIFO status word:
+
+ Byte | 0    | 1    | 2    | 3    | 4
+------|------|------|------|------|------
+ TX   | 0x60 | x    | x    | x    | x
+ RX   | x    | 0x00 | 0x00 | 0x00 | 0x00
+
+*x = don't care*
+
+#### Write to debug TX FIFO (**0x70**) (unimplemented)
+
+Writes bytes to debug TX FIFO.
+
+This command consumes space in debug TX FIFO. Check debug TX FIFO availability before issuing this command.
+
+Command bytes:
+
+ Byte(s)   | 0    | 1         | 2         | 3         | ...
+-----------|------|-----------|-----------|-----------|-----
+ Value     | 0x70 | Data byte | Data byte | Data byte | ...
+ Direction | W    | W         | W         | W         | ...
+
+Data byte bits:
+
+ 7:0  |
+------|
+ DATA |
+
+- Bits 7:0 **DATA**: Byte to be written to debug TX FIFO.
+
+Example - fill debug TX FIFO with 4 bytes **`0xDE`**, **`0xAD`**, **`0xBE`**, **`0xEF`**:
+
+ Byte | 0    | 1    | 2    | 3    | 4
+------|------|------|------|------|------
+ TX   | 0x70 | 0xDE | 0xAD | 0xBE | 0xEF
+ RX   | x    | x    | x    | x    | x
+
+*x = don't care*
+
+#### Read from RX FIFO (**0x80**) (unimplemented)
+
+Reads bytes from debug RX FIFO. Before reading it's necessary to check debug RX FIFO availability. Reading empty FIFO won't break anything but it's pointless.
+Command bytes:
+
+ Byte(s)   | 0    | 1         | 2         | 3         | ...
+-----------|------|-----------|-----------|-----------|-----
+ Value     | 0x70 | Data byte | Data byte | Data byte | ...
+ Direction | W    | R         | R         | R         | ...
+
+Data byte bits:
+
+ 7:0  |
+------|
+ DATA |
+
+- Bits 7:0 **DATA**: Byte read from debug RX FIFO.
+
+Example - read 4 bytes from debug RX FIFO:
+
+ Byte | 0    | 1    | 2    | 3    | 4
+------|------|------|------|------|------
+ TX   | 0x80 | x    | x    | x    | x
+ RX   | x    | 0xDE | 0xAD | 0xBE | 0xEF
+
+*x = don't care*
+
 #### PC communication module bus controller reset (**0xFC**)
 
 Resets PC communication module bus controller. It's recommended to issue "Reset (**0xFF**)" command before sending this one.
@@ -414,7 +576,7 @@ Example - flush RX FIFO:
 
 #### Reset (**0xFF**)
 
-Resets PC communication module SPI controller and flushes both TX and RX FIFOs.
+Resets PC communication module SPI controller and flushes both TX and RX data/debug FIFOs.
 
 Command bytes:
 
