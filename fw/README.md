@@ -12,8 +12,8 @@ A FPGA firmware written in Verilog for SummerCart64.
 - **`0x1C00 0000 - 0x1C00 0000`** - [R/W] *Flash Registers*
 - **`0x1D00 0000 - 0x1D00 07FF`** - [R/W] *EEPROM Memory*
 - **`0x1D10 0000 - 0x1D10 03FF`** - [R] *Debug RX FIFO* (unimplemented)
-- **`0x1D10 0800 - 0x1D10 0FFF`** - [W] *Debug TX FIFO* (unimplemented)
-- **`0x1E00 0000 - 0x1E00 0010`** - [R/W] *Cart Registers*
+- **`0x1D10 0800 - 0x1D10 0BFF`** - [W] *Debug TX FIFO* (unimplemented)
+- **`0x1E00 0000 - 0x1E00 0014`** - [R/W] *Cart Registers*
 
 ## Memory spaces
 
@@ -132,10 +132,12 @@ This register is used for PC -> bootloader communication.
 
 #### Debug single byte RX FIFO access (**DEBUG_RX**) (unimplemented)
 
-Address offset: **`0x08`**\
+Address offset: **`0x08`** and **`0x0C`**\
 Access: Read only, 4 byte (32 bit) aligned
 
 This register grabs single byte from debug RX FIFO.
+
+Due to how PI interface read prefetch is implemented this register exists on 2 addresses but it's necessary to do only single read on address offset **`0x08`**. Never read from address **`0x0C`** directly as it will not perform read action properly (read pointer is not incremented).
 
  31:8  | 7:0
 -------|------------
@@ -147,7 +149,7 @@ This register grabs single byte from debug RX FIFO.
 
 #### Debug single byte TX FIFO access (**DEBUG_TX**) (unimplemented)
 
-Address offset: **`0x0C`**\
+Address offset: **`0x10`**\
 Access: Write only, 4 byte (32 bit) aligned
 
 This register puts single byte on debug TX FIFO.
@@ -162,7 +164,7 @@ This register puts single byte on debug TX FIFO.
 
 #### Debug status register (**DEBUG_SR**) (unimplemented)
 
-Address offset: **`0x10`**\
+Address offset: **`0x14`**\
 Access: Read or write, 4 byte (32 bit) aligned
 
 This register is used for reading status and flushing debug RX/TX FIFOs.
@@ -298,7 +300,7 @@ Example - set address increment and disable N64:
 
 *x = don't care*
 
-#### Address (**0x20**)
+#### Set address (**0x20**)
 
 Sets starting bus address.
 
@@ -477,7 +479,7 @@ Example - fill debug TX FIFO with 4 bytes **`0xDE`**, **`0xAD`**, **`0xBE`**, **
 
 *x = don't care*
 
-#### Read from RX FIFO (**0x80**) (unimplemented)
+#### Read from debug RX FIFO (**0x80**) (unimplemented)
 
 Reads bytes from debug RX FIFO. Before reading it's necessary to check debug RX FIFO availability. Reading empty FIFO won't break anything but it's pointless.
 Command bytes:
