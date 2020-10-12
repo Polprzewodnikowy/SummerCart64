@@ -1,24 +1,25 @@
 #ifndef BOOT_H__
 #define BOOT_H__
 
-#define BOOT_CRC32_5101     (0x587BD543)
-#define BOOT_CRC32_6101     (0x6170A4A1)
-#define BOOT_CRC32_7102     (0x009E9EA3)
-#define BOOT_CRC32_X102     (0x90BB6CB5)
-#define BOOT_CRC32_X103     (0x0B050EE0)
-#define BOOT_CRC32_X105     (0x98BC2C86)
-#define BOOT_CRC32_X106     (0xACC8580A)
-#define BOOT_CRC32_8303     (0x0E018159)
+#define BOOT_CRC32_5101             (0x587BD543)
+#define BOOT_CRC32_6101             (0x6170A4A1)
+#define BOOT_CRC32_7102             (0x009E9EA3)
+#define BOOT_CRC32_X102             (0x90BB6CB5)
+#define BOOT_CRC32_X103             (0x0B050EE0)
+#define BOOT_CRC32_X105             (0x98BC2C86)
+#define BOOT_CRC32_X106             (0xACC8580A)
+#define BOOT_CRC32_8303             (0x0E018159)
 
-#define BOOT_SEED_5101      (0x0000AC00)
-#define BOOT_SEED_X101      (0x00043F3F)
-#define BOOT_SEED_X102      (0x00003F3F)
-#define BOOT_SEED_X103      (0x0000783F)
-#define BOOT_SEED_X105      (0x0000913F)
-#define BOOT_SEED_X106      (0x0000853F)
-#define BOOT_SEED_8303      (0x0000DD00)
+#define BOOT_SEED_5101              (0x0000AC00)
+#define BOOT_SEED_X101              (0x00043F3F)
+#define BOOT_SEED_X102              (0x00003F3F)
+#define BOOT_SEED_X103              (0x0000783F)
+#define BOOT_SEED_X105              (0x0000913F)
+#define BOOT_SEED_X106              (0x0000853F)
+#define BOOT_SEED_8303              (0x0000DD00)
 
-#define BOOT_SEED_IPL3(x)   (((x) & 0x0000FF00) >> 8)
+#define BOOT_SEED_IPL3(x)           (((x) & 0x0000FF00) >> 8)
+#define BOOT_SEED_OS_VERSION(x)     (((x) & 0x00040000) >> 18)
 
 typedef enum cic_type_e {
     E_CIC_TYPE_UNKNOWN,
@@ -79,12 +80,9 @@ typedef struct os_boot_config_s os_boot_config_t;
 #define OS_BOOT_ROM_TYPE_GAME_PAK   (0)
 #define OS_BOOT_ROM_TYPE_DD         (1)
 
-#define OS_BOOT_VERSION_NTSC        (0)
-#define OS_BOOT_VERSION_PAL         (6)
-
 cart_header_t *boot_load_cart_header(void);
 cic_type_t boot_get_cic_type(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);
-void boot(cic_type_t cic_type, tv_type_t tv_type);
+void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type);
 
 #endif

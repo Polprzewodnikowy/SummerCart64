@@ -66,7 +66,7 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
     }
 }
 
-void boot(cic_type_t cic_type, tv_type_t tv_type) {
+void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type) {
     tv_type_t os_tv_type = tv_type == E_TV_TYPE_UNKNOWN ? OS_BOOT_CONFIG->tv_type : tv_type;
 
     volatile uint64_t gpr_regs[32];
@@ -95,36 +95,29 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
     AI->dram_addr = 0;
     AI->len = 0;
 
-    while (SP->status & SP_STATUS_DMA_BUSY);
+    PI->dom1_lat = cart_header->pi_conf & 0xFF;
+    PI->dom1_pwd = cart_header->pi_conf >> 8;
+    PI->dom1_pgs = cart_header->pi_conf >> 16;
+    PI->dom1_rls = cart_header->pi_conf >> 20;
 
     if (DP_CMD->status & DP_CMD_STATUS_XBUS_DMEM_DMA) {
         while (DP_CMD->status & DP_CMD_STATUS_PIPE_BUSY);
     }
 
-    DP_CMD->status = DP_CMD_STATUS_CLEAR_FLUSH | DP_CMD_STATUS_CLEAR_FREEZE | DP_CMD_STATUS_CLEAR_XBUS_DMEM_DMA;
-
-    for (size_t i = 0; i < ARRAY_ITEMS(SP_MEM->dmem); i++) {
-        SP_MEM->dmem[i] = CART[i];
+    for (size_t i = 0; i < ARRAY_ITEMS(cart_header->boot_code); i++) {
+        SP_MEM->dmem[16 + i] = cart_header->boot_code[i];
     }
 
-    while (PI->status & (PI_STATUS_IO_BUSY | PI_STATUS_DMA_BUSY));
+    // CIC X105 based games checks if start of IPL2 code exists in SP IMEM
 
-    PI->status = PI_STATUS_CLEAR_INTERRUPT | PI_STATUS_RESET_CONTROLLER;
-
-    for (size_t i = 0; i < ARRAY_ITEMS(SP_MEM->imem); i++) {
-        SP_MEM->imem[i] = 0;
-    }
-
-    if (cic_type == E_CIC_TYPE_X105) {
-        SP_MEM->imem[0] = 0x3C0DBFC0;
-        SP_MEM->imem[1] = os_tv_type == E_TV_TYPE_PAL ? 0xBDA807FC : 0x8DA807FC;
-        SP_MEM->imem[2] = 0x25AD07C0;
-        SP_MEM->imem[3] = 0x31080080;
-        SP_MEM->imem[4] = 0x5500FFFC;
-        SP_MEM->imem[5] = 0x3C0DBFC0;
-        SP_MEM->imem[6] = 0x8DA80024;
-        SP_MEM->imem[7] = 0x3C0BB000;
-    }
+    SP_MEM->imem[0] = 0x3C0DBFC0;   // lui   t5, 0xBFC0
+    SP_MEM->imem[1] = 0x8DA807FC;   // lw    t0, 0x07FC(t5)
+    SP_MEM->imem[2] = 0x25AD07C0;   // addiu t5, t5, 0x07C0
+    SP_MEM->imem[3] = 0x31080080;   // andi  t0, t0, 0x0080
+    SP_MEM->imem[4] = 0x5500FFFC;   // bnel  t0, zero, &SP_MEM->imem[0]
+    SP_MEM->imem[5] = 0x3C0DBFC0;   // lui   t5, 0xBFC0
+    SP_MEM->imem[6] = 0x8DA80024;   // lw    t0, 0x0024(t5)
+    SP_MEM->imem[7] = 0x3C0BB000;   // lui   t3, 0xB000
 
     if (cic_type == E_CIC_TYPE_X105) {
         OS_BOOT_CONFIG->mem_size_6105 = OS_BOOT_CONFIG->mem_size;
@@ -139,7 +132,7 @@ void boot(cic_type_t cic_type, tv_type_t tv_type) {
     gpr_regs[CPU_REG_S4] = os_tv_type;
     gpr_regs[CPU_REG_S5] = OS_BOOT_CONFIG->reset_type;
     gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seeds[cic_type]);
-    gpr_regs[CPU_REG_S7] = (os_tv_type == E_TV_TYPE_PAL) ? OS_BOOT_VERSION_PAL : OS_BOOT_VERSION_NTSC;
+    gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seeds[cic_type]);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
     gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == E_TV_TYPE_PAL) ? 341 : 340]);
 
