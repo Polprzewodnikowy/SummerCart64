@@ -3,7 +3,7 @@
 PACKAGE_FILE_NAME="SummerCart64"
 
 if [ $1 ]; then
-    PACKAGE_FILE_NAME="${PACKAGE_FILE_NAME}_${1}"
+    PACKAGE_FILE_NAME="${1}"
 fi
 
 # Build bootloader
