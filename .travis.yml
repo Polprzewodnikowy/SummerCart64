@@ -2,11 +2,13 @@ os: linux
 dist: focal
 arch: amd64
 
+language: c
+
 services:
   - docker
 
 script:
-  ./build.sh ${TRAVIS_COMMIT}-test
+  ./build.sh
 
 deploy:
   provider: releases
