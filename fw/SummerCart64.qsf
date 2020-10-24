@@ -140,10 +140,6 @@ set_location_assignment PIN_52 -to io_n64_pi_ad[12]
 set_location_assignment PIN_55 -to io_n64_pi_ad[13]
 set_location_assignment PIN_57 -to io_n64_pi_ad[14]
 set_location_assignment PIN_59 -to io_n64_pi_ad[15]
-set_location_assignment PIN_13 -to i_ftdi_do
-set_location_assignment PIN_14 -to o_ftdi_di
-set_location_assignment PIN_12 -to i_ftdi_clk
-set_location_assignment PIN_15 -to i_ftdi_cs
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
@@ -189,22 +185,32 @@ set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
 set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
 set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
-set_global_assignment -name VERILOG_FILE rtl/n64_si.v
-set_global_assignment -name VERILOG_FILE rtl/cart_config.v
-set_global_assignment -name VERILOG_FILE rtl/sdram.v
-set_global_assignment -name VERILOG_FILE rtl/external/wbsdram.v
-set_global_assignment -name VERILOG_FILE rtl/external/qflexpress.v
-set_global_assignment -name VERILOG_FILE rtl/address_decoder.v
-set_global_assignment -name VERILOG_FILE rtl/flash.v
-set_global_assignment -name VERILOG_FILE rtl/n64_pi.v
-set_global_assignment -name VERILOG_FILE rtl/pc.v
-set_global_assignment -name VERILOG_FILE rtl/top.v
-set_global_assignment -name SDC_FILE constraints.sdc
-set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
+set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
+set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+set_location_assignment PIN_15 -to i_ftdi_cts
+set_location_assignment PIN_14 -to i_ftdi_so
+set_location_assignment PIN_13 -to o_ftdi_clk
+set_location_assignment PIN_12 -to o_ftdi_si
+set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
+set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
+set_global_assignment -name VERILOG_FILE rtl/intel/gpio/gpio_ddro.v -library gpio_ddro
 set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_bus_to_pc.qip
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_pc_to_bus.qip
-set_global_assignment -name SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
+set_global_assignment -name VERILOG_FILE rtl/intel/pll/pll.v
+set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
+set_global_assignment -name VERILOG_FILE rtl/intel/ram/ram_n64_eeprom.v
 set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name VERILOG_FILE rtl/memory/sdram.v
+set_global_assignment -name VERILOG_FILE rtl/memory/external_flash.v
+set_global_assignment -name VERILOG_FILE rtl/memory/embedded_flash.v
+set_global_assignment -name VERILOG_FILE rtl/n64/si.v
+set_global_assignment -name VERILOG_FILE rtl/n64/pi.v
+set_global_assignment -name VERILOG_FILE rtl/n64/bank_decoder.v
+set_global_assignment -name VERILOG_FILE rtl/usb/fsi.v
+set_global_assignment -name VERILOG_FILE rtl/usb/controller.v
+set_global_assignment -name VERILOG_FILE rtl/top.v
+set_global_assignment -name SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
+set_global_assignment -name SDC_FILE constraints.sdc
+set_global_assignment -name GENERATE_SVF_FILE ON
 set_global_assignment -name SLD_FILE db/SignalTapLogicAnalyzer_auto_stripped.stp
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

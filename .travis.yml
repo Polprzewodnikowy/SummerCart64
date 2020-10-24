@@ -1,0 +1,18 @@
+language: c
+
+services:
+  - docker
+
+script:
+  - docker pull anacierdem/libdragon:latest
+  - docker run --mount src="$(pwd)/sw/bootloader",target="/libdragon",type=bind anacierdem/libdragon:latest make N64_BYTE_SWAP=false
+  - docker pull chriz2600/quartus-lite:20.1.0
+  - docker run --mount src="$(pwd)",target="/build",type=bind chriz2600/quartus-lite quartus_wrapper quartus_sh --flow compile /build/fw/SummerCart64.qpf
+  - zip SummerCart64-firmware-${TRAVIS_COMMIT}.zip ./fw/output_files/SummerCart64.pof ./fw/output_files/SummerCart64.sof ./fw/output_files/SummerCart64.svf
+
+deploy:
+  provider: releases
+  api_key: key
+  file: SummerCart64-firmware-${TRAVIS_COMMIT}.zip
+  skip_cleanup: true
+  draft: true
