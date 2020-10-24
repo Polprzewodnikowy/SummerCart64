@@ -16,4 +16,4 @@ deploy:
   on:
     repo: Polprzewodnikowy/SummerCollection
     branch: ftdi_fast_serial
-  skip_cleanup: 'true'
+  cleanup: false
