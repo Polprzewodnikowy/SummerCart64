@@ -17,7 +17,7 @@ PCB_FILES=(
     "./hw/SummerCart64_brd_place_top.pdf"
 )
 
-if [ $1 ]; then
+if [[ $1 ]]; then
     PACKAGE_FILE_NAME="${1}"
 fi
 
@@ -45,10 +45,10 @@ mkdir -p packages
 # ZIP files for release
 zip -r "packages/${PACKAGE_FILE_NAME}.zip" ${FILES[@]}
 
-# Generate Gerber files (no CI available, only on WSL)
-if [ !$CI -a $WSL_DISTRO_NAME ]; then
+# Generate Gerbers and copy pdf files (no CI available, only on WSL)
+if [[ !$CI && $WSL_DISTRO_NAME ]]; then
     pushd hw
-    if [ -e CAMOutputs ]; then
+    if [[ -e CAMOutputs ]]; then
         rm -r CAMOutputs
     fi
     eaglecon.exe -X -dCAMJOB -jSummerCart64.cam SummerCart64.brd
