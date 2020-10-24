@@ -1,18 +1,19 @@
-language: c
+os: linux
+dist: focal
+arch: amd64
 
 services:
   - docker
 
 script:
-  - docker pull anacierdem/libdragon:latest
-  - docker run --mount src="$(pwd)/sw/bootloader",target="/libdragon",type=bind anacierdem/libdragon:latest make N64_BYTE_SWAP=false
-  - docker pull chriz2600/quartus-lite:20.1.0
-  - docker run --mount src="$(pwd)",target="/build",type=bind chriz2600/quartus-lite quartus_wrapper quartus_sh --flow compile /build/fw/SummerCart64.qpf
-  - zip SummerCart64-firmware-${TRAVIS_COMMIT}.zip ./fw/output_files/SummerCart64.pof ./fw/output_files/SummerCart64.sof ./fw/output_files/SummerCart64.svf
+  ./build.sh ${TRAVIS_COMMIT}-test
 
 deploy:
   provider: releases
-  api_key: key
-  file: SummerCart64-firmware-${TRAVIS_COMMIT}.zip
-  skip_cleanup: true
-  draft: true
+  token:
+    secure: LNBOWTFd5wz3sR7ec4OA/wbVjIWFCv2WJnx6QBIOhgh2VIicNd91ZgMxq77T7/DBxPJ7GhAuG76s4K68ve8m5+klhpjtxVwstDzHBaNbRIUbhxjKh8oJGX8T+qeB60cnjz1YwmGASWSXNpXPhW/SZRw1lAjpv3W2cxTmDyAzayV+xO7HeVfOAgaKOAL600LwjEdWGLFVRx2MQqMe2NAJ4XWu8oJBXjrlQc/5jHW/3o4oFILs+Jr7VwRt3qYrU0xJ8XPJFDo7AWvAHYH4vrACIOXMPIuI29tsi9eWcT/+q96IKmpDPRvn3nrMnb7bMN995WyW2tFvGqABsFRwUXJ6Ydc7aFdTAC2+u/cWpR4AEpLGNWFqpDlLwjNfqiZ1rhDDAlEI/bA+zU/qyziT5lDaARFJtRxuQIWeZRa7EgmaTc0izghrzIBC807+G1cUTGntSjgVb8B6rtJa6tBt3/9Iu4RmRxJnKkgWQBNo8CEVVDAe/Ms7igashEoaidr545eR/9ervxGLftFUctKWjnsEL4r7ifjUOj9h/E7BZx61WkJ8hORoMValcc+Kv0aCmkzWKe0UsSsuMzsXHc3x782AO2Xq5fZLk0urdqQ/uzu5crSnReJh/lCZxjg11BG31r5kAixBaSkiJFFrAs+GOSR/IskRn8gKThjZtna8DUnHApE=
+  file: SummerCart64.zip
+  on:
+    repo: Polprzewodnikowy/SummerCollection
+    branch: ftdi_fast_serial
+  skip_cleanup: 'true'
