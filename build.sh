@@ -26,8 +26,9 @@ popd
 
 # ZIP files for release
 zip -j ${PACKAGE_FILE_NAME}.zip \
-    ./fw/output_files/SummerCart64.sof \
-    ./fw/output_files/SummerCart64.svf \
     ./fw/output_files/SummerCart64.pof \
+    ./fw/output_files/SummerCart64.sof \
     ./fw/output_files/SummerCart64_pof.svf \
+    ./fw/output_files/SummerCart64.svf \
+    ./hw/ftdi-template-release.xml \
     ./UltraCIC-III/UltraCIC-III.hex
