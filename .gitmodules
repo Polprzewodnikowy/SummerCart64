@@ -1,0 +1,3 @@
+[submodule "UltraCIC-III"]
+	path = UltraCIC-III
+	url = https://github.com/ManCloud/UltraCIC-III.git
