@@ -1,0 +1,4 @@
+[submodule "sw/cic"]
+	path = sw/cic
+	url = https://github.com/ManCloud/UltraCIC-III.git
+	ignore = dirty
