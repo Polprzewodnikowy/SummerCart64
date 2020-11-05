@@ -229,7 +229,7 @@
 <text x="-10" y="-12" size="1.27" layer="27" align="top-left">&gt;VALUE</text>
 <circle x="-9" y="9" radius="0.2" width="0.4" layer="21"/>
 <circle x="-12.1" y="8.75" radius="0.1" width="0.2" layer="21"/>
-<smd name="CASE_B" x="0" y="0" dx="5" dy="5" layer="16"/>
+<smd name="CASE_B" x="0" y="0" dx="5" dy="5" layer="16" cream="no"/>
 <pad name="P$1" x="-1.5" y="1.5" drill="0.35"/>
 <pad name="P$2" x="0" y="1.5" drill="0.35"/>
 <pad name="P$3" x="1.5" y="1.5" drill="0.35"/>

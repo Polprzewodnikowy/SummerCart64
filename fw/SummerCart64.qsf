@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.0 Build 711 06/05/2020 SJ Lite Edition
-# Date created = 23:45:19  July 29, 2020
+# Date created = 00:00:00  November 06, 2020
 #
 # -------------------------------------------------------------------------- #
 #
@@ -37,30 +37,35 @@
 # -------------------------------------------------------------------------- #
 
 
-set_global_assignment -name FAMILY "MAX 10"
-set_global_assignment -name DEVICE 10M08SCE144C8G
-set_global_assignment -name TOP_LEVEL_ENTITY top
+
+# Project-Wide Assignments
+# ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:45:19  JULY 29, 2020"
 set_global_assignment -name LAST_QUARTUS_VERSION "20.1.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
-set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
-set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
-set_global_assignment -name DEVICE_FILTER_PACKAGE EQFP
-set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
-set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
-set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
-set_global_assignment -name ENABLE_OCT_DONE OFF
-set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
-set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
-set_global_assignment -name EXTERNAL_FLASH_FALLBACK_ADDRESS 00000000
-set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
-set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
-set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
-set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
-set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
-set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
-set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
+set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
+set_global_assignment -name SMART_RECOMPILE OFF
+set_global_assignment -name VERILOG_FILE rtl/cart/control.v
+set_global_assignment -name VERILOG_FILE rtl/usb/pc.v
+set_global_assignment -name VERILOG_FILE rtl/usb/ftdi_fsi.v
+set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
+set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
+set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
+set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
+set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
+set_global_assignment -name VERILOG_FILE rtl/memory/sdram.v
+set_global_assignment -name VERILOG_FILE rtl/memory/embedded_flash.v
+set_global_assignment -name VERILOG_FILE rtl/n64/si.v
+set_global_assignment -name VERILOG_FILE rtl/n64/pi.v
+set_global_assignment -name VERILOG_FILE rtl/n64/bank_decoder.v
+set_global_assignment -name VERILOG_FILE rtl/top.v
+set_global_assignment -name SDC_FILE constraints.sdc
+set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_ack.qip
+
+# Pin & Location Assignments
+# ==========================
 set_location_assignment PIN_26 -to i_clk
 set_location_assignment PIN_98 -to io_sdram_dq[0]
 set_location_assignment PIN_97 -to io_sdram_dq[1]
@@ -140,18 +145,6 @@ set_location_assignment PIN_52 -to io_n64_pi_ad[12]
 set_location_assignment PIN_55 -to io_n64_pi_ad[13]
 set_location_assignment PIN_57 -to io_n64_pi_ad[14]
 set_location_assignment PIN_59 -to io_n64_pi_ad[15]
-set_location_assignment PIN_13 -to i_ftdi_do
-set_location_assignment PIN_14 -to o_ftdi_di
-set_location_assignment PIN_12 -to i_ftdi_clk
-set_location_assignment PIN_15 -to i_ftdi_cs
-set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
-set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
-set_global_assignment -name POWER_DEFAULT_INPUT_IO_TOGGLE_RATE "12.5 %"
-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to o_sdram_clk
 set_location_assignment PIN_29 -to i_n64_cic_clk
 set_location_assignment PIN_30 -to io_n64_cic_dq
 set_location_assignment PIN_138 -to io_pmod[0]
@@ -165,46 +158,121 @@ set_location_assignment PIN_11 -to io_pmod[7]
 set_location_assignment PIN_22 -to io_rtc_sda
 set_location_assignment PIN_21 -to o_rtc_scl
 set_location_assignment PIN_17 -to o_led
-set_global_assignment -name OPTIMIZATION_MODE BALANCED
-set_global_assignment -name ENABLE_SIGNALTAP ON
-set_global_assignment -name USE_SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
+set_location_assignment PIN_15 -to i_ftdi_cts
+set_location_assignment PIN_14 -to i_ftdi_so
+set_location_assignment PIN_13 -to o_ftdi_clk
+set_location_assignment PIN_12 -to o_ftdi_si
+
+# Classic Timing Assignments
+# ==========================
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
+set_global_assignment -name TIMING_ANALYZER_DO_REPORT_TIMING ON
+
+# Compiler Assignments
+# ====================
+set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
+
+# Analysis & Synthesis Assignments
+# ================================
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE_FILTER_PACKAGE EQFP
+set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
+set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
+set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
+set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+set_global_assignment -name TOP_LEVEL_ENTITY top
+
+# Fitter Assignments
+# ==================
+set_global_assignment -name DEVICE 10M08SCE144C8G
+set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
+set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
+set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED WITH WEAK PULL-UP"
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE COMP IMAGE"
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_ftdi_do
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
-set_global_assignment -name SMART_RECOMPILE OFF
-set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
-set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
-set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_ftdi_clk
-set_global_assignment -name TIMING_ANALYZER_DO_REPORT_TIMING ON
 set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING OFF
 set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
-set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
-set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
 set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
-set_global_assignment -name VERILOG_FILE rtl/n64_si.v
-set_global_assignment -name VERILOG_FILE rtl/cart_config.v
-set_global_assignment -name VERILOG_FILE rtl/sdram.v
-set_global_assignment -name VERILOG_FILE rtl/external/wbsdram.v
-set_global_assignment -name VERILOG_FILE rtl/external/qflexpress.v
-set_global_assignment -name VERILOG_FILE rtl/address_decoder.v
-set_global_assignment -name VERILOG_FILE rtl/flash.v
-set_global_assignment -name VERILOG_FILE rtl/n64_pi.v
-set_global_assignment -name VERILOG_FILE rtl/pc.v
-set_global_assignment -name VERILOG_FILE rtl/top.v
-set_global_assignment -name SDC_FILE constraints.sdc
-set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
-set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_bus_to_pc.qip
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_pc_to_bus.qip
-set_global_assignment -name SIGNALTAP_FILE misc/SignalTapLogicAnalyzer.stp
-set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
-set_global_assignment -name SLD_FILE db/SignalTapLogicAnalyzer_auto_stripped.stp
+
+# Assembler Assignments
+# =====================
+set_global_assignment -name ENABLE_OCT_DONE OFF
+set_global_assignment -name EXTERNAL_FLASH_FALLBACK_ADDRESS 00000000
+set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
+
+# Programmer Assignments
+# ======================
+set_global_assignment -name GENERATE_SVF_FILE ON
+
+# Signal Tap Assignments
+# ======================
+set_global_assignment -name ENABLE_SIGNALTAP OFF
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
+
+# Power Estimation Assignments
+# ============================
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "NO HEAT SINK WITH STILL AIR"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name POWER_DEFAULT_INPUT_IO_TOGGLE_RATE "12.5 %"
+
+# Advanced I/O Timing Assignments
+# ===============================
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
+
+# ------------------------------
+# start ENTITY(altera_gpio_lite)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(altera_gpio_lite)
+# ----------------------------
+
+# -----------------------
+# start ENTITY(gpio_ddro)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(gpio_ddro)
+# ---------------------
+
+# -----------------
+# start ENTITY(top)
+
+	# Fitter Assignments
+	# ==================
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
+	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
+	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
+	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
+
+	# start DESIGN_PARTITION(Top)
+	# ---------------------------
+
+		# Incremental Compilation Assignments
+		# ===================================
+		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+		set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+
+	# end DESIGN_PARTITION(Top)
+	# -------------------------
+
+# end ENTITY(top)
+# ---------------
