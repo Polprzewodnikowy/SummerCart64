@@ -14,8 +14,24 @@ module usb_pc (
     output reg [3:0] o_bank,
     output reg [25:0] o_address,
     input [31:0] i_data,
-    output reg [31:0] o_data
+    output reg [31:0] o_data,
+
+    input i_debug_start,
+    output o_debug_busy,
+    input [3:0] i_debug_bank,
+    input [25:0] i_debug_address,
+    input [19:0] i_debug_length,
+
+    input i_debug_fifo_request,
+    input i_debug_fifo_flush,
+    output [10:0] o_debug_fifo_items,
+    output [31:0] o_debug_fifo_data
 );
+
+    // Module parameters
+
+    parameter byte VERSION = "a";
+
 
     // FTDI transport
 
@@ -47,15 +63,38 @@ module usb_pc (
     );
 
 
+    // Debug FIFO
+
+    wire w_fifo_usb_full;
+    wire [9:0] w_fifo_usb_items;
+    reg r_fifo_usb_write_request;
+    reg [31:0] r_fifo_usb_data;
+
+    assign o_debug_fifo_items = {w_fifo_usb_full, w_fifo_usb_items};
+
+    fifo_usb fifo_usb_inst (
+        .clock(i_clk),
+        .sclr(i_debug_fifo_flush),
+
+        .full(w_fifo_usb_full),
+        .usedw(w_fifo_usb_items),
+
+        .wrreq(r_fifo_usb_write_request),
+        .data(r_fifo_usb_data),
+
+        .rdreq(i_debug_fifo_request),
+        .q(o_debug_fifo_data)
+    );
+
+
     // Command ids
 
     localparam byte CMD_TRIGGER [0:2]   = '{"C", "M", "D"};
 
     localparam byte CMD_IDENTIFY        = "I";
-    localparam byte CMD_READ            = "R";
     localparam byte CMD_WRITE           = "W";
-    localparam byte CMD_DEBUG_MODE      = "D";
-    localparam byte CMD_DEBUG_WRITE     = "F";
+    localparam byte CMD_DEBUG_WRITE     = "D";
+    localparam byte CMD_DEBUG_SEND      = "Q";
 
     localparam [1:0] RX_STAGE_CMD       = 2'd0;
     localparam [1:0] RX_STAGE_PARAM     = 2'd1;
@@ -87,6 +126,13 @@ module usb_pc (
             r_rx_stage <= RX_STAGE_CMD;
             r_rx_byte_counter <= 3'd0;
         end else begin
+            if (i_debug_start) begin
+                r_rx_stage <= RX_STAGE_IGNORE;
+                r_rx_cmd <= CMD_DEBUG_SEND;
+                r_tx_cmd <= CMD_DEBUG_SEND;
+                r_tx_cmd_valid <= 1'b1;
+            end
+
             if (w_ftdi_rx_valid) begin
                 r_rx_byte_counter <= r_rx_byte_counter + 3'd1;
 
@@ -107,13 +153,9 @@ module usb_pc (
                                     r_tx_cmd <= w_ftdi_rx_data;
                                 end
 
-                                CMD_READ: r_rx_stage <= RX_STAGE_PARAM;
-
                                 CMD_WRITE: r_rx_stage <= RX_STAGE_PARAM;
 
-                                CMD_DEBUG_MODE: r_rx_stage <= RX_STAGE_PARAM;
-
-                                CMD_DEBUG_WRITE: r_rx_stage <= RX_STAGE_DATA;
+                                CMD_DEBUG_WRITE: r_rx_stage <= RX_STAGE_PARAM;
 
                                 default: r_rx_stage <= RX_STAGE_CMD;
                             endcase
@@ -124,27 +166,9 @@ module usb_pc (
                         r_rx_buffer <= {r_rx_buffer[55:0], w_ftdi_rx_data};
 
                         case (r_rx_cmd)
-                            CMD_READ: begin
-                                if (r_rx_byte_counter == 3'd7) begin
-                                    r_rx_stage <= RX_STAGE_IGNORE;
-                                    r_rx_byte_counter <= 3'd0;
-                                    r_rx_param_valid <= 1'b1;
-                                    r_tx_cmd_valid <= 1'b1;
-                                    r_tx_cmd <= r_rx_cmd;
-                                end
-                            end
-
                             CMD_WRITE: begin
                                 if (r_rx_byte_counter == 3'd7) begin
                                     r_rx_stage <= RX_STAGE_DATA;
-                                    r_rx_byte_counter <= 3'd0;
-                                    r_rx_param_valid <= 1'b1;
-                                end
-                            end
-
-                            CMD_DEBUG_MODE: begin
-                                if (r_rx_byte_counter == 3'd3) begin
-                                    r_rx_stage <= RX_STAGE_CMD;
                                     r_rx_byte_counter <= 3'd0;
                                     r_rx_param_valid <= 1'b1;
                                 end
@@ -182,10 +206,13 @@ module usb_pc (
                             end
 
                             CMD_DEBUG_WRITE: begin
-                                if (r_data_items_remaining == 20'd0) begin
-                                    r_rx_stage <= RX_STAGE_CMD;
+                                if (r_rx_byte_counter == 3'd3) begin
+                                    if (r_data_items_remaining == 20'd0) begin
+                                        r_rx_stage <= RX_STAGE_CMD;
+                                    end
+                                    r_rx_byte_counter <= 3'd0;
+                                    r_rx_buffer_valid <= 1'b1;
                                 end
-                                r_rx_buffer_valid <= 1'b1;
                             end
 
                             default: begin
@@ -215,22 +242,15 @@ module usb_pc (
 
     // Command parameter decoder
 
-    reg r_tx_debug_enabled;
-
     always @(posedge i_clk) begin
         if (i_reset) begin
-            r_tx_debug_enabled <= 1'b0;
         end else begin
             if (r_rx_param_valid) begin
                 case (r_rx_cmd)
-                    CMD_READ, CMD_WRITE: begin
+                    CMD_WRITE: begin
                         o_address <= {r_rx_buffer[63:34], 2'b00};
                         o_bank <= r_rx_buffer[27:24];
                         r_data_items_remaining <= r_rx_buffer[19:0];
-                    end
-
-                    CMD_DEBUG_MODE: begin
-                        r_tx_debug_enabled <= r_rx_buffer[0];
                     end
 
                     CMD_DEBUG_WRITE: begin
@@ -239,8 +259,18 @@ module usb_pc (
                 endcase
             end
 
+            if (r_tx_cmd_valid && r_tx_cmd == CMD_DEBUG_SEND) begin
+                o_bank <= i_debug_bank;
+                o_address <= i_debug_address;
+                r_data_items_remaining <= i_debug_length;
+            end
+
             if (o_request && !i_busy && r_data_items_remaining > 20'd0) begin
                 o_address[25:2] <= o_address[25:2] + 1'd1;
+                r_data_items_remaining <= r_data_items_remaining - 1'd1;
+            end
+
+            if (r_fifo_usb_write_request && r_data_items_remaining > 20'd0) begin
                 r_data_items_remaining <= r_data_items_remaining - 1'd1;
             end
         end
@@ -249,7 +279,7 @@ module usb_pc (
 
     // TX module
 
-    localparam byte IDENTIFY_STRING [0:3]   = '{"S", "6", "4", "a"};
+    localparam byte IDENTIFY_STRING [0:3]   = '{"S", "6", "4", VERSION};
     localparam byte RSP_COMPLETE [0:2]      = '{"C", "M", "P"};
 
     localparam [1:0] TX_STAGE_IDLE          = 2'd0;
@@ -268,7 +298,7 @@ module usb_pc (
             TX_STAGE_DATA: begin
                 case (r_tx_cmd)
                     CMD_IDENTIFY: r_ftdi_tx_data = IDENTIFY_STRING[r_tx_byte_counter];
-                    CMD_READ: r_ftdi_tx_data = r_i_data_buffer[(r_tx_byte_counter * 8) -: 8];
+                    CMD_DEBUG_SEND: r_ftdi_tx_data = r_i_data_buffer[(((4 - r_tx_byte_counter) * 8) - 1) -: 8];
                 endcase
             end
 
@@ -281,9 +311,16 @@ module usb_pc (
 
     wire w_tx_successful = r_ftdi_tx_valid && !w_ftdi_tx_busy;
 
+    reg r_bus_data_request;
+    reg r_bus_data_valid;
+    reg r_bus_data_feisable;
+
+    assign o_debug_busy = r_tx_stage == TX_STAGE_DATA && r_tx_cmd == CMD_DEBUG_SEND;
+
     always @(posedge i_clk) begin
         r_ftdi_tx_valid <= 1'b0;
         r_tx_done <= 1'b0;
+        r_bus_data_request <= 1'b0;
 
         if (i_reset) begin
             r_tx_stage <= TX_STAGE_IDLE;
@@ -295,11 +332,21 @@ module usb_pc (
                     r_tx_byte_counter <= 2'd0;
 
                     if (r_tx_cmd_valid) begin
-                        r_ftdi_tx_valid <= 1'b1;
-
                         case (r_tx_cmd)
-                            CMD_IDENTIFY: r_tx_stage <= TX_STAGE_DATA;
-                            default: r_tx_stage <= TX_STAGE_RESPONSE;
+                            CMD_IDENTIFY: begin
+                                r_tx_stage <= TX_STAGE_DATA;
+                                r_ftdi_tx_valid <= 1'b1;
+                            end
+
+                            CMD_DEBUG_SEND: begin
+                                r_bus_data_request <= 1'b1;
+                                r_tx_stage <= TX_STAGE_DATA;
+                            end
+
+                            default: begin
+                                r_tx_stage <= TX_STAGE_RESPONSE;
+                                r_ftdi_tx_valid <= 1'b1;
+                            end
                         endcase
                     end
                 end
@@ -312,15 +359,33 @@ module usb_pc (
                             CMD_IDENTIFY: begin
                                 r_tx_stage <= TX_STAGE_RESPONSE;
                             end
-
-                            CMD_READ: begin
-                                if (r_data_items_remaining == 20'd0) begin
-                                    r_tx_stage <= TX_STAGE_RESPONSE;
-                                end
-                            end
-
-                            default: r_tx_stage <= TX_STAGE_RESPONSE;
                         endcase
+                    end
+
+                    if (r_tx_cmd == CMD_DEBUG_SEND) begin
+                        r_ftdi_tx_valid <= 1'b0;
+
+                        if (r_bus_data_valid) begin
+                            r_bus_data_feisable <= 1'b1;
+                        end
+
+                        if (r_bus_data_feisable) begin
+                            r_ftdi_tx_valid <= 1'b1;
+                        end
+
+                        if (w_tx_successful) begin
+                            if (r_tx_byte_counter == 2'd3 && r_bus_data_feisable) begin
+                                r_bus_data_request <= 1'b1;
+                                r_bus_data_feisable <= 1'b0;
+                            end
+                        end
+
+                        if (w_tx_successful && r_data_items_remaining == 20'd0 && r_tx_byte_counter == 2'd3) begin
+                            r_bus_data_request <= 1'b0;
+                            r_tx_stage <= TX_STAGE_IDLE;
+                            r_tx_done <= 1'b1;
+                            r_bus_data_feisable <= 1'b0;
+                        end
                     end
                 end
 
@@ -344,6 +409,8 @@ module usb_pc (
     always @(posedge i_clk) begin
         o_request <= 1'b0;
         o_write <= 1'b0;
+        r_bus_data_valid <= 1'b0;
+        r_fifo_usb_write_request <= 1'b0;
 
         if (i_reset) begin
             r_ftdi_rx_ready <= 1'b1;
@@ -366,13 +433,33 @@ module usb_pc (
                         r_ftdi_rx_ready <= 1'b0;
                     end
                 end
+
+                CMD_DEBUG_WRITE: begin
+                    if (r_rx_buffer_valid) begin
+                        r_fifo_usb_data <= r_rx_buffer[31:0];
+                        r_fifo_usb_write_request <= 1'b1;
+                    end
+
+                    if (w_fifo_usb_full) begin
+                        r_ftdi_rx_ready <= 1'b0;
+                    end else begin
+                        r_ftdi_rx_ready <= 1'b1;
+                    end
+                end
             endcase
 
-            // TODO: Read from bus
-            // case (r_tx_cmd)
-            //     CMD_READ: begin
-            //     end
-            // endcase
+            if (r_bus_data_request) begin
+                o_request <= 1'b1;
+            end
+
+            if (o_request && i_busy) begin
+                o_request <= 1'b1;
+            end
+
+            if (i_ack) begin
+                r_i_data_buffer <= i_data;
+                r_bus_data_valid <= 1'b1;
+            end
         end
     end
 

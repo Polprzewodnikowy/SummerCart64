@@ -18,7 +18,7 @@
 # -------------------------------------------------------------------------- #
 #
 # Quartus Prime
-# Version 20.1.0 Build 711 06/05/2020 SJ Lite Edition
+# Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
 # Date created = 00:00:00  November 06, 2020
 #
 # -------------------------------------------------------------------------- #
@@ -42,10 +42,11 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:45:19  JULY 29, 2020"
-set_global_assignment -name LAST_QUARTUS_VERSION "20.1.0 Lite Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name SMART_RECOMPILE OFF
+set_global_assignment -name VERILOG_FILE rtl/cart/led.v
 set_global_assignment -name VERILOG_FILE rtl/cart/control.v
 set_global_assignment -name VERILOG_FILE rtl/usb/pc.v
 set_global_assignment -name VERILOG_FILE rtl/usb/ftdi_fsi.v
@@ -63,6 +64,7 @@ set_global_assignment -name VERILOG_FILE rtl/n64/bank_decoder.v
 set_global_assignment -name VERILOG_FILE rtl/top.v
 set_global_assignment -name SDC_FILE constraints.sdc
 set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_ack.qip
+set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
 
 # Pin & Location Assignments
 # ==========================

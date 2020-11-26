@@ -50,12 +50,30 @@ module top (
     inout [7:0] io_pmod
 );
 
+    // Firmware version
+
+    localparam byte VERSION = "a";
+
+
     // Clock and reset signals
 
     wire w_sys_clk;
     wire w_sdram_clk;
     wire w_pll_lock;
     wire w_sys_reset = ~w_pll_lock;
+
+
+    // PMOD signal names
+
+    wire w_n64_controller_i;
+    wire w_n64_controller_o;
+    wire w_n64_reset_btn;
+
+    assign w_n64_controller_i = io_pmod[1];
+    assign io_pmod[1] = w_n64_controller_o ? 1'bZ : 1'b0;
+    assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
+
+    assign w_n64_controller_o = 1'b1;
 
 
     // PLL clock generator
@@ -168,6 +186,17 @@ module top (
     wire w_pc_ack_eeprom;
     wire [31:0] w_pc_i_data_eeprom;
 
+    wire w_debug_dma_start;
+    wire w_debug_dma_busy;
+    wire [3:0] w_debug_dma_bank;
+    wire [25:0] w_debug_dma_address;
+    wire [19:0] w_debug_dma_length;
+
+    wire w_debug_fifo_request;
+    wire w_debug_fifo_flush;
+    wire [10:0] w_debug_fifo_items;
+    wire [31:0] w_debug_fifo_data;
+
     always @(*) begin
         w_pc_busy = w_pc_busy_cart_control || w_pc_busy_sdram || w_pc_busy_eeprom;
         w_pc_ack = w_pc_ack_cart_control || w_pc_ack_sdram || w_pc_ack_eeprom;
@@ -193,8 +222,20 @@ module top (
         .o_bank(w_pc_bank),
         .o_address(w_pc_address),
         .i_data(w_pc_i_data),
-        .o_data(w_pc_o_data)
+        .o_data(w_pc_o_data),
+
+        .i_debug_start(w_debug_dma_start),
+        .o_debug_busy(w_debug_dma_busy),
+        .i_debug_bank(w_debug_dma_bank),
+        .i_debug_address(w_debug_dma_address),
+        .i_debug_length(w_debug_dma_length),
+
+        .i_debug_fifo_request(w_debug_fifo_request),
+        .i_debug_fifo_flush(w_debug_fifo_flush),
+        .o_debug_fifo_items(w_debug_fifo_items),
+        .o_debug_fifo_data(w_debug_fifo_data)
     );
+    defparam usb_pc_inst.VERSION = VERSION;
 
 
     // Cart interface
@@ -207,6 +248,7 @@ module top (
     wire [31:0] w_cart_control_o_data;
     wire [31:0] w_cart_control_i_data;
 
+    wire w_sdram_writable;
     wire w_rom_switch;
     wire w_eeprom_enable;
     wire w_eeprom_16k_mode;
@@ -214,7 +256,7 @@ module top (
     device_arbiter device_arbiter_cart_control_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
-        
+
         .i_request_pri(w_n64_request),
         .i_write_pri(w_n64_write),
         .o_busy_pri(w_n64_busy_cart_control),
@@ -223,7 +265,7 @@ module top (
         .i_address_pri(w_n64_address[25:2]),
         .o_data_pri(w_n64_i_data_cart_control),
         .i_data_pri(w_n64_o_data),
-    
+
         .i_request_sec(w_pc_request),
         .i_write_sec(w_pc_write),
         .o_busy_sec(w_pc_busy_cart_control),
@@ -232,7 +274,7 @@ module top (
         .i_address_sec(w_pc_address[25:2]),
         .o_data_sec(w_pc_i_data_cart_control),
         .i_data_sec(w_pc_o_data),
-    
+
         .o_request(w_cart_control_request),
         .o_write(w_cart_control_write),
         .i_busy(w_cart_control_busy),
@@ -257,20 +299,39 @@ module top (
         .i_address(w_cart_control_address),
         .o_data(w_cart_control_o_data),
         .i_data(w_cart_control_i_data),
-    
+
+        .o_sdram_writable(w_sdram_writable),
         .o_rom_switch(w_rom_switch),
         .o_eeprom_enable(w_eeprom_enable),
-        .o_eeprom_16k_mode(w_eeprom_16k_mode)
+        .o_eeprom_16k_mode(w_eeprom_16k_mode),
+
+        .o_n64_reset_btn(w_n64_reset_btn),
+
+        .i_debug_ready(1'b1),
+
+        .o_debug_dma_start(w_debug_dma_start),
+        .i_debug_dma_busy(w_debug_dma_busy),
+        .o_debug_dma_bank(w_debug_dma_bank),
+        .o_debug_dma_address(w_debug_dma_address),
+        .o_debug_dma_length(w_debug_dma_length),
+
+        .o_debug_fifo_request(w_debug_fifo_request),
+        .o_debug_fifo_flush(w_debug_fifo_flush),
+        .i_debug_fifo_items(w_debug_fifo_items),
+        .i_debug_fifo_data(w_debug_fifo_data)
     );
+    defparam cart_control_inst.VERSION = VERSION;
 
 
     // Embedded flash
+
+    wire w_embedded_flash_request = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == BANK_ROM;
 
     memory_embedded_flash memory_embedded_flash_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request(!w_rom_switch && w_n64_request && !w_n64_write && w_n64_bank == BANK_ROM),
+        .i_request(w_embedded_flash_request),
         .o_busy(w_n64_busy_embedded_flash),
         .o_ack(w_n64_ack_embedded_flash),
         .i_address(w_n64_address[25:2]),
@@ -279,6 +340,8 @@ module top (
 
 
     // SDRAM
+
+    wire w_sdram_request_pri = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && w_sdram_writable));
 
     wire w_sdram_request;
     wire w_sdram_write;
@@ -291,8 +354,8 @@ module top (
     device_arbiter device_arbiter_sdram_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
-        
-        .i_request_pri(w_rom_switch && w_n64_request),
+
+        .i_request_pri(w_sdram_request_pri),
         .i_write_pri(w_n64_write),
         .o_busy_pri(w_n64_busy_sdram),
         .o_ack_pri(w_n64_ack_sdram),
@@ -300,7 +363,7 @@ module top (
         .i_address_pri(w_n64_address[25:1]),
         .o_data_pri(w_n64_i_data_sdram),
         .i_data_pri(w_n64_o_data),
-    
+
         .i_request_sec(w_pc_request),
         .i_write_sec(w_pc_write),
         .o_busy_sec(w_pc_busy_sdram),
@@ -309,7 +372,7 @@ module top (
         .i_address_sec(w_pc_address[25:1]),
         .o_data_sec(w_pc_i_data_sdram),
         .i_data_sec(w_pc_o_data),
-    
+
         .o_request(w_sdram_request),
         .o_write(w_sdram_write),
         .i_busy(w_sdram_busy),
@@ -355,7 +418,7 @@ module top (
     device_arbiter device_arbiter_eeprom_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
-        
+
         .i_request_pri(w_n64_request),
         .i_write_pri(w_n64_write),
         .o_busy_pri(w_n64_busy_eeprom),
@@ -364,7 +427,7 @@ module top (
         .i_address_pri(w_n64_address[25:2]),
         .o_data_pri(w_n64_i_data_eeprom),
         .i_data_pri(w_n64_o_data),
-    
+
         .i_request_sec(w_pc_request),
         .i_write_sec(w_pc_write),
         .o_busy_sec(w_pc_busy_eeprom),
@@ -373,7 +436,7 @@ module top (
         .i_address_sec(w_pc_address[25:2]),
         .o_data_sec(w_pc_i_data_eeprom),
         .i_data_sec(w_pc_o_data),
-    
+
         .o_request(w_eeprom_request),
         .o_write(w_eeprom_write),
         .i_busy(w_eeprom_busy),
@@ -402,6 +465,20 @@ module top (
 
         .i_eeprom_enable(w_eeprom_enable),
         .i_eeprom_16k_mode(w_eeprom_16k_mode)
+    );
+
+
+    // LED
+
+    wire w_led_trigger = (w_n64_request && !w_n64_busy) || (w_pc_request && !w_pc_busy);
+
+    cart_led cart_led_inst (
+        .i_clk(w_sys_clk),
+        .i_reset(w_sys_reset),
+
+        .i_trigger(w_led_trigger),
+
+        .o_led(o_led)
     );
 
 endmodule

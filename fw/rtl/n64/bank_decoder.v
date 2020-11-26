@@ -14,7 +14,7 @@ module n64_bank_decoder (
     localparam [31:0] ROM_END       = 32'h13FF_FFFF;
 
     localparam [31:0] CART_BASE     = 32'h1E00_0000;
-    localparam [31:0] CART_END      = 32'h1EFF_FFFF;
+    localparam [31:0] CART_END      = 32'h1E00_1FFF;
 
     localparam [31:0] EEPROM_BASE   = 32'h1D00_0000;
     localparam [31:0] EEPROM_END    = 32'h1D00_07FF;

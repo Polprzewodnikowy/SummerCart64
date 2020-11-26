@@ -227,11 +227,11 @@ module n64_si (
 
 
     // Bus logic
- 
-    always @(posedge i_clk) begin
-        o_ack <= !i_reset && i_request;
-    end
 
     assign o_busy = 1'b0;
+
+    always @(posedge i_clk) begin
+        o_ack <= !i_reset && i_request && !i_write;
+    end
 
 endmodule

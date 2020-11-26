@@ -1,7 +1,7 @@
 module device_arbiter (
     input i_clk,
     input i_reset,
-    
+
     input i_request_pri,
     input i_write_pri,
     output o_busy_pri,
@@ -66,11 +66,11 @@ module device_arbiter (
         o_write = 1'b0;
         o_address = 26'd0;
         o_data = 32'd0;
-        if (w_request_pri_successful) begin
+        if (w_request_pri) begin
             o_write = i_write_pri;
             o_address = i_address_pri;
             o_data = i_data_pri;
-        end else if (w_request_sec_successful) begin
+        end else if (w_request_sec) begin
             o_write = i_write_sec;
             o_address = i_address_sec;
             o_data = i_data_sec;

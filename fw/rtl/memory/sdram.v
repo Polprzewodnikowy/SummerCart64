@@ -312,7 +312,7 @@ module memory_sdram (
                         r_sdram_data <= i_data;
                         r_busy <= 1'b1;
                         r_write_pending <= i_write;
-                        
+
                         if (w_request_in_another_row || (i_write && w_read_pending)) begin
                             r_request_pending <= 1'b1;
                             r_current_word <= 1'b0;
