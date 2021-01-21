@@ -42,8 +42,8 @@ module device_arbiter #(
 
     always @(posedge i_clk) begin
         if (i_reset) begin
-            r_ack_fifo_wrptr <= 2'd0;
-            r_ack_fifo_rdptr <= 2'd0;
+            r_ack_fifo_wrptr <= {FIFO_ADDRESS_WIDTH{1'b0}};
+            r_ack_fifo_rdptr <= {FIFO_ADDRESS_WIDTH{1'b0}};
         end else begin
             if (w_ack_fifo_wrreq) begin
                 r_ack_fifo_mem[r_ack_fifo_wrptr] <= r_request_successful & ~i_write;
