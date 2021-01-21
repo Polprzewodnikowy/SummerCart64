@@ -37,7 +37,7 @@ module memory_embedded_flash (
                 w_onchip_flash_o_data[7:0],
                 w_onchip_flash_o_data[15:8],
                 w_onchip_flash_o_data[23:16],
-                w_onchip_flash_o_data[31:24],
+                w_onchip_flash_o_data[31:24]
             };
         end
     end

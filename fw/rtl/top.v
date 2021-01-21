@@ -1,3 +1,5 @@
+`include "constants.vh"
+
 module top (
     input i_clk,
 
@@ -18,8 +20,8 @@ module top (
     input i_n64_si_clk,
     inout io_n64_si_dq,
 
-    input i_n64_cic_clk,
-    inout io_n64_cic_dq,
+    input i_n64_cic_clk,        // TODO: to be removed
+    inout io_n64_cic_dq,        // TODO: to be removed
 
     output o_sdram_clk,
     output o_sdram_cs,
@@ -34,9 +36,9 @@ module top (
     inout io_sd_cmd,
     inout [3:0] io_sd_dat,
 
-    output o_flash_clk,
-    output o_flash_cs,
-    inout [3:0] io_flash_dq,
+    output o_flash_clk,         // TODO: to be removed
+    output o_flash_cs,          // TODO: to be removed
+    inout [3:0] io_flash_dq,    // TODO: to be removed
 
     output o_sram_clk,
     output o_sram_cs,
@@ -47,13 +49,8 @@ module top (
 
     output o_led,
 
-    inout [7:0] io_pmod
+    inout [7:0] io_pmod         // TODO: to be removed
 );
-
-    // Firmware version
-
-    localparam byte VERSION = "a";
-
 
     // Clock and reset signals
 
@@ -63,17 +60,11 @@ module top (
     wire w_sys_reset = ~w_pll_lock;
 
 
-    // PMOD signal names
+    // Temporary PMOD signal names
 
-    wire w_n64_controller_i;
-    wire w_n64_controller_o;
     wire w_n64_reset_btn;
 
-    assign w_n64_controller_i = io_pmod[1];
-    assign io_pmod[1] = w_n64_controller_o ? 1'bZ : 1'b0;
     assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
-
-    assign w_n64_controller_o = 1'b1;
 
 
     // PLL clock generator
@@ -94,14 +85,6 @@ module top (
         .din({1'b0, 1'b1}),
         .pad_out(o_sdram_clk)
     );
-
-
-    // Bank ids
-
-    localparam [3:0] BANK_INVALID   = 4'd0;
-    localparam [3:0] BANK_ROM       = 4'd1;
-    localparam [3:0] BANK_CART      = 4'd2;
-    localparam [3:0] BANK_EEPROM    = 4'd3;
 
 
     // N64 PI
@@ -131,6 +114,9 @@ module top (
     wire w_n64_ack_eeprom;
     wire [31:0] w_n64_i_data_eeprom;
 
+    wire w_ddipl_enable;
+    wire [23:0] w_ddipl_address;
+
     always @(*) begin
         w_n64_busy = w_n64_busy_cart_control || w_n64_busy_sdram || w_n64_busy_embedded_flash || w_n64_busy_eeprom;
         w_n64_ack = w_n64_ack_cart_control || w_n64_ack_sdram || w_n64_ack_embedded_flash || w_n64_ack_eeprom;
@@ -159,7 +145,10 @@ module top (
         .o_bank(w_n64_bank),
         .o_address(w_n64_address),
         .i_data(w_n64_i_data),
-        .o_data(w_n64_o_data)
+        .o_data(w_n64_o_data),
+
+        .i_ddipl_enable(w_ddipl_enable),
+        .i_ddipl_address(w_ddipl_address)
     );
 
 
@@ -189,7 +178,7 @@ module top (
     wire w_debug_dma_start;
     wire w_debug_dma_busy;
     wire [3:0] w_debug_dma_bank;
-    wire [25:0] w_debug_dma_address;
+    wire [23:0] w_debug_dma_address;
     wire [19:0] w_debug_dma_length;
 
     wire w_debug_fifo_request;
@@ -206,7 +195,9 @@ module top (
         if (w_pc_ack_eeprom) w_pc_i_data = w_pc_i_data_eeprom;
     end
 
-    usb_pc usb_pc_inst (
+    usb_pc #(
+        .VERSION(`VERSION)
+    ) usb_pc_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
@@ -235,7 +226,6 @@ module top (
         .o_debug_fifo_items(w_debug_fifo_items),
         .o_debug_fifo_data(w_debug_fifo_data)
     );
-    defparam usb_pc_inst.VERSION = VERSION;
 
 
     // Cart interface
@@ -244,7 +234,7 @@ module top (
     wire w_cart_control_write;
     wire w_cart_control_busy;
     wire w_cart_control_ack;
-    wire [25:0] w_cart_control_address;
+    wire [10:0] w_cart_control_address;
     wire [31:0] w_cart_control_o_data;
     wire [31:0] w_cart_control_i_data;
 
@@ -253,39 +243,35 @@ module top (
     wire w_eeprom_enable;
     wire w_eeprom_16k_mode;
 
-    device_arbiter device_arbiter_cart_control_inst (
+    device_arbiter #(
+        .NUM_CONTROLLERS(2),
+        .ADDRESS_WIDTH(11),
+        .DEVICE_BANK(`BANK_CART)
+    ) device_arbiter_cart_control_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request_pri(w_n64_request),
-        .i_write_pri(w_n64_write),
-        .o_busy_pri(w_n64_busy_cart_control),
-        .o_ack_pri(w_n64_ack_cart_control),
-        .i_bank_pri(w_n64_bank),
-        .i_address_pri(w_n64_address[25:2]),
-        .o_data_pri(w_n64_i_data_cart_control),
-        .i_data_pri(w_n64_o_data),
+        .i_request({w_pc_request, w_n64_request}),
+        .i_write({w_pc_write, w_n64_write}),
+        .o_busy({w_pc_busy_cart_control, w_n64_busy_cart_control}),
+        .o_ack({w_pc_ack_cart_control, w_n64_ack_cart_control}),
+        .i_bank({w_pc_bank, w_n64_bank}),
+        .i_address({w_pc_address[12:2], w_n64_address[12:2]}),
+        .o_data({w_pc_i_data_cart_control, w_n64_i_data_cart_control}),
+        .i_data({w_pc_o_data, w_n64_o_data}),
 
-        .i_request_sec(w_pc_request),
-        .i_write_sec(w_pc_write),
-        .o_busy_sec(w_pc_busy_cart_control),
-        .o_ack_sec(w_pc_ack_cart_control),
-        .i_bank_sec(w_pc_bank),
-        .i_address_sec(w_pc_address[25:2]),
-        .o_data_sec(w_pc_i_data_cart_control),
-        .i_data_sec(w_pc_o_data),
-
-        .o_request(w_cart_control_request),
-        .o_write(w_cart_control_write),
-        .i_busy(w_cart_control_busy),
-        .i_ack(w_cart_control_ack),
-        .o_address(w_cart_control_address),
-        .i_data(w_cart_control_o_data),
-        .o_data(w_cart_control_i_data)
+        .o_device_request(w_cart_control_request),
+        .o_device_write(w_cart_control_write),
+        .i_device_busy(w_cart_control_busy),
+        .i_device_ack(w_cart_control_ack),
+        .o_device_address(w_cart_control_address),
+        .i_device_data(w_cart_control_o_data),
+        .o_device_data(w_cart_control_i_data)
     );
-    defparam device_arbiter_cart_control_inst.DEVICE_BANK = BANK_CART;
 
-    cart_control cart_control_inst (
+    cart_control #(
+        .VERSION(`VERSION)
+    ) cart_control_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
@@ -302,6 +288,7 @@ module top (
 
         .o_sdram_writable(w_sdram_writable),
         .o_rom_switch(w_rom_switch),
+        .o_ddipl_enable(w_ddipl_enable),
         .o_eeprom_enable(w_eeprom_enable),
         .o_eeprom_16k_mode(w_eeprom_16k_mode),
 
@@ -318,70 +305,65 @@ module top (
         .o_debug_fifo_request(w_debug_fifo_request),
         .o_debug_fifo_flush(w_debug_fifo_flush),
         .i_debug_fifo_items(w_debug_fifo_items),
-        .i_debug_fifo_data(w_debug_fifo_data)
+        .i_debug_fifo_data(w_debug_fifo_data),
+
+        .o_ddipl_address(w_ddipl_address)
     );
-    defparam cart_control_inst.VERSION = VERSION;
 
 
     // Embedded flash
 
-    wire w_embedded_flash_request = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == BANK_ROM;
+    wire w_embedded_flash_request_n64 = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == `BANK_ROM;
 
     memory_embedded_flash memory_embedded_flash_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request(w_embedded_flash_request),
+        .i_request(w_embedded_flash_request_n64),
         .o_busy(w_n64_busy_embedded_flash),
         .o_ack(w_n64_ack_embedded_flash),
-        .i_address(w_n64_address[25:2]),
+        .i_address(w_n64_address[20:2]),
         .o_data(w_n64_i_data_embedded_flash)
     );
 
 
     // SDRAM
 
-    wire w_sdram_request_pri = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && w_sdram_writable));
+    wire w_sdram_request_n64 = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && w_sdram_writable));
 
     wire w_sdram_request;
     wire w_sdram_write;
     wire w_sdram_busy;
     wire w_sdram_ack;
-    wire [25:0] w_sdram_address;
+    wire [24:0] w_sdram_address;
     wire [31:0] w_sdram_o_data;
     wire [31:0] w_sdram_i_data;
 
-    device_arbiter device_arbiter_sdram_inst (
+    device_arbiter #(
+        .NUM_CONTROLLERS(2),
+        .ADDRESS_WIDTH(25),
+        .DEVICE_BANK(`BANK_ROM)
+    ) device_arbiter_sdram_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request_pri(w_sdram_request_pri),
-        .i_write_pri(w_n64_write),
-        .o_busy_pri(w_n64_busy_sdram),
-        .o_ack_pri(w_n64_ack_sdram),
-        .i_bank_pri(w_n64_bank),
-        .i_address_pri(w_n64_address[25:1]),
-        .o_data_pri(w_n64_i_data_sdram),
-        .i_data_pri(w_n64_o_data),
+        .i_request({w_pc_request, w_sdram_request_n64}),
+        .i_write({w_pc_write, w_n64_write}),
+        .o_busy({w_pc_busy_sdram, w_n64_busy_sdram}),
+        .o_ack({w_pc_ack_sdram, w_n64_ack_sdram}),
+        .i_bank({w_pc_bank, w_n64_bank}),
+        .i_address({w_pc_address[25:1], w_n64_address[25:1]}),
+        .o_data({w_pc_i_data_sdram, w_n64_i_data_sdram}),
+        .i_data({w_pc_o_data, w_n64_o_data}),
 
-        .i_request_sec(w_pc_request),
-        .i_write_sec(w_pc_write),
-        .o_busy_sec(w_pc_busy_sdram),
-        .o_ack_sec(w_pc_ack_sdram),
-        .i_bank_sec(w_pc_bank),
-        .i_address_sec(w_pc_address[25:1]),
-        .o_data_sec(w_pc_i_data_sdram),
-        .i_data_sec(w_pc_o_data),
-
-        .o_request(w_sdram_request),
-        .o_write(w_sdram_write),
-        .i_busy(w_sdram_busy),
-        .i_ack(w_sdram_ack),
-        .o_address(w_sdram_address),
-        .i_data(w_sdram_o_data),
-        .o_data(w_sdram_i_data)
+        .o_device_request(w_sdram_request),
+        .o_device_write(w_sdram_write),
+        .i_device_busy(w_sdram_busy),
+        .i_device_ack(w_sdram_ack),
+        .o_device_address(w_sdram_address),
+        .i_device_data(w_sdram_o_data),
+        .o_device_data(w_sdram_i_data)
     );
-    defparam device_arbiter_sdram_inst.DEVICE_BANK = BANK_ROM;
 
     memory_sdram memory_sdram_inst (
         .i_clk(w_sys_clk),
@@ -411,41 +393,35 @@ module top (
     wire w_eeprom_write;
     wire w_eeprom_busy;
     wire w_eeprom_ack;
-    wire [25:0] w_eeprom_address;
+    wire [10:0] w_eeprom_address;
     wire [31:0] w_eeprom_o_data;
     wire [31:0] w_eeprom_i_data;
 
-    device_arbiter device_arbiter_eeprom_inst (
+    device_arbiter #(
+        .NUM_CONTROLLERS(2),
+        .ADDRESS_WIDTH(11),
+        .DEVICE_BANK(`BANK_EEPROM)
+    ) device_arbiter_eeprom_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request_pri(w_n64_request),
-        .i_write_pri(w_n64_write),
-        .o_busy_pri(w_n64_busy_eeprom),
-        .o_ack_pri(w_n64_ack_eeprom),
-        .i_bank_pri(w_n64_bank),
-        .i_address_pri(w_n64_address[25:2]),
-        .o_data_pri(w_n64_i_data_eeprom),
-        .i_data_pri(w_n64_o_data),
+        .i_request({w_pc_request, w_n64_request}),
+        .i_write({w_pc_write, w_n64_write}),
+        .o_busy({w_pc_busy_eeprom, w_n64_busy_eeprom}),
+        .o_ack({w_pc_ack_eeprom, w_n64_ack_eeprom}),
+        .i_bank({w_pc_bank, w_n64_bank}),
+        .i_address({w_pc_address[12:2], w_n64_address[12:2]}),
+        .o_data({w_pc_i_data_eeprom, w_n64_i_data_eeprom}),
+        .i_data({w_pc_o_data, w_n64_o_data}),
 
-        .i_request_sec(w_pc_request),
-        .i_write_sec(w_pc_write),
-        .o_busy_sec(w_pc_busy_eeprom),
-        .o_ack_sec(w_pc_ack_eeprom),
-        .i_bank_sec(w_pc_bank),
-        .i_address_sec(w_pc_address[25:2]),
-        .o_data_sec(w_pc_i_data_eeprom),
-        .i_data_sec(w_pc_o_data),
-
-        .o_request(w_eeprom_request),
-        .o_write(w_eeprom_write),
-        .i_busy(w_eeprom_busy),
-        .i_ack(w_eeprom_ack),
-        .o_address(w_eeprom_address),
-        .i_data(w_eeprom_o_data),
-        .o_data(w_eeprom_i_data)
+        .o_device_request(w_eeprom_request),
+        .o_device_write(w_eeprom_write),
+        .i_device_busy(w_eeprom_busy),
+        .i_device_ack(w_eeprom_ack),
+        .o_device_address(w_eeprom_address),
+        .i_device_data(w_eeprom_o_data),
+        .o_device_data(w_eeprom_i_data)
     );
-    defparam device_arbiter_eeprom_inst.DEVICE_BANK = BANK_EEPROM;
 
     n64_si n64_si_inst (
         .i_clk(w_sys_clk),

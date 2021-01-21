@@ -4225,15 +4225,6 @@ design rules under a new name.</description>
 <wire x1="-10.2" y1="2" x2="-5.8" y2="2" width="0.127" layer="1"/>
 <wire x1="-5.8" y1="2" x2="-3.1" y2="4.7" width="0.127" layer="1"/>
 </signal>
-<signal name="JTCK_C">
-<contactref element="J1" pad="44"/>
-<contactref element="RN2" pad="1"/>
-<wire x1="-15" y1="-6" x2="-15" y2="0.7" width="0.127" layer="1"/>
-<wire x1="-7.3" y1="2.9" x2="-5.5" y2="4.7" width="0.127" layer="1"/>
-<wire x1="-5.5" y1="4.7" x2="-5.5" y2="5.325" width="0.127" layer="1"/>
-<wire x1="-15" y1="0.7" x2="-12.8" y2="2.9" width="0.127" layer="1"/>
-<wire x1="-12.8" y1="2.9" x2="-7.3" y2="2.9" width="0.127" layer="1"/>
-</signal>
 <signal name="CLK_SDRAM">
 <contactref element="U2" pad="38"/>
 <contactref element="U1" pad="75"/>
@@ -5587,6 +5578,15 @@ design rules under a new name.</description>
 <via x="-41.3" y="24.8" extent="1-16" drill="0.35"/>
 <wire x1="-41.3" y1="24.8" x2="-42.355" y2="24.8" width="0.127" layer="1"/>
 <wire x1="-42.355" y1="24.8" x2="-42.365" y2="24.81" width="0.127" layer="1"/>
+</signal>
+<signal name="/INT_C">
+<contactref element="J1" pad="44"/>
+<contactref element="RN2" pad="1"/>
+<wire x1="-7.3" y1="2.9" x2="-5.5" y2="4.7" width="0.127" layer="1"/>
+<wire x1="-5.5" y1="4.7" x2="-5.5" y2="5.325" width="0.127" layer="1"/>
+<wire x1="-15" y1="0.7" x2="-12.8" y2="2.9" width="0.127" layer="1"/>
+<wire x1="-12.8" y1="2.9" x2="-7.3" y2="2.9" width="0.127" layer="1"/>
+<wire x1="-15" y1="-6" x2="-15" y2="0.7" width="0.127" layer="1"/>
 </signal>
 </signals>
 <mfgpreviewcolors>

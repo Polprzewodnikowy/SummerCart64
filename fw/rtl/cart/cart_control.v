@@ -15,6 +15,7 @@ module cart_control (
 
     output reg o_sdram_writable,
     output reg o_rom_switch,
+    output reg o_ddipl_enable,
     output reg o_eeprom_enable,
     output reg o_eeprom_16k_mode,
 
@@ -25,13 +26,15 @@ module cart_control (
     output reg o_debug_dma_start,
     input i_debug_dma_busy,
     output reg [3:0] o_debug_dma_bank,
-    output reg [25:0] o_debug_dma_address,
+    output reg [23:0] o_debug_dma_address,
     output reg [19:0] o_debug_dma_length,
 
     output reg o_debug_fifo_request,
     output reg o_debug_fifo_flush,
     input [10:0] i_debug_fifo_items,
-    input [31:0] i_debug_fifo_data
+    input [31:0] i_debug_fifo_data,
+    
+    output reg [23:0] o_ddipl_address
 );
 
     // Module parameters
@@ -45,6 +48,7 @@ module cart_control (
     localparam [10:0] REG_USB_SCR       = 11'd4;
     localparam [10:0] REG_USB_DMA_ADDR  = 11'd5;
     localparam [10:0] REG_USB_DMA_LEN   = 11'd6;
+    localparam [10:0] REG_DDIPL_ADDR    = 11'd7;
 
     localparam [10:0] MEM_USB_FIFO_BASE = 11'h400;
     localparam [10:0] MEM_USB_FIFO_END  = 11'h7FF;
@@ -63,7 +67,7 @@ module cart_control (
 
     // Registers
 
-    reg [7:0] r_bootloader;
+    reg [15:0] r_bootloader;
 
 
     // Bus controller
@@ -78,6 +82,9 @@ module cart_control (
         end
     end
 
+
+    // Write logic
+
     always @(posedge i_clk) begin
         o_debug_dma_start <= 1'b0;
         o_debug_fifo_flush <= 1'b0;
@@ -85,21 +92,23 @@ module cart_control (
         if (i_reset) begin
             o_sdram_writable <= 1'b0;
             o_rom_switch <= 1'b0;
+            o_ddipl_enable <= 1'b0;
             o_eeprom_enable <= 1'b0;
             o_eeprom_16k_mode <= 1'b0;
             o_n64_reset_btn <= 1'b1;
+            o_ddipl_address <= 24'hF0_0000;
             o_debug_dma_bank <= 4'd1;
-            o_debug_dma_address <= 26'h3F0_0000;
+            o_debug_dma_address <= 24'hFC_0000;
             o_debug_dma_length <= 20'd0;
-            r_bootloader <= 8'h00;
+            r_bootloader <= 16'h0000;
         end else begin
             if (i_request && i_write && !o_busy) begin
                 case (i_address)
                     REG_SCR: begin
-                        {o_eeprom_16k_mode, o_eeprom_enable, o_rom_switch, o_sdram_writable} <= {i_data[4:3], i_data[1:0]};
+                        {o_eeprom_16k_mode, o_eeprom_enable, o_ddipl_enable, o_rom_switch, o_sdram_writable} <= {i_data[4:0]};
                     end
                     REG_BOOT: begin
-                        r_bootloader <= i_data[7:0];
+                        r_bootloader <= i_data[15:0];
                     end
                     REG_GPIO: begin
                         o_n64_reset_btn <= ~i_data[0];
@@ -108,10 +117,15 @@ module cart_control (
                         {o_debug_fifo_flush, o_debug_dma_start} <= {i_data[2], i_data[0]};
                     end
                     REG_USB_DMA_ADDR: begin
-                        {o_debug_dma_bank, o_debug_dma_address} <= {i_data[31:28], i_data[25:2], 2'b00};
+                        {o_debug_dma_bank, o_debug_dma_address} <= {i_data[31:28], i_data[25:2]};
                     end
                     REG_USB_DMA_LEN: begin
                         o_debug_dma_length <= i_data[19:0];
+                    end
+                    REG_DDIPL_ADDR: begin
+                        o_ddipl_address <= i_data[25:2];
+                    end
+                    default: begin
                     end
                 endcase
             end
@@ -125,16 +139,20 @@ module cart_control (
         end
     end
 
+
+    // Read logic
+
     always @(posedge i_clk) begin
+        o_data <= 32'h0000_0000;
         o_debug_fifo_request <= 1'b0;
 
         if (i_request && !i_write && !o_busy) begin
             case (i_address)
                 REG_SCR: begin
-                    o_data <= {27'd0, o_eeprom_16k_mode, o_eeprom_enable, 1'b0, o_rom_switch, o_sdram_writable};
+                    o_data <= {27'd0, o_eeprom_16k_mode, o_eeprom_enable, o_ddipl_enable, o_rom_switch, o_sdram_writable};
                 end
                 REG_BOOT: begin
-                    o_data <= {24'd0, r_bootloader};
+                    o_data <= {16'd0, r_bootloader};
                 end
                 REG_VERSION: begin
                     o_data <= {"S", "6", "4", VERSION};
@@ -146,13 +164,15 @@ module cart_control (
                     o_data <= {18'd0, i_debug_fifo_items, 1'b0, i_debug_ready, i_debug_dma_busy};
                 end
                 REG_USB_DMA_ADDR: begin
-                    o_data <= {o_debug_dma_bank, 2'b00, o_debug_dma_address};
+                    o_data <= {o_debug_dma_bank, 2'b00, o_debug_dma_address, 2'b00};
                 end
                 REG_USB_DMA_LEN: begin
                     o_data <= {12'd0, o_debug_dma_length};
                 end
+                REG_DDIPL_ADDR: begin
+                    o_data <= {6'd0, o_ddipl_address, 2'b00};
+                end
                 default: begin
-                    o_data <= 32'h0000_0000;
                 end
             endcase
 

@@ -19,7 +19,7 @@ module usb_pc (
     input i_debug_start,
     output o_debug_busy,
     input [3:0] i_debug_bank,
-    input [25:0] i_debug_address,
+    input [23:0] i_debug_address,
     input [19:0] i_debug_length,
 
     input i_debug_fifo_request,
@@ -138,7 +138,7 @@ module usb_pc (
 
                 case (r_rx_stage)
                     RX_STAGE_CMD: begin
-                        if (w_ftdi_rx_data != CMD_TRIGGER[r_rx_byte_counter]) begin
+                        if (w_ftdi_rx_data != CMD_TRIGGER[r_rx_byte_counter[1:0]]) begin
                             r_rx_byte_counter <= 3'd0;
                         end
 
@@ -248,7 +248,7 @@ module usb_pc (
             if (r_rx_param_valid) begin
                 case (r_rx_cmd)
                     CMD_WRITE: begin
-                        o_address <= {r_rx_buffer[63:34], 2'b00};
+                        o_address <= {r_rx_buffer[57:34], 2'b00};
                         o_bank <= r_rx_buffer[27:24];
                         r_data_items_remaining <= r_rx_buffer[19:0];
                     end
@@ -261,7 +261,7 @@ module usb_pc (
 
             if (r_tx_cmd_valid && r_tx_cmd == CMD_DEBUG_SEND) begin
                 o_bank <= i_debug_bank;
-                o_address <= i_debug_address;
+                o_address <= {i_debug_address, 2'b00};
                 r_data_items_remaining <= i_debug_length;
             end
 

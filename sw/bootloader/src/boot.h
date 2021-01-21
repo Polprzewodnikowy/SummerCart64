@@ -82,7 +82,7 @@ typedef struct os_boot_config_s os_boot_config_t;
 #define OS_BOOT_ROM_TYPE_GAME_PAK   (0)
 #define OS_BOOT_ROM_TYPE_DD         (1)
 
-cart_header_t *boot_load_cart_header(void);
+cart_header_t *boot_load_cart_header(cic_type_t cic_type);
 cic_type_t boot_get_cic_type(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);
 void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type);

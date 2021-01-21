@@ -115,6 +115,7 @@ typedef struct PI_regs_s {
 #define VI_REGS_BASE                        (0xA4400000)
 #define AI_REGS_BASE                        (0xA4500000)
 #define PI_REGS_BASE                        (0xA4600000)
+#define DDIPL_BASE                          (0xA6000000)
 #define CART_BASE                           (0xB0000000)
 
 #define SP_MEM                              ((volatile SP_MEM_t *) SP_MEM_BASE)
@@ -123,6 +124,7 @@ typedef struct PI_regs_s {
 #define VI                                  ((volatile VI_regs_t *) VI_REGS_BASE)
 #define AI                                  ((volatile AI_regs_t *) AI_REGS_BASE)
 #define PI                                  ((volatile PI_regs_t *) PI_REGS_BASE)
+#define DDIPL                               ((volatile uint32_t *) DDIPL_BASE)
 #define CART                                ((volatile uint32_t *) CART_BASE)
 
 #define SP_STATUS_HALT                      (1 << 0)

@@ -55,7 +55,6 @@ Instructions below are mostly written for Windows users and point to Windows spe
 
 There are several issues with the project at the moment in order of importance. Keep in mind that core flashcart functionality is fully working:
 
-- No debug interface for the [N64-UNFLoader](https://github.com/buu342/N64-UNFLoader).
 - No read functionality through USB interface.
 - No SRAM/FlashRAM save hardware implementation.
 - No SD card interface hardware implementation.
@@ -65,7 +64,7 @@ There are several issues with the project at the moment in order of importance. 
 
 ## What's next
 
-Current goal is to write debug module for the [N64-UNFLoader](https://github.com/buu342/N64-UNFLoader).
+Current goal is to fix bugs in SDRAM and PC modules.
 
 
 ## Finished sample

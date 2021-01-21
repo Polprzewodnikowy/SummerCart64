@@ -6,9 +6,9 @@ module memory_sdram (
     output o_sdram_ras,
     output o_sdram_cas,
     output o_sdram_we,
-    output [1:0] o_sdram_ba,
-    output [12:0] o_sdram_a,
-    inout [15:0] io_sdram_dq,
+    output reg [1:0] o_sdram_ba,
+    output reg [12:0] o_sdram_a,
+    inout reg [15:0] io_sdram_dq,
 
     input i_request,
     input i_write,
@@ -163,7 +163,7 @@ module memory_sdram (
 
     always @(posedge i_clk) begin
         if (i_reset) begin
-            r_init_counter <= 1'd0;
+            r_init_counter <= 16'd0;
         end else if (r_init_counter < INIT_DONE) begin
             r_init_counter <= r_init_counter + 1'd1;
         end
@@ -239,7 +239,7 @@ module memory_sdram (
                         r_sdram_precharge <= 1'b1;
                     end else if (w_init_refresh_1 || w_init_refresh_2) begin
                         r_sdram_cmd <= CMD_REF;
-                        r_refresh_counter <= 1'd0;
+                        r_refresh_counter <= 10'd0;
                     end else if (w_init_mode_reg) begin
                         r_sdram_cmd <= CMD_MRS;
                     end else if (w_init_done) begin
@@ -251,19 +251,19 @@ module memory_sdram (
                 STATE_IDLE: begin
                     if (w_refresh_pending) begin
                         r_sdram_cmd <= CMD_REF;
-                        r_refresh_counter <= 1'd0;
-                        r_rcd_ras_rc_counter <= 1'd0;
+                        r_refresh_counter <= 10'd0;
+                        r_rcd_ras_rc_counter <= 5'd0;
                         r_state <= STATE_REFRESHING;
                         r_busy <= 1'b1;
                     end else if (r_request_pending || r_cross_row_request) begin
                         r_sdram_cmd <= CMD_ACT;
-                        r_rcd_ras_rc_counter <= 1'd0;
+                        r_rcd_ras_rc_counter <= 5'd0;
                         r_state <= STATE_ACTIVATING;
                         r_busy <= 1'b1;
                     end else if (i_request && !o_busy) begin
                         r_sdram_cmd <= CMD_ACT;
                         r_sdram_data <= i_data;
-                        r_rcd_ras_rc_counter <= 1'd0;
+                        r_rcd_ras_rc_counter <= 5'd0;
                         r_state <= STATE_ACTIVATING;
                         r_request_pending <= 1'b1;
                         r_write_pending <= i_write;
@@ -275,7 +275,7 @@ module memory_sdram (
                 STATE_ACTIVATING: begin
                     if (w_rcd_timing_met) begin
                         r_sdram_cmd <= r_write_pending ? CMD_WRITE : CMD_READ;
-                        if (r_write_pending) r_wr_counter <= 1'd0;
+                        if (r_write_pending) r_wr_counter <= 2'd0;
                         if (r_cross_row_request) begin
                             r_cross_row_request <= 1'b0;
                             r_busy <= 1'b0;
@@ -289,13 +289,13 @@ module memory_sdram (
                 STATE_ACTIVE: begin
                     if (r_wr_wait) begin
                         if (w_wr_timing_met) begin
-                            r_rp_counter <= 1'd0;
+                            r_rp_counter <= 3'd0;
                             r_state <= STATE_PRECHARGING;
                             r_wr_wait <= 1'b0;
                         end
                     end else if (r_request_pending && !(r_write_pending && w_read_pending)) begin
                         r_sdram_cmd <= r_write_pending ? CMD_WRITE : CMD_READ;
-                        if (r_write_pending) r_wr_counter <= 1'd0;
+                        if (r_write_pending) r_wr_counter <= 2'd0;
                         r_current_word <= 1'b1;
                         if (r_current_word) begin
                             r_busy <= 1'b0;
@@ -305,7 +305,7 @@ module memory_sdram (
                         if (w_ras_timing_met && w_wr_timing_met) begin
                             r_sdram_cmd <= CMD_PRE;
                             r_sdram_precharge <= 1'b1;
-                            r_rp_counter <= 1'd0;
+                            r_rp_counter <= 3'd0;
                             r_state <= STATE_PRECHARGING;
                         end
                     end else if (i_request && !o_busy) begin
@@ -322,19 +322,19 @@ module memory_sdram (
                                 end else begin
                                     r_sdram_cmd <= CMD_PRE;
                                     r_sdram_precharge <= 1'b1;
-                                    r_rp_counter <= 1'd0;
+                                    r_rp_counter <= 3'd0;
                                     r_state <= STATE_PRECHARGING;
                                 end
                             end
                         end else begin
                             r_sdram_cmd <= i_write ? CMD_WRITE : CMD_READ;
-                            if (i_write) r_wr_counter <= 1'd0;
+                            if (i_write) r_wr_counter <= 2'd0;
                             r_current_word <= 1'b1;
                             if (w_next_address_in_another_row) begin
                                 r_sdram_precharge <= 1'b1;
                                 r_cross_row_request <= 1'b1;
                                 if (!i_write) begin
-                                    r_rp_counter <= 1'd0;
+                                    r_rp_counter <= 3'd0;
                                     r_state <= STATE_PRECHARGING;
                                 end else begin
                                     r_wr_wait <= 1'b1;

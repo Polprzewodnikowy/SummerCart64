@@ -7,7 +7,7 @@ module n64_pi (
     input i_n64_pi_aleh,
     input i_n64_pi_read,
     input i_n64_pi_write,
-    inout [15:0] io_n64_pi_ad,
+    inout reg [15:0] io_n64_pi_ad,
 
     output reg o_request,
     output reg o_write,
@@ -16,7 +16,10 @@ module n64_pi (
     output [3:0] o_bank,
     output reg [25:0] o_address,
     input [31:0] i_data,
-    output reg [31:0] o_data
+    output reg [31:0] o_data,
+
+    input i_ddipl_enable,
+    input [23:0] i_ddipl_address
 );
 
     // Parameters
@@ -86,7 +89,9 @@ module n64_pi (
         .i_address(r_pi_address),
         .o_translated_address(w_translated_address),
         .o_bank(o_bank),
-        .o_bank_prefetch(w_bank_prefetch)
+        .o_bank_prefetch(w_bank_prefetch),
+        .i_ddipl_enable(i_ddipl_enable),
+        .i_ddipl_address(i_ddipl_address)
     );
 
 

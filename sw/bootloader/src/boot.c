@@ -4,13 +4,27 @@
 #include "crc32.h"
 #include "n64_regs.h"
 
-static cart_header_t global_cart_header __attribute__((aligned(8)));
+static cart_header_t global_cart_header __attribute__((aligned(16)));
 
-cart_header_t *boot_load_cart_header(void) {
+cart_header_t *boot_load_cart_header(cic_type_t cic_type) {
     cart_header_t *cart_header_pointer = &global_cart_header;
 
     data_cache_hit_writeback_invalidate(cart_header_pointer, sizeof(cart_header_t));
-    dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
+    
+    disable_interrupts();
+
+    while (dma_busy());
+    MEMORY_BARRIER();
+    PI->dram_addr = cart_header_pointer;
+    MEMORY_BARRIER();
+    PI->cart_addr = (cic_type == E_CIC_TYPE_8303 ? DDIPL_BASE : CART_BASE) & 0x1FFFFFFF;
+    MEMORY_BARRIER();
+    PI->wr_len = sizeof(cart_header_t) - 1;
+    MEMORY_BARRIER();
+    while (dma_busy());
+
+    enable_interrupts();
+
     data_cache_hit_invalidate(cart_header_pointer, sizeof(cart_header_t));
 
     return cart_header_pointer;
@@ -128,7 +142,7 @@ void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type) {
     }
 
     gpr_regs[CPU_REG_T3] = CPU_ADDRESS_IN_REG(SP_MEM->dmem[16]);
-    gpr_regs[CPU_REG_S3] = OS_BOOT_ROM_TYPE_GAME_PAK;
+    gpr_regs[CPU_REG_S3] = cic_type == E_CIC_TYPE_8303 ? OS_BOOT_ROM_TYPE_DD : OS_BOOT_ROM_TYPE_GAME_PAK;
     gpr_regs[CPU_REG_S4] = os_tv_type;
     gpr_regs[CPU_REG_S5] = OS_BOOT_CONFIG->reset_type;
     gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seeds[cic_type]);

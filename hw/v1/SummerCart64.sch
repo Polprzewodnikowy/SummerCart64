@@ -802,7 +802,7 @@
 <pin name="AD7" x="20.32" y="25.4" length="middle" rot="R180"/>
 <pin name="3V3@42" x="-20.32" y="35.56" length="middle" direction="pwr"/>
 <pin name="CIC_DATA_CLK" x="20.32" y="-30.48" length="middle" direction="out" rot="R180"/>
-<pin name="JTCK" x="20.32" y="-17.78" length="middle" direction="in" rot="R180"/>
+<pin name="/INT" x="20.32" y="-17.78" length="middle" direction="in" function="dot" rot="R180"/>
 <pin name="/NMI" x="20.32" y="-15.24" length="middle" direction="out" function="dot" rot="R180"/>
 <pin name="VIDEO_SYNC" x="20.32" y="-38.1" length="middle" direction="out" rot="R180"/>
 <pin name="GND@47" x="-20.32" y="0" length="middle" direction="pwr"/>
@@ -1197,6 +1197,7 @@
 <devices>
 <device name="" package="N64_EDGE">
 <connects>
+<connect gate="&gt;NAME" pin="/INT" pad="44"/>
 <connect gate="&gt;NAME" pin="/NMI" pad="45"/>
 <connect gate="&gt;NAME" pin="/READ" pad="10"/>
 <connect gate="&gt;NAME" pin="/RESET" pad="20"/>
@@ -1239,7 +1240,6 @@
 <connect gate="&gt;NAME" pin="GND@48" pad="48"/>
 <connect gate="&gt;NAME" pin="GND@50" pad="50"/>
 <connect gate="&gt;NAME" pin="GND@6" pad="6"/>
-<connect gate="&gt;NAME" pin="JTCK" pad="44"/>
 <connect gate="&gt;NAME" pin="KEY@14" pad="14"/>
 <connect gate="&gt;NAME" pin="KEY@39" pad="39"/>
 <connect gate="&gt;NAME" pin="LAUDIO" pad="24"/>
@@ -16374,18 +16374,6 @@ Source: http://www.st.com/stonline/products/literature/ds/7194/ld1117axx.pdf</de
 <pinref part="RN2" gate="D" pin="1"/>
 </segment>
 </net>
-<net name="JTCK_C" class="0">
-<segment>
-<pinref part="J1" gate="&gt;NAME" pin="JTCK"/>
-<wire x1="274.32" y1="287.02" x2="281.94" y2="287.02" width="0.1524" layer="91"/>
-<label x="281.94" y="287.02" size="1.27" layer="95" xref="yes"/>
-</segment>
-<segment>
-<pinref part="RN2" gate="A" pin="1"/>
-<wire x1="175.26" y1="337.82" x2="182.88" y2="337.82" width="0.1524" layer="91"/>
-<label x="182.88" y="337.82" size="1.27" layer="95" rot="MR180" xref="yes"/>
-</segment>
-</net>
 <net name="CLK_SDRAM" class="0">
 <segment>
 <pinref part="U2" gate="G$1" pin="CLK"/>
@@ -17856,6 +17844,18 @@ Source: http://www.st.com/stonline/products/literature/ds/7194/ld1117axx.pdf</de
 <pinref part="U9" gate="G$1" pin="BCBUS0"/>
 <wire x1="472.44" y1="53.34" x2="574.04" y2="53.34" width="0.1524" layer="91"/>
 <pinref part="S1" gate="G$1" pin="3"/>
+</segment>
+</net>
+<net name="/INT_C" class="0">
+<segment>
+<pinref part="J1" gate="&gt;NAME" pin="/INT"/>
+<wire x1="274.32" y1="287.02" x2="281.94" y2="287.02" width="0.1524" layer="91"/>
+<label x="281.94" y="287.02" size="1.27" layer="95" xref="yes"/>
+</segment>
+<segment>
+<pinref part="RN2" gate="A" pin="1"/>
+<wire x1="175.26" y1="337.82" x2="182.88" y2="337.82" width="0.1524" layer="91"/>
+<label x="182.88" y="337.82" size="1.27" layer="95" rot="MR180" xref="yes"/>
 </segment>
 </net>
 </nets>

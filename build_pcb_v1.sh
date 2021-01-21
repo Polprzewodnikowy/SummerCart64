@@ -3,12 +3,12 @@
 PACKAGES_FOLDER_NAME="packages"
 PACKAGE_FILE_NAME="SummerCart64_PCB"
 FILES=(
-    "./hw/CAMOutputs"
+    "./hw/v1/CAMOutputs"
     # Manually created files
-    "./hw/SummerCart64_sch.pdf"
-    "./hw/SummerCart64_brd_top.pdf"
-    "./hw/SummerCart64_brd_bot.pdf"
-    "./hw/SummerCart64_brd_place_top.pdf"
+    "./hw/v1/SummerCart64_sch.pdf"
+    "./hw/v1/SummerCart64_brd_top.pdf"
+    "./hw/v1/SummerCart64_brd_bot.pdf"
+    "./hw/v1/SummerCart64_brd_place_top.pdf"
 )
 
 
@@ -19,7 +19,7 @@ fi
 
 
 # Generate Gerbers
-pushd hw
+pushd hw/v1
 if [[ -e CAMOutputs ]]; then
     rm -rf CAMOutputs
 fi
