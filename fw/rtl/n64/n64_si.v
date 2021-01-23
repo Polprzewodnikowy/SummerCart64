@@ -10,7 +10,7 @@ module n64_si (
     input i_write,
     output o_busy,
     output reg o_ack,
-    input [10:0] i_address,
+    input [8:0] i_address,
     input [31:0] i_data,
     output [31:0] o_data,
 
@@ -219,7 +219,7 @@ module n64_si (
         .wren_a(w_eeprom_write_op),
         .q_a(w_eeprom_o_data),
 
-        .address_b(i_address[10:2]),
+        .address_b(i_address),
         .data_b({i_data[7:0], i_data[15:8], i_data[23:16], i_data[31:24]}),
         .wren_b(!i_reset && i_request && i_write),
         .q_b({o_data[7:0], o_data[15:8], o_data[23:16], o_data[31:24]})

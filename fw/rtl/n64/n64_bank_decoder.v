@@ -18,13 +18,17 @@ module n64_bank_decoder (
     localparam [31:0] CART_BASE     = 32'h1E00_0000;
     localparam [31:0] CART_END      = 32'h1E00_3FFF;
 
-    localparam [31:0] EEPROM_BASE   = 32'h1E08_0000;
-    localparam [31:0] EEPROM_END    = 32'h1E08_07FF;
+    localparam [31:0] EEPROM_BASE   = 32'h1E00_4000;
+    localparam [31:0] EEPROM_END    = 32'h1E00_47FF;
+
+    localparam [31:0] SD_BASE       = 32'h1E00_8000;
+    localparam [31:0] SD_END        = 32'h1E00_87FF;
 
     wire [25:0] w_ddipl_translated_address = 26'(i_address - DDIPL_BASE + {6'd0, i_ddipl_address, 2'b00});
     wire [25:0] w_rom_translated_address = 26'(i_address - ROM_BASE);
     wire [25:0] w_cart_translated_address = 26'(i_address - CART_BASE);
     wire [25:0] w_eeprom_translated_address = 26'(i_address - EEPROM_BASE);
+    wire [25:0] w_sd_translated_address = 26'(i_address - SD_BASE);
 
     always @(*) begin
         o_bank = `BANK_INVALID;
@@ -52,6 +56,11 @@ module n64_bank_decoder (
             o_translated_address = w_eeprom_translated_address;
             o_bank = `BANK_EEPROM;
             o_bank_prefetch = 1'b1;
+        end
+
+        if (i_address >= SD_BASE && i_address <= SD_END) begin
+            o_translated_address = w_sd_translated_address;
+            o_bank = `BANK_SD;
         end
     end
 

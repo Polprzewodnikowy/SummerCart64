@@ -8,8 +8,8 @@ module top (
     input i_ftdi_so,
     input i_ftdi_cts,
 
-    input i_n64_nmi,
     input i_n64_reset,
+    input i_n64_nmi,
 
     input i_n64_pi_alel,
     input i_n64_pi_aleh,
@@ -60,11 +60,16 @@ module top (
     wire w_sys_reset = ~w_pll_lock;
 
 
-    // Temporary PMOD signal names
+    // Temporary signal names
 
     wire w_n64_reset_btn;
 
+    assign io_n64_cic_dq = 1'bZ;
+    assign {o_flash_clk, o_flash_cs, io_flash_dq} = 6'bZZZZZZ;
+    assign {o_sram_clk, o_sram_cs, io_sram_dq} = 6'bZZZZZZ;
+    assign {o_rtc_scl, io_rtc_sda} = 2'bZZ;
     assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
+    assign {io_pmod[7:4], io_pmod[2:0]} = 7'bZZZZZZZ;
 
 
     // PLL clock generator
@@ -82,7 +87,7 @@ module top (
     gpio_ddro sdram_clk_ddro (
         .outclock(w_sdram_clk),
         .outclocken(1'b1),
-        .din({1'b0, 1'b1}),
+        .din({1'b1, 1'b0}),
         .pad_out(o_sdram_clk)
     );
 
@@ -114,17 +119,22 @@ module top (
     wire w_n64_ack_eeprom;
     wire [31:0] w_n64_i_data_eeprom;
 
+    wire w_n64_busy_sd;
+    wire w_n64_ack_sd;
+    wire [31:0] w_n64_i_data_sd;
+
     wire w_ddipl_enable;
     wire [23:0] w_ddipl_address;
 
     always @(*) begin
-        w_n64_busy = w_n64_busy_cart_control || w_n64_busy_sdram || w_n64_busy_embedded_flash || w_n64_busy_eeprom;
-        w_n64_ack = w_n64_ack_cart_control || w_n64_ack_sdram || w_n64_ack_embedded_flash || w_n64_ack_eeprom;
+        w_n64_busy = w_n64_busy_cart_control || w_n64_busy_sdram || w_n64_busy_embedded_flash || w_n64_busy_eeprom || w_n64_busy_sd;
+        w_n64_ack = w_n64_ack_cart_control || w_n64_ack_sdram || w_n64_ack_embedded_flash || w_n64_ack_eeprom || w_n64_ack_sd;
         w_n64_i_data = 32'h0000_0000;
         if (w_n64_ack_cart_control) w_n64_i_data = w_n64_i_data_cart_control;
         if (w_n64_ack_sdram) w_n64_i_data = w_n64_i_data_sdram;
         if (w_n64_ack_embedded_flash) w_n64_i_data = w_n64_i_data_embedded_flash;
         if (w_n64_ack_eeprom) w_n64_i_data = w_n64_i_data_eeprom;
+        if (w_n64_ack_sd) w_n64_i_data = w_n64_i_data_sd;
     end
 
     n64_pi n64_pi_inst (
@@ -393,13 +403,13 @@ module top (
     wire w_eeprom_write;
     wire w_eeprom_busy;
     wire w_eeprom_ack;
-    wire [10:0] w_eeprom_address;
+    wire [8:0] w_eeprom_address;
     wire [31:0] w_eeprom_o_data;
     wire [31:0] w_eeprom_i_data;
 
     device_arbiter #(
         .NUM_CONTROLLERS(2),
-        .ADDRESS_WIDTH(11),
+        .ADDRESS_WIDTH(9),
         .DEVICE_BANK(`BANK_EEPROM)
     ) device_arbiter_eeprom_inst (
         .i_clk(w_sys_clk),
@@ -410,7 +420,7 @@ module top (
         .o_busy({w_pc_busy_eeprom, w_n64_busy_eeprom}),
         .o_ack({w_pc_ack_eeprom, w_n64_ack_eeprom}),
         .i_bank({w_pc_bank, w_n64_bank}),
-        .i_address({w_pc_address[12:2], w_n64_address[12:2]}),
+        .i_address({w_pc_address[10:2], w_n64_address[10:2]}),
         .o_data({w_pc_i_data_eeprom, w_n64_i_data_eeprom}),
         .i_data({w_pc_o_data, w_n64_o_data}),
 
@@ -441,6 +451,40 @@ module top (
 
         .i_eeprom_enable(w_eeprom_enable),
         .i_eeprom_16k_mode(w_eeprom_16k_mode)
+    );
+
+
+    // SD card
+
+    wire w_sd_clk;
+    wire w_sd_cs;
+    wire w_sd_mosi;
+    wire w_sd_miso;
+
+    assign o_sd_clk = w_sd_clk;
+    assign io_sd_dat[3] = w_sd_cs;
+    assign io_sd_cmd = w_sd_mosi;
+    assign w_sd_miso = io_sd_dat[0];
+    assign io_sd_dat[2:1] = 2'bZZ;
+
+    wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
+
+    sd_spi sd_spi_inst (
+        .i_clk(w_sys_clk),
+        .i_reset(w_sys_reset),
+
+        .o_sd_clk(w_sd_clk),
+        .o_sd_cs(w_sd_cs),
+        .o_sd_mosi(w_sd_mosi),
+        .i_sd_miso(w_sd_miso),
+
+        .i_request(w_n64_request_sd),
+        .i_write(w_n64_write),
+        .o_busy(w_n64_busy_sd),
+        .o_ack(w_n64_ack_sd),
+        .i_address(w_n64_address[10:2]),
+        .o_data(w_n64_i_data_sd),
+        .i_data(w_n64_o_data)
     );
 
 

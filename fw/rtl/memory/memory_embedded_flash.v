@@ -45,7 +45,7 @@ module memory_embedded_flash (
     onchip_flash onchip_flash_inst (
         .clock(i_clk),
         .reset_n(~i_reset),
-        .avmm_data_addr(i_address),
+        .avmm_data_addr(i_address[14:0]),
         .avmm_data_read(r_onchip_flash_request),
         .avmm_data_readdata(w_onchip_flash_o_data),
         .avmm_data_waitrequest(w_onchip_flash_busy),

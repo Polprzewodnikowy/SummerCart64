@@ -46,10 +46,12 @@ set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name SMART_RECOMPILE OFF
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
 set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
 set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
+set_global_assignment -name QIP_FILE rtl/intel/ram/ram_sd_buffer.qip
 set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
 set_global_assignment -name SDC_FILE constraints.sdc
 set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
@@ -62,6 +64,7 @@ set_global_assignment -name VERILOG_FILE rtl/memory/memory_sdram.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_bank_decoder.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_pi.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_si.v
+set_global_assignment -name VERILOG_FILE rtl/sd/sd_spi.v
 set_global_assignment -name VERILOG_FILE rtl/top.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_pc.v
