@@ -49,9 +49,9 @@ set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_n64_si_dq}]
 
 set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_sd_clk}]
 set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_sd_cmd}]
-set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_sd_dq[*]}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_sd_dat[*]}]
 set_false_path -from [get_ports {io_sd_cmd}] -to [get_clocks $w_sys_clk]
-set_false_path -from [get_ports {io_sd_dq[*]}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {io_sd_dat[*]}] -to [get_clocks $w_sys_clk]
 
 set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_led}]
 

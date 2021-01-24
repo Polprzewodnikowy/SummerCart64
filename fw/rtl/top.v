@@ -481,7 +481,7 @@ module top (
         .i_write(w_n64_write),
         .o_busy(w_n64_busy_sd),
         .o_ack(w_n64_ack_sd),
-        .i_address(w_n64_address[3:2]),
+        .i_address(w_n64_address[9:2]),
         .o_data(w_n64_i_data_sd),
         .i_data(w_n64_o_data)
     );

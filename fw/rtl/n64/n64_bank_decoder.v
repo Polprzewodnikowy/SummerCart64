@@ -22,7 +22,7 @@ module n64_bank_decoder (
     localparam [31:0] EEPROM_END    = 32'h1E00_47FF;
 
     localparam [31:0] SD_BASE       = 32'h1E00_8000;
-    localparam [31:0] SD_END        = 32'h1E00_800F;
+    localparam [31:0] SD_END        = 32'h1E00_83FF;
 
     wire [25:0] w_ddipl_translated_address = 26'(i_address - DDIPL_BASE + {6'd0, i_ddipl_address, 2'b00});
     wire [25:0] w_rom_translated_address = 26'(i_address - ROM_BASE);
