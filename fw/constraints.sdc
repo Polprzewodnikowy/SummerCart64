@@ -7,6 +7,8 @@ create_generated_clock -name flash_se_neg_reg -divide_by 2 -source [get_pins -co
 set w_sys_clk {sys_pll|altpll_component|auto_generated|pll1|clk[0]}
 set w_sdram_clk {sys_pll|altpll_component|auto_generated|pll1|clk[1]}
 
+set_annotated_delay -from sys_pll|altpll_component|auto_generated|wire_pll1_clk[0]~clkctrl|outclk 0
+
 derive_pll_clocks
 derive_clock_uncertainty
 
@@ -24,28 +26,34 @@ set_output_delay -clock $w_sdram_clk -min -0.8 {o_sdram_cs o_sdram_ras o_sdram_c
 set_multicycle_path -from [get_clocks $w_sys_clk] -to [get_clocks $w_sdram_clk] -setup -end 2
 
 
-# Asynchronous logic
+# False paths
 
-set_false_path -from [get_clocks {*}] -to [get_ports {o_ftdi_clk}]
-set_false_path -from [get_clocks {*}] -to [get_ports {o_ftdi_si}]
-set_false_path -from [get_ports {i_ftdi_so}] -to [get_clocks {*}]
-set_false_path -from [get_ports {i_ftdi_cts}] -to [get_clocks {*}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_ftdi_clk}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_ftdi_si}]
+set_false_path -from [get_ports {i_ftdi_so}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {i_ftdi_cts}] -to [get_clocks $w_sys_clk]
 
-set_false_path -from [get_ports {i_n64_reset}] -to [get_clocks {*}]
-set_false_path -from [get_ports {i_n64_nmi}] -to [get_clocks {*}]
+set_false_path -from [get_ports {i_n64_reset}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {i_n64_nmi}] -to [get_clocks $w_sys_clk]
 
-set_false_path -from [get_ports {i_n64_pi_alel}] -to [get_clocks {*}]
-set_false_path -from [get_ports {i_n64_pi_aleh}] -to [get_clocks {*}]
-set_false_path -from [get_ports {i_n64_pi_read}] -to [get_clocks {*}]
-set_false_path -from [get_ports {i_n64_pi_write}] -to [get_clocks {*}]
-set_false_path -from [get_ports {io_n64_pi_ad[*]}] -to [get_clocks {*}]
-set_false_path -from [get_clocks {*}] -to [get_ports {io_n64_pi_ad[*]}]
+set_false_path -from [get_ports {i_n64_pi_alel}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {i_n64_pi_aleh}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {i_n64_pi_read}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {i_n64_pi_write}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {io_n64_pi_ad[*]}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_n64_pi_ad[*]}]
 
-set_false_path -from [get_ports {i_n64_si_clk}] -to [get_clocks {*}]
-set_false_path -from [get_ports {io_n64_si_dq}] -to [get_clocks {*}]
-set_false_path -from [get_clocks {*}] -to [get_ports {io_n64_si_dq}]
+set_false_path -from [get_ports {i_n64_si_clk}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {io_n64_si_dq}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_n64_si_dq}]
 
-set_false_path -from [get_clocks {*}] -to [get_ports {o_led}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_sd_clk}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_sd_cmd}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_sd_dq[*]}]
+set_false_path -from [get_ports {io_sd_cmd}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_ports {io_sd_dq[*]}] -to [get_clocks $w_sys_clk]
 
-set_false_path -from [get_ports {io_pmod[*]}] -to [get_clocks {*}]
-set_false_path -from [get_clocks {*}] -to [get_ports {io_pmod[*]}]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {o_led}]
+
+set_false_path -from [get_ports {io_pmod[*]}] -to [get_clocks $w_sys_clk]
+set_false_path -from [get_clocks $w_sys_clk] -to [get_ports {io_pmod[*]}]

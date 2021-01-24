@@ -462,14 +462,13 @@ module top (
     wire w_sd_miso;
 
     assign o_sd_clk = w_sd_clk;
-    assign io_sd_dat[3] = w_sd_cs;
+    assign io_sd_dat = {w_sd_cs, 3'bZZZ};
     assign io_sd_cmd = w_sd_mosi;
     assign w_sd_miso = io_sd_dat[0];
-    assign io_sd_dat[2:1] = 2'bZZ;
-
+    
     wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
 
-    sd_spi sd_spi_inst (
+    sd_interface sd_interface_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
@@ -482,7 +481,7 @@ module top (
         .i_write(w_n64_write),
         .o_busy(w_n64_busy_sd),
         .o_ack(w_n64_ack_sd),
-        .i_address(w_n64_address[10:2]),
+        .i_address(w_n64_address[3:2]),
         .o_data(w_n64_i_data_sd),
         .i_data(w_n64_o_data)
     );
