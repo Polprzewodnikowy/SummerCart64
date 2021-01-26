@@ -16,6 +16,8 @@ module cart_control (
     output reg o_sdram_writable,
     output reg o_rom_switch,
     output reg o_ddipl_enable,
+    output reg o_sd_enable,
+    output reg o_eeprom_pi_enable,
     output reg o_eeprom_enable,
     output reg o_eeprom_16k_mode,
 
@@ -91,6 +93,8 @@ module cart_control (
             o_sdram_writable <= 1'b0;
             o_rom_switch <= 1'b0;
             o_ddipl_enable <= 1'b0;
+            o_sd_enable <= 1'b0;
+            o_eeprom_pi_enable <= 1'b0;
             o_eeprom_enable <= 1'b0;
             o_eeprom_16k_mode <= 1'b0;
             o_n64_reset_btn <= 1'b1;
@@ -103,7 +107,15 @@ module cart_control (
             if (i_request && i_write && !o_busy) begin
                 case (i_address[2:0])
                     REG_SCR: begin
-                        {o_eeprom_16k_mode, o_eeprom_enable, o_ddipl_enable, o_rom_switch, o_sdram_writable} <= i_data[4:0];
+                        {
+                            o_sd_enable,
+                            o_eeprom_pi_enable,
+                            o_eeprom_16k_mode,
+                            o_eeprom_enable,
+                            o_ddipl_enable,
+                            o_rom_switch,
+                            o_sdram_writable
+                        } <= i_data[6:0];
                     end
                     REG_BOOT: begin
                         r_bootloader <= i_data[15:0];
@@ -147,7 +159,15 @@ module cart_control (
             if (i_address < MEM_USB_FIFO_BASE) begin
                 case (i_address[2:0])
                     REG_SCR: begin
-                        o_data[4:0] <= {o_eeprom_16k_mode, o_eeprom_enable, o_ddipl_enable, o_rom_switch, o_sdram_writable};
+                        o_data[6:0] <= {
+                            o_sd_enable,
+                            o_eeprom_pi_enable,
+                            o_eeprom_16k_mode,
+                            o_eeprom_enable,
+                            o_ddipl_enable,
+                            o_rom_switch,
+                            o_sdram_writable
+                        };
                     end
                     REG_BOOT: begin
                         o_data[15:0] <= r_bootloader;

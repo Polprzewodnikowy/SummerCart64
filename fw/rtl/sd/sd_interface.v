@@ -28,13 +28,13 @@ module sd_interface (
 
     // Bus controller
 
-    reg [7:0] r_o_data;
+    reg [8:0] r_o_data;
 
     wire w_address_in_buffers = i_address >= MEM_SD_BUFFER_BASE;
     wire [31:0] w_sd_buffer_rx_o_data;
 
     assign o_busy = 1'b0;
-    assign o_data = w_address_in_buffers ? w_sd_buffer_rx_o_data : {24'd0, r_o_data};
+    assign o_data = w_address_in_buffers ? w_sd_buffer_rx_o_data : {23'd0, r_o_data};
 
     always @(posedge i_clk) begin
         o_ack <= !i_reset && i_request && !i_write && !o_busy;
@@ -49,6 +49,7 @@ module sd_interface (
     reg r_spi_start;
     reg [7:0] r_spi_tx_data;
     reg [7:0] r_spi_rx_data;
+
     reg r_spi_rx_only;
 
     reg r_spi_start_multi;
@@ -97,14 +98,11 @@ module sd_interface (
                         r_o_data[3:0] <= {r_spi_clk_div, r_spi_busy};
                     end
                     REG_SD_DR: begin
-                        r_o_data[7:0] <= r_spi_rx_data;
+                        r_o_data[8:0] <= {r_spi_busy, r_spi_rx_data};
                     end
                     default: begin end
                 endcase
             end
-            // else begin
-            //     o_data <= w_sd_buffer_rx_o_data;
-            // end
         end
     end
 
@@ -126,15 +124,13 @@ module sd_interface (
 
     // Buffers
 
-    reg [8:0] r_spi_multi_current_byte;
-    reg r_spi_multi_byte_write;
-
+    reg [8:0] r_spi_multi_tx_address;
     wire [7:0] w_spi_multi_tx_data;
 
     ram_sd_buffer ram_sd_buffer_tx_inst (
         .clock(i_clk),
 
-        .address_a(r_spi_multi_current_byte),
+        .address_a(r_spi_multi_tx_address),
         .q_a(w_spi_multi_tx_data),
 
         .wren_b(!i_reset && i_request && i_write && !o_busy && w_address_in_buffers),
@@ -142,11 +138,14 @@ module sd_interface (
         .data_b({i_data[7:0], i_data[15:8], i_data[23:16], i_data[31:24]})
     );
 
+    reg r_spi_multi_rx_byte_write;
+    reg [8:0] r_spi_multi_rx_address;
+
     ram_sd_buffer ram_sd_buffer_rx_inst (
         .clock(i_clk),
 
-        .wren_a(r_spi_multi_byte_write),
-        .address_a(r_spi_multi_current_byte - 1'd1),
+        .wren_a(r_spi_multi_rx_byte_write),
+        .address_a(r_spi_multi_rx_address),
         .data_a(r_spi_rx_data),
 
         .address_b(i_address[6:0]),
@@ -154,7 +153,7 @@ module sd_interface (
     );
 
 
-    // Actual SPI stuff
+    // Shifting operation
 
     reg r_spi_multi;
     reg r_spi_first_bit;
@@ -164,38 +163,41 @@ module sd_interface (
     wire [7:0] w_next_spi_tx_data = r_spi_rx_only ? 8'hFF : (r_spi_multi ? w_spi_multi_tx_data : r_spi_tx_data);
 
     always @(posedge i_clk) begin
-        r_spi_multi_byte_write <= 1'b0;
+        r_spi_multi_rx_byte_write <= 1'b0;
 
         if (i_reset) begin
             o_sd_clk <= 1'b0;
             r_spi_bit_clk <= 4'd8;
-            r_spi_multi_current_byte <= 9'd0;
+            r_spi_multi_tx_address <= 9'd0;
+            r_spi_multi_rx_address <= 9'd0;
         end else begin
             if (!r_spi_busy && (r_spi_start || r_spi_start_multi)) begin
                 r_spi_busy <= 1'b1;
                 r_spi_multi <= r_spi_start_multi;
                 r_spi_first_bit <= 1'b1;
-                // r_spi_multi_current_byte <= 9'd0;
             end else if (r_spi_busy && r_spi_clk_strobe) begin
                 if (r_spi_first_bit) begin
                     r_spi_first_bit <= 1'b0;
                     {o_sd_mosi, r_spi_tx_shift} <= w_next_spi_tx_data;
+                    r_spi_multi_tx_address <= r_spi_multi_tx_address + 1'd1;
                 end else if (!o_sd_clk) begin
                     o_sd_clk <= 1'b1;
                     r_spi_rx_data <= {r_spi_rx_data[6:0], i_sd_miso};
                     r_spi_bit_clk <= r_spi_bit_clk - 1'd1;
                     if (r_spi_bit_clk == 4'd1) begin
-                        r_spi_multi_current_byte <= r_spi_multi_current_byte + 1'd1;
-                        r_spi_multi_byte_write <= 1'b1;
+                        r_spi_multi_rx_byte_write <= 1'b1;
                     end
                 end else begin
                     o_sd_clk <= 1'b0;
                     if (r_spi_bit_clk == 4'd0) begin
-                        r_spi_bit_clk <= 4'd8;
                         {o_sd_mosi, r_spi_tx_shift} <= w_next_spi_tx_data;
-                        if (r_spi_multi_current_byte == 9'(r_spi_multi_length + 1'd1)) begin
+                        r_spi_bit_clk <= 4'd8;
+                        r_spi_multi_tx_address <= r_spi_multi_tx_address + 1'd1;
+                        r_spi_multi_rx_address <= r_spi_multi_rx_address + 1'd1;
+                        if (r_spi_multi_rx_address == r_spi_multi_length) begin
                             r_spi_busy <= 1'b0;
-                            r_spi_multi_current_byte <= 9'd0;
+                            r_spi_multi_tx_address <= 9'd0;
+                            r_spi_multi_rx_address <= 9'd0;
                         end
                     end else begin
                         {o_sd_mosi, r_spi_tx_shift} <= {r_spi_tx_shift, 1'b0};

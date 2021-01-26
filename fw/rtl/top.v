@@ -124,6 +124,9 @@ module top (
     wire [31:0] w_n64_i_data_sd;
 
     wire w_ddipl_enable;
+    wire w_sd_enable;
+    wire w_eeprom_pi_enable;
+
     wire [23:0] w_ddipl_address;
 
     always @(*) begin
@@ -158,6 +161,9 @@ module top (
         .o_data(w_n64_o_data),
 
         .i_ddipl_enable(w_ddipl_enable),
+        .i_sd_enable(w_sd_enable),
+        .i_eeprom_enable(w_eeprom_pi_enable),
+
         .i_ddipl_address(w_ddipl_address)
     );
 
@@ -299,6 +305,8 @@ module top (
         .o_sdram_writable(w_sdram_writable),
         .o_rom_switch(w_rom_switch),
         .o_ddipl_enable(w_ddipl_enable),
+        .o_sd_enable(w_sd_enable),
+        .o_eeprom_pi_enable(w_eeprom_pi_enable),
         .o_eeprom_enable(w_eeprom_enable),
         .o_eeprom_16k_mode(w_eeprom_16k_mode),
 

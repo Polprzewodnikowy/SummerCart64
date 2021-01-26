@@ -6,6 +6,8 @@ module n64_bank_decoder (
     output reg [3:0] o_bank,
     output reg o_bank_prefetch,
     input i_ddipl_enable,
+    input i_sd_enable,
+    input i_eeprom_enable,
     input [23:0] i_ddipl_address
 );
 
@@ -52,13 +54,13 @@ module n64_bank_decoder (
             o_bank = `BANK_CART;
         end
 
-        if (i_address >= EEPROM_BASE && i_address <= EEPROM_END) begin
+        if (i_address >= EEPROM_BASE && i_address <= EEPROM_END && i_eeprom_enable) begin
             o_translated_address = w_eeprom_translated_address;
             o_bank = `BANK_EEPROM;
             o_bank_prefetch = 1'b1;
         end
 
-        if (i_address >= SD_BASE && i_address <= SD_END) begin
+        if (i_address >= SD_BASE && i_address <= SD_END && i_sd_enable) begin
             o_translated_address = w_sd_translated_address;
             o_bank = `BANK_SD;
         end

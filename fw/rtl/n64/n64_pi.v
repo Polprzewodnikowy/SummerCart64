@@ -19,6 +19,9 @@ module n64_pi (
     output reg [31:0] o_data,
 
     input i_ddipl_enable,
+    input i_sd_enable,
+    input i_eeprom_enable,
+
     input [23:0] i_ddipl_address
 );
 
@@ -91,6 +94,8 @@ module n64_pi (
         .o_bank(o_bank),
         .o_bank_prefetch(w_bank_prefetch),
         .i_ddipl_enable(i_ddipl_enable),
+        .i_sd_enable(i_sd_enable),
+        .i_eeprom_enable(i_eeprom_enable),
         .i_ddipl_address(i_ddipl_address)
     );
 
