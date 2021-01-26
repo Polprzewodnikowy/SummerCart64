@@ -1,55 +1,78 @@
-#include <libdragon.h>
+// #include <libdragon.h>
 
 #include "boot.h"
 #include "crc32.h"
 #include "n64_regs.h"
+#include "sc64_sd.h"
+#include "ff.h"
+
 
 static cart_header_t global_cart_header __attribute__((aligned(16)));
 
-cart_header_t *boot_load_cart_header(cic_type_t cic_type) {
+static const struct crc32_to_cic_seed crc32_to_cic_seed[] = {
+    { .ipl3_crc32 = 0x587BD543, .cic_seed = 0x00AC },   // CIC5101
+    { .ipl3_crc32 = 0x6170A4A1, .cic_seed = 0x013F },   // CIC6101
+    { .ipl3_crc32 = 0x009E9EA3, .cic_seed = 0x013F },   // CIC7102
+    { .ipl3_crc32 = 0x90BB6CB5, .cic_seed = 0x003F },   // CICx102
+    { .ipl3_crc32 = 0x0B050EE0, .cic_seed = 0x0078 },   // CICx103
+    { .ipl3_crc32 = 0x98BC2C86, .cic_seed = 0x0091 },   // CICx105
+    { .ipl3_crc32 = 0xACC8580A, .cic_seed = 0x0085 },   // CICx106
+    { .ipl3_crc32 = 0x10C68B18, .cic_seed = 0x00DD },   // JP 64DD dev
+    { .ipl3_crc32 = 0x0E018159, .cic_seed = 0x00DD },   // JP 64DD retail
+    { .ipl3_crc32 = 0x8FEBA21E, .cic_seed = 0x00DE },   // US 64DD
+};
+
+
+void boot_load_menu_from_sd_card(const char *path) {
+    uint8_t pi_dma_buffer[64 * 1024] __attribute__((aligned(16)));
+    size_t offset = 0;
+
+    FATFS fatfs;
+    FIL fil;
+    UINT bytes_read = 0;
+
+    if (f_mount(&fatfs, "", 1) == FR_OK) {
+        if (f_open(&fil, path, FA_READ) == FR_OK) {
+            if (f_size(&fil)) {
+                do {
+                    if (f_read(&fil, pi_dma_buffer, sizeof(pi_dma_buffer), &bytes_read) != FR_OK) {
+                        break;
+                    }
+
+                    platform_cache_writeback(pi_dma_buffer, sizeof(pi_dma_buffer));
+                    platform_pi_dma_write(pi_dma_buffer, CART_BASE + offset, sizeof(pi_dma_buffer));
+
+                    offset += bytes_read;
+                } while (offset < f_size(&fil));
+            }
+        }
+    }
+
+    f_unmount("");
+
+    sc64_sd_deinit();
+}
+
+cart_header_t *boot_load_cart_header(void) {
     cart_header_t *cart_header_pointer = &global_cart_header;
 
-    data_cache_hit_writeback_invalidate(cart_header_pointer, sizeof(cart_header_t));
-    
-    disable_interrupts();
-
-    while (dma_busy());
-    MEMORY_BARRIER();
-    PI->dram_addr = cart_header_pointer;
-    MEMORY_BARRIER();
-    PI->cart_addr = (cic_type == E_CIC_TYPE_8303 ? DDIPL_BASE : CART_BASE) & 0x1FFFFFFF;
-    MEMORY_BARRIER();
-    PI->wr_len = sizeof(cart_header_t) - 1;
-    MEMORY_BARRIER();
-    while (dma_busy());
-
-    enable_interrupts();
-
-    data_cache_hit_invalidate(cart_header_pointer, sizeof(cart_header_t));
+    platform_pi_dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
+    platform_cache_invalidate(cart_header_pointer, sizeof(cart_header_t));
 
     return cart_header_pointer;
 }
 
-cic_type_t boot_get_cic_type(cart_header_t *cart_header) {
-    switch (crc32_calculate(cart_header->boot_code, sizeof(cart_header->boot_code))) {
-        case BOOT_CRC32_5101:
-            return E_CIC_TYPE_5101;
-        case BOOT_CRC32_6101:
-        case BOOT_CRC32_7102:
-            return E_CIC_TYPE_X101;
-        case BOOT_CRC32_X102:
-            return E_CIC_TYPE_X102;
-        case BOOT_CRC32_X103:
-            return E_CIC_TYPE_X103;
-        case BOOT_CRC32_X105:
-            return E_CIC_TYPE_X105;
-        case BOOT_CRC32_X106:
-            return E_CIC_TYPE_X106;
-        case BOOT_CRC32_8303:
-            return E_CIC_TYPE_8303;
-        default:
-            return E_CIC_TYPE_UNKNOWN;
+uint16_t boot_get_cic_seed(cart_header_t *cart_header) {
+    uint16_t cic_seed = crc32_to_cic_seed[3].cic_seed;
+    uint32_t ipl3_crc32 = crc32_calculate(cart_header->boot_code, sizeof(cart_header->boot_code));
+
+    for (size_t i = 0; i < ARRAY_ITEMS(crc32_to_cic_seed); i++) {
+        if (crc32_to_cic_seed[i].ipl3_crc32 == ipl3_crc32) {
+            cic_seed = crc32_to_cic_seed[i].cic_seed;
+        }
     }
+
+    return cic_seed;
 }
 
 tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
@@ -80,21 +103,17 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
     }
 }
 
-void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type) {
+void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint32_t ddipl_override) {
+    uint32_t is_x105_boot = (cic_seed == crc32_to_cic_seed[5].cic_seed);
+    uint32_t is_ddipl_boot = (
+        ddipl_override || 
+        (cic_seed == crc32_to_cic_seed[7].cic_seed) ||
+        (cic_seed == crc32_to_cic_seed[8].cic_seed) ||
+        (cic_seed == crc32_to_cic_seed[9].cic_seed)
+    );
     tv_type_t os_tv_type = tv_type == E_TV_TYPE_UNKNOWN ? OS_BOOT_CONFIG->tv_type : tv_type;
 
     volatile uint64_t gpr_regs[32];
-
-    const uint32_t cic_seeds[] = {
-        BOOT_SEED_X102,
-        BOOT_SEED_5101,
-        BOOT_SEED_X101,
-        BOOT_SEED_X102,
-        BOOT_SEED_X103,
-        BOOT_SEED_X105,
-        BOOT_SEED_X106,
-        BOOT_SEED_8303,
-    };
 
     while (!(SP->status & SP_STATUS_HALT));
 
@@ -133,7 +152,7 @@ void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type) {
     SP_MEM->imem[6] = 0x8DA80024;   // lw    t0, 0x0024(t5)
     SP_MEM->imem[7] = 0x3C0BB000;   // lui   t3, 0xB000
 
-    if (cic_type == E_CIC_TYPE_X105) {
+    if (is_x105_boot) {
         OS_BOOT_CONFIG->mem_size_6105 = OS_BOOT_CONFIG->mem_size;
     }
 
@@ -142,11 +161,11 @@ void boot(cart_header_t *cart_header, cic_type_t cic_type, tv_type_t tv_type) {
     }
 
     gpr_regs[CPU_REG_T3] = CPU_ADDRESS_IN_REG(SP_MEM->dmem[16]);
-    gpr_regs[CPU_REG_S3] = cic_type == E_CIC_TYPE_8303 ? OS_BOOT_ROM_TYPE_DD : OS_BOOT_ROM_TYPE_GAME_PAK;
+    gpr_regs[CPU_REG_S3] = is_ddipl_boot ? OS_BOOT_ROM_TYPE_DD : OS_BOOT_ROM_TYPE_GAME_PAK;
     gpr_regs[CPU_REG_S4] = os_tv_type;
     gpr_regs[CPU_REG_S5] = OS_BOOT_CONFIG->reset_type;
-    gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seeds[cic_type]);
-    gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seeds[cic_type]);
+    gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seed);
+    gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
     gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == E_TV_TYPE_PAL) ? 341 : 340]);
 
