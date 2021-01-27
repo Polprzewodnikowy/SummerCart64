@@ -8,7 +8,7 @@ static const size_t SC64_SD_BUFFER_SIZE = sizeof(SC64_SD->buffer);
 
 static uint8_t sd_spi_dma_buffer[sizeof(SC64_SD->buffer)] __attribute__((aligned(16)));
 static uint8_t sd_card_initialized = FALSE;
-static uint8_t sd_card_type = 0;
+static uint8_t sd_card_type_block = FALSE;
 
 
 static void sc64_sd_spi_set_prescaler(uint8_t prescaler) {
@@ -35,10 +35,6 @@ static uint8_t sc64_sd_spi_exchange(uint8_t data) {
     return (uint8_t) (dr & SC64_SD_DR_DATA_MASK);
 }
 
-static void sc64_sd_spi_write(uint8_t data) {
-    sc64_sd_spi_exchange(data);
-}
-
 static uint8_t sc64_sd_spi_read(void) {
     return sc64_sd_spi_exchange(0xFF);
 }
@@ -61,7 +57,7 @@ static void sc64_sd_spi_multi_write(uint8_t *data, size_t length) {
         platform_cache_writeback(sd_spi_dma_buffer, dma_transfer_length);
         platform_pi_dma_write(sd_spi_dma_buffer, &SC64_SD->buffer, dma_transfer_length);
 
-        platform_pi_io_write(&SC64_SD->multi, ((block_size - 1) << SC64_SD_MULTI_LENGTH_BIT) & SC64_SD_MULTI_LENGTH_MASK);
+        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(FALSE, block_size));
 
         while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
 
@@ -70,22 +66,25 @@ static void sc64_sd_spi_multi_write(uint8_t *data, size_t length) {
     } while (remaining > 0);
 }
 
-static void sc64_sd_spi_multi_read(uint8_t *data, size_t length) {
+static void sc64_sd_spi_multi_read(uint8_t *data, size_t length, uint8_t is_buffer_aligned) {
     size_t remaining = length;
     size_t offset = 0;
 
     do {
         size_t block_size = remaining < SC64_SD_BUFFER_SIZE ? remaining : SC64_SD_BUFFER_SIZE;
         uint32_t dma_transfer_length = block_size + ((block_size % 4) ? (4 - (block_size % 4)) : 0);
+        uint8_t *buffer_pointer = is_buffer_aligned ? (data + offset) : sd_spi_dma_buffer;
         
-        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI_RX_ONLY | (((block_size - 1) << SC64_SD_MULTI_LENGTH_BIT) & SC64_SD_MULTI_LENGTH_MASK));
+        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(TRUE, block_size));
 
         while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
         
-        platform_pi_dma_read(sd_spi_dma_buffer, &SC64_SD->buffer, dma_transfer_length);
-        platform_cache_invalidate(sd_spi_dma_buffer, dma_transfer_length);
+        platform_pi_dma_read(buffer_pointer, &SC64_SD->buffer, dma_transfer_length);
+        platform_cache_invalidate(buffer_pointer, dma_transfer_length);
 
-        memcpy(data + offset, sd_spi_dma_buffer, block_size);
+        if (!is_buffer_aligned) {
+            memcpy(data + offset, sd_spi_dma_buffer, block_size);
+        }
 
         remaining -= block_size;
         offset += block_size;
@@ -98,7 +97,7 @@ static uint8_t sc64_sd_wait_ready(void) {
     for (uint16_t attempts = 10000; attempts > 0; --attempts) {
         response = sc64_sd_spi_read();
 
-        if (response == 0xFF) {
+        if (response == SD_NOT_BUSY_RESPONSE) {
             break;
         }
     }
@@ -107,11 +106,13 @@ static uint8_t sc64_sd_wait_ready(void) {
 }
 
 uint8_t sc64_sd_init(void) {
-    uint8_t cmd;
-    uint8_t response;
-    uint8_t ocr[4];
-    uint8_t cmd6_data[64];
-    uint8_t ct;
+    uint32_t arg;
+    uint8_t success;
+    uint8_t response[5];
+    uint8_t *short_response = &response[0];
+    uint32_t *extended_response = (uint32_t *) &response[1];
+    uint8_t sd_version_2_or_later;
+    uint8_t status_data[64] __attribute__((aligned(16)));
 
     if (!sd_card_initialized) {
         sc64_enable_sd();
@@ -119,79 +120,71 @@ uint8_t sc64_sd_init(void) {
         sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
         sc64_sd_spi_release();
 
+        sc64_sd_spi_set_chip_select(TRUE);
+
         for (uint8_t dummy_clocks = 10; dummy_clocks > 0; --dummy_clocks) {
             sc64_sd_spi_read();
         }
 
-        ct = 0;
+        do {
+            success = sc64_sd_cmd_send(CMD0, 0, response);
+            if (!(success && *short_response == R1_IN_IDLE_STATE)) break;
 
-        if (sc64_sd_cmd_write(CMD0, 0) == 0x01) {
-            if (sc64_sd_cmd_write(CMD8, 0x1AA) == 1) {
-                sc64_sd_spi_multi_read(ocr, 4);
-
-                if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
-                    for (uint16_t attempts = 10000; attempts > 0; --attempts) {
-                        response = sc64_sd_cmd_write(ACMD41, (1 << 30));
-
-                        if (!response) {
-                            break;
-                        }
-                    }
-
-                    if (!response && sc64_sd_cmd_write(CMD58, 0) == 0) {
-                        sc64_sd_spi_multi_read(ocr, 4);
-                        ct = (ocr[0] & 0x40) ? CARD_TYPE_SD2 | CARD_TYPE_BLOCK : CARD_TYPE_SD2;
-                    }
-                }
+            arg = CMD8_ARG_SUPPLY_VOLTAGE_27_36_V | CMD8_ARG_CHECK_PATTERN_AA;
+            success = sc64_sd_cmd_send(CMD8, CMD8_ARG_SUPPLY_VOLTAGE_27_36_V | CMD8_ARG_CHECK_PATTERN_AA, response);
+            if (!success) {
+                break;
+            } else if (*short_response & R1_ILLEGAL_COMMAND) {
+                sd_version_2_or_later = FALSE;
+            } else if (
+                ((*extended_response & R7_VOLTAGE_ACCEPTED_MASK) == R7_SUPPLY_VOLTAGE_27_36_V) &&
+                ((*extended_response & R7_CHECK_PATTERN_MASK) == R7_CHECK_PATTERN_AA)
+            ) {
+                sd_version_2_or_later = TRUE;
             } else {
-                if (sc64_sd_cmd_write(ACMD41, 0) <= 1) {
-                    ct = CARD_TYPE_SD1;
-                    cmd = ACMD41;
-                } else {
-                    ct = CARD_TYPE_MMC;
-                    cmd = CMD1;
-                }
-                
-                for (uint16_t attempts = 10000; attempts > 0; --attempts) {
-                    response = sc64_sd_cmd_write(cmd, 0);
+                break;
+            }
 
-                    if (!response) {
-                        break;
-                    }
-                }
+            success = sc64_sd_cmd_send(CMD58, 0, response);
+            if (!success || (!(*extended_response & R3_27_36_V_MASK))) break;
 
-                if (response || sc64_sd_cmd_write(CMD16, 512) != 0) {
-                    ct = 0;
+            arg = sd_version_2_or_later ? ACMD41_ARG_HCS : 0;
+            for (size_t attempts = 0; attempts < 10000; attempts++) {
+                success = sc64_sd_cmd_send(ACMD41, arg, response);
+                if (!success || (!(*short_response & R1_IN_IDLE_STATE))) {
+                    break;
                 }
             }
-        }
+            if (!success) break;
 
-        if (ct) {
-            sd_card_initialized = TRUE;
-            sd_card_type = ct;
-
-            sc64_sd_spi_release();
+            success = sc64_sd_cmd_send(CMD58, 0, response);
+            if (!success) break;
+            sd_card_type_block = (*extended_response & R3_CCS) ? TRUE : FALSE;
 
             sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_4);
 
-            if (sc64_sd_cmd_write(CMD6, 0x00000001) == 0) {
-                if(sc64_sd_block_read(cmd6_data, 64)) {
-                    if (cmd6_data[13] & 0x02) {
-                        if (sc64_sd_cmd_write(CMD6, 0x80000001) == 0) {
-                            sc64_sd_block_read(cmd6_data, 64);
-                            sc64_sd_spi_release();
-                            sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_2);
-                        }
-                    }
-                }
+            // Set high speed mode
+            success = sc64_sd_cmd_send(CMD6, 0x00000001, response);
+            if (!success) break;
+            success = sc64_sd_block_read(status_data, 64);
+            if (!success) break;
+            if (status_data[13] & 0x02) {
+                success = sc64_sd_cmd_send(CMD6, 0x80000001, response);
+                if (!success) break;
+                success = sc64_sd_block_read(status_data, 64);
+                if (!success) break;
+                sc64_sd_spi_read();
+                sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_2);
             }
 
-            sc64_sd_spi_release();
-        } else {
-            sc64_sd_deinit();
+            sd_card_initialized = TRUE;
 
-            return FALSE;
-        }
+            return TRUE;
+        } while (0);
+
+        sc64_sd_deinit();
+
+        return FALSE;
     }
 
     return TRUE;
@@ -199,15 +192,12 @@ uint8_t sc64_sd_init(void) {
 
 void sc64_sd_deinit(void) {
     sd_card_initialized = FALSE;
-    sd_card_type = 0;
 
     sc64_sd_spi_release();
 
-    sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
-
-    platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI_RX_ONLY | (((512 - 1) << SC64_SD_MULTI_LENGTH_BIT) & SC64_SD_MULTI_LENGTH_MASK));
-
     while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
+    
+    sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
 
     sc64_disable_sd();
 }
@@ -216,109 +206,96 @@ uint8_t sc64_sd_get_status(void) {
     return sd_card_initialized ? TRUE : FALSE;
 }
 
-uint8_t sc64_sd_get_card_type(void) {
-    return sd_card_type;
-}
-
-uint8_t sc64_sd_cmd_write(uint8_t cmd, uint32_t arg) {
-    uint8_t response;
+uint8_t sc64_sd_cmd_send(uint8_t cmd, uint32_t arg, uint8_t *response) {
     uint8_t cmd_data[7];
     uint8_t cmd_data_length;
+    uint8_t is_long_response;
 
-    if (cmd & 0x80) {
-        cmd &= 0x7F;
-        
-        response = sc64_sd_cmd_write(CMD55, 0);
-        
-        if (response > 1) {
-            return response;
-        }
-    }
+    if (cmd & ACMD_MARK) {
+        sc64_sd_cmd_send(CMD55, 0, response);
 
-    sc64_sd_spi_set_chip_select(FALSE);
-    sc64_sd_spi_set_chip_select(TRUE);
-
-    response = sc64_sd_wait_ready();
-
-    if (response != 0xFF) {
-        return response;
-    }
-
-    cmd_data[0] = cmd;
-    cmd_data[1] = (uint8_t) (arg >> 24);
-    cmd_data[2] = (uint8_t) (arg >> 16);
-    cmd_data[3] = (uint8_t) (arg >> 8);
-    cmd_data[4] = (uint8_t) (arg >> 0);
-    cmd_data[5] = 0x01;
-    cmd_data[6] = 0xFF;
-
-    cmd_data_length = 6;
-
-    if (cmd == CMD0) {
-        cmd_data[5] = 0x95;
-    }
-
-    if (cmd == CMD8) {
-        cmd_data[5] = 0x87;
-    }
-
-    if (cmd == CMD12) {
-        cmd_data[5] = 0xFF;
-        cmd_data_length = 7;
-    }
-
-    sc64_sd_spi_multi_write(cmd_data, cmd_data_length);
-
-    for (uint32_t attempts = 100000; attempts > 0; --attempts) {
-        response = sc64_sd_spi_read();
-
-        if (!(response & 0x80)) {
-            break;
-        }
-    }
-
-    return response;
-}
-
-uint8_t sc64_sd_block_write(uint8_t *buffer, size_t length, uint8_t token) {
-    uint8_t crc[2] = { 0xFF, 0xFF };
-
-    if (sc64_sd_wait_ready() != 0xFF) {
-        return FALSE;
-    }
-
-    sc64_sd_spi_write(token);
-
-    if (token != 0xFD) {
-        sc64_sd_spi_multi_write(buffer, length);
-        sc64_sd_spi_multi_write(crc, 2);
-
-        if((sc64_sd_spi_read() & 0x1F) != 0x05) {
+        if (*response & ~(R1_IN_IDLE_STATE)) {
             return FALSE;
         }
     }
 
-    return TRUE;
+    if (sc64_sd_wait_ready() != SD_NOT_BUSY_RESPONSE) {
+        return FALSE;
+    }
+
+    if ((cmd == CMD17 || cmd == CMD18) && sd_card_type_block) {
+        
+    }
+
+    cmd_data[0] = cmd & ~ACMD_MARK;         // Command index
+    cmd_data[5] = 0x01;                     // CRC7 and stop bit
+    cmd_data[6] = 0xFF;                     // CMD12 stuff byte
+
+    cmd_data_length = 6;
+    is_long_response = FALSE;
+
+    switch (cmd) {
+        case CMD0:
+            cmd_data[5] = 0x95;
+            break;
+        case CMD8:
+            cmd_data[5] = 0x87;
+            is_long_response = TRUE;
+            break;
+        case CMD12:
+            cmd_data_length = 7;
+            break;
+        case CMD17:
+        case CMD18:
+            if (!sd_card_type_block) {
+                arg *= SD_BLOCK_SIZE;
+            }
+            break;
+        case CMD58:
+            is_long_response = TRUE;
+            break;
+    }
+
+    cmd_data[1] = (uint8_t) (arg >> 24);    // Command argument
+    cmd_data[2] = (uint8_t) (arg >> 16);
+    cmd_data[3] = (uint8_t) (arg >> 8);
+    cmd_data[4] = (uint8_t) (arg >> 0);
+
+    sc64_sd_spi_multi_write(cmd_data, cmd_data_length);
+
+    for (uint32_t response_timeout = 0; response_timeout < 8; response_timeout++) {
+        *response = sc64_sd_spi_read();
+
+        if (!(*response & RESPONSE_START_BIT)) {
+            if (is_long_response) {
+                sc64_sd_spi_multi_read(response + 1, 4, FALSE);
+            }
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
 }
 
 uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length) {
     uint8_t token;
-    uint8_t dummy[2];
+    uint8_t crc[2];
 
     for (uint16_t attempts = 10000; attempts > 0; --attempts) {
         token = sc64_sd_spi_read();
 
-        if (token != 0xFF) {
+        if (token != SD_NOT_BUSY_RESPONSE) {
             break;
         }
     }
 
-    if (token != 0xFE) {
+    if (token != DATA_TOKEN_BLOCK_READ) {
         return FALSE;
     }
 
-    sc64_sd_spi_multi_read(buffer, length);
-    sc64_sd_spi_multi_read(dummy, 2);
+    sc64_sd_spi_multi_read(buffer, length, TRUE);
+    sc64_sd_spi_multi_read(crc, 2, FALSE);
 
-    return TRUE;    
+    return TRUE;
 }

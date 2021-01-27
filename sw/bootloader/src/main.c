@@ -1,5 +1,6 @@
 #include "sc64.h"
 #include "boot.h"
+#include "error_display.h"
 
 
 static const char *MENU_FILE_PATH = "SC64/MENU.z64";
@@ -7,14 +8,12 @@ static const char *MENU_FILE_PATH = "SC64/MENU.z64";
 
 int main(void) {
     if (sc64_get_version() != SC64_CART_VERSION_A) {
-        while (1);  // Do nothing when not running on SummerCart64
+        error_display_and_halt(E_MENU_NOT_SC64, MENU_FILE_PATH);
     }
 
     sc64_enable_rom_switch();
 
     uint32_t boot_mode = sc64_get_boot_mode();
-
-    sc64_set_boot_mode(boot_mode | SC64_CART_BOOT_SKIP_MENU);
 
     uint32_t skip_menu = (boot_mode & SC64_CART_BOOT_SKIP_MENU);
     uint32_t cic_seed_override = (boot_mode & SC64_CART_BOOT_CIC_SEED_OVERRIDE);
@@ -26,9 +25,13 @@ int main(void) {
     if (!skip_menu) {
         sc64_enable_sdram_writable();
 
-        boot_load_menu_from_sd_card(MENU_FILE_PATH);
+        menu_load_error_t error = boot_load_menu_from_sd_card(MENU_FILE_PATH);
 
         sc64_disable_sdram_writable();
+
+        if (error != E_MENU_OK) {
+            error_display_and_halt(error, MENU_FILE_PATH);
+        }
     }
 
     if (ddipl_override) {

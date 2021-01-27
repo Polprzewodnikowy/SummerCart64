@@ -2,8 +2,8 @@
 #define PLATFORM_H__
 
 
-#include <inttypes.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <libdragon.h>
 

@@ -113,5 +113,7 @@ typedef struct sc64_sd_registers {
 #define SC64_SD_MULTI_LENGTH_BIT            (0)
 #define SC64_SD_MULTI_LENGTH_MASK           (0x1FF << SC64_SD_MULTI_LENGTH_BIT)
 
+#define SC64_SD_MULTI(r, l)                 (((r) ? (SC64_SD_MULTI_RX_ONLY) : 0) | ((((l) - 1) & SC64_SD_MULTI_LENGTH_MASK) >> SC64_SD_MULTI_LENGTH_BIT))
+
 
 #endif

@@ -3,10 +3,8 @@
 
 
 #include "platform.h"
+#include "error_display.h"
 
-
-#define BOOT_SEED_IPL3(x)           (((x) & 0x000000FF) >> 0)
-#define BOOT_SEED_OS_VERSION(x)     (((x) & 0x00000100) >> 8)
 
 struct crc32_to_cic_seed {
     uint32_t ipl3_crc32;
@@ -60,7 +58,11 @@ typedef struct os_boot_config_s os_boot_config_t;
 #define OS_BOOT_ROM_TYPE_GAME_PAK   (0)
 #define OS_BOOT_ROM_TYPE_DD         (1)
 
-void boot_load_menu_from_sd_card(const char *path);
+#define BOOT_SEED_IPL3(x)           (((x) & 0x000000FF) >> 0)
+#define BOOT_SEED_OS_VERSION(x)     (((x) & 0x00000100) >> 8)
+
+
+menu_load_error_t boot_load_menu_from_sd_card(const char *path);
 cart_header_t *boot_load_cart_header(void);
 uint16_t boot_get_cic_seed(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);
