@@ -94,7 +94,7 @@ static void sc64_sd_spi_multi_read(uint8_t *data, size_t length, uint8_t is_buff
 static uint8_t sc64_sd_wait_ready(void) {
     uint8_t response;
 
-    for (uint16_t attempts = 10000; attempts > 0; --attempts) {
+    for (size_t attempts = 10000; attempts > 0; --attempts) {
         response = sc64_sd_spi_read();
 
         if (response == SD_NOT_BUSY_RESPONSE) {
@@ -282,7 +282,7 @@ uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length) {
     uint8_t token;
     uint8_t crc[2];
 
-    for (uint16_t attempts = 10000; attempts > 0; --attempts) {
+    for (size_t attempts = 10000; attempts > 0; --attempts) {
         token = sc64_sd_spi_read();
 
         if (token != SD_NOT_BUSY_RESPONSE) {
