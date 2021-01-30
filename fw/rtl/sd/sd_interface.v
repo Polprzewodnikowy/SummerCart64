@@ -1,3 +1,5 @@
+`include "../constants.vh"
+
 module sd_interface (
     input i_clk,
     input i_reset,
@@ -13,15 +15,25 @@ module sd_interface (
     output reg o_ack,
     input [7:0] i_address,
     output [31:0] o_data,
-    input [31:0] i_data
+    input [31:0] i_data,
+
+    output o_dma_request,
+    output o_dma_write,
+    input i_dma_busy,
+    input i_dma_ack,
+    output [3:0] o_dma_bank,
+    output [23:0] o_dma_address,
+    input [31:0] i_dma_data,
+    output [31:0] o_dma_data
 );
 
     // Register offsets
 
-    localparam [1:0] REG_SD_SCR         = 2'd0;
-    localparam [1:0] REG_SD_CS          = 2'd1;
-    localparam [1:0] REG_SD_DR          = 2'd2;
-    localparam [1:0] REG_SD_MULTI       = 2'd3;
+    localparam [2:0] REG_SD_SCR         = 3'd0;
+    localparam [2:0] REG_SD_CS          = 3'd1;
+    localparam [2:0] REG_SD_DR          = 3'd2;
+    localparam [2:0] REG_SD_MULTI       = 3'd3;
+    localparam [2:0] REG_SD_DMA         = 3'd4;
 
     localparam [7:0] MEM_SD_BUFFER_BASE = 8'h80;
 
@@ -41,6 +53,38 @@ module sd_interface (
     end
 
 
+    // DMA controller
+
+    reg r_dma_fifo_flush;
+    reg r_dma_fifo_push;
+    reg [31:0] r_dma_fifo_data;
+    reg r_dma_start;
+
+    wire w_dma_fifo_full;
+    wire w_dma_fifo_empty;
+    
+    sd_dma sd_dma_inst (
+        .i_clk(i_clk),
+        .i_reset(i_reset),
+
+        .i_fifo_flush(r_dma_fifo_flush),
+        .i_fifo_push(r_dma_fifo_push),
+        .o_fifo_full(w_dma_fifo_full),
+        .o_fifo_empty(w_dma_fifo_empty),
+        .i_fifo_data(r_dma_fifo_data),
+
+        .i_start(r_dma_start),
+
+        .o_request(o_dma_request),
+        .o_write(o_dma_write),
+        .i_busy(i_dma_busy),
+        .i_ack(i_dma_ack),
+        .o_address(o_dma_address),
+        .i_data(i_dma_data),
+        .o_data(o_dma_data)
+    );
+
+
     // Bus <-> peripheral interface registers
 
     reg r_spi_busy;
@@ -54,6 +98,7 @@ module sd_interface (
 
     reg r_spi_start_multi;
     reg [8:0] r_spi_multi_length;
+    reg r_spi_multi_dma;
 
 
     // Write logic
@@ -61,12 +106,14 @@ module sd_interface (
     always @(posedge i_clk) begin
         r_spi_start <= 1'b0;
         r_spi_start_multi <= 1'b0;
+        r_dma_start <= 1'b0;
+        r_dma_fifo_flush <= 1'b0;
 
         if (i_reset) begin
             o_sd_cs <= 1'b1;
             r_spi_clk_div <= 3'b111;
         end else if (i_request && i_write && !o_busy && !w_address_in_buffers) begin
-            case (i_address[1:0])
+            case (i_address[2:0])
                 REG_SD_SCR: begin
                     r_spi_clk_div <= i_data[3:1];
                 end
@@ -78,10 +125,14 @@ module sd_interface (
                     r_spi_tx_data <= i_data[7:0];
                     r_spi_rx_only <= 1'b0;
                     r_spi_multi_length <= 9'd0;
+                    r_spi_multi_dma <= 1'b0;
                 end
                 REG_SD_MULTI: if (!r_spi_busy) begin
                     r_spi_start_multi <= 1'b1;
-                    {r_spi_rx_only, r_spi_multi_length} <= i_data[9:0];
+                    {r_spi_multi_dma, r_spi_rx_only, r_spi_multi_length} <= i_data[10:0];
+                end
+                REG_SD_DMA: begin
+                    {r_dma_fifo_flush, r_dma_start} <= i_data[1:0];
                 end
             endcase
         end
@@ -93,14 +144,16 @@ module sd_interface (
     always @(posedge i_clk) begin
         if (!i_reset && i_request && !i_write && !o_busy) begin
             if (!w_address_in_buffers) begin
-                case (i_address[1:0])
+                case (i_address[2:0])
                     REG_SD_SCR: begin
                         r_o_data[3:0] <= {r_spi_clk_div, r_spi_busy};
                     end
                     REG_SD_DR: begin
                         r_o_data[8:0] <= {r_spi_busy, r_spi_rx_data};
                     end
-                    default: begin end
+                    REG_SD_DMA: begin
+                        r_o_data[1:0] <= {w_dma_fifo_full, w_dma_fifo_empty};
+                    end
                 endcase
             end
         end
@@ -115,10 +168,12 @@ module sd_interface (
 
     wire w_spi_clk_div_selected = r_spi_clk_div_counter[r_spi_clk_div];
 
+    wire w_spi_clk_stop = w_dma_fifo_full;
+
     always @(posedge i_clk) begin
         r_spi_clk_div_counter <= r_spi_clk_div_counter + 1'd1;
         r_spi_clk_prev_value <= w_spi_clk_div_selected;
-        r_spi_clk_strobe <= w_spi_clk_div_selected != r_spi_clk_prev_value;
+        r_spi_clk_strobe <= (w_spi_clk_div_selected != r_spi_clk_prev_value) && !w_dma_fifo_full;
     end
 
 
@@ -206,5 +261,32 @@ module sd_interface (
             end
         end
     end
+
+
+    // DMA RX FIFO controller
+
+    reg [1:0] r_dma_byte_counter;
+
+    always @(posedge i_clk) begin
+        r_dma_fifo_push <= 1'b0;
+
+        if (i_reset) begin
+            r_dma_byte_counter <= 2'd0;
+        end else begin
+            if (!r_spi_busy || (r_spi_busy && !r_spi_multi_dma)) begin
+                if (r_dma_start || r_dma_fifo_flush) begin
+                    r_dma_byte_counter <= 2'd0;
+                end
+            end else if (r_spi_multi_rx_byte_write && r_spi_multi_dma) begin
+                r_dma_byte_counter <= r_dma_byte_counter + 1'd1;
+                r_dma_fifo_data <= {r_dma_fifo_data[23:0], r_spi_rx_data};
+                if (r_dma_byte_counter == 2'd3) begin
+                    r_dma_fifo_push <= 1'b1;
+                end
+            end
+        end
+    end
+
+    assign o_dma_bank = `BANK_ROM;
 
 endmodule

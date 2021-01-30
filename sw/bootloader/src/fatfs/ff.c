@@ -6872,3 +6872,5 @@ FRESULT f_setcp (
 }
 #endif	/* FF_CODE_PAGE == 0 */
 
+#include "ff_extensions.c.inc"
+

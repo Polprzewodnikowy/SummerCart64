@@ -1,11 +1,15 @@
 #ifndef N64_REGS_H__
 #define N64_REGS_H__
 
+
 #include <inttypes.h>
+
 
 #define ARRAY_ITEMS(x)          (sizeof(x) / sizeof(x[0]))
 
+
 #define CPU_ADDRESS_IN_REG(x)   ((0xFFFFFFFFULL << 32) | ((uint32_t) (&(x))))
+
 
 #define CPU_REG_Z0              (0)
 #define CPU_REG_AT              (1)
@@ -39,6 +43,7 @@
 #define CPU_REG_SP              (29)
 #define CPU_REG_FP              (30)
 #define CPU_REG_RA              (31)
+
 
 typedef struct SP_MEM_s {
     volatile uint32_t dmem[1024];
@@ -109,6 +114,7 @@ typedef struct PI_regs_s {
     volatile uint32_t dom2_rls;
 } PI_regs_t;
 
+
 #define SP_MEM_BASE                         (0xA4000000)
 #define SP_REGS_BASE                        (0xA4040000)
 #define DP_CMD_REGS_BASE                    (0xA4100000)
@@ -143,5 +149,6 @@ typedef struct PI_regs_s {
 #define PI_STATUS_IO_BUSY                   (1 << 1)
 #define PI_STATUS_RESET_CONTROLLER          (1 << 0)
 #define PI_STATUS_CLEAR_INTERRUPT           (1 << 1)
+
 
 #endif

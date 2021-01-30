@@ -1,6 +1,8 @@
-#include "sc64.h"
 #include "boot.h"
 #include "error_display.h"
+
+#include "sc64.h"
+#include "sc64_sd_fs.h"
 
 
 static const char *MENU_FILE_PATH = "SC64/MENU.z64";
@@ -8,7 +10,7 @@ static const char *MENU_FILE_PATH = "SC64/MENU.z64";
 
 int main(void) {
     if (sc64_get_version() != SC64_CART_VERSION_A) {
-        error_display_and_halt(E_MENU_NOT_SC64, MENU_FILE_PATH);
+        error_display_and_halt(E_MENU_ERROR_NOT_SC64, MENU_FILE_PATH);
     }
 
     sc64_enable_rom_switch();
@@ -23,11 +25,29 @@ int main(void) {
     uint16_t cic_seed = ((boot_mode & SC64_CART_BOOT_CIC_SEED_MASK) >> SC64_CART_BOOT_CIC_SEED_BIT);
 
     if (!skip_menu) {
-        sc64_enable_sdram_writable();
+        sc64_sd_fs_error_t sd_error = sc64_sd_fs_load_rom(MENU_FILE_PATH);
 
-        menu_load_error_t error = boot_load_menu_from_sd_card(MENU_FILE_PATH);
+        menu_load_error_t error = E_MENU_OK;
 
-        sc64_disable_sdram_writable();
+        switch (sd_error) {
+            case SC64_SD_FS_NO_CARD:
+                error = E_MENU_ERROR_NO_CARD;
+                break;
+            case SC64_SD_FS_NO_FILESYSTEM:
+                error = E_MENU_ERROR_NO_FILESYSTEM;
+                break;
+            case SC64_SD_FS_NO_FILE:
+                error = E_MENU_ERROR_NO_FILE;
+                break;
+            case SC64_SD_FS_READ_ERROR:
+                error = E_MENU_ERROR_READ_ERROR;
+                break;
+            case SC64_SD_FS_OTHER_ERROR:
+                error = E_MENU_ERROR_OTHER_ERROR;
+                break;
+            default:
+                break;
+        }
 
         if (error != E_MENU_OK) {
             error_display_and_halt(error, MENU_FILE_PATH);

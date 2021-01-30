@@ -3,7 +3,6 @@
 
 
 #include "platform.h"
-#include "error_display.h"
 
 
 struct crc32_to_cic_seed {
@@ -52,6 +51,7 @@ struct os_boot_config_s {
 
 typedef struct os_boot_config_s os_boot_config_t;
 
+
 #define OS_BOOT_CONFIG_BASE         (0xA0000300)
 #define OS_BOOT_CONFIG              ((os_boot_config_t *) OS_BOOT_CONFIG_BASE)
 
@@ -62,7 +62,6 @@ typedef struct os_boot_config_s os_boot_config_t;
 #define BOOT_SEED_OS_VERSION(x)     (((x) & 0x00000100) >> 8)
 
 
-menu_load_error_t boot_load_menu_from_sd_card(const char *path);
 cart_header_t *boot_load_cart_header(void);
 uint16_t boot_get_cic_seed(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);

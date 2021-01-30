@@ -345,6 +345,57 @@ module top (
     );
 
 
+    // SD card
+
+    wire w_sd_clk;
+    wire w_sd_cs;
+    wire w_sd_mosi;
+    wire w_sd_miso;
+
+    assign o_sd_clk = w_sd_clk;
+    assign io_sd_dat = {w_sd_cs, 3'bZZZ};
+    assign io_sd_cmd = w_sd_mosi;
+    assign w_sd_miso = io_sd_dat[0];
+    
+    wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
+
+    wire w_sd_dma_request;
+    wire w_sd_dma_write;
+    wire w_sd_dma_busy;
+    wire w_sd_dma_ack;
+    wire [3:0] w_sd_dma_bank;
+    wire [23:0] w_sd_dma_address;
+    wire [31:0] w_sd_dma_i_data;
+    wire [31:0] w_sd_dma_o_data;
+
+    sd_interface sd_interface_inst (
+        .i_clk(w_sys_clk),
+        .i_reset(w_sys_reset),
+
+        .o_sd_clk(w_sd_clk),
+        .o_sd_cs(w_sd_cs),
+        .o_sd_mosi(w_sd_mosi),
+        .i_sd_miso(w_sd_miso),
+
+        .i_request(w_n64_request_sd),
+        .i_write(w_n64_write),
+        .o_busy(w_n64_busy_sd),
+        .o_ack(w_n64_ack_sd),
+        .i_address(w_n64_address[9:2]),
+        .o_data(w_n64_i_data_sd),
+        .i_data(w_n64_o_data),
+
+        .o_dma_request(w_sd_dma_request),
+        .o_dma_write(w_sd_dma_write),
+        .i_dma_busy(w_sd_dma_busy),
+        .i_dma_ack(w_sd_dma_ack),
+        .o_dma_bank(w_sd_dma_bank),
+        .o_dma_address(w_sd_dma_address),
+        .i_dma_data(w_sd_dma_i_data),
+        .o_dma_data(w_sd_dma_o_data)
+    );
+
+
     // SDRAM
 
     wire w_sdram_request_n64 = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && w_sdram_writable));
@@ -358,21 +409,21 @@ module top (
     wire [31:0] w_sdram_i_data;
 
     device_arbiter #(
-        .NUM_CONTROLLERS(2),
+        .NUM_CONTROLLERS(3),
         .ADDRESS_WIDTH(25),
         .DEVICE_BANK(`BANK_ROM)
     ) device_arbiter_sdram_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request({w_pc_request, w_sdram_request_n64}),
-        .i_write({w_pc_write, w_n64_write}),
-        .o_busy({w_pc_busy_sdram, w_n64_busy_sdram}),
-        .o_ack({w_pc_ack_sdram, w_n64_ack_sdram}),
-        .i_bank({w_pc_bank, w_n64_bank}),
-        .i_address({w_pc_address[25:1], w_n64_address[25:1]}),
-        .o_data({w_pc_i_data_sdram, w_n64_i_data_sdram}),
-        .i_data({w_pc_o_data, w_n64_o_data}),
+        .i_request({w_sd_dma_request, w_pc_request, w_sdram_request_n64}),
+        .i_write({w_sd_dma_write, w_pc_write, w_n64_write}),
+        .o_busy({w_sd_dma_busy, w_pc_busy_sdram, w_n64_busy_sdram}),
+        .o_ack({w_sd_dma_ack, w_pc_ack_sdram, w_n64_ack_sdram}),
+        .i_bank({w_sd_dma_bank, w_pc_bank, w_n64_bank}),
+        .i_address({{w_sd_dma_address, 1'b0}, w_pc_address[25:1], w_n64_address[25:1]}),
+        .o_data({w_sd_dma_i_data, w_pc_i_data_sdram, w_n64_i_data_sdram}),
+        .i_data({w_sd_dma_o_data, w_pc_o_data, w_n64_o_data}),
 
         .o_device_request(w_sdram_request),
         .o_device_write(w_sdram_write),
@@ -459,39 +510,6 @@ module top (
 
         .i_eeprom_enable(w_eeprom_enable),
         .i_eeprom_16k_mode(w_eeprom_16k_mode)
-    );
-
-
-    // SD card
-
-    wire w_sd_clk;
-    wire w_sd_cs;
-    wire w_sd_mosi;
-    wire w_sd_miso;
-
-    assign o_sd_clk = w_sd_clk;
-    assign io_sd_dat = {w_sd_cs, 3'bZZZ};
-    assign io_sd_cmd = w_sd_mosi;
-    assign w_sd_miso = io_sd_dat[0];
-    
-    wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
-
-    sd_interface sd_interface_inst (
-        .i_clk(w_sys_clk),
-        .i_reset(w_sys_reset),
-
-        .o_sd_clk(w_sd_clk),
-        .o_sd_cs(w_sd_cs),
-        .o_sd_mosi(w_sd_mosi),
-        .i_sd_miso(w_sd_miso),
-
-        .i_request(w_n64_request_sd),
-        .i_write(w_n64_write),
-        .o_busy(w_n64_busy_sd),
-        .o_ack(w_n64_ack_sd),
-        .i_address(w_n64_address[9:2]),
-        .o_data(w_n64_i_data_sd),
-        .i_data(w_n64_o_data)
     );
 
 

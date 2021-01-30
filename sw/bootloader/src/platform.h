@@ -8,10 +8,13 @@
 #include <libdragon.h>
 
 
-#define TRUE    (1)
-#define FALSE   (0)
+#define BOOTLOADER_VERSION  (1)
 
-#define __IO    volatile
+
+#define TRUE                (1)
+#define FALSE               (0)
+
+#define __IO                volatile
 
 typedef uint32_t reg_t;
 

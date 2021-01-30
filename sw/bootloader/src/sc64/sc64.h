@@ -5,6 +5,9 @@
 #include "sc64_regs.h"
 
 
+#define SC64_SDRAM_SIZE     (64 * 1024 * 1024)
+
+
 void sc64_enable_sd(void);
 void sc64_disable_sd(void);
 void sc64_enable_eeprom_pi(void);

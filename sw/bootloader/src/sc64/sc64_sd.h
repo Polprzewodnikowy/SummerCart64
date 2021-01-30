@@ -58,7 +58,9 @@ uint8_t sc64_sd_init(void);
 void sc64_sd_deinit(void);
 uint8_t sc64_sd_get_status(void);
 uint8_t sc64_sd_cmd_send(uint8_t cmd, uint32_t arg, uint8_t *response);
-uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length);
+uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length, uint8_t dma);
+void sc64_sd_dma_prepare(void);
+void sc64_sd_dma_wait_for_finish(void);
 
 
 #endif

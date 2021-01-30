@@ -1,8 +1,6 @@
 #include "boot.h"
 #include "crc32.h"
 #include "n64_regs.h"
-#include "sc64_sd.h"
-#include "ff.h"
 
 
 static const struct crc32_to_cic_seed crc32_to_cic_seed[] = {
@@ -21,55 +19,6 @@ static const struct crc32_to_cic_seed crc32_to_cic_seed[] = {
 
 static cart_header_t global_cart_header __attribute__((aligned(16)));
 
-
-menu_load_error_t boot_load_menu_from_sd_card(const char *path) {
-    menu_load_error_t error = E_MENU_OK;
-
-    uint8_t pi_dma_buffer[64 * 1024] __attribute__((aligned(16)));
-    size_t offset = 0;
-
-    FRESULT fresult;
-    FATFS fatfs;
-    FIL fil;
-    UINT bytes_read = 0;
-
-    do {
-        fresult = f_mount(&fatfs, "", 1);
-        if (fresult != FR_OK) {
-            error = (fresult == FR_NO_FILESYSTEM) ? E_MENU_ERROR_NO_FILESYSTEM : E_MENU_ERROR_NO_OR_BAD_SD_CARD;
-            break;
-        }
-
-        fresult = f_open(&fil, path, FA_READ);
-        if (fresult != FR_OK) {
-            error = ((fresult == FR_NO_PATH) || (fresult == FR_NO_FILE)) ? E_MENU_ERROR_NO_FILE_TO_LOAD : E_MENU_ERROR_NO_OR_BAD_SD_CARD;
-            break;
-        }
-
-        if (!f_size(&fil)) {
-            error = E_MENU_ERROR_BAD_FILE;
-            break;
-        }
-
-        do {
-            if (f_read(&fil, pi_dma_buffer, sizeof(pi_dma_buffer), &bytes_read) != FR_OK) {
-                error = E_MENU_ERROR_READ_EXCEPTION;
-                break;
-            }
-
-            platform_cache_writeback(pi_dma_buffer, sizeof(pi_dma_buffer));
-            platform_pi_dma_write(pi_dma_buffer, CART_BASE + offset, sizeof(pi_dma_buffer));
-
-            offset += bytes_read;
-        } while (offset < f_size(&fil));
-    } while (0);
-
-    f_unmount("");
-
-    sc64_sd_deinit();
-
-    return error;
-}
 
 cart_header_t *boot_load_cart_header(void) {
     cart_header_t *cart_header_pointer = &global_cart_header;

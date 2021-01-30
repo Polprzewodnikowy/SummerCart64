@@ -64,6 +64,7 @@ set_global_assignment -name VERILOG_FILE rtl/memory/memory_sdram.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_bank_decoder.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_pi.v
 set_global_assignment -name VERILOG_FILE rtl/n64/n64_si.v
+set_global_assignment -name VERILOG_FILE rtl/sd/sd_dma.v
 set_global_assignment -name VERILOG_FILE rtl/sd/sd_interface.v
 set_global_assignment -name VERILOG_FILE rtl/top.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v

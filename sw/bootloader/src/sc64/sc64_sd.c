@@ -57,7 +57,7 @@ static void sc64_sd_spi_multi_write(uint8_t *data, size_t length) {
         platform_cache_writeback(sd_spi_dma_buffer, dma_transfer_length);
         platform_pi_dma_write(sd_spi_dma_buffer, &SC64_SD->buffer, dma_transfer_length);
 
-        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(FALSE, block_size));
+        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(FALSE, FALSE, block_size));
 
         while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
 
@@ -75,7 +75,7 @@ static void sc64_sd_spi_multi_read(uint8_t *data, size_t length, uint8_t is_buff
         uint32_t dma_transfer_length = block_size + ((block_size % 4) ? (4 - (block_size % 4)) : 0);
         uint8_t *buffer_pointer = is_buffer_aligned ? (data + offset) : sd_spi_dma_buffer;
         
-        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(TRUE, block_size));
+        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(FALSE, TRUE, block_size));
 
         while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
         
@@ -88,6 +88,20 @@ static void sc64_sd_spi_multi_read(uint8_t *data, size_t length, uint8_t is_buff
 
         remaining -= block_size;
         offset += block_size;
+    } while (remaining > 0);
+}
+
+static void sc64_sd_spi_multi_read_dma(size_t length) {
+    size_t remaining = length;
+
+    do {
+        size_t block_size = remaining < SC64_SD_BUFFER_SIZE ? remaining : SC64_SD_BUFFER_SIZE;
+
+        platform_pi_io_write(&SC64_SD->multi, SC64_SD_MULTI(TRUE, TRUE, block_size));
+
+        while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
+
+        remaining -= block_size;
     } while (remaining > 0);
 }
 
@@ -116,6 +130,8 @@ uint8_t sc64_sd_init(void) {
 
     if (!sd_card_initialized) {
         sc64_enable_sd();
+
+        platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH);
 
         sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
         sc64_sd_spi_release();
@@ -166,12 +182,12 @@ uint8_t sc64_sd_init(void) {
             // Set high speed mode
             success = sc64_sd_cmd_send(CMD6, 0x00000001, response);
             if (!success) break;
-            success = sc64_sd_block_read(status_data, 64);
+            success = sc64_sd_block_read(status_data, 64, FALSE);
             if (!success) break;
             if (status_data[13] & 0x02) {
                 success = sc64_sd_cmd_send(CMD6, 0x80000001, response);
                 if (!success) break;
-                success = sc64_sd_block_read(status_data, 64);
+                success = sc64_sd_block_read(status_data, 64, FALSE);
                 if (!success) break;
                 sc64_sd_spi_read();
                 sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_2);
@@ -196,6 +212,8 @@ void sc64_sd_deinit(void) {
     sc64_sd_spi_release();
 
     while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
+
+    platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH);
     
     sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
 
@@ -278,7 +296,7 @@ uint8_t sc64_sd_cmd_send(uint8_t cmd, uint32_t arg, uint8_t *response) {
     return FALSE;
 }
 
-uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length) {
+uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length, uint8_t dma) {
     uint8_t token;
     uint8_t crc[2];
 
@@ -294,8 +312,20 @@ uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length) {
         return FALSE;
     }
 
-    sc64_sd_spi_multi_read(buffer, length, TRUE);
+    if (dma) {
+        sc64_sd_spi_multi_read_dma(length);
+    } else {
+        sc64_sd_spi_multi_read(buffer, length, TRUE);
+    }
     sc64_sd_spi_multi_read(crc, 2, FALSE);
 
     return TRUE;
+}
+
+void sc64_sd_dma_prepare(void) {
+    platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH | SC64_SD_DMA_START);
+}
+
+void sc64_sd_dma_wait_for_finish(void) {
+    while (!(platform_pi_io_read(&SC64_SD->dma) & SC64_SD_DMA_FIFO_EMPTY));
 }

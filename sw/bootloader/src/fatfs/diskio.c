@@ -47,7 +47,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
             return RES_PARERR;
         }
 
-        success = sc64_sd_block_read(buff, SD_BLOCK_SIZE);
+        success = sc64_sd_block_read(buff, SD_BLOCK_SIZE, FALSE);
 
         if (!success) {
             return RES_ERROR;
@@ -60,7 +60,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
         }
 
         for (size_t i = 0; i < count; i++) {
-            success = sc64_sd_block_read(buff, SD_BLOCK_SIZE);
+            success = sc64_sd_block_read(buff, SD_BLOCK_SIZE, FALSE);
 
             if (!success) {
                 return RES_ERROR;

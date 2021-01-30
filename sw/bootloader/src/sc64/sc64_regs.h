@@ -83,7 +83,8 @@ typedef struct sc64_sd_registers {
     __IO reg_t cs;                          // Chip select pin control
     __IO reg_t dr;                          // Data to be sent and return value
     __IO reg_t multi;                       // Multi byte transmission
-    __IO reg_t __reserved[124];
+    __IO reg_t dma;                         // DMA configuration
+    __IO reg_t __reserved[123];
     __IO reg_t buffer[128];                 // Multi byte transmission buffer
 } sc64_sd_registers_t;
 
@@ -109,11 +110,17 @@ typedef struct sc64_sd_registers {
 #define SC64_SD_DR_DATA_BIT                 (0)
 #define SC64_SD_DR_DATA_MASK                (0xFF << SC64_SD_DR_DATA_BIT)
 
+#define SC64_SD_MULTI_DMA                   (1 << 10)
 #define SC64_SD_MULTI_RX_ONLY               (1 << 9)
 #define SC64_SD_MULTI_LENGTH_BIT            (0)
 #define SC64_SD_MULTI_LENGTH_MASK           (0x1FF << SC64_SD_MULTI_LENGTH_BIT)
 
-#define SC64_SD_MULTI(r, l)                 (((r) ? (SC64_SD_MULTI_RX_ONLY) : 0) | ((((l) - 1) & SC64_SD_MULTI_LENGTH_MASK) >> SC64_SD_MULTI_LENGTH_BIT))
+#define SC64_SD_MULTI(d, r, l)              ((d ? (SC64_SD_MULTI_DMA) : 0) | ((r) ? (SC64_SD_MULTI_RX_ONLY) : 0) | ((((l) - 1) & SC64_SD_MULTI_LENGTH_MASK) >> SC64_SD_MULTI_LENGTH_BIT))
+
+#define SC64_SD_DMA_FLUSH                   (1 << 1)
+#define SC64_SD_DMA_START                   (1 << 0)
+#define SC64_SD_DMA_FIFO_FULL               (1 << 1)
+#define SC64_SD_DMA_FIFO_EMPTY              (1 << 0)
 
 
 #endif
