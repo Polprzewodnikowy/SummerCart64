@@ -7,8 +7,6 @@ create_generated_clock -name flash_se_neg_reg -divide_by 2 -source [get_pins -co
 set w_sys_clk {sys_pll|altpll_component|auto_generated|pll1|clk[0]}
 set w_sdram_clk {sys_pll|altpll_component|auto_generated|pll1|clk[1]}
 
-set_annotated_delay -from sys_pll|altpll_component|auto_generated|wire_pll1_clk[0]~clkctrl|outclk 0
-
 derive_pll_clocks
 derive_clock_uncertainty
 

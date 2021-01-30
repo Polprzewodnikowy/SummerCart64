@@ -21,7 +21,7 @@ module memory_sdram (
 
     // SDRAM timings (in nanoseconds)
 
-    parameter real CLK_FREQ     = 90_000_000.0;
+    parameter real CLK_FREQ     = 100_000_000.0;
 
     parameter [2:0] CAS_LATENCY = 3'd2;
 

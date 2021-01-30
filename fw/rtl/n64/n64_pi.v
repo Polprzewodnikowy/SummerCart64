@@ -140,11 +140,17 @@ module n64_pi (
     // Read buffer logic
 
     reg [31:0] r_pi_read_buffer;
+    reg r_prefetch_read;
 
     always @(posedge i_clk) begin
+        if (w_address_valid_op) begin
+            r_prefetch_read <= w_prefetch;
+        end
         if (i_ack) begin
             if (w_prefetch) r_pi_read_buffer <= i_data;
             else r_pi_output_data <= i_data;
+            if (r_prefetch_read) r_pi_output_data <= i_data;
+            r_prefetch_read <= 1'b0;
         end
         if (w_prefetch && w_bus_read_op) r_pi_output_data <= r_pi_read_buffer;
     end
@@ -167,20 +173,34 @@ module n64_pi (
 
     // Bus request logic
 
-    wire w_bus_request_op = !o_request && ((w_address_valid_op && w_prefetch) || w_bus_read_op || w_bus_write_op);
+    reg r_pending_request;
+    reg r_pending_request_write;
 
+    wire w_bus_request_op = (w_address_valid_op && w_prefetch) || w_bus_read_op || w_bus_write_op;
+    
     always @(posedge i_clk) begin
         if (i_reset) begin
             o_request <= 1'b0;
             o_write <= 1'b0;
+            r_pending_request <= 1'b0;
         end else begin
-            if (w_bus_request_op) begin
-                o_request <= 1'b1;
-                o_write <= w_bus_write_op;
-            end
             if (o_request && !i_busy) begin
                 o_request <= 1'b0;
                 o_write <= 1'b0;
+            end
+            if (w_bus_request_op) begin
+                if (o_request) begin
+                    r_pending_request <= 1'b1;
+                    r_pending_request_write <= w_bus_write_op;
+                end else begin
+                    o_request <= 1'b1;
+                    o_write <= w_bus_write_op;
+                end
+            end
+            if (r_pending_request && !i_busy) begin
+                o_request <= 1'b1;
+                o_write <= r_pending_request_write;
+                r_pending_request <= 1'b0;
             end
         end
     end
