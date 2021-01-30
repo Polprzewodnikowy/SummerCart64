@@ -17,6 +17,22 @@ static void sc64_disable_peripheral(uint32_t mask) {
     platform_pi_io_write(&SC64_CART->scr, config);
 }
 
+void sc64_enable_flashram(void) {
+    sc64_enable_peripheral(SC64_CART_SCR_FLASHRAM_ENABLE);
+}
+
+void sc64_disable_flashram(void) {
+    sc64_disable_peripheral(SC64_CART_SCR_FLASHRAM_ENABLE);
+} 
+
+void sc64_enable_sram(void) {
+    sc64_enable_peripheral(SC64_CART_SCR_SRAM_ENABLE);
+}
+
+void sc64_disable_sram(void) {
+    sc64_disable_peripheral(SC64_CART_SCR_SRAM_ENABLE);
+} 
+
 void sc64_enable_sd(void) {
     sc64_enable_peripheral(SC64_CART_SCR_SD_ENABLE);
 }
@@ -84,4 +100,8 @@ uint32_t sc64_get_version(void) {
 
 void sc64_set_ddipl_address(uint32_t address) {
     platform_pi_io_write(&SC64_CART->ddipl_addr, address);
+}
+
+void sc64_set_sram_address(uint32_t address) {
+    platform_pi_io_write(&SC64_CART->sram_addr, address);
 }

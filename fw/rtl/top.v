@@ -123,11 +123,16 @@ module top (
     wire w_n64_ack_sd;
     wire [31:0] w_n64_i_data_sd;
 
+    wire w_sram_request;
+
     wire w_ddipl_enable;
+    wire w_sram_enable;
+    wire w_flashram_enable;
     wire w_sd_enable;
     wire w_eeprom_pi_enable;
 
     wire [23:0] w_ddipl_address;
+    wire [23:0] w_sram_address;
 
     always @(*) begin
         w_n64_busy = w_n64_busy_cart_control || w_n64_busy_sdram || w_n64_busy_embedded_flash || w_n64_busy_eeprom || w_n64_busy_sd;
@@ -160,11 +165,16 @@ module top (
         .i_data(w_n64_i_data),
         .o_data(w_n64_o_data),
 
+        .o_sram_request(w_sram_request),
+
         .i_ddipl_enable(w_ddipl_enable),
+        .i_sram_enable(w_sram_enable),
+        .i_flashram_enable(w_flashram_enable),
         .i_sd_enable(w_sd_enable),
         .i_eeprom_enable(w_eeprom_pi_enable),
 
-        .i_ddipl_address(w_ddipl_address)
+        .i_ddipl_address(w_ddipl_address),
+        .i_sram_address(w_sram_address)
     );
 
 
@@ -305,6 +315,8 @@ module top (
         .o_sdram_writable(w_sdram_writable),
         .o_rom_switch(w_rom_switch),
         .o_ddipl_enable(w_ddipl_enable),
+        .o_sram_enable(w_sram_enable),
+        .o_flashram_enable(w_flashram_enable),
         .o_sd_enable(w_sd_enable),
         .o_eeprom_pi_enable(w_eeprom_pi_enable),
         .o_eeprom_enable(w_eeprom_enable),
@@ -325,7 +337,8 @@ module top (
         .i_debug_fifo_items(w_debug_fifo_items),
         .i_debug_fifo_data(w_debug_fifo_data),
 
-        .o_ddipl_address(w_ddipl_address)
+        .o_ddipl_address(w_ddipl_address),
+        .o_sram_address(w_sram_address)
     );
 
 
@@ -398,7 +411,7 @@ module top (
 
     // SDRAM
 
-    wire w_sdram_request_n64 = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && w_sdram_writable));
+    wire w_sdram_request_n64 = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && (w_sdram_writable || w_sram_request)));
 
     wire w_sdram_request;
     wire w_sdram_write;

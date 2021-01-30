@@ -18,11 +18,16 @@ module n64_pi (
     input [31:0] i_data,
     output reg [31:0] o_data,
 
+    output o_sram_request,
+
     input i_ddipl_enable,
+    input i_sram_enable,
+    input i_flashram_enable,
     input i_sd_enable,
     input i_eeprom_enable,
 
-    input [23:0] i_ddipl_address
+    input [23:0] i_ddipl_address,
+    input [23:0] i_sram_address
 );
 
     // Parameters
@@ -93,10 +98,14 @@ module n64_pi (
         .o_translated_address(w_translated_address),
         .o_bank(o_bank),
         .o_bank_prefetch(w_bank_prefetch),
+        .o_sram_request(o_sram_request),
         .i_ddipl_enable(i_ddipl_enable),
+        .i_sram_enable(i_sram_enable),
+        .i_flashram_enable(i_flashram_enable),
         .i_sd_enable(i_sd_enable),
         .i_eeprom_enable(i_eeprom_enable),
-        .i_ddipl_address(i_ddipl_address)
+        .i_ddipl_address(i_ddipl_address),
+        .i_sram_address(i_sram_address)
     );
 
 
@@ -193,7 +202,7 @@ module n64_pi (
             r_first_transfer <= 1'b1;
         end
         if (w_first_transfer_clear_op) r_first_transfer <= 1'b0;
-        if (w_address_increment_op) o_address[8:2] <= o_address[8:2] + 1'b1;
+        if (w_address_increment_op) o_address[15:2] <= o_address[15:2] + 1'b1;
     end
 
 endmodule
