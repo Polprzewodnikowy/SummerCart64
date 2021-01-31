@@ -17,6 +17,7 @@ module cart_control (
     output reg o_rom_switch,
     output reg o_ddipl_enable,
     output reg o_sram_enable,
+    output reg o_sram_768k_mode,
     output reg o_flashram_enable,
     output reg o_sd_enable,
     output reg o_eeprom_pi_enable,
@@ -98,6 +99,7 @@ module cart_control (
             o_rom_switch <= 1'b0;
             o_ddipl_enable <= 1'b0;
             o_sram_enable <= 1'b0;
+            o_sram_768k_mode <= 1'b0;
             o_flashram_enable <= 1'b0;
             o_sd_enable <= 1'b0;
             o_eeprom_pi_enable <= 1'b0;
@@ -116,6 +118,7 @@ module cart_control (
                     REG_SCR: begin
                         {
                             o_flashram_enable,
+                            o_sram_768k_mode,
                             o_sram_enable,
                             o_sd_enable,
                             o_eeprom_pi_enable,
@@ -124,7 +127,7 @@ module cart_control (
                             o_ddipl_enable,
                             o_rom_switch,
                             o_sdram_writable
-                        } <= i_data[8:0];
+                        } <= i_data[9:0];
                     end
                     REG_BOOT: begin
                         r_bootloader <= i_data[15:0];
@@ -171,8 +174,9 @@ module cart_control (
             if (i_address < MEM_USB_FIFO_BASE) begin
                 case (i_address[3:0])
                     REG_SCR: begin
-                        o_data[8:0] <= {
+                        o_data[9:0] <= {
                             o_flashram_enable,
+                            o_sram_768k_mode,
                             o_sram_enable,
                             o_sd_enable,
                             o_eeprom_pi_enable,
@@ -194,6 +198,12 @@ module cart_control (
                     end
                     REG_USB_SCR: begin
                         {o_data[13:3], o_data[1:0]} <= {i_debug_fifo_items, i_debug_ready, i_debug_dma_busy};
+                    end
+                    REG_DDIPL_ADDR: begin
+                        o_data[25:0] <= {o_ddipl_address, 2'b00};
+                    end
+                    REG_SRAM_ADDR: begin
+                        o_data[25:0] <= {o_sram_address, 2'b00};
                     end
                     default: begin
                     end

@@ -32,7 +32,7 @@ static uint8_t sc64_sd_spi_exchange(uint8_t data) {
         dr = platform_pi_io_read(&SC64_SD->dr);
     } while (dr & SC64_SD_DR_BUSY);
 
-    return (uint8_t) (dr & SC64_SD_DR_DATA_MASK);
+    return (uint8_t) SC64_SD_DR_DATA(dr);
 }
 
 static uint8_t sc64_sd_spi_read(void) {
@@ -131,7 +131,7 @@ uint8_t sc64_sd_init(void) {
     if (!sd_card_initialized) {
         sc64_enable_sd();
 
-        platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH);
+        platform_pi_io_write(&SC64_SD->dma_scr, SC64_SD_DMA_SCR_FLUSH);
 
         sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
         sc64_sd_spi_release();
@@ -213,7 +213,7 @@ void sc64_sd_deinit(void) {
 
     while (platform_pi_io_read(&SC64_SD->scr) & SC64_SD_SCR_BUSY);
 
-    platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH);
+    platform_pi_io_write(&SC64_SD->dma_scr, SC64_SD_DMA_SCR_FLUSH);
     
     sc64_sd_spi_set_prescaler(SC64_SD_SCR_PRESCALER_256);
 
@@ -222,6 +222,14 @@ void sc64_sd_deinit(void) {
 
 uint8_t sc64_sd_get_status(void) {
     return sd_card_initialized ? TRUE : FALSE;
+}
+
+void sc64_sd_dma_wait_for_finish(void) {
+    while (!(platform_pi_io_read(&SC64_SD->dma_scr) & SC64_SD_DMA_SCR_FIFO_EMPTY));
+}
+
+void sc64_sd_dma_set_address(uint8_t bank, uint32_t address) {
+    platform_pi_io_write(&SC64_SD->dma_addr, SC64_SD_DMA_ADDR(bank, address));
 }
 
 uint8_t sc64_sd_cmd_send(uint8_t cmd, uint32_t arg, uint8_t *response) {
@@ -320,12 +328,4 @@ uint8_t sc64_sd_block_read(uint8_t *buffer, size_t length, uint8_t dma) {
     sc64_sd_spi_multi_read(crc, 2, FALSE);
 
     return TRUE;
-}
-
-void sc64_sd_dma_prepare(void) {
-    platform_pi_io_write(&SC64_SD->dma, SC64_SD_DMA_FLUSH | SC64_SD_DMA_START);
-}
-
-void sc64_sd_dma_wait_for_finish(void) {
-    while (!(platform_pi_io_read(&SC64_SD->dma) & SC64_SD_DMA_FIFO_EMPTY));
 }

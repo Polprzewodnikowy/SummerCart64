@@ -22,6 +22,7 @@ module n64_pi (
 
     input i_ddipl_enable,
     input i_sram_enable,
+    input i_sram_768k_mode,
     input i_flashram_enable,
     input i_sd_enable,
     input i_eeprom_enable,
@@ -101,6 +102,7 @@ module n64_pi (
         .o_sram_request(o_sram_request),
         .i_ddipl_enable(i_ddipl_enable),
         .i_sram_enable(i_sram_enable),
+        .i_sram_768k_mode(i_sram_768k_mode),
         .i_flashram_enable(i_flashram_enable),
         .i_sd_enable(i_sd_enable),
         .i_eeprom_enable(i_eeprom_enable),

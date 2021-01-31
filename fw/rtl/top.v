@@ -127,6 +127,7 @@ module top (
 
     wire w_ddipl_enable;
     wire w_sram_enable;
+    wire w_sram_768k_mode;
     wire w_flashram_enable;
     wire w_sd_enable;
     wire w_eeprom_pi_enable;
@@ -169,6 +170,7 @@ module top (
 
         .i_ddipl_enable(w_ddipl_enable),
         .i_sram_enable(w_sram_enable),
+        .i_sram_768k_mode(w_sram_768k_mode),
         .i_flashram_enable(w_flashram_enable),
         .i_sd_enable(w_sd_enable),
         .i_eeprom_enable(w_eeprom_pi_enable),
@@ -316,6 +318,7 @@ module top (
         .o_rom_switch(w_rom_switch),
         .o_ddipl_enable(w_ddipl_enable),
         .o_sram_enable(w_sram_enable),
+        .o_sram_768k_mode(w_sram_768k_mode),
         .o_flashram_enable(w_flashram_enable),
         .o_sd_enable(w_sd_enable),
         .o_eeprom_pi_enable(w_eeprom_pi_enable),
@@ -344,7 +347,7 @@ module top (
 
     // Embedded flash
 
-    wire w_embedded_flash_request_n64 = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == `BANK_ROM;
+    wire w_embedded_flash_request_n64 = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == `BANK_SDRAM;
 
     memory_embedded_flash memory_embedded_flash_inst (
         .i_clk(w_sys_clk),
@@ -380,6 +383,22 @@ module top (
     wire [23:0] w_sd_dma_address;
     wire [31:0] w_sd_dma_i_data;
     wire [31:0] w_sd_dma_o_data;
+
+    wire w_sd_dma_busy_sdram;
+    wire w_sd_dma_ack_sdram;
+    wire [31:0] w_sd_dma_i_data_sdram;
+
+    wire w_sd_dma_busy_eeprom;
+    wire w_sd_dma_ack_eeprom;
+    wire [31:0] w_sd_dma_i_data_eeprom;
+
+    always @(*) begin
+        w_sd_dma_busy = w_sd_dma_busy_sdram || w_sd_dma_busy_eeprom;
+        w_sd_dma_ack = w_sd_dma_ack_sdram || w_sd_dma_ack_eeprom;
+        w_sd_dma_i_data = 32'h0000_0000;
+        if (w_sd_dma_ack_sdram) w_sd_dma_i_data = w_sd_dma_i_data_sdram;
+        if (w_sd_dma_ack_eeprom) w_sd_dma_i_data = w_sd_dma_i_data_eeprom;
+    end
 
     sd_interface sd_interface_inst (
         .i_clk(w_sys_clk),
@@ -424,18 +443,18 @@ module top (
     device_arbiter #(
         .NUM_CONTROLLERS(3),
         .ADDRESS_WIDTH(25),
-        .DEVICE_BANK(`BANK_ROM)
+        .DEVICE_BANK(`BANK_SDRAM)
     ) device_arbiter_sdram_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
         .i_request({w_sd_dma_request, w_pc_request, w_sdram_request_n64}),
         .i_write({w_sd_dma_write, w_pc_write, w_n64_write}),
-        .o_busy({w_sd_dma_busy, w_pc_busy_sdram, w_n64_busy_sdram}),
-        .o_ack({w_sd_dma_ack, w_pc_ack_sdram, w_n64_ack_sdram}),
+        .o_busy({w_sd_dma_busy_sdram, w_pc_busy_sdram, w_n64_busy_sdram}),
+        .o_ack({w_sd_dma_ack_sdram, w_pc_ack_sdram, w_n64_ack_sdram}),
         .i_bank({w_sd_dma_bank, w_pc_bank, w_n64_bank}),
         .i_address({{w_sd_dma_address, 1'b0}, w_pc_address[25:1], w_n64_address[25:1]}),
-        .o_data({w_sd_dma_i_data, w_pc_i_data_sdram, w_n64_i_data_sdram}),
+        .o_data({w_sd_dma_i_data_sdram, w_pc_i_data_sdram, w_n64_i_data_sdram}),
         .i_data({w_sd_dma_o_data, w_pc_o_data, w_n64_o_data}),
 
         .o_device_request(w_sdram_request),
@@ -480,21 +499,21 @@ module top (
     wire [31:0] w_eeprom_i_data;
 
     device_arbiter #(
-        .NUM_CONTROLLERS(2),
+        .NUM_CONTROLLERS(3),
         .ADDRESS_WIDTH(9),
         .DEVICE_BANK(`BANK_EEPROM)
     ) device_arbiter_eeprom_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request({w_pc_request, w_n64_request}),
-        .i_write({w_pc_write, w_n64_write}),
-        .o_busy({w_pc_busy_eeprom, w_n64_busy_eeprom}),
-        .o_ack({w_pc_ack_eeprom, w_n64_ack_eeprom}),
-        .i_bank({w_pc_bank, w_n64_bank}),
-        .i_address({w_pc_address[10:2], w_n64_address[10:2]}),
-        .o_data({w_pc_i_data_eeprom, w_n64_i_data_eeprom}),
-        .i_data({w_pc_o_data, w_n64_o_data}),
+        .i_request({w_sd_dma_request, w_pc_request, w_n64_request}),
+        .i_write({w_sd_dma_write, w_pc_write, w_n64_write}),
+        .o_busy({w_sd_dma_busy_eeprom, w_pc_busy_eeprom, w_n64_busy_eeprom}),
+        .o_ack({w_sd_dma_ack_eeprom, w_pc_ack_eeprom, w_n64_ack_eeprom}),
+        .i_bank({w_sd_dma_bank, w_pc_bank, w_n64_bank}),
+        .i_address({w_sd_dma_address[8:0], w_pc_address[10:2], w_n64_address[10:2]}),
+        .o_data({w_sd_dma_i_data_eeprom, w_pc_i_data_eeprom, w_n64_i_data_eeprom}),
+        .i_data({w_sd_dma_o_data, w_pc_o_data, w_n64_o_data}),
 
         .o_device_request(w_eeprom_request),
         .o_device_write(w_eeprom_write),

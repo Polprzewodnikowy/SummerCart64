@@ -10,7 +10,6 @@ FRESULT fe_load(const TCHAR *path, UINT max_length, transfer_function_t transfer
     DWORD cluster;
     LBA_t starting_sector;
     UINT sector_count;
-    UINT sector_remainder;
     UINT bytes_processed;
 
 

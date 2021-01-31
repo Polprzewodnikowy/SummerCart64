@@ -5,6 +5,16 @@
 #include "platform.h"
 
 
+// Bank definitions
+
+#define SC64_BANK_INVALID                   (0)
+#define SC64_BANK_SDRAM                     (1)
+#define SC64_BANK_CART                      (2)
+#define SC64_BANK_EEPROM                    (3)
+#define SC64_BANK_FLASHRAM                  (4)
+#define SC64_BANK_SD                        (5)
+
+
 // Cart Interface Registers
 
 typedef struct sc64_cart_registers {
@@ -25,7 +35,8 @@ typedef struct sc64_cart_registers {
 
 #define SC64_CART                           ((__IO sc64_cart_registers_t *) SC64_CART_BASE)
 
-#define SC64_CART_SCR_FLASHRAM_ENABLE       (1 << 8)
+#define SC64_CART_SCR_FLASHRAM_ENABLE       (1 << 9)
+#define SC64_CART_SCR_SRAM_768K_MODE        (1 << 8)
 #define SC64_CART_SCR_SRAM_ENABLE           (1 << 7)
 #define SC64_CART_SCR_SD_ENABLE             (1 << 6)
 #define SC64_CART_SCR_EEPROM_PI_ENABLE      (1 << 5)
@@ -55,17 +66,31 @@ typedef struct sc64_cart_registers {
 #define SC64_CART_USB_SCR_FIFO_FLUSH        (1 << 2)
 #define SC64_CART_USB_SCR_DMA_START         (1 << 0)
 
+#define SC64_CART_USB_SCR_FIFO_ITEMS(i)     (((i) & SC64_CART_USB_SCR_FIFO_ITEMS_MASK) >> SC64_CART_USB_SCR_FIFO_ITEMS_BIT)
+
 #define SC64_CART_USB_DMA_ADDR_BANK_BIT     (28)
 #define SC64_CART_USB_DMA_ADDR_BANK_MASK    (0xF << SC64_CART_USB_DMA_ADDR_BANK_BIT)
 #define SC64_CART_USB_DMA_ADDR_ADDRESS_BIT  (0)
 #define SC64_CART_USB_DMA_ADDR_ADDRESS_MASK (0x3FFFFFC << SC64_CART_USB_DMA_ADDR_ADDRESS_BIT)
 
+#define SC64_CART_USB_DMA_ADDR(b, a)        ((((b) << SC64_CART_USB_DMA_ADDR_BANK_BIT) & SC64_CART_USB_DMA_ADDR_BANK_MASK) | (((a) << SC64_CART_USB_DMA_ADDR_ADDRESS_BIT) & SC64_CART_USB_DMA_ADDR_ADDRESS_MASK))
+
 #define SC64_CART_USB_DMA_LEN_LENGTH_BIT    (0)
 #define SC64_CART_USB_DMA_LEN_LENGTH_MASK   (0xFFFFF << SC64_CART_USB_DMA_LEN_LENGTH_BIT)
+
+#define SC64_CART_USB_DMA_LEN(l)            ((((l) - 1) << SC64_CART_USB_DMA_LEN_LENGTH_BIT) & SC64_CART_USB_DMA_LEN_LENGTH_MASK)
 
 #define SC64_CART_DDIPL_ADDR_ADDRESS_BIT    (0)
 #define SC64_CART_DDIPL_ADDR_ADDRESS_MASK   (0x3FFFFFC << SC64_CART_DDIPL_ADDR_ADDRESS_BIT)
 #define SC64_CART_DDIPL_ADDR_DEFAULT        (0x3C00000)
+
+#define SC64_CART_DDIPL_ADDR(a)             (((a) << SC64_CART_DDIPL_ADDR_ADDRESS_BIT) & SC64_CART_DDIPL_ADDR_ADDRESS_MASK)
+
+#define SC64_CART_SRAM_ADDR_ADDRESS_BIT     (0)
+#define SC64_CART_SRAM_ADDR_ADDRESS_MASK    (0x3FFFFFC << SC64_CART_SRAM_ADDR_ADDRESS_BIT)
+#define SC64_CART_SRAM_ADDR_DEFAULT         (0x3FF8000)
+
+#define SC64_CART_SRAM_ADDR(a)              (((a) << SC64_CART_SRAM_ADDR_ADDRESS_BIT) & SC64_CART_SRAM_ADDR_ADDRESS_MASK)
 
 
 // EEPROM Registers
@@ -86,8 +111,9 @@ typedef struct sc64_sd_registers {
     __IO reg_t cs;                          // Chip select pin control
     __IO reg_t dr;                          // Data to be sent and return value
     __IO reg_t multi;                       // Multi byte transmission
-    __IO reg_t dma;                         // DMA configuration
-    __IO reg_t __reserved[123];
+    __IO reg_t dma_scr;                     // DMA configuration
+    __IO reg_t dma_addr;                    // DMA starting address
+    __IO reg_t __reserved[122];
     __IO reg_t buffer[128];                 // Multi byte transmission buffer
 } sc64_sd_registers_t;
 
@@ -113,17 +139,25 @@ typedef struct sc64_sd_registers {
 #define SC64_SD_DR_DATA_BIT                 (0)
 #define SC64_SD_DR_DATA_MASK                (0xFF << SC64_SD_DR_DATA_BIT)
 
+#define SC64_SD_DR_DATA(d)                  (((d) & SC64_SD_DR_DATA_MASK) >> SC64_SD_DR_DATA_BIT)
+
 #define SC64_SD_MULTI_DMA                   (1 << 10)
 #define SC64_SD_MULTI_RX_ONLY               (1 << 9)
 #define SC64_SD_MULTI_LENGTH_BIT            (0)
 #define SC64_SD_MULTI_LENGTH_MASK           (0x1FF << SC64_SD_MULTI_LENGTH_BIT)
 
-#define SC64_SD_MULTI(d, r, l)              ((d ? (SC64_SD_MULTI_DMA) : 0) | ((r) ? (SC64_SD_MULTI_RX_ONLY) : 0) | ((((l) - 1) & SC64_SD_MULTI_LENGTH_MASK) >> SC64_SD_MULTI_LENGTH_BIT))
+#define SC64_SD_MULTI(d, r, l)              ((d ? (SC64_SD_MULTI_DMA) : 0) | ((r) ? (SC64_SD_MULTI_RX_ONLY) : 0) | ((((l) - 1) & SC64_SD_MULTI_LENGTH_MASK) << SC64_SD_MULTI_LENGTH_BIT))
 
-#define SC64_SD_DMA_FLUSH                   (1 << 1)
-#define SC64_SD_DMA_START                   (1 << 0)
-#define SC64_SD_DMA_FIFO_FULL               (1 << 1)
-#define SC64_SD_DMA_FIFO_EMPTY              (1 << 0)
+#define SC64_SD_DMA_SCR_FLUSH               (1 << 0)
+#define SC64_SD_DMA_SCR_FIFO_FULL           (1 << 1)
+#define SC64_SD_DMA_SCR_FIFO_EMPTY          (1 << 0)
+
+#define SC64_SD_DMA_ADDR_BANK_BIT           (28)
+#define SC64_SD_DMA_ADDR_BANK_MASK          (0xF << SC64_SD_DMA_ADDR_BANK_BIT)
+#define SC64_SD_DMA_ADDR_ADDRESS_BIT        (0)
+#define SC64_SD_DMA_ADDR_ADDRESS_MASK       (0x3FFFFFC << SC64_SD_DMA_ADDR_ADDRESS_BIT)
+
+#define SC64_SD_DMA_ADDR(b, a)              ((((b) << SC64_SD_DMA_ADDR_BANK_BIT) & SC64_SD_DMA_ADDR_BANK_MASK) | (((a) << SC64_SD_DMA_ADDR_ADDRESS_BIT) & SC64_SD_DMA_ADDR_ADDRESS_MASK))
 
 
 #endif

@@ -8,14 +8,9 @@ module sd_dma (
     output o_fifo_empty,
     input [31:0] i_fifo_data,
 
-    input i_start,
-
     output reg o_request,
     output reg o_write,
     input i_busy,
-    input i_ack,
-    output reg [23:0] o_address,
-    input [31:0] i_data,
     output reg [31:0] o_data
 );
 
@@ -43,29 +38,22 @@ module sd_dma (
     end
 
     always @(posedge i_clk) begin
-        if (i_reset) begin
+        if (i_reset || i_fifo_flush) begin
             o_request <= 1'b0;
             o_write <= 1'b1;
             r_dma_fifo_rdptr <= 7'd0;
         end else begin
-            if (i_start) begin
-                o_address <= 24'd0;
-                o_request <= 1'b0;
-                o_write <= 1'b1;
-            end else begin
-                if (!o_request && !o_fifo_empty) begin
-                    o_request <= 1'b1;
-                    o_data <= w_rddata;
+            if (!o_request && !o_fifo_empty) begin
+                o_request <= 1'b1;
+                o_data <= w_rddata;
+                r_dma_fifo_rdptr <= r_dma_fifo_rdptr + 1'd1;
+            end
+            if (w_request_successful) begin
+                if (o_fifo_empty) begin
+                    o_request <= 1'b0;
+                end else begin
                     r_dma_fifo_rdptr <= r_dma_fifo_rdptr + 1'd1;
-                end
-                if (w_request_successful) begin
-                    o_address <= o_address + 1'd1;
-                    if (o_fifo_empty) begin
-                        o_request <= 1'b0;
-                    end else begin
-                        r_dma_fifo_rdptr <= r_dma_fifo_rdptr + 1'd1;
-                        o_data <= w_rddata;
-                    end
+                    o_data <= w_rddata;
                 end
             end
         end
