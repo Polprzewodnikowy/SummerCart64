@@ -168,8 +168,6 @@ module sd_interface (
 
     wire w_spi_clk_div_selected = r_spi_clk_div_counter[r_spi_clk_div];
 
-    wire w_spi_clk_stop = w_dma_fifo_full;
-
     always @(posedge i_clk) begin
         r_spi_clk_div_counter <= r_spi_clk_div_counter + 1'd1;
         r_spi_clk_prev_value <= w_spi_clk_div_selected;

@@ -87,7 +87,7 @@ module top (
     gpio_ddro sdram_clk_ddro (
         .outclock(w_sdram_clk),
         .outclocken(1'b1),
-        .din({1'b1, 1'b0}),
+        .din({1'b0, 1'b1}),
         .pad_out(o_sdram_clk)
     );
 
