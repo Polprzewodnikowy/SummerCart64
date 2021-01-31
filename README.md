@@ -55,7 +55,7 @@ Instructions below are mostly written for Windows users and point to Windows spe
 
 There are several issues with the project at the moment in order of importance. Keep in mind that core flashcart functionality is fully working:
 
-- No SRAM/FlashRAM save emulation implementation.
+- No FlashRAM save emulation implementation.
 - No save write-back to SD card implementation.
 - No RTC implementation.
 

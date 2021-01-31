@@ -93,8 +93,10 @@ sc64_sd_fs_error_t sc64_sd_fs_load_rom(const char *path) {
                 case FR_NO_FILE:
                 case FR_NO_PATH:
                     error = SC64_SD_FS_NO_FILE;
+                    break;
                 default:
                     error = SC64_SD_FS_OTHER_ERROR;
+                    break;
             }
             break;
         }

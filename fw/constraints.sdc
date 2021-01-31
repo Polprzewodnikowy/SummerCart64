@@ -26,9 +26,9 @@ set_multicycle_path -from [get_clocks {sdram_clk}] -to [get_clocks $sys_clk] -se
 
 # False paths
 
-set_false_path -from [get_clocks $sys_clk] -to [get_ports {o_ftdi_si}]
-set_false_path -from [get_ports {i_ftdi_so}] -to [get_clocks $sys_clk]
-set_false_path -from [get_ports {i_ftdi_cts}] -to [get_clocks $sys_clk]
+set_false_path -from [get_clocks ftdi_clk] -to [get_ports {o_ftdi_si}]
+set_false_path -from [get_ports {i_ftdi_so}] -to [get_clocks ftdi_clk]
+set_false_path -from [get_ports {i_ftdi_cts}] -to [get_clocks ftdi_clk]
 
 set_false_path -from [get_ports {i_n64_reset}] -to [get_clocks $sys_clk]
 set_false_path -from [get_ports {i_n64_nmi}] -to [get_clocks $sys_clk]
@@ -44,10 +44,10 @@ set_false_path -from [get_ports {i_n64_si_clk}] -to [get_clocks $sys_clk]
 set_false_path -from [get_ports {io_n64_si_dq}] -to [get_clocks $sys_clk]
 set_false_path -from [get_clocks $sys_clk] -to [get_ports {io_n64_si_dq}]
 
-set_false_path -from [get_clocks $sys_clk] -to [get_ports {io_sd_cmd}]
-set_false_path -from [get_clocks $sys_clk] -to [get_ports {io_sd_dat[*]}]
-set_false_path -from [get_ports {io_sd_cmd}] -to [get_clocks $sys_clk]
-set_false_path -from [get_ports {io_sd_dat[*]}] -to [get_clocks $sys_clk]
+set_false_path -from [get_clocks sd_clk] -to [get_ports {io_sd_cmd}]
+set_false_path -from [get_clocks sd_clk] -to [get_ports {io_sd_dat[*]}]
+set_false_path -from [get_ports {io_sd_cmd}] -to [get_clocks sd_clk]
+set_false_path -from [get_ports {io_sd_dat[*]}] -to [get_clocks sd_clk]
 
 set_false_path -from [get_clocks $sys_clk] -to [get_ports {o_led}]
 

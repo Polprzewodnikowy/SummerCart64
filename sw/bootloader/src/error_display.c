@@ -12,7 +12,7 @@ void error_display_and_halt(menu_load_error_t error, const char *path) {
     console_set_render_mode(RENDER_MANUAL);
     console_clear();
 
-    printf("Bootloader v%d error:\n\n%2d: ", BOOTLOADER_VERSION, error);
+    printf("SC64 Bootloader ver. %d.%02d error:\n\n%2d: ", BOOTLOADER_VERSION_MAJOR, BOOTLOADER_VERSION_MINOR, error);
 
     switch (error) {
         case E_MENU_OK:
