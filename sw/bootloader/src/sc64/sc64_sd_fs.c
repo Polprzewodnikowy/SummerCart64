@@ -6,7 +6,7 @@
 #include "sc64_sd_fs.h"
 
 
-static DRESULT sc64_sd_fs_load_with_dma(BYTE pdrv, FSIZE_t offset, LBA_t sector, UINT count, UINT remainder) {
+static DRESULT sc64_sd_fs_load_with_dma(BYTE pdrv, FSIZE_t offset, LBA_t sector, UINT count) {
     uint8_t success;
     uint8_t response;
 

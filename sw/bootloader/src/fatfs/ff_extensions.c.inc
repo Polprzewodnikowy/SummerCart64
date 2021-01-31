@@ -24,6 +24,7 @@ FRESULT fe_load(const TCHAR *path, UINT max_length, transfer_function_t transfer
     }
 
     bytes_to_read = (fp->obj.objsize > max_length) ? max_length : fp->obj.objsize;
+    bytes_to_read += ((bytes_to_read % SS(fs)) != 0) ? (SS(fs) - (bytes_to_read % SS(fs))) : 0;
 
     while (bytes_to_read) {
         cluster_sector = (UINT) (fp->fptr / SS(fs) & (fs->csize - 1));
@@ -62,19 +63,18 @@ FRESULT fe_load(const TCHAR *path, UINT max_length, transfer_function_t transfer
         starting_sector += cluster_sector;
 
         sector_count = bytes_to_read / SS(fs);
-        sector_remainder = sector_count ? 0 : (bytes_to_read % SS(fs));
 
         if (cluster_sector + sector_count > fs->csize) {
             sector_count = fs->csize - cluster_sector;
         }
 
-        if (transfer_function(fs->pdrv, fp->fptr, starting_sector, sector_count, sector_remainder) != RES_OK) {
+        if (transfer_function(fs->pdrv, fp->fptr, starting_sector, sector_count) != RES_OK) {
             LEAVE_FF(fs, FR_DISK_ERR);
         }
 
         fp->sect = starting_sector;
 
-        bytes_processed = (SS(fs) * sector_count) + sector_remainder;
+        bytes_processed = sector_count * SS(fs);
         fp->fptr += bytes_processed;
         bytes_to_read -= bytes_processed;
     }
