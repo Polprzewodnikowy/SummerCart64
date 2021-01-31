@@ -257,14 +257,16 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 	# Fitter Assignments
 	# ==================
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"

@@ -13,7 +13,7 @@ static const struct crc32_to_cic_seed crc32_to_cic_seed[] = {
     { .ipl3_crc32 = 0xACC8580A, .cic_seed = 0x0085 },   // CICx106
     { .ipl3_crc32 = 0x10C68B18, .cic_seed = 0x00DD },   // JP 64DD dev
     { .ipl3_crc32 = 0x0E018159, .cic_seed = 0x00DD },   // JP 64DD retail
-    { .ipl3_crc32 = 0x8FEBA21E, .cic_seed = 0x00DE },   // US 64DD
+    { .ipl3_crc32 = 0x8FEBA21E, .cic_seed = 0x00DE },   // US 64DD retail
 };
 
 
