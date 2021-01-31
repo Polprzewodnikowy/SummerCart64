@@ -4,7 +4,7 @@
 // MODULE: altsyncram 
 
 // ============================================================
-// File Name: ram_n64_eeprom.v
+// File Name: ram_sd_buffer.v
 // Megafunction Name(s):
 // 			altsyncram
 //
@@ -37,7 +37,7 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module ram_n64_eeprom (
+module ram_sd_buffer (
 	address_a,
 	address_b,
 	clock,
@@ -48,8 +48,8 @@ module ram_n64_eeprom (
 	q_a,
 	q_b);
 
-	input	[10:0]  address_a;
-	input	[8:0]  address_b;
+	input	[8:0]  address_a;
+	input	[6:0]  address_b;
 	input	  clock;
 	input	[7:0]  data_a;
 	input	[31:0]  data_b;
@@ -105,8 +105,8 @@ module ram_n64_eeprom (
 		altsyncram_component.indata_reg_b = "CLOCK0",
 		altsyncram_component.intended_device_family = "MAX 10",
 		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 2048,
-		altsyncram_component.numwords_b = 512,
+		altsyncram_component.numwords_a = 512,
+		altsyncram_component.numwords_b = 128,
 		altsyncram_component.operation_mode = "BIDIR_DUAL_PORT",
 		altsyncram_component.outdata_aclr_a = "NONE",
 		altsyncram_component.outdata_aclr_b = "NONE",
@@ -114,10 +114,10 @@ module ram_n64_eeprom (
 		altsyncram_component.outdata_reg_b = "UNREGISTERED",
 		altsyncram_component.power_up_uninitialized = "FALSE",
 		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
-		altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ",
-		altsyncram_component.widthad_a = 11,
-		altsyncram_component.widthad_b = 9,
+		altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_WITH_NBE_READ",
+		altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_WITH_NBE_READ",
+		altsyncram_component.widthad_a = 9,
+		altsyncram_component.widthad_b = 7,
 		altsyncram_component.width_a = 8,
 		altsyncram_component.width_b = 32,
 		altsyncram_component.width_byteena_a = 1,
@@ -160,16 +160,16 @@ endmodule
 // Retrieval info: PRIVATE: JTAG_ENABLED NUMERIC "0"
 // Retrieval info: PRIVATE: JTAG_ID STRING "NONE"
 // Retrieval info: PRIVATE: MAXIMUM_DEPTH NUMERIC "0"
-// Retrieval info: PRIVATE: MEMSIZE NUMERIC "16384"
-// Retrieval info: PRIVATE: MEM_IN_BITS NUMERIC "1"
+// Retrieval info: PRIVATE: MEMSIZE NUMERIC "4096"
+// Retrieval info: PRIVATE: MEM_IN_BITS NUMERIC "0"
 // Retrieval info: PRIVATE: MIFfilename STRING ""
 // Retrieval info: PRIVATE: OPERATION_MODE NUMERIC "3"
 // Retrieval info: PRIVATE: OUTDATA_ACLR_B NUMERIC "0"
 // Retrieval info: PRIVATE: OUTDATA_REG_B NUMERIC "0"
 // Retrieval info: PRIVATE: RAM_BLOCK_TYPE NUMERIC "0"
 // Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_MIXED_PORTS NUMERIC "2"
-// Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_A NUMERIC "3"
-// Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_B NUMERIC "3"
+// Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_A NUMERIC "4"
+// Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_B NUMERIC "4"
 // Retrieval info: PRIVATE: REGdata NUMERIC "1"
 // Retrieval info: PRIVATE: REGq NUMERIC "0"
 // Retrieval info: PRIVATE: REGrdaddress NUMERIC "0"
@@ -198,8 +198,8 @@ endmodule
 // Retrieval info: CONSTANT: INDATA_REG_B STRING "CLOCK0"
 // Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "MAX 10"
 // Retrieval info: CONSTANT: LPM_TYPE STRING "altsyncram"
-// Retrieval info: CONSTANT: NUMWORDS_A NUMERIC "2048"
-// Retrieval info: CONSTANT: NUMWORDS_B NUMERIC "512"
+// Retrieval info: CONSTANT: NUMWORDS_A NUMERIC "512"
+// Retrieval info: CONSTANT: NUMWORDS_B NUMERIC "128"
 // Retrieval info: CONSTANT: OPERATION_MODE STRING "BIDIR_DUAL_PORT"
 // Retrieval info: CONSTANT: OUTDATA_ACLR_A STRING "NONE"
 // Retrieval info: CONSTANT: OUTDATA_ACLR_B STRING "NONE"
@@ -207,17 +207,17 @@ endmodule
 // Retrieval info: CONSTANT: OUTDATA_REG_B STRING "UNREGISTERED"
 // Retrieval info: CONSTANT: POWER_UP_UNINITIALIZED STRING "FALSE"
 // Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_MIXED_PORTS STRING "DONT_CARE"
-// Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_A STRING "NEW_DATA_NO_NBE_READ"
-// Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_B STRING "NEW_DATA_NO_NBE_READ"
-// Retrieval info: CONSTANT: WIDTHAD_A NUMERIC "11"
-// Retrieval info: CONSTANT: WIDTHAD_B NUMERIC "9"
+// Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_A STRING "NEW_DATA_WITH_NBE_READ"
+// Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_B STRING "NEW_DATA_WITH_NBE_READ"
+// Retrieval info: CONSTANT: WIDTHAD_A NUMERIC "9"
+// Retrieval info: CONSTANT: WIDTHAD_B NUMERIC "7"
 // Retrieval info: CONSTANT: WIDTH_A NUMERIC "8"
 // Retrieval info: CONSTANT: WIDTH_B NUMERIC "32"
 // Retrieval info: CONSTANT: WIDTH_BYTEENA_A NUMERIC "1"
 // Retrieval info: CONSTANT: WIDTH_BYTEENA_B NUMERIC "1"
 // Retrieval info: CONSTANT: WRCONTROL_WRADDRESS_REG_B STRING "CLOCK0"
-// Retrieval info: USED_PORT: address_a 0 0 11 0 INPUT NODEFVAL "address_a[10..0]"
-// Retrieval info: USED_PORT: address_b 0 0 9 0 INPUT NODEFVAL "address_b[8..0]"
+// Retrieval info: USED_PORT: address_a 0 0 9 0 INPUT NODEFVAL "address_a[8..0]"
+// Retrieval info: USED_PORT: address_b 0 0 7 0 INPUT NODEFVAL "address_b[6..0]"
 // Retrieval info: USED_PORT: clock 0 0 0 0 INPUT VCC "clock"
 // Retrieval info: USED_PORT: data_a 0 0 8 0 INPUT NODEFVAL "data_a[7..0]"
 // Retrieval info: USED_PORT: data_b 0 0 32 0 INPUT NODEFVAL "data_b[31..0]"
@@ -225,8 +225,8 @@ endmodule
 // Retrieval info: USED_PORT: q_b 0 0 32 0 OUTPUT NODEFVAL "q_b[31..0]"
 // Retrieval info: USED_PORT: wren_a 0 0 0 0 INPUT GND "wren_a"
 // Retrieval info: USED_PORT: wren_b 0 0 0 0 INPUT GND "wren_b"
-// Retrieval info: CONNECT: @address_a 0 0 11 0 address_a 0 0 11 0
-// Retrieval info: CONNECT: @address_b 0 0 9 0 address_b 0 0 9 0
+// Retrieval info: CONNECT: @address_a 0 0 9 0 address_a 0 0 9 0
+// Retrieval info: CONNECT: @address_b 0 0 7 0 address_b 0 0 7 0
 // Retrieval info: CONNECT: @clock0 0 0 0 0 clock 0 0 0 0
 // Retrieval info: CONNECT: @data_a 0 0 8 0 data_a 0 0 8 0
 // Retrieval info: CONNECT: @data_b 0 0 32 0 data_b 0 0 32 0
@@ -234,10 +234,10 @@ endmodule
 // Retrieval info: CONNECT: @wren_b 0 0 0 0 wren_b 0 0 0 0
 // Retrieval info: CONNECT: q_a 0 0 8 0 @q_a 0 0 8 0
 // Retrieval info: CONNECT: q_b 0 0 32 0 @q_b 0 0 32 0
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom.v TRUE
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom.inc FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom.cmp FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom.bsf FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom_inst.v FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL ram_n64_eeprom_bb.v FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer.v TRUE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer.inc FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer.cmp FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer.bsf FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer_inst.v FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ram_sd_buffer_bb.v FALSE
 // Retrieval info: LIB_FILE: altera_mf

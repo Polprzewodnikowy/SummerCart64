@@ -18,7 +18,7 @@
 # -------------------------------------------------------------------------- #
 #
 # Quartus Prime
-# Version 20.1.0 Build 711 06/05/2020 SJ Lite Edition
+# Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
 # Date created = 00:00:00  November 06, 2020
 #
 # -------------------------------------------------------------------------- #
@@ -42,39 +42,105 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:45:19  JULY 29, 2020"
-set_global_assignment -name LAST_QUARTUS_VERSION "20.1.0 Lite Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name SMART_RECOMPILE OFF
-set_global_assignment -name VERILOG_FILE rtl/cart/control.v
-set_global_assignment -name VERILOG_FILE rtl/usb/pc.v
-set_global_assignment -name VERILOG_FILE rtl/usb/ftdi_fsi.v
-set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
-set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
+set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
 set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
-set_global_assignment -name VERILOG_FILE rtl/memory/sdram.v
-set_global_assignment -name VERILOG_FILE rtl/memory/embedded_flash.v
-set_global_assignment -name VERILOG_FILE rtl/n64/si.v
-set_global_assignment -name VERILOG_FILE rtl/n64/pi.v
-set_global_assignment -name VERILOG_FILE rtl/n64/bank_decoder.v
-set_global_assignment -name VERILOG_FILE rtl/top.v
+set_global_assignment -name QIP_FILE rtl/intel/ram/ram_sd_buffer.qip
+set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
 set_global_assignment -name SDC_FILE constraints.sdc
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_ack.qip
+set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
+set_global_assignment -name VERILOG_FILE rtl/cart/cart_control.v
+set_global_assignment -name VERILOG_FILE rtl/cart/cart_led.v
+set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
+set_global_assignment -name VERILOG_FILE rtl/memory/memory_embedded_flash.v
+set_global_assignment -name VERILOG_FILE rtl/memory/memory_sdram.v
+set_global_assignment -name VERILOG_FILE rtl/n64/n64_bank_decoder.v
+set_global_assignment -name VERILOG_FILE rtl/n64/n64_pi.v
+set_global_assignment -name VERILOG_FILE rtl/n64/n64_si.v
+set_global_assignment -name VERILOG_FILE rtl/sd/sd_dma.v
+set_global_assignment -name VERILOG_FILE rtl/sd/sd_interface.v
+set_global_assignment -name VERILOG_FILE rtl/top.v
+set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v
+set_global_assignment -name VERILOG_FILE rtl/usb/usb_pc.v
+set_global_assignment -name VERILOG_INCLUDE_FILE rtl/constants.vh
+set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
+set_location_assignment PIN_6 -to io_pmod[3]
+set_location_assignment PIN_7 -to io_pmod[4]
+set_location_assignment PIN_8 -to io_pmod[5]
+set_location_assignment PIN_10 -to io_pmod[6]
+set_location_assignment PIN_11 -to io_pmod[7]
+set_location_assignment PIN_12 -to o_ftdi_si
+set_location_assignment PIN_13 -to o_ftdi_clk
+set_location_assignment PIN_14 -to i_ftdi_so
+set_location_assignment PIN_15 -to i_ftdi_cts
+set_location_assignment PIN_17 -to o_led
+set_location_assignment PIN_21 -to o_rtc_scl
+set_location_assignment PIN_22 -to io_rtc_sda
+set_location_assignment PIN_24 -to io_n64_si_dq
+set_location_assignment PIN_25 -to i_n64_nmi
 set_location_assignment PIN_26 -to i_clk
-set_location_assignment PIN_98 -to io_sdram_dq[0]
-set_location_assignment PIN_97 -to io_sdram_dq[1]
-set_location_assignment PIN_96 -to io_sdram_dq[2]
-set_location_assignment PIN_93 -to io_sdram_dq[3]
-set_location_assignment PIN_92 -to io_sdram_dq[4]
-set_location_assignment PIN_91 -to io_sdram_dq[5]
-set_location_assignment PIN_90 -to io_sdram_dq[6]
+set_location_assignment PIN_27 -to i_n64_reset
+set_location_assignment PIN_28 -to i_n64_si_clk
+set_location_assignment PIN_29 -to i_n64_cic_clk
+set_location_assignment PIN_30 -to io_n64_cic_dq
+set_location_assignment PIN_32 -to io_n64_pi_ad[7]
+set_location_assignment PIN_33 -to io_n64_pi_ad[8]
+set_location_assignment PIN_38 -to io_n64_pi_ad[6]
+set_location_assignment PIN_39 -to io_n64_pi_ad[9]
+set_location_assignment PIN_41 -to io_n64_pi_ad[5]
+set_location_assignment PIN_43 -to io_n64_pi_ad[10]
+set_location_assignment PIN_44 -to io_n64_pi_ad[4]
+set_location_assignment PIN_45 -to io_n64_pi_ad[11]
+set_location_assignment PIN_46 -to i_n64_pi_aleh
+set_location_assignment PIN_47 -to i_n64_pi_read
+set_location_assignment PIN_48 -to i_n64_pi_write
+set_location_assignment PIN_50 -to i_n64_pi_alel
+set_location_assignment PIN_52 -to io_n64_pi_ad[12]
+set_location_assignment PIN_54 -to io_n64_pi_ad[3]
+set_location_assignment PIN_55 -to io_n64_pi_ad[13]
+set_location_assignment PIN_56 -to io_n64_pi_ad[2]
+set_location_assignment PIN_57 -to io_n64_pi_ad[14]
+set_location_assignment PIN_58 -to io_n64_pi_ad[1]
+set_location_assignment PIN_59 -to io_n64_pi_ad[15]
+set_location_assignment PIN_60 -to io_n64_pi_ad[0]
+set_location_assignment PIN_61 -to o_sdram_a[4]
+set_location_assignment PIN_62 -to o_sdram_a[5]
+set_location_assignment PIN_64 -to o_sdram_a[6]
+set_location_assignment PIN_65 -to o_sdram_a[7]
+set_location_assignment PIN_66 -to o_sdram_a[8]
+set_location_assignment PIN_69 -to o_sdram_a[9]
+set_location_assignment PIN_70 -to o_sdram_a[11]
+set_location_assignment PIN_74 -to o_sdram_a[12]
+set_location_assignment PIN_75 -to o_sdram_clk
+set_location_assignment PIN_76 -to o_sdram_a[3]
+set_location_assignment PIN_77 -to o_sdram_a[2]
+set_location_assignment PIN_78 -to o_sdram_a[1]
+set_location_assignment PIN_79 -to o_sdram_a[0]
+set_location_assignment PIN_80 -to o_sdram_a[10]
+set_location_assignment PIN_81 -to o_sdram_ba[1]
+set_location_assignment PIN_84 -to o_sdram_ba[0]
+set_location_assignment PIN_85 -to o_sdram_cs
+set_location_assignment PIN_86 -to o_sdram_ras
+set_location_assignment PIN_87 -to o_sdram_cas
+set_location_assignment PIN_88 -to o_sdram_we
 set_location_assignment PIN_89 -to io_sdram_dq[7]
+set_location_assignment PIN_90 -to io_sdram_dq[6]
+set_location_assignment PIN_91 -to io_sdram_dq[5]
+set_location_assignment PIN_92 -to io_sdram_dq[4]
+set_location_assignment PIN_93 -to io_sdram_dq[3]
+set_location_assignment PIN_96 -to io_sdram_dq[2]
+set_location_assignment PIN_97 -to io_sdram_dq[1]
+set_location_assignment PIN_98 -to io_sdram_dq[0]
 set_location_assignment PIN_99 -to io_sdram_dq[8]
 set_location_assignment PIN_100 -to io_sdram_dq[9]
 set_location_assignment PIN_101 -to io_sdram_dq[10]
@@ -83,85 +149,27 @@ set_location_assignment PIN_105 -to io_sdram_dq[12]
 set_location_assignment PIN_106 -to io_sdram_dq[13]
 set_location_assignment PIN_110 -to io_sdram_dq[14]
 set_location_assignment PIN_111 -to io_sdram_dq[15]
-set_location_assignment PIN_79 -to o_sdram_a[0]
-set_location_assignment PIN_78 -to o_sdram_a[1]
-set_location_assignment PIN_77 -to o_sdram_a[2]
-set_location_assignment PIN_76 -to o_sdram_a[3]
-set_location_assignment PIN_61 -to o_sdram_a[4]
-set_location_assignment PIN_62 -to o_sdram_a[5]
-set_location_assignment PIN_64 -to o_sdram_a[6]
-set_location_assignment PIN_65 -to o_sdram_a[7]
-set_location_assignment PIN_66 -to o_sdram_a[8]
-set_location_assignment PIN_69 -to o_sdram_a[9]
-set_location_assignment PIN_80 -to o_sdram_a[10]
-set_location_assignment PIN_70 -to o_sdram_a[11]
-set_location_assignment PIN_74 -to o_sdram_a[12]
-set_location_assignment PIN_84 -to o_sdram_ba[0]
-set_location_assignment PIN_81 -to o_sdram_ba[1]
-set_location_assignment PIN_75 -to o_sdram_clk
-set_location_assignment PIN_85 -to o_sdram_cs
-set_location_assignment PIN_87 -to o_sdram_cas
-set_location_assignment PIN_86 -to o_sdram_ras
-set_location_assignment PIN_88 -to o_sdram_we
+set_location_assignment PIN_112 -to io_sd_dat[1]
+set_location_assignment PIN_113 -to io_sd_dat[0]
 set_location_assignment PIN_114 -to o_sd_clk
 set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
-set_location_assignment PIN_112 -to io_sd_dat[1]
-set_location_assignment PIN_113 -to io_sd_dat[0]
-set_location_assignment PIN_134 -to o_flash_cs
-set_location_assignment PIN_131 -to o_flash_clk
-set_location_assignment PIN_132 -to io_flash_dq[3]
-set_location_assignment PIN_136 -to io_flash_dq[2]
-set_location_assignment PIN_135 -to io_flash_dq[1]
-set_location_assignment PIN_130 -to io_flash_dq[0]
+set_location_assignment PIN_121 -to io_sram_dq[0]
 set_location_assignment PIN_122 -to o_sram_clk
 set_location_assignment PIN_123 -to io_sram_dq[3]
-set_location_assignment PIN_127 -to io_sram_dq[2]
-set_location_assignment PIN_126 -to io_sram_dq[1]
-set_location_assignment PIN_121 -to io_sram_dq[0]
 set_location_assignment PIN_124 -to o_sram_cs
-set_location_assignment PIN_24 -to io_n64_si_dq
-set_location_assignment PIN_25 -to i_n64_nmi
-set_location_assignment PIN_27 -to i_n64_reset
-set_location_assignment PIN_28 -to i_n64_si_clk
-set_location_assignment PIN_46 -to i_n64_pi_aleh
-set_location_assignment PIN_50 -to i_n64_pi_alel
-set_location_assignment PIN_47 -to i_n64_pi_read
-set_location_assignment PIN_48 -to i_n64_pi_write
-set_location_assignment PIN_60 -to io_n64_pi_ad[0]
-set_location_assignment PIN_58 -to io_n64_pi_ad[1]
-set_location_assignment PIN_56 -to io_n64_pi_ad[2]
-set_location_assignment PIN_54 -to io_n64_pi_ad[3]
-set_location_assignment PIN_44 -to io_n64_pi_ad[4]
-set_location_assignment PIN_41 -to io_n64_pi_ad[5]
-set_location_assignment PIN_38 -to io_n64_pi_ad[6]
-set_location_assignment PIN_32 -to io_n64_pi_ad[7]
-set_location_assignment PIN_33 -to io_n64_pi_ad[8]
-set_location_assignment PIN_39 -to io_n64_pi_ad[9]
-set_location_assignment PIN_43 -to io_n64_pi_ad[10]
-set_location_assignment PIN_45 -to io_n64_pi_ad[11]
-set_location_assignment PIN_52 -to io_n64_pi_ad[12]
-set_location_assignment PIN_55 -to io_n64_pi_ad[13]
-set_location_assignment PIN_57 -to io_n64_pi_ad[14]
-set_location_assignment PIN_59 -to io_n64_pi_ad[15]
-set_location_assignment PIN_29 -to i_n64_cic_clk
-set_location_assignment PIN_30 -to io_n64_cic_dq
+set_location_assignment PIN_126 -to io_sram_dq[1]
+set_location_assignment PIN_127 -to io_sram_dq[2]
+set_location_assignment PIN_130 -to io_flash_dq[0]
+set_location_assignment PIN_131 -to o_flash_clk
+set_location_assignment PIN_132 -to io_flash_dq[3]
+set_location_assignment PIN_134 -to o_flash_cs
+set_location_assignment PIN_135 -to io_flash_dq[1]
+set_location_assignment PIN_136 -to io_flash_dq[2]
 set_location_assignment PIN_138 -to io_pmod[0]
 set_location_assignment PIN_140 -to io_pmod[1]
 set_location_assignment PIN_141 -to io_pmod[2]
-set_location_assignment PIN_6 -to io_pmod[3]
-set_location_assignment PIN_7 -to io_pmod[4]
-set_location_assignment PIN_8 -to io_pmod[5]
-set_location_assignment PIN_10 -to io_pmod[6]
-set_location_assignment PIN_11 -to io_pmod[7]
-set_location_assignment PIN_22 -to io_rtc_sda
-set_location_assignment PIN_21 -to o_rtc_scl
-set_location_assignment PIN_17 -to o_led
-set_location_assignment PIN_15 -to i_ftdi_cts
-set_location_assignment PIN_14 -to i_ftdi_so
-set_location_assignment PIN_13 -to o_ftdi_clk
-set_location_assignment PIN_12 -to o_ftdi_si
 
 # Classic Timing Assignments
 # ==========================
@@ -210,7 +218,7 @@ set_global_assignment -name GENERATE_SVF_FILE ON
 
 # Signal Tap Assignments
 # ======================
-set_global_assignment -name ENABLE_SIGNALTAP OFF
+set_global_assignment -name ENABLE_SIGNALTAP ON
 set_global_assignment -name USE_SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
 
 # Power Estimation Assignments
@@ -249,14 +257,16 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 	# Fitter Assignments
 	# ==================
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_cic_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_cic_dq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"

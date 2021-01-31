@@ -60,7 +60,7 @@
    enabled="1"
    autoexport="1">
   <parameter name="AUTO_CLOCK_RATE" value="0" />
-  <parameter name="CLOCK_FREQUENCY" value="90.0" />
+  <parameter name="CLOCK_FREQUENCY" value="100.0" />
   <parameter name="CONFIGURATION_MODE">Single Compressed Image</parameter>
   <parameter name="CONFIGURATION_SCHEME">Internal Configuration</parameter>
   <parameter name="DATA_INTERFACE" value="Parallel" />
