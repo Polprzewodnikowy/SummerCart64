@@ -32,21 +32,24 @@ module device_arbiter #(
 
     reg [(NUM_CONTROLLERS - 1):0] r_ack_fifo_mem [0:(ACK_FIFO_LENGTH - 1)];
     
-    reg [(FIFO_ADDRESS_WIDTH - 1):0] r_ack_fifo_wrptr;
-    reg [(FIFO_ADDRESS_WIDTH - 1):0] r_ack_fifo_rdptr;
+    reg [FIFO_ADDRESS_WIDTH:0] r_ack_fifo_wrptr;
+    reg [FIFO_ADDRESS_WIDTH:0] r_ack_fifo_rdptr;
 
     wire w_ack_fifo_wrreq = |(r_request_successful & ~i_write);
     wire w_ack_fifo_rdreq = i_device_ack;
-    
-    wire w_ack_fifo_full = (r_ack_fifo_wrptr + 1'd1) == r_ack_fifo_rdptr;
+
+    wire w_empty = r_ack_fifo_wrptr[FIFO_ADDRESS_WIDTH] == r_ack_fifo_rdptr[FIFO_ADDRESS_WIDTH];
+    wire w_full_or_empty = r_ack_fifo_wrptr[(FIFO_ADDRESS_WIDTH - 1):0] == r_ack_fifo_rdptr[(FIFO_ADDRESS_WIDTH - 1):0];
+
+    wire w_ack_fifo_full = !w_empty && w_full_or_empty;
 
     always @(posedge i_clk) begin
         if (i_reset) begin
-            r_ack_fifo_wrptr <= {FIFO_ADDRESS_WIDTH{1'b0}};
-            r_ack_fifo_rdptr <= {FIFO_ADDRESS_WIDTH{1'b0}};
+            r_ack_fifo_wrptr <= {(FIFO_ADDRESS_WIDTH + 1){1'b0}};
+            r_ack_fifo_rdptr <= {(FIFO_ADDRESS_WIDTH + 1){1'b0}};
         end else begin
             if (w_ack_fifo_wrreq) begin
-                r_ack_fifo_mem[r_ack_fifo_wrptr] <= r_request_successful & ~i_write;
+                r_ack_fifo_mem[r_ack_fifo_wrptr[(FIFO_ADDRESS_WIDTH - 1):0]] <= r_request_successful & ~i_write;
                 r_ack_fifo_wrptr <= r_ack_fifo_wrptr + 1'd1;
             end
             if (w_ack_fifo_rdreq) begin
@@ -66,7 +69,7 @@ module device_arbiter #(
         end
 
         r_request_successful = r_request & ~o_busy;
-        o_ack = {NUM_CONTROLLERS{i_device_ack}} & r_ack_fifo_mem[r_ack_fifo_rdptr];
+        o_ack = {NUM_CONTROLLERS{i_device_ack}} & r_ack_fifo_mem[r_ack_fifo_rdptr[(FIFO_ADDRESS_WIDTH - 1):0]];
         o_data = {NUM_CONTROLLERS{i_device_data}};
     end
 
