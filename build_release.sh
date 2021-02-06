@@ -4,7 +4,7 @@ PACKAGES_FOLDER_NAME="packages"
 PACKAGE_FILE_NAME="SummerCart64"
 FILES=(
     "./fw/output_files/SummerCart64.pof"
-    "./hw/ftdi-template.xml"
+    "./hw/v1/ftdi-template.xml"
     "./sw/cic/UltraCIC-III.hex"
     "./sw/cic/UltraCIC-III.eep.hex"
 )
