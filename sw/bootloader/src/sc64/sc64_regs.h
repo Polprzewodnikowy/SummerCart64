@@ -165,8 +165,8 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_DMA_BANK_GET(addr)          (((addr) >> 28) & 0xF)
 #define SC64_SD_DMA_BANK_ADDR(b, a)         ((((b) & 0xF) << 28) | ((a) & 0x3FFFFFC))
 
-#define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x7FFF) * 4)
-#define SC64_SD_DMA_LEN(l)                  ((((l) / 4) - 1) & 0x7FFF)
+#define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x3FFFF) * 4)
+#define SC64_SD_DMA_LEN(l)                  ((((l) / 4) - 1) & 0x3FFFF)
 
 
 #endif

@@ -187,8 +187,8 @@ module sd_interface (
 
     wire [3:0] w_dma_bank;
     wire [23:0] w_dma_address;
-    wire [14:0] w_dma_length;
-    wire [14:0] w_dma_left;
+    wire [17:0] w_dma_length;
+    wire [17:0] w_dma_left;
     wire w_dma_load_bank_address;
     wire w_dma_load_length;
     wire w_dma_direction;

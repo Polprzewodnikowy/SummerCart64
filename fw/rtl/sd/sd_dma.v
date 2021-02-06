@@ -4,8 +4,8 @@ module sd_dma (
 
     input [3:0] i_dma_bank,
     input [23:0] i_dma_address,
-    input [14:0] i_dma_length,
-    output [14:0] o_dma_left,
+    input [17:0] i_dma_length,
+    output [17:0] o_dma_left,
     input i_dma_load_bank_address,
     input i_dma_load_length,
     input i_dma_direction,
@@ -47,14 +47,14 @@ module sd_dma (
         end
     end
 
-    reg [14:0] r_remaining;
+    reg [17:0] r_remaining;
 
     assign o_dma_left = r_remaining;
 
     always @(posedge i_clk) begin
         if (i_dma_load_length && !o_dma_busy) begin
             r_remaining <= i_dma_length;
-        end else if (w_request_successful && r_remaining > 15'd0) begin
+        end else if (w_request_successful && r_remaining > 18'd0) begin
             r_remaining <= r_remaining - 1'd1;
         end
     end
@@ -66,7 +66,7 @@ module sd_dma (
             if (i_dma_start && !o_dma_busy) begin
                 o_dma_busy <= 1'b1;
             end
-            if (i_dma_stop || (w_request_successful && r_remaining == 15'd0)) begin
+            if (i_dma_stop || (w_request_successful && r_remaining == 18'd0)) begin
                 o_dma_busy <= 1'b0;
             end
         end

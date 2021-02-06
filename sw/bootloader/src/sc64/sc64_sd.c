@@ -379,7 +379,6 @@ sc64_sd_err_t sc64_sd_read_sectors(uint32_t starting_sector, size_t count, void 
 }
 
 sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address) {
-    size_t num_transfers;
     size_t sectors_left;
     uint32_t current_sector;
     uint32_t current_address;
@@ -397,7 +396,6 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
         return E_PAR_ERROR;
     }
 
-    num_transfers = (count / 2048) + 1;
     sectors_left = count;
     current_sector = starting_sector;
     if (!sd_card_type_block) {
@@ -405,7 +403,7 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
     }
     current_address = address;
 
-    for (size_t i = 0; i < num_transfers; i++) {
+    do {
         num_blocks = (sectors_left > 2048) ? 2048 : sectors_left;
 
         platform_pi_io_write(&SC64_SD->DMA_ADDR, SC64_SD_DMA_BANK_ADDR(bank, current_address));
@@ -450,9 +448,10 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
 
         while (platform_pi_io_read(&SC64_SD->DMA_SCR) & SC64_SD_DMA_SCR_BUSY);
 
-        current_sector += sd_card_type_block ? 1 : SD_BLOCK_SIZE;
+        sectors_left -= num_blocks;
+        current_sector += num_blocks * (sd_card_type_block ? 1 : SD_BLOCK_SIZE);
         current_address += num_blocks * SD_BLOCK_SIZE;
-    }
+    } while (sectors_left > 0);
 
     return E_OK;
 }

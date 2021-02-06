@@ -38,10 +38,10 @@ module sd_regs (
 
     output reg [3:0] o_dma_bank,
     output reg [23:0] o_dma_address,
-    output reg [14:0] o_dma_length,
+    output reg [17:0] o_dma_length,
     input [3:0] i_dma_bank,
     input [23:0] i_dma_address,
-    input [14:0] i_dma_left,
+    input [17:0] i_dma_left,
     output reg o_dma_load_bank_address,
     output reg o_dma_load_length,
     output reg o_dma_direction,
@@ -73,7 +73,7 @@ module sd_regs (
     always @(*) begin
         o_dma_bank = i_data[31:28];
         o_dma_address = i_data[25:2];
-        o_dma_length = i_data[14:0];
+        o_dma_length = i_data[17:0];
         o_dma_load_bank_address = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_ADDR);
         o_dma_load_length = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_LEN);
         o_busy = 1'b0;
@@ -210,7 +210,7 @@ module sd_regs (
                     end
 
                     SD_REG_DMA_LEN: begin
-                        o_data <= {17'd0, i_dma_left};
+                        o_data <= {14'd0, i_dma_left};
                     end
                 endcase
             end else begin
