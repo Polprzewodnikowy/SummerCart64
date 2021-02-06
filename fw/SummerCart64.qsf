@@ -51,7 +51,6 @@ set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
 set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
-set_global_assignment -name QIP_FILE rtl/intel/ram/ram_sd_buffer.qip
 set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
 set_global_assignment -name SDC_FILE constraints.sdc
 set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
