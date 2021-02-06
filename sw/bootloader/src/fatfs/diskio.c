@@ -29,8 +29,7 @@ DSTATUS disk_initialize(BYTE pdrv) {
 }
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
-    uint8_t success;
-    uint8_t response;
+    sc64_sd_err_t error;
 
     if ((pdrv > 0) || (count == 0)) {
         return RES_PARERR;
@@ -40,40 +39,10 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
         return RES_NOTRDY;
     }
 
-    if (count == 1) {
-        success = sc64_sd_cmd_send(CMD17, sector, &response);
+    error = sc64_sd_read_sectors(sector, count, buff);
 
-        if (!success || response) {
-            return RES_PARERR;
-        }
-
-        success = sc64_sd_block_read(buff, SD_BLOCK_SIZE, FALSE);
-
-        if (!success) {
-            return RES_ERROR;
-        }
-    } else {
-        success = sc64_sd_cmd_send(CMD18, sector, &response);
-        
-        if (!success || response) {
-            return RES_PARERR;
-        }
-
-        for (size_t i = 0; i < count; i++) {
-            success = sc64_sd_block_read(buff, SD_BLOCK_SIZE, FALSE);
-
-            if (!success) {
-                return RES_ERROR;
-            }
-
-            buff += SD_BLOCK_SIZE;
-        }
-
-        success = sc64_sd_cmd_send(CMD12, 0, &response);
-
-        if (!success || response) {
-            return RES_ERROR;
-        }
+    if (error != E_OK) {
+        return RES_ERROR;
     }
 
     return RES_OK;

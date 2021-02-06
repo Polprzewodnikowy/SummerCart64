@@ -98,9 +98,9 @@ module sd_interface (
         .i_fifo_push(w_rx_fifo_push),
         .i_fifo_pop(w_rx_fifo_regs_pop || w_rx_fifo_dma_pop),
         .o_fifo_empty(w_rx_fifo_empty),
-        // .o_fifo_full(),
+        .o_fifo_full(),
         .o_fifo_items(w_rx_fifo_items),
-        // .o_fifo_underrun(),
+        .o_fifo_underrun(),
         .o_fifo_overrun(w_rx_fifo_overrun),
         .i_fifo_data(w_rx_fifo_i_data),
         .o_fifo_data(w_rx_fifo_o_data)
@@ -136,9 +136,9 @@ module sd_interface (
         .i_fifo_pop(w_tx_fifo_pop),
         .o_fifo_empty(w_tx_fifo_empty),
         .o_fifo_full(w_tx_fifo_full),
-        // .o_fifo_items(),
-        // .o_fifo_underrun(),
-        // .o_fifo_overrun(),
+        .o_fifo_items(),
+        .o_fifo_underrun(),
+        .o_fifo_overrun(),
         .i_fifo_data(r_tx_fifo_i_data),
         .o_fifo_data(w_tx_fifo_o_data)
     );

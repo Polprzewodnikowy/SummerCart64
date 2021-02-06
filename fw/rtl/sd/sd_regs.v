@@ -65,7 +65,7 @@ module sd_regs (
     localparam [2:0] SD_REG_DAT         = 3'd4;
     localparam [2:0] SD_REG_DMA_SCR     = 3'd5;
     localparam [2:0] SD_REG_DMA_ADDR    = 3'd6;
-    localparam [2:0] SD_REG_DMA_LENGTH  = 3'd7;
+    localparam [2:0] SD_REG_DMA_LEN     = 3'd7;
 
     wire w_write_request = i_request && i_write && !o_busy;
     wire w_read_request = i_request && !i_write && !o_busy;
@@ -75,7 +75,7 @@ module sd_regs (
         o_dma_address = i_data[25:2];
         o_dma_length = i_data[14:0];
         o_dma_load_bank_address = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_ADDR);
-        o_dma_load_length = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_LENGTH);
+        o_dma_load_length = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_LEN);
         o_busy = 1'b0;
     end
 
@@ -142,7 +142,7 @@ module sd_regs (
                     SD_REG_DMA_ADDR: begin
                     end
 
-                    SD_REG_DMA_LENGTH: begin
+                    SD_REG_DMA_LEN: begin
                     end
                 endcase
             end else begin
@@ -164,7 +164,7 @@ module sd_regs (
             if (!i_address[3]) begin
                 case (i_address[2:0])
                     SD_REG_SCR: begin
-                        o_data <= {30'd0, o_sd_clk_config};
+                        o_data <= {29'd0, o_dat_width, o_sd_clk_config};
                     end
 
                     SD_REG_ARG: begin
@@ -176,7 +176,8 @@ module sd_regs (
                             21'd0,
                             i_command_response_crc_error,
                             i_command_timeout,
-                            2'b00,
+                            o_command_skip_response,
+                            o_command_long_response,
                             i_command_busy,
                             i_command_index
                         };
@@ -208,7 +209,7 @@ module sd_regs (
                         o_data <= {i_dma_bank, 2'd0, i_dma_address, 2'b00};
                     end
 
-                    SD_REG_DMA_LENGTH: begin
+                    SD_REG_DMA_LEN: begin
                         o_data <= {17'd0, i_dma_left};
                     end
                 endcase

@@ -2,27 +2,27 @@
 
 
 static void sc64_enable_peripheral(uint32_t mask) {
-    uint32_t config = platform_pi_io_read(&SC64_CART->scr);
+    uint32_t config = platform_pi_io_read(&SC64_CART->SCR);
 
     config |= mask;
 
-    platform_pi_io_write(&SC64_CART->scr, config);
+    platform_pi_io_write(&SC64_CART->SCR, config);
 }
 
 static void sc64_disable_peripheral(uint32_t mask) {
-    uint32_t config = platform_pi_io_read(&SC64_CART->scr);
+    uint32_t config = platform_pi_io_read(&SC64_CART->SCR);
 
     config &= ~mask;
 
-    platform_pi_io_write(&SC64_CART->scr, config);
+    platform_pi_io_write(&SC64_CART->SCR, config);
 }
 
 uint32_t sc64_get_scr(void) {
-    return platform_pi_io_read(&SC64_CART->scr);
+    return platform_pi_io_read(&SC64_CART->SCR);
 }
 
 void sc64_set_scr(uint32_t scr) {
-    platform_pi_io_write(&SC64_CART->scr, scr);
+    platform_pi_io_write(&SC64_CART->SCR, scr);
 }
 
 void sc64_enable_flashram(void) {
@@ -100,29 +100,29 @@ void sc64_disable_sdram_writable(void) {
 }
 
 uint32_t sc64_get_boot_mode(void) {
-    return platform_pi_io_read(&SC64_CART->boot);
+    return platform_pi_io_read(&SC64_CART->BOOT);
 }
 
 void sc64_set_boot_mode(uint32_t boot) {
-    platform_pi_io_write(&SC64_CART->boot, boot);
+    platform_pi_io_write(&SC64_CART->BOOT, boot);
 }
 
 uint32_t sc64_get_version(void) {
-    return platform_pi_io_read(&SC64_CART->version);
+    return platform_pi_io_read(&SC64_CART->VERSION);
 }
 
 uint32_t sc64_get_ddipl_address(void) {
-    return platform_pi_io_read(&SC64_CART->ddipl_addr) & SC64_CART_DDIPL_ADDR_ADDRESS_MASK;
+    return platform_pi_io_read(&SC64_CART->DDIPL_ADDR) & SC64_CART_DDIPL_ADDR_ADDRESS_MASK;
 }
 
 void sc64_set_ddipl_address(uint32_t address) {
-    platform_pi_io_write(&SC64_CART->ddipl_addr, address & SC64_CART_DDIPL_ADDR_ADDRESS_MASK);
+    platform_pi_io_write(&SC64_CART->DDIPL_ADDR, address & SC64_CART_DDIPL_ADDR_ADDRESS_MASK);
 }
 
 uint32_t sc64_get_sram_address(void) {
-    return platform_pi_io_read(&SC64_CART->sram_addr) & SC64_CART_SRAM_ADDR_ADDRESS_MASK;
+    return platform_pi_io_read(&SC64_CART->SRAM_ADDR) & SC64_CART_SRAM_ADDR_ADDRESS_MASK;
 }
 
 void sc64_set_sram_address(uint32_t address) {
-    platform_pi_io_write(&SC64_CART->sram_addr, address & SC64_CART_SRAM_ADDR_ADDRESS_MASK);
+    platform_pi_io_write(&SC64_CART->SRAM_ADDR, address & SC64_CART_SRAM_ADDR_ADDRESS_MASK);
 }
