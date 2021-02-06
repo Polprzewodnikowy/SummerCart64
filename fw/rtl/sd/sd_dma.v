@@ -2,61 +2,92 @@ module sd_dma (
     input i_clk,
     input i_reset,
 
-    input i_fifo_flush,
-    input i_fifo_push,
-    output o_fifo_full,
-    output o_fifo_empty,
-    input [31:0] i_fifo_data,
+    input [3:0] i_dma_bank,
+    input [23:0] i_dma_address,
+    input [17:0] i_dma_length,
+    output [17:0] o_dma_left,
+    input i_dma_load_bank_address,
+    input i_dma_load_length,
+    input i_dma_direction,
+    input i_dma_start,
+    input i_dma_stop,
+    output reg o_dma_busy,
 
-    output reg o_request,
+    output o_rx_fifo_pop,
+    input i_rx_fifo_empty,
+    input [31:0] i_rx_fifo_data,
+
+    output reg o_tx_fifo_push,
+    input i_tx_fifo_full,
+    output [31:0] o_tx_fifo_data,
+
+    output o_request,
     output reg o_write,
     input i_busy,
-    output reg [31:0] o_data
+    input i_ack,
+    output reg [3:0] o_bank,
+    output reg [23:0] o_address,
+    input [31:0] i_data,
+    output [31:0] o_data
 );
-
-    reg [31:0] r_dma_fifo_mem [0:127];
-    
-    reg [6:0] r_dma_fifo_wrptr;
-    reg [6:0] r_dma_fifo_rdptr;
-
-    assign o_fifo_full = (r_dma_fifo_wrptr + 1'd1) == r_dma_fifo_rdptr;
-    assign o_fifo_empty = r_dma_fifo_wrptr == r_dma_fifo_rdptr;
-
-    wire [31:0] w_rddata = r_dma_fifo_mem[r_dma_fifo_rdptr];
 
     wire w_request_successful = o_request && !i_busy;
 
     always @(posedge i_clk) begin
-        if (i_reset || i_fifo_flush) begin
-            r_dma_fifo_wrptr <= 7'd0;
-        end else begin
-            if (i_fifo_push) begin
-                r_dma_fifo_wrptr <= r_dma_fifo_wrptr + 1'd1;
-                r_dma_fifo_mem[r_dma_fifo_wrptr] <= i_fifo_data;
-            end
+        if (i_dma_load_bank_address && !o_dma_busy) begin
+            o_bank <= i_dma_bank;
         end
     end
 
     always @(posedge i_clk) begin
-        if (i_reset || i_fifo_flush) begin
-            o_request <= 1'b0;
-            o_write <= 1'b1;
-            r_dma_fifo_rdptr <= 7'd0;
+        if (i_dma_load_bank_address && !o_dma_busy) begin
+            o_address <= i_dma_address;
+        end else if (w_request_successful) begin
+            o_address <= o_address + 1'd1;
+        end
+    end
+
+    reg [17:0] r_remaining;
+
+    assign o_dma_left = r_remaining;
+
+    always @(posedge i_clk) begin
+        if (i_dma_load_length && !o_dma_busy) begin
+            r_remaining <= i_dma_length;
+        end else if (w_request_successful && r_remaining > 18'd0) begin
+            r_remaining <= r_remaining - 1'd1;
+        end
+    end
+
+    always @(posedge i_clk) begin
+        if (i_reset) begin
+            o_dma_busy <= 1'b0;
         end else begin
-            if (!o_request && !o_fifo_empty) begin
-                o_request <= 1'b1;
-                o_data <= w_rddata;
-                r_dma_fifo_rdptr <= r_dma_fifo_rdptr + 1'd1;
+            if (i_dma_start && !o_dma_busy) begin
+                o_dma_busy <= 1'b1;
             end
-            if (w_request_successful) begin
-                if (o_fifo_empty) begin
-                    o_request <= 1'b0;
-                end else begin
-                    r_dma_fifo_rdptr <= r_dma_fifo_rdptr + 1'd1;
-                    o_data <= w_rddata;
-                end
+            if (i_dma_stop || (w_request_successful && r_remaining == 18'd0)) begin
+                o_dma_busy <= 1'b0;
             end
         end
     end
+
+    assign o_rx_fifo_pop = o_dma_busy && o_write && w_request_successful;
+
+    assign o_tx_fifo_data = i_data;
+
+    assign o_request = o_dma_busy && (o_write ? (
+        !i_rx_fifo_empty
+    ) : (
+         1'b0   // TODO: Reading
+    ));
+
+    always @(posedge i_clk) begin
+        if (i_dma_start) begin
+            o_write <= i_dma_direction;
+        end
+    end
+
+    assign o_data = i_rx_fifo_data;
 
 endmodule

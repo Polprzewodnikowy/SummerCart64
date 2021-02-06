@@ -20,9 +20,6 @@ module top (
     input i_n64_si_clk,
     inout io_n64_si_dq,
 
-    input i_n64_cic_clk,        // TODO: to be removed
-    inout io_n64_cic_dq,        // TODO: to be removed
-
     output o_sdram_clk,
     output o_sdram_cs,
     output o_sdram_ras,
@@ -36,10 +33,6 @@ module top (
     inout io_sd_cmd,
     inout [3:0] io_sd_dat,
 
-    output o_flash_clk,         // TODO: to be removed
-    output o_flash_cs,          // TODO: to be removed
-    inout [3:0] io_flash_dq,    // TODO: to be removed
-
     output o_sram_clk,
     output o_sram_cs,
     inout [3:0] io_sram_dq,
@@ -49,7 +42,7 @@ module top (
 
     output o_led,
 
-    inout [7:0] io_pmod         // TODO: to be removed
+    inout [7:0] io_pmod
 );
 
     // Clock and reset signals
@@ -64,8 +57,6 @@ module top (
 
     wire w_n64_reset_btn;
 
-    assign io_n64_cic_dq = 1'bZ;
-    assign {o_flash_clk, o_flash_cs, io_flash_dq} = 6'bZZZZZZ;
     assign {o_sram_clk, o_sram_cs, io_sram_dq} = 6'bZZZZZZ;
     assign {o_rtc_scl, io_rtc_sda} = 2'bZZ;
     assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
@@ -363,16 +354,6 @@ module top (
 
     // SD card
 
-    wire w_sd_clk;
-    wire w_sd_cs;
-    wire w_sd_mosi;
-    wire w_sd_miso;
-
-    assign o_sd_clk = w_sd_clk;
-    assign io_sd_dat = {w_sd_cs, 3'bZZZ};
-    assign io_sd_cmd = w_sd_mosi;
-    assign w_sd_miso = io_sd_dat[0];
-    
     wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
 
     wire w_sd_dma_request;
@@ -404,16 +385,15 @@ module top (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .o_sd_clk(w_sd_clk),
-        .o_sd_cs(w_sd_cs),
-        .o_sd_mosi(w_sd_mosi),
-        .i_sd_miso(w_sd_miso),
+        .o_sd_clk(o_sd_clk),
+        .io_sd_cmd(io_sd_cmd),
+        .io_sd_dat(io_sd_dat),
 
         .i_request(w_n64_request_sd),
         .i_write(w_n64_write),
         .o_busy(w_n64_busy_sd),
         .o_ack(w_n64_ack_sd),
-        .i_address(w_n64_address[9:2]),
+        .i_address({w_n64_address[9], w_n64_address[4:2]}),
         .o_data(w_n64_i_data_sd),
         .i_data(w_n64_o_data),
 
