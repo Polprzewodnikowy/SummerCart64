@@ -27,13 +27,14 @@ typedef struct sc64_cart_registers {
     __IO reg_t USB_DMA_LEN;                 // USB transfer length for DMA to PC
     __IO reg_t DDIPL_ADDR;                  // 64 Disk Drive IPL location in SDRAM
     __IO reg_t SRAM_ADDR;                   // SRAM save emulation location in SDRAM
-    __IO reg_t __reserved[1015];
+    __IO reg_t __unused[1015];
     __IO reg_t USB_FIFO[1024];              // USB data from PC read FIFO memory end
 } sc64_cart_registers_t;
 
 #define SC64_CART_BASE                      (0x1E000000)
 
 #define SC64_CART                           ((__IO sc64_cart_registers_t *) SC64_CART_BASE)
+
 
 #define SC64_CART_SCR_FLASHRAM_ENABLE       (1 << 9)
 #define SC64_CART_SCR_SRAM_768K_MODE        (1 << 8)
@@ -52,6 +53,7 @@ typedef struct sc64_cart_registers {
 #define SC64_CART_BOOT_DDIPL_OVERRIDE       (1 << 12)
 #define SC64_CART_BOOT_TV_TYPE_BIT          (10)
 #define SC64_CART_BOOT_TV_TYPE_MASK         (0x3 << SC64_CART_BOOT_TV_TYPE_BIT)
+#define SC64_CART_BOOT_ROM_LOADED           (1 << 9)
 #define SC64_CART_BOOT_CIC_SEED_BIT         (0)
 #define SC64_CART_BOOT_CIC_SEED_MASK        (0x1FF << SC64_CART_BOOT_CIC_SEED_BIT)
 
@@ -123,6 +125,7 @@ typedef struct sc64_sd_registers_s {
 
 #define SC64_SD                             ((__IO sc64_sd_registers_t *) SC64_SD_BASE)
 
+
 #define SC64_SD_SCR_DAT_WIDTH               (1 << 2)
 #define SC64_SD_SCR_CLK_MASK                (0x3 << 0)
 #define SC64_SD_SCR_CLK_STOP                (0 << 0)
@@ -130,43 +133,53 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_SCR_CLK_25_MHZ              (2 << 0)
 #define SC64_SD_SCR_CLK_50_MHZ              (3 << 0)
 
-#define SC64_SD_CMD_RESPONSE_CRC_ERROR      (1 << 10)
-#define SC64_SD_CMD_TIMEOUT                 (1 << 9)
+
+#define SC64_SD_CMD_RESPONSE_CRC_ERROR      (1 << 8)
+#define SC64_SD_CMD_TIMEOUT                 (1 << 7)
+#define SC64_SD_CMD_BUSY                    (1 << 6)
+#define SC64_SD_CMD_INDEX_GET(cmd)          ((cmd) & 0x3F)
+
 #define SC64_SD_CMD_SKIP_RESPONSE           (1 << 8)
 #define SC64_SD_CMD_LONG_RESPONSE           (1 << 7)
-#define SC64_SD_CMD_BUSY                    (1 << 6)
 #define SC64_SD_CMD_START                   (1 << 6)
-#define SC64_SD_CMD_INDEX_GET(cmd)          ((cmd) & 0x3F)
 #define SC64_SD_CMD_INDEX(i)                ((i) & 0x3F)
 
-#define SC64_SD_DAT_RX_FIFO_FULL            (1 << 31)
-#define SC64_SD_DAT_RX_FIFO_ITEMS_GET(dat)  (((dat) >> 24) & 0xFF)
-#define SC64_SD_DAT_TX_FIFO_FULL            (1 << 23)
-#define SC64_SD_DAT_TX_FIFO_EMPTY           (1 << 22)
-#define SC64_SD_DAT_TX_FIFO_FLUSH           (1 << 22)
-#define SC64_SD_DAT_RX_FIFO_OVERRUN         (1 << 21)
-#define SC64_SD_DAT_RX_FIFO_FLUSH           (1 << 21)
-#define SC64_SD_DAT_NUM_BLOCKS_GET(dat)     ((((dat) >> 10) & 0x7FF) + 1)
-#define SC64_SD_DAT_NUM_BLOCKS(nb)          ((((nb) - 1) & 0x7FF) << 10)
-#define SC64_SD_DAT_BLOCK_SIZE_GET(dat)     (((((dat) >> 3) & 0x7F) + 1) * 4)
+
+#define SC64_SD_DAT_TX_FIFO_ITEMS_GET(dat)  (((dat) >> 17) & 0x1FF)
+#define SC64_SD_DAT_TX_FIFO_FULL            (1 << 16)
+#define SC64_SD_DAT_TX_FIFO_EMPTY           (1 << 15)
+#define SC64_SD_DAT_TX_FIFO_UNDERRUN        (1 << 14)
+#define SC64_SD_DAT_RX_FIFO_ITEMS_GET(dat)  (((dat) >> 5) & 0x1FF)
+#define SC64_SD_DAT_RX_FIFO_FULL            (1 << 4)
+#define SC64_SD_DAT_RX_FIFO_EMPTY           (1 << 3)
+#define SC64_SD_DAT_RX_FIFO_OVERRUN         (1 << 2)
+#define SC64_SD_DAT_CRC_ERROR               (1 << 1)
+#define SC64_SD_DAT_BUSY                    (1 << 0)
+
+#define SC64_SD_DAT_TX_FIFO_FLUSH           (1 << 19)
+#define SC64_SD_DAT_RX_FIFO_FLUSH           (1 << 18)
+#define SC64_SD_DAT_NUM_BLOCKS(nb)          ((((nb) - 1) & 0xFF) << 10)
 #define SC64_SD_DAT_BLOCK_SIZE(bs)          (((((bs) / 4) - 1) & 0x7F) << 3)
 #define SC64_SD_DAT_DIRECTION               (1 << 2)
-#define SC64_SD_DAT_CRC_ERROR               (1 << 1)
 #define SC64_SD_DAT_STOP                    (1 << 1)
-#define SC64_SD_DAT_BUSY                    (1 << 0)
 #define SC64_SD_DAT_START                   (1 << 0)
+
+
+#define SC64_SD_DMA_SCR_BUSY                (1 << 0)
 
 #define SC64_SD_DMA_SCR_DIRECTION           (1 << 2)
 #define SC64_SD_DMA_SCR_STOP                (1 << 1)
-#define SC64_SD_DMA_SCR_BUSY                (1 << 0)
 #define SC64_SD_DMA_SCR_START               (1 << 0)
+
 
 #define SC64_SD_DMA_ADDR_GET(addr)          ((addr) & 0x3FFFFFC)
 #define SC64_SD_DMA_BANK_GET(addr)          (((addr) >> 28) & 0xF)
+
 #define SC64_SD_DMA_BANK_ADDR(b, a)         ((((b) & 0xF) << 28) | ((a) & 0x3FFFFFC))
 
-#define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x3FFFF) * 4)
-#define SC64_SD_DMA_LEN(l)                  ((((l) / 4) - 1) & 0x3FFFF)
+#define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x7FFF) * 4)
+
+#define SC64_SD_DMA_LEN(l)                  ((((l) / 4) - 1) & 0x7FFF)
 
 
 #endif

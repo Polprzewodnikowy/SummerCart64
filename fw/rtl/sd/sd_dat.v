@@ -10,7 +10,7 @@ module sd_dat (
     input i_dat_width,
     input i_dat_direction,
     input [6:0] i_dat_block_size,
-    input [10:0] i_dat_num_blocks,
+    input [7:0] i_dat_num_blocks,
     input i_dat_start,
     input i_dat_stop,
     output o_dat_busy,
@@ -64,16 +64,16 @@ module sd_dat (
 
     // Block counter logic
 
-    reg [10:0] r_block_counter;
+    reg [7:0] r_block_counter;
 
     wire w_read_start = i_dat_start && r_state[STATE_IDLE];
-    wire w_read_stop = r_block_counter == 11'd0;
+    wire w_read_stop = r_block_counter == 8'd0;
 
     always @(posedge i_clk) begin
         if (w_read_start) begin
             r_block_counter <= i_dat_num_blocks;
         end else if (w_data_end) begin
-            if (r_block_counter > 11'd0) begin
+            if (r_block_counter > 8'd0) begin
                 r_block_counter <= r_block_counter - 1'd1;
             end
         end

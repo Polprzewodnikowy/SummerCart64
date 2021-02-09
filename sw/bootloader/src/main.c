@@ -1,16 +1,17 @@
-#include "boot.h"
-#include "error_display.h"
-
-#include "sc64.h"
-#include "sc64_sd_fs.h"
+#include "boot/boot.h"
+#include "loader/loader.h"
+#include "sc64/sc64.h"
+#include "sc64/sc64_sd_fs.h"
 
 
 static const char *MENU_FILE_PATH = "SC64/MENU.z64";
 
 
 int main(void) {
+    loader_init();
+
     if (sc64_get_version() != SC64_CART_VERSION_A) {
-        error_display_and_halt(E_MENU_ERROR_NOT_SC64, MENU_FILE_PATH);
+        loader_display_error_and_halt(E_MENU_ERROR_NOT_SC64, "");
     }
 
     sc64_enable_rom_switch();
@@ -50,7 +51,7 @@ int main(void) {
         }
 
         if (error != E_MENU_OK) {
-            error_display_and_halt(error, MENU_FILE_PATH);
+            loader_display_error_and_halt(error, MENU_FILE_PATH);
         }
     }
 
@@ -69,6 +70,8 @@ int main(void) {
     if (!tv_type_override) {
         tv_type = boot_get_tv_type(cart_header);
     }
+
+    loader_cleanup();
 
     boot(cart_header, cic_seed, tv_type, ddipl_override);
 }

@@ -85,8 +85,9 @@ module sd_interface (
     wire w_rx_fifo_regs_pop;
     wire w_rx_fifo_dma_pop;
     wire w_rx_fifo_empty;
-    wire [7:0] w_rx_fifo_items;
+    wire w_rx_fifo_full;
     wire w_rx_fifo_overrun;
+    wire [8:0] w_rx_fifo_items;
     wire [31:0] w_rx_fifo_i_data;
     wire [31:0] w_rx_fifo_o_data;
 
@@ -98,10 +99,10 @@ module sd_interface (
         .i_fifo_push(w_rx_fifo_push),
         .i_fifo_pop(w_rx_fifo_regs_pop || w_rx_fifo_dma_pop),
         .o_fifo_empty(w_rx_fifo_empty),
-        .o_fifo_full(),
-        .o_fifo_items(w_rx_fifo_items),
+        .o_fifo_full(w_rx_fifo_full),
         .o_fifo_underrun(),
         .o_fifo_overrun(w_rx_fifo_overrun),
+        .o_fifo_items(w_rx_fifo_items),
         .i_fifo_data(w_rx_fifo_i_data),
         .o_fifo_data(w_rx_fifo_o_data)
     );
@@ -115,6 +116,8 @@ module sd_interface (
     wire w_tx_fifo_pop;
     wire w_tx_fifo_empty;
     wire w_tx_fifo_full;
+    wire w_tx_fifo_underrun;
+    wire [8:0] w_tx_fifo_items;
     reg [31:0] r_tx_fifo_i_data;
     wire [31:0] w_tx_fifo_o_data;
 
@@ -136,9 +139,9 @@ module sd_interface (
         .i_fifo_pop(w_tx_fifo_pop),
         .o_fifo_empty(w_tx_fifo_empty),
         .o_fifo_full(w_tx_fifo_full),
-        .o_fifo_items(),
-        .o_fifo_underrun(),
+        .o_fifo_underrun(w_tx_fifo_underrun),
         .o_fifo_overrun(),
+        .o_fifo_items(w_tx_fifo_items),
         .i_fifo_data(r_tx_fifo_i_data),
         .o_fifo_data(w_tx_fifo_o_data)
     );
@@ -149,7 +152,7 @@ module sd_interface (
     wire w_dat_width;
     wire w_dat_direction;
     wire [6:0] w_dat_block_size;
-    wire [10:0] w_dat_num_blocks;
+    wire [7:0] w_dat_num_blocks;
     wire w_dat_start;
     wire w_dat_stop;
     wire w_dat_busy;
@@ -187,8 +190,8 @@ module sd_interface (
 
     wire [3:0] w_dma_bank;
     wire [23:0] w_dma_address;
-    wire [17:0] w_dma_length;
-    wire [17:0] w_dma_left;
+    wire [14:0] w_dma_length;
+    wire [14:0] w_dma_left;
     wire w_dma_load_bank_address;
     wire w_dma_load_length;
     wire w_dma_direction;
@@ -260,14 +263,18 @@ module sd_interface (
 
         .o_rx_fifo_flush(w_rx_fifo_flush),
         .o_rx_fifo_pop(w_rx_fifo_regs_pop),
-        .i_rx_fifo_items(w_rx_fifo_items),
+        .i_rx_fifo_empty(w_rx_fifo_empty),
+        .i_rx_fifo_full(w_rx_fifo_full),
         .i_rx_fifo_overrun(w_rx_fifo_overrun),
+        .i_rx_fifo_items(w_rx_fifo_items),
         .i_rx_fifo_data(w_rx_fifo_o_data),
 
         .o_tx_fifo_flush(w_tx_fifo_flush),
         .o_tx_fifo_push(w_tx_fifo_regs_push),
         .i_tx_fifo_empty(w_tx_fifo_empty),
         .i_tx_fifo_full(w_tx_fifo_full),
+        .i_tx_fifo_underrun(w_tx_fifo_underrun),
+        .i_tx_fifo_items(w_tx_fifo_items),
         .o_tx_fifo_data(w_tx_fifo_i_data_regs),
 
         .o_dma_bank(w_dma_bank),

@@ -1,3 +1,10 @@
 #!/bin/bash
 
-docker run -t --mount type=bind,src="$(pwd)",target="/libdragon" anacierdem/libdragon:4.1.1 /bin/bash -c "/usr/bin/make clean; /usr/bin/make all N64_BYTE_SWAP=false"
+LIBDRAGON_DOCKER_VERSION=latest
+
+docker \
+    run \
+    -t \
+    --mount type=bind,src=`realpath "$(dirname $0)"`,target="/libdragon" \
+    anacierdem/libdragon:$LIBDRAGON_DOCKER_VERSION \
+    /bin/bash -c "make clean && make all"

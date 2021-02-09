@@ -48,6 +48,14 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     return RES_OK;
 }
 
+#if !FF_FS_READONLY
+
+DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
+    return RES_ERROR;
+}
+
+#endif
+
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
     return RES_PARERR;
 }

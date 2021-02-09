@@ -1,8 +1,5 @@
-#ifndef ERROR_DISPLAY_H__
-#define ERROR_DISPLAY_H__
-
-
-#include "platform.h"
+#ifndef ERRORS_H__
+#define ERRORS_H__
 
 
 typedef enum menu_load_error_e {
@@ -13,10 +10,8 @@ typedef enum menu_load_error_e {
     E_MENU_ERROR_NO_FILE,
     E_MENU_ERROR_READ_ERROR,
     E_MENU_ERROR_OTHER_ERROR,
+    E_MENU_END,
 } menu_load_error_t;
-
-
-void error_display_and_halt(menu_load_error_t error, const char *path);
 
 
 #endif
