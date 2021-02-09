@@ -5,18 +5,6 @@
 #include "platform.h"
 
 
-struct crc32_to_cic_seed {
-    uint32_t ipl3_crc32;
-    uint16_t cic_seed;
-};
-
-typedef enum tv_type_e {
-    E_TV_TYPE_PAL,
-    E_TV_TYPE_NTSC,
-    E_TV_TYPE_MPAL,
-    E_TV_TYPE_UNKNOWN,
-} tv_type_t;
-
 struct cart_header_s {
     uint32_t pi_conf;
     uint32_t clock_rate;

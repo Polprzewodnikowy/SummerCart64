@@ -3,7 +3,10 @@
 #include "n64_regs.h"
 
 
-static const struct crc32_to_cic_seed crc32_to_cic_seed[] = {
+static const struct crc32_to_cic_seed {
+    uint32_t ipl3_crc32;
+    uint16_t cic_seed;
+} crc32_to_cic_seed[] = {
     { .ipl3_crc32 = 0x587BD543, .cic_seed = 0x00AC },   // CIC5101
     { .ipl3_crc32 = 0x6170A4A1, .cic_seed = 0x013F },   // CIC6101
     { .ipl3_crc32 = 0x009E9EA3, .cic_seed = 0x013F },   // CIC7102
@@ -53,7 +56,7 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
         case 'W':
         case 'X':
         case 'Y':
-            return E_TV_TYPE_PAL;
+            return TV_PAL;
         case '7':
         case 'A':
         case 'C':
@@ -62,11 +65,11 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
         case 'K':
         case 'N':
         case 'U':
-            return E_TV_TYPE_NTSC;
+            return TV_NTSC;
         case 'B':
-            return E_TV_TYPE_MPAL;
+            return TV_MPAL;
         default:
-            return E_TV_TYPE_UNKNOWN;
+            return -1;
     }
 }
 
@@ -78,7 +81,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint
         (cic_seed == crc32_to_cic_seed[8].cic_seed) ||
         (cic_seed == crc32_to_cic_seed[9].cic_seed)
     );
-    tv_type_t os_tv_type = tv_type == E_TV_TYPE_UNKNOWN ? OS_BOOT_CONFIG->tv_type : tv_type;
+    tv_type_t os_tv_type = tv_type < 0 ? OS_BOOT_CONFIG->tv_type : tv_type;
 
     volatile uint64_t gpr_regs[32];
 
@@ -134,7 +137,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint
     gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seed);
     gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
-    gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == E_TV_TYPE_PAL) ? 341 : 340]);
+    gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == TV_PAL) ? 341 : 340]);
 
     __asm__ (
         ".set noat \n\t"

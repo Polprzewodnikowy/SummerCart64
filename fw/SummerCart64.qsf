@@ -178,7 +178,7 @@ set_global_assignment -name TIMING_ANALYZER_DO_REPORT_TIMING ON
 
 # Compiler Assignments
 # ====================
-set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
+set_global_assignment -name OPTIMIZATION_MODE "AGGRESSIVE PERFORMANCE"
 
 # Analysis & Synthesis Assignments
 # ================================

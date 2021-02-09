@@ -18,7 +18,7 @@ module sd_regs (
     output reg o_dat_width,
     output reg o_dat_direction,
     output reg [6:0] o_dat_block_size,
-    output reg [10:0] o_dat_num_blocks,
+    output reg [7:0] o_dat_num_blocks,
     output reg o_dat_start,
     output reg o_dat_stop,
     input i_dat_busy,
@@ -26,24 +26,28 @@ module sd_regs (
 
     output reg o_rx_fifo_flush,
     output reg o_rx_fifo_pop,
-    input [7:0] i_rx_fifo_items,
+    input i_rx_fifo_empty,
+    input i_rx_fifo_full,
     input i_rx_fifo_overrun,
+    input [8:0] i_rx_fifo_items,
     input [31:0] i_rx_fifo_data,
 
     output reg o_tx_fifo_flush,
-    output reg o_tx_fifo_push,
+    output o_tx_fifo_push,
     input i_tx_fifo_empty,
     input i_tx_fifo_full,
-    output reg [31:0] o_tx_fifo_data,
+    input i_tx_fifo_underrun,
+    input [8:0] i_tx_fifo_items,
+    output [31:0] o_tx_fifo_data,
 
-    output reg [3:0] o_dma_bank,
-    output reg [23:0] o_dma_address,
-    output reg [17:0] o_dma_length,
+    output [3:0] o_dma_bank,
+    output [23:0] o_dma_address,
+    output [14:0] o_dma_length,
     input [3:0] i_dma_bank,
     input [23:0] i_dma_address,
-    input [17:0] i_dma_left,
-    output reg o_dma_load_bank_address,
-    output reg o_dma_load_length,
+    input [14:0] i_dma_left,
+    output o_dma_load_bank_address,
+    output o_dma_load_length,
     output reg o_dma_direction,
     output reg o_dma_start,
     output reg o_dma_stop,
@@ -73,9 +77,11 @@ module sd_regs (
     always @(*) begin
         o_dma_bank = i_data[31:28];
         o_dma_address = i_data[25:2];
-        o_dma_length = i_data[17:0];
+        o_dma_length = i_data[14:0];
         o_dma_load_bank_address = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_ADDR);
         o_dma_load_length = w_write_request && !i_address[3] && (i_address[2:0] == SD_REG_DMA_LEN);
+        o_tx_fifo_data = i_data;
+        o_tx_fifo_push = w_write_request && i_address[3] && !i_tx_fifo_full && !i_dma_busy;
         o_busy = 1'b0;
     end
 
@@ -84,7 +90,6 @@ module sd_regs (
         o_dat_start <= 1'b0;
         o_rx_fifo_flush <= 1'b0;
         o_tx_fifo_flush <= 1'b0;
-        o_tx_fifo_push <= 1'b0;
         o_dma_start <= 1'b0;
         o_dat_stop <= 1'b0;
         o_dma_stop <= 1'b0;
@@ -94,49 +99,62 @@ module sd_regs (
             o_dat_width <= 1'b0;
             o_dat_direction <= 1'b0;
             o_dat_block_size <= 7'd0;
-            o_dat_num_blocks <= 11'd0;
+            o_dat_num_blocks <= 8'd0;
             o_dma_direction <= 1'b0;
         end else if (w_write_request) begin
             if (!i_address[3]) begin
                 case (i_address[2:0])
                     SD_REG_SCR: begin
-                        {o_dat_width, o_sd_clk_config} <= i_data[2:0];
+                        if (!i_command_busy && !i_dat_busy) begin
+                            o_sd_clk_config <= i_data[1:0];
+                        end
+                        if (!i_dat_busy) begin
+                            o_dat_width <= i_data[2];
+                        end
                     end
 
                     SD_REG_ARG: begin
-                        o_command_argument <= i_data;
+                        if (!i_command_busy) begin
+                            o_command_argument <= i_data;
+                        end
                     end
 
                     SD_REG_CMD: begin
-                        {
-                            o_command_skip_response,
-                            o_command_long_response,
-                            o_command_start,
-                            o_command_index
-                        } <= i_data[8:0];
+                        if (!i_command_busy) begin
+                            {
+                                o_command_skip_response,
+                                o_command_long_response,
+                                o_command_start,
+                                o_command_index
+                            } <= i_data[8:0];
+                        end
                     end
 
                     SD_REG_RSP: begin
                     end
 
                     SD_REG_DAT: begin
-                        {
-                            o_tx_fifo_flush,
-                            o_rx_fifo_flush,
-                            o_dat_num_blocks,
-                            o_dat_block_size,
-                            o_dat_direction,
-                            o_dat_stop,
-                            o_dat_start
-                        } <= i_data[22:0];
+                        if (!i_dat_busy || i_data[1]) begin
+                            {
+                                o_tx_fifo_flush,
+                                o_rx_fifo_flush,
+                                o_dat_num_blocks,
+                                o_dat_block_size,
+                                o_dat_direction,
+                                o_dat_stop,
+                                o_dat_start
+                            } <= i_data[19:0];
+                        end
                     end
 
                     SD_REG_DMA_SCR: begin
-                        {
-                            o_dma_direction,
-                            o_dma_stop,
-                            o_dma_start
-                        } <= i_data[2:0];
+                        if (!i_dma_busy || i_data[1]) begin
+                            {
+                                o_dma_direction,
+                                o_dma_stop,
+                                o_dma_start
+                            } <= i_data[2:0];
+                        end
                     end
 
                     SD_REG_DMA_ADDR: begin
@@ -145,9 +163,6 @@ module sd_regs (
                     SD_REG_DMA_LEN: begin
                     end
                 endcase
-            end else begin
-                o_tx_fifo_push <= 1'b1;
-                o_tx_fifo_data <= i_data;
             end
         end
     end
@@ -173,11 +188,9 @@ module sd_regs (
 
                     SD_REG_CMD: begin
                         o_data <= {
-                            21'd0,
+                            23'd0,
                             i_command_response_crc_error,
                             i_command_timeout,
-                            o_command_skip_response,
-                            o_command_long_response,
                             i_command_busy,
                             i_command_index
                         };
@@ -189,13 +202,15 @@ module sd_regs (
 
                     SD_REG_DAT: begin
                         o_data <= {
-                            i_rx_fifo_items,
+                            6'd0,
+                            i_tx_fifo_items,
                             i_tx_fifo_full,
                             i_tx_fifo_empty,
+                            i_tx_fifo_underrun,
+                            i_rx_fifo_items,
+                            i_rx_fifo_full,
+                            i_rx_fifo_empty,
                             i_rx_fifo_overrun,
-                            o_dat_num_blocks,
-                            o_dat_block_size,
-                            o_dat_direction,
                             i_dat_crc_error,
                             i_dat_busy
                         };
@@ -210,11 +225,13 @@ module sd_regs (
                     end
 
                     SD_REG_DMA_LEN: begin
-                        o_data <= {14'd0, i_dma_left};
+                        o_data <= {17'd0, i_dma_left};
                     end
                 endcase
             end else begin
-                o_rx_fifo_pop <= 1'b1;
+                if (!i_rx_fifo_empty && !i_dma_busy) begin
+                    o_rx_fifo_pop <= 1'b1;
+                end
                 o_data <= i_rx_fifo_data;
             end
         end
