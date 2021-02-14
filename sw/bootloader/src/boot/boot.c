@@ -23,7 +23,7 @@ static const struct crc32_to_cic_seed {
 static cart_header_t global_cart_header __attribute__((aligned(16)));
 
 
-cart_header_t *boot_load_cart_header(void) {
+cart_header_t *boot_load_cart_header(bool ddipl) {
     cart_header_t *cart_header_pointer = &global_cart_header;
 
     platform_pi_dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
@@ -81,9 +81,11 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint
         (cic_seed == crc32_to_cic_seed[8].cic_seed) ||
         (cic_seed == crc32_to_cic_seed[9].cic_seed)
     );
-    tv_type_t os_tv_type = tv_type < 0 ? OS_BOOT_CONFIG->tv_type : tv_type;
+    tv_type_t os_tv_type = tv_type == -1 ? OS_BOOT_CONFIG->tv_type : tv_type;
 
     volatile uint64_t gpr_regs[32];
+
+    MI->interrupt_mask = MI_INT_CLEAR_SP | MI_INT_CLEAR_SI | MI_INT_CLEAR_AI | MI_INT_CLEAR_VI | MI_INT_CLEAR_PI | MI_INT_CLEAR_DP;
 
     while (!(SP->status & SP_STATUS_HALT));
 
@@ -117,7 +119,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint
     SP_MEM->imem[1] = 0x8DA807FC;   // lw    t0, 0x07FC(t5)
     SP_MEM->imem[2] = 0x25AD07C0;   // addiu t5, t5, 0x07C0
     SP_MEM->imem[3] = 0x31080080;   // andi  t0, t0, 0x0080
-    SP_MEM->imem[4] = 0x5500FFFC;   // bnel  t0, zero, &SP_MEM->imem[0]
+    SP_MEM->imem[4] = 0x5500FFFC;   // bnel  t0, zero, &SP_MEM->imem[1]
     SP_MEM->imem[5] = 0x3C0DBFC0;   // lui   t5, 0xBFC0
     SP_MEM->imem[6] = 0x8DA80024;   // lw    t0, 0x0024(t5)
     SP_MEM->imem[7] = 0x3C0BB000;   // lui   t3, 0xB000
@@ -133,7 +135,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint
     gpr_regs[CPU_REG_T3] = CPU_ADDRESS_IN_REG(SP_MEM->dmem[16]);
     gpr_regs[CPU_REG_S3] = is_ddipl_boot ? OS_BOOT_ROM_TYPE_DD : OS_BOOT_ROM_TYPE_GAME_PAK;
     gpr_regs[CPU_REG_S4] = os_tv_type;
-    gpr_regs[CPU_REG_S5] = OS_BOOT_CONFIG->reset_type;
+    gpr_regs[CPU_REG_S5] = OS_BOOT_RESET_TYPE_COLD;
     gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seed);
     gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);

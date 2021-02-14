@@ -15,6 +15,8 @@
 #define NTOA(n)         ('0' + ((n) %  10))
 
 
+static bool loader_initialized = false;
+
 static char version_string[] = "SC64 Bootloader ver. X.X";
 static char error_number_string[] = "ERROR X";
 static const char *error_strings[] = {    
@@ -31,12 +33,12 @@ static int x_offset = X_OFFSET;
 static int y_offset = Y_OFFSET;
 
 
-static display_context_t loader_get_display(void) {
+static display_context_t loader_get_display(bool lock) {
     display_context_t display;
 
     do {
         display = display_lock();
-    } while (!display);
+    } while (!display && lock);
 
     x_offset = X_OFFSET;
     y_offset = Y_OFFSET;
@@ -58,32 +60,71 @@ static void loader_draw_version_and_logo(display_context_t display) {
     graphics_draw_sprite(display, center_x, center_y, logo);
 }
 
-void loader_init(void) {
-    display_context_t display;
-
+static void loader_init(void) {
     init_interrupts();
-    
+
     audio_init(44100, 2);
     audio_write_silence();
 
     display_init(RESOLUTION_320x240, DEPTH_32_BPP, 2, GAMMA_NONE, ANTIALIAS_OFF);
 
-    display = loader_get_display();
+    loader_initialized = true;
+}
+
+void loader_cleanup(void) {
+    audio_close();
+
+    display_close();
+
+    disable_interrupts();
+
+    loader_initialized = false;
+}
+
+void loader_display_logo(void) {
+    if (!loader_initialized) {
+        loader_init();
+    }
+
+    display_context_t display;
+
+    display = loader_get_display(true);
+
+    graphics_fill_screen(display, 0);
 
     loader_draw_version_and_logo(display);
 
     display_show(display);
 }
 
-void loader_cleanup(void) {
-    audio_close();
-    display_close();
-}
+void loader_display_message(const char *message) {
+    if (!loader_initialized) {
+        loader_init();
+    }
 
-void loader_display_error_and_halt(menu_load_error_t error, const char *path) {
     display_context_t display;
 
-    display = loader_get_display();
+    display = loader_get_display(true);
+
+    graphics_fill_screen(display, 0);
+
+    loader_draw_version_and_logo(display);
+
+    graphics_draw_text(display, x_offset, y_offset, message);
+
+    display_show(display);
+}
+
+void loader_display_error_and_halt(menu_load_error_t error, const char *message) {
+    if (!loader_initialized) {
+        loader_init();
+    }
+
+    display_context_t display;
+
+    display = loader_get_display(true);
+
+    graphics_fill_screen(display, 0);
 
     loader_draw_version_and_logo(display);
 
@@ -94,11 +135,9 @@ void loader_display_error_and_halt(menu_load_error_t error, const char *path) {
     int error_string_index = error >= E_MENU_END ? (E_MENU_END - 1) : error;
     const char *error_string = error_strings[error_string_index];
     graphics_draw_text(display, x_offset, y_offset, error_string);
-    y_offset += Y_PADDING;
+    y_offset += Y_PADDING * 2;
 
-    if (error == E_MENU_ERROR_NO_FILE) {
-        graphics_draw_text(display, x_offset, y_offset, path);
-    }
+    graphics_draw_text(display, x_offset, y_offset, message);
 
     display_show(display);
 

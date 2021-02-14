@@ -83,6 +83,18 @@ module top (
     );
 
 
+    // SD clock output
+
+    wire w_sd_clk;
+
+    gpio_ddro sd_clk_ddro (
+        .outclock(w_sd_clk),
+        .outclocken(1'b1),
+        .din({1'b0, 1'b1}),
+        .pad_out(o_sd_clk)
+    );
+
+
     // N64 PI
 
     wire w_n64_request;
@@ -385,7 +397,7 @@ module top (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .o_sd_clk(o_sd_clk),
+        .o_sd_clk(w_sd_clk),
         .io_sd_cmd(io_sd_cmd),
         .io_sd_dat(io_sd_dat),
 
