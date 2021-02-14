@@ -36,6 +36,7 @@ typedef struct sc64_cart_registers {
 #define SC64_CART                           ((__IO sc64_cart_registers_t *) SC64_CART_BASE)
 
 
+#define SC64_CART_SCR_SKIP_BOOTLOADER       (1 << 10)
 #define SC64_CART_SCR_FLASHRAM_ENABLE       (1 << 9)
 #define SC64_CART_SCR_SRAM_768K_MODE        (1 << 8)
 #define SC64_CART_SCR_SRAM_ENABLE           (1 << 7)
@@ -101,7 +102,7 @@ typedef struct sc64_eeprom_registers {
     __IO reg_t MEM[512];                    // EEPROM memory
 } sc64_eeprom_registers_t;
 
-#define SC64_EEPROM_BASE                    (0x1E004000)
+#define SC64_EEPROM_BASE                    (0x1E010000)
 
 #define SC64_EEPROM                         ((__IO sc64_eeprom_registers_t *) SC64_EEPROM_BASE)
 
@@ -121,7 +122,7 @@ typedef struct sc64_sd_registers_s {
     __IO reg_t FIFO[128];                   // SD data path FIFO buffer
 } sc64_sd_registers_t;
 
-#define SC64_SD_BASE                        (0x1E008000)
+#define SC64_SD_BASE                        (0x1E020000)
 
 #define SC64_SD                             ((__IO sc64_sd_registers_t *) SC64_SD_BASE)
 
@@ -146,10 +147,12 @@ typedef struct sc64_sd_registers_s {
 
 
 #define SC64_SD_DAT_TX_FIFO_ITEMS_GET(dat)  (((dat) >> 17) & 0x1FF)
+#define SC64_SD_DAT_TX_FIFO_BYTES_GET(dat)  (SC64_SD_DAT_TX_FIFO_ITEMS_GET(dat) * 4)
 #define SC64_SD_DAT_TX_FIFO_FULL            (1 << 16)
 #define SC64_SD_DAT_TX_FIFO_EMPTY           (1 << 15)
 #define SC64_SD_DAT_TX_FIFO_UNDERRUN        (1 << 14)
 #define SC64_SD_DAT_RX_FIFO_ITEMS_GET(dat)  (((dat) >> 5) & 0x1FF)
+#define SC64_SD_DAT_RX_FIFO_BYTES_GET(dat)  (SC64_SD_DAT_RX_FIFO_ITEMS_GET(dat) * 4)
 #define SC64_SD_DAT_RX_FIFO_FULL            (1 << 4)
 #define SC64_SD_DAT_RX_FIFO_EMPTY           (1 << 3)
 #define SC64_SD_DAT_RX_FIFO_OVERRUN         (1 << 2)
@@ -163,6 +166,10 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_DAT_DIRECTION               (1 << 2)
 #define SC64_SD_DAT_STOP                    (1 << 1)
 #define SC64_SD_DAT_START                   (1 << 0)
+
+#define SC64_SD_DAT_FIFO_SIZE_BYTES         (1024)
+#define SC64_SD_DAT_NUM_BLOCKS_MAX          (256)
+#define SC64_SD_DAT_BLOCK_SIZE_MAX          (512)
 
 
 #define SC64_SD_DMA_SCR_BUSY                (1 << 0)
@@ -180,6 +187,8 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x7FFF) * 4)
 
 #define SC64_SD_DMA_LEN(l)                  ((((l) / 4) - 1) & 0x7FFF)
+
+#define SC64_SD_DMA_LEN_MAX                 (0x20000)
 
 
 #endif

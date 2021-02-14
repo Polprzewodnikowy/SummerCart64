@@ -15,8 +15,6 @@
 
 #define SD_BLOCK_SIZE                   (512)
 
-#define MAX_NUM_BLOCKS                  (256)
-
 
 typedef enum sc64_sd_clock_e {
     CLOCK_STOP,
@@ -43,6 +41,11 @@ typedef enum sc64_sd_dat_direction_e {
     DAT_DIR_RX,
     DAT_DIR_TX,
 } sc64_sd_dat_direction_t;
+
+typedef enum sc64_sd_dma_direction_e {
+    DMA_DIR_MEM,
+    DMA_DIR_CARD,
+} sc64_sd_dma_direction_t;
 
 
 static bool sd_card_initialized = false;
@@ -85,26 +88,24 @@ static void sc64_sd_set_dat_width(sc64_sd_dat_width_t dat_width) {
     platform_pi_io_write(&SC64_SD->SCR, scr);
 }
 
-static void sc64_sd_hw_init(void) {
-    sc64_enable_sd();
-
+static void sc64_sd_hw_reset(void) {
     while (platform_pi_io_read(&SC64_SD->CMD) & SC64_SD_CMD_BUSY);
     platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_STOP);
     platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_TX_FIFO_FLUSH | SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
     platform_pi_io_write(&SC64_SD->SCR, 0);
+}
 
+static void sc64_sd_hw_init(void) {
+    sc64_enable_sd();
+    sc64_sd_hw_reset();
     sc64_sd_set_clock(CLOCK_400_KHZ);
     sc64_sd_set_dat_width(DAT_WIDTH_1BIT);
 }
 
 static void sc64_sd_hw_deinit(void) {
     if (sc64_get_scr() & SC64_CART_SCR_SD_ENABLE) {
-        while (platform_pi_io_read(&SC64_SD->CMD) & SC64_SD_CMD_BUSY);
-        platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_STOP);
-        platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_TX_FIFO_FLUSH | SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
-        platform_pi_io_write(&SC64_SD->SCR, 0);
+        sc64_sd_hw_reset();
     }
-
     sc64_disable_sd();
 }
 
@@ -176,22 +177,24 @@ static sc64_sd_err_t sc64_sd_dat_read(size_t block_size, void *buffer) {
     int timeout;
     uint32_t reg;
 
-    timeout = 100000;
+    timeout = 1000000;
     do {
         reg = platform_pi_io_read(&SC64_SD->DAT);
-        if (SC64_SD_DAT_RX_FIFO_ITEMS_GET(reg) >= block_size) {
+        if (SC64_SD_DAT_RX_FIFO_BYTES_GET(reg) >= block_size) {
             break;
         }
     } while ((reg & SC64_SD_DAT_BUSY) && (--timeout));
 
-    if (reg & SC64_SD_DAT_CRC_ERROR) {
-        return E_CRC_ERROR;
-    }
+    if (!(reg & SC64_SD_DAT_BUSY)) {
+        if (reg & SC64_SD_DAT_CRC_ERROR) {
+            return E_CRC_ERROR;
+        }
 
-    if (reg & SC64_SD_DAT_RX_FIFO_OVERRUN) {
-        platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH);
+        if (reg & SC64_SD_DAT_RX_FIFO_OVERRUN) {
+            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH);
 
-        return E_FIFO_ERROR;
+            return E_FIFO_ERROR;
+        }
     }
 
     if (timeout == 0) {
@@ -202,6 +205,64 @@ static sc64_sd_err_t sc64_sd_dat_read(size_t block_size, void *buffer) {
 
     platform_pi_dma_read(buffer, &SC64_SD->FIFO, block_size);
     platform_cache_invalidate(buffer, block_size);
+
+    return E_OK;
+}
+
+static sc64_sd_err_t sc64_sd_dat_write(size_t block_size, void *buffer) {
+    int timeout;
+    uint32_t reg;
+
+    timeout = 1000000;
+    do {
+        reg = platform_pi_io_read(&SC64_SD->DAT);
+        if ((SC64_SD_DAT_FIFO_SIZE_BYTES - SC64_SD_DAT_TX_FIFO_BYTES_GET(reg)) >= block_size) {
+            break;
+        }
+    } while ((reg & SC64_SD_DAT_BUSY) && (--timeout));
+
+    if (!(reg & SC64_SD_DAT_BUSY)) {
+        if (reg & SC64_SD_DAT_CRC_ERROR) {
+            return E_CRC_ERROR;
+        }
+
+        if (reg & SC64_SD_DAT_TX_FIFO_UNDERRUN) {
+            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_TX_FIFO_FLUSH);
+
+            return E_FIFO_ERROR;
+        }
+    }
+
+    if (timeout == 0) {
+        sc64_sd_dat_abort();
+
+        return E_TIMEOUT;
+    }
+    
+    platform_pi_dma_write(buffer, &SC64_SD->FIFO, block_size);
+    platform_cache_invalidate(buffer, block_size);
+
+    return E_OK;
+}
+
+static void sc64_sd_dma_prepare(size_t num_blocks, size_t block_size, sc64_sd_dma_direction_t direction, uint8_t bank, uint32_t address) {
+    platform_pi_io_write(&SC64_SD->DMA_ADDR, SC64_SD_DMA_BANK_ADDR(bank, address));
+    platform_pi_io_write(&SC64_SD->DMA_LEN, SC64_SD_DMA_LEN(num_blocks * block_size));
+    platform_pi_io_write(&SC64_SD->DMA_SCR, (direction == DMA_DIR_MEM ? SC64_SD_DMA_SCR_DIRECTION : 0) | SC64_SD_DMA_SCR_START);
+}
+
+static void sc64_sd_dma_abort(void) {
+    platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_STOP);
+}
+
+static sc64_sd_err_t sc64_sd_sectors_parameters_check(size_t count, uint8_t *buffer, bool check_buffer) {
+    if (!sd_card_initialized) {
+        return E_NO_INIT;
+    }
+
+    if ((count == 0) || (check_buffer && (buffer == NULL))) {
+        return E_PAR_ERROR;
+    }
 
     return E_OK;
 }
@@ -316,23 +377,18 @@ void sc64_sd_deinit(void) {
     sc64_sd_hw_deinit();
 }
 
-bool sc64_sd_get_status(void) {
+bool sc64_sd_status_get(void) {
     return sd_card_initialized;
 }
 
-sc64_sd_err_t sc64_sd_read_sectors(uint32_t starting_sector, size_t count, void *buffer) {
+sc64_sd_err_t sc64_sd_sectors_read(uint32_t starting_sector, size_t count, uint8_t *buffer) {
     sc64_sd_err_t error;
     uint32_t response;
     uint32_t current_sector;
-    uint32_t reg;
-    int timeout;
 
-    if (!sd_card_initialized) {
-        return E_NO_INIT;
-    }
-
-    if ((count == 0) || (buffer == NULL)) {
-        return E_PAR_ERROR;
+    error = sc64_sd_sectors_parameters_check(count, buffer, true);
+    if (error != E_OK) {
+        return error;
     }
 
     current_sector = starting_sector;
@@ -341,38 +397,19 @@ sc64_sd_err_t sc64_sd_read_sectors(uint32_t starting_sector, size_t count, void 
     }
 
     for (size_t i = 0; i < count; i++) {
-        platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_NUM_BLOCKS(1) | SC64_SD_DAT_BLOCK_SIZE(SD_BLOCK_SIZE) | SC64_SD_DAT_START);
+        sc64_sd_dat_prepare(1, SD_BLOCK_SIZE, DAT_DIR_RX);
         
         error = sc64_sd_cmd_send(17, current_sector, NO_FLAGS, &response);
         if (error != E_OK) {
-            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
+            sc64_sd_dat_abort();
 
             return error;
         }
 
-        timeout = 100000;
-        do {
-            reg = platform_pi_io_read(&SC64_SD->DAT);
-        } while ((reg & SC64_SD_DAT_BUSY) && (--timeout));
-
-        if (reg & SC64_SD_DAT_CRC_ERROR) {
-            return E_CRC_ERROR;
+        error = sc64_sd_dat_read(SD_BLOCK_SIZE, buffer);
+        if (error != E_OK) {
+            return error;
         }
-
-        if (reg & SC64_SD_DAT_RX_FIFO_OVERRUN) {
-            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH);
-
-            return E_FIFO_ERROR;
-        }
-
-        if (timeout == 0) {
-            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
-
-            return E_TIMEOUT;
-        }
-
-        platform_pi_dma_read(buffer, &SC64_SD->FIFO, SD_BLOCK_SIZE);
-        platform_cache_invalidate(buffer, SD_BLOCK_SIZE);
 
         buffer += SD_BLOCK_SIZE;
         current_sector += sd_card_type_block ? 1 : SD_BLOCK_SIZE;
@@ -381,7 +418,44 @@ sc64_sd_err_t sc64_sd_read_sectors(uint32_t starting_sector, size_t count, void 
     return E_OK;
 }
 
-sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address) {
+sc64_sd_err_t sc64_sd_sectors_write(uint32_t starting_sector, size_t count, uint8_t *buffer) {
+    sc64_sd_err_t error;
+    uint32_t response;
+    uint32_t current_sector;
+
+    error = sc64_sd_sectors_parameters_check(count, buffer, true);
+    if (error != E_OK) {
+        return error;
+    }
+
+    current_sector = starting_sector;
+    if (!sd_card_type_block) {
+        current_sector *= SD_BLOCK_SIZE;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        sc64_sd_dat_prepare(1, SD_BLOCK_SIZE, DAT_DIR_TX);
+
+        error = sc64_sd_cmd_send(24, current_sector, NO_FLAGS, &response);
+        if (error != E_OK) {
+            sc64_sd_dat_abort();
+
+            return error;
+        }
+
+        error = sc64_sd_dat_write(SD_BLOCK_SIZE, buffer);
+        if (error != E_OK) {
+            return error;
+        }
+
+        buffer += SD_BLOCK_SIZE;
+        current_sector += sd_card_type_block ? 1 : SD_BLOCK_SIZE;
+    }
+
+    return E_OK;
+}
+
+sc64_sd_err_t sc64_sd_sectors_read_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address) {
     size_t sectors_left;
     uint32_t current_sector;
     uint32_t current_address;
@@ -391,12 +465,9 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
     uint32_t response;
     int timeout;
 
-    if (!sd_card_initialized) {
-        return E_NO_INIT;
-    }
-
-    if (count == 0) {
-        return E_PAR_ERROR;
+    error = sc64_sd_sectors_parameters_check(count, NULL, false);
+    if (error != E_OK) {
+        return error;
     }
 
     sectors_left = count;
@@ -407,16 +478,15 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
     current_address = address;
 
     do {
-        num_blocks = (sectors_left > MAX_NUM_BLOCKS) ? MAX_NUM_BLOCKS : sectors_left;
+        num_blocks = (sectors_left > SC64_SD_DAT_NUM_BLOCKS_MAX) ? SC64_SD_DAT_NUM_BLOCKS_MAX : sectors_left;
 
-        platform_pi_io_write(&SC64_SD->DMA_ADDR, SC64_SD_DMA_BANK_ADDR(bank, current_address));
-        platform_pi_io_write(&SC64_SD->DMA_LEN, SC64_SD_DMA_LEN(num_blocks * SD_BLOCK_SIZE));
-        platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_DIRECTION | SC64_SD_DMA_SCR_START);
-        platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_NUM_BLOCKS(num_blocks) | SC64_SD_DAT_BLOCK_SIZE(SD_BLOCK_SIZE) | SC64_SD_DAT_START);
+        sc64_sd_dma_prepare(num_blocks, SD_BLOCK_SIZE, DMA_DIR_MEM, bank, current_address);
+        sc64_sd_dat_prepare(num_blocks, SD_BLOCK_SIZE, DAT_DIR_RX);
 
         error = sc64_sd_cmd_send(18, current_sector, NO_FLAGS, &response);
         if (error != E_OK) {
-            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
+            sc64_sd_dat_abort();
+            sc64_sd_dma_abort();
 
             return error;
         }
@@ -428,28 +498,110 @@ sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, u
 
         error = sc64_sd_cmd_send(12, 0, NO_FLAGS, &response);
         if (error != E_OK) {
+            sc64_sd_dat_abort();
+            sc64_sd_dma_abort();
+
             return error;
         }
 
         if (reg & SC64_SD_DAT_CRC_ERROR) {
+            sc64_sd_dma_abort();
+
             return E_CRC_ERROR;
         }
 
         if (reg & SC64_SD_DAT_RX_FIFO_OVERRUN) {
             platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH);
-            platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_STOP);
+            sc64_sd_dma_abort();
 
             return E_FIFO_ERROR;
         }
 
         if (timeout == 0) {
-            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_RX_FIFO_FLUSH | SC64_SD_DAT_STOP);
-            platform_pi_io_write(&SC64_SD->DMA_SCR, SC64_SD_DMA_SCR_STOP);
+            sc64_sd_dat_abort();
+            sc64_sd_dma_abort();
 
             return E_TIMEOUT;
         }
 
         while (platform_pi_io_read(&SC64_SD->DMA_SCR) & SC64_SD_DMA_SCR_BUSY);
+
+        sectors_left -= num_blocks;
+        current_sector += num_blocks * (sd_card_type_block ? 1 : SD_BLOCK_SIZE);
+        current_address += num_blocks * SD_BLOCK_SIZE;
+    } while (sectors_left > 0);
+
+    return E_OK;
+}
+
+sc64_sd_err_t sc64_sd_sectors_write_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address) {
+    size_t sectors_left;
+    uint32_t current_sector;
+    uint32_t current_address;
+    uint32_t num_blocks;
+    uint32_t reg;
+    sc64_sd_err_t error;
+    uint32_t response;
+    int timeout;
+
+    error = sc64_sd_sectors_parameters_check(count, NULL, false);
+    if (error != E_OK) {
+        return error;
+    }
+
+    sectors_left = count;
+    current_sector = starting_sector;
+    if (!sd_card_type_block) {
+        current_sector *= SD_BLOCK_SIZE;
+    }
+    current_address = address;
+
+    do {
+        num_blocks = (sectors_left > SC64_SD_DAT_NUM_BLOCKS_MAX) ? SC64_SD_DAT_NUM_BLOCKS_MAX : sectors_left;
+
+        sc64_sd_dat_prepare(num_blocks, SD_BLOCK_SIZE, DAT_DIR_TX);
+        sc64_sd_dma_prepare(num_blocks, SD_BLOCK_SIZE, DMA_DIR_CARD, bank, current_address);
+
+        error = sc64_sd_cmd_send(25, current_sector, NO_FLAGS, &response);
+        if (error != E_OK) {
+            sc64_sd_dma_abort();
+            sc64_sd_dat_abort();
+
+            return error;
+        }
+
+        timeout = 1000000;
+        do {
+            reg = platform_pi_io_read(&SC64_SD->DAT);
+        } while ((reg & SC64_SD_DAT_BUSY) && (--timeout));
+
+        error = sc64_sd_cmd_send(12, 0, NO_FLAGS, &response);
+        if (error != E_OK) {
+            sc64_sd_dma_abort();
+            sc64_sd_dat_abort();
+
+            return error;
+        }
+
+        if (reg & SC64_SD_DAT_CRC_ERROR) {
+            sc64_sd_dma_abort();
+
+            return E_CRC_ERROR;
+        }
+
+        if (reg & SC64_SD_DAT_TX_FIFO_UNDERRUN) {
+            sc64_sd_dma_abort();
+            platform_pi_io_write(&SC64_SD->DAT, SC64_SD_DAT_TX_FIFO_FLUSH);
+
+            return E_FIFO_ERROR;
+        }
+
+        if (timeout == 0) {
+            sc64_sd_dma_abort();
+            sc64_sd_dat_abort();
+
+            return E_TIMEOUT;
+        }
 
         sectors_left -= num_blocks;
         current_sector += num_blocks * (sd_card_type_block ? 1 : SD_BLOCK_SIZE);

@@ -77,6 +77,7 @@ module cart_control (
     // Registers
 
     reg [15:0] r_bootloader;
+    reg r_skip_bootloader;
 
 
     // Bus controller
@@ -112,11 +113,13 @@ module cart_control (
             o_debug_dma_address <= 24'hFC_0000;
             o_debug_dma_length <= 20'd0;
             r_bootloader <= 16'h0000;
+            r_skip_bootloader <= 1'b0;
         end else begin
             if (i_request && i_write && !o_busy) begin
                 case (i_address[3:0])
                     REG_SCR: begin
                         {
+                            r_skip_bootloader,
                             o_flashram_enable,
                             o_sram_768k_mode,
                             o_sram_enable,
@@ -127,7 +130,7 @@ module cart_control (
                             o_ddipl_enable,
                             o_rom_switch,
                             o_sdram_writable
-                        } <= i_data[9:0];
+                        } <= i_data[10:0];
                     end
                     REG_BOOT: begin
                         r_bootloader <= i_data[15:0];
@@ -157,7 +160,7 @@ module cart_control (
 
             if (!r_reset_ff2 || !r_nmi_ff2) begin
                 o_sdram_writable <= 1'b0;
-                o_rom_switch <= 1'b0;
+                o_rom_switch <= r_skip_bootloader;
                 o_n64_reset_btn <= 1'b1;
                 o_debug_fifo_flush <= 1'b1;
             end
@@ -172,9 +175,12 @@ module cart_control (
 
         if (!i_reset && i_request && !i_write && !o_busy) begin
             if (i_address < MEM_USB_FIFO_BASE) begin
+                o_data <= 32'h0000_0000;
+
                 case (i_address[3:0])
                     REG_SCR: begin
-                        o_data[9:0] <= {
+                        o_data[10:0] <= {
+                            r_skip_bootloader,
                             o_flashram_enable,
                             o_sram_768k_mode,
                             o_sram_enable,

@@ -25,15 +25,23 @@ void sc64_set_scr(uint32_t scr) {
     platform_pi_io_write(&SC64_CART->SCR, scr);
 }
 
+void sc64_enable_skip_bootloader(void) {
+    sc64_enable_peripheral(SC64_CART_SCR_SKIP_BOOTLOADER);
+}
+
+void sc64_disable_skip_bootloader(void) {
+    sc64_disable_peripheral(SC64_CART_SCR_SKIP_BOOTLOADER);
+}
+
 void sc64_enable_flashram(void) {
     sc64_enable_peripheral(SC64_CART_SCR_FLASHRAM_ENABLE);
 }
 
 void sc64_disable_flashram(void) {
     sc64_disable_peripheral(SC64_CART_SCR_FLASHRAM_ENABLE);
-} 
+}
 
-void sc64_enable_sram(uint8_t mode_768k) {
+void sc64_enable_sram(bool mode_768k) {
     sc64_enable_peripheral(SC64_CART_SCR_SRAM_ENABLE);
     if (mode_768k) {
         sc64_enable_peripheral(SC64_CART_SCR_SRAM_768K_MODE);
@@ -62,7 +70,7 @@ void sc64_disable_eeprom_pi(void) {
     sc64_disable_peripheral(SC64_CART_SCR_EEPROM_PI_ENABLE);
 }
 
-void sc64_enable_eeprom(uint8_t mode_16k) {
+void sc64_enable_eeprom(bool mode_16k) {
     sc64_enable_peripheral(SC64_CART_SCR_EEPROM_ENABLE);
     if (mode_16k) {
         sc64_enable_peripheral(SC64_CART_SCR_EEPROM_16K_MODE);

@@ -46,11 +46,15 @@ typedef struct os_boot_config_s os_boot_config_t;
 #define OS_BOOT_ROM_TYPE_GAME_PAK   (0)
 #define OS_BOOT_ROM_TYPE_DD         (1)
 
+#define OS_BOOT_RESET_TYPE_COLD     (0)
+#define OS_BOOT_RESET_TYPE_NMI      (1)
+#define OS_BOOT_RESET_TYPE_DISK     (2)
+
 #define BOOT_SEED_IPL3(x)           (((x) & 0x000000FF) >> 0)
 #define BOOT_SEED_OS_VERSION(x)     (((x) & 0x00000100) >> 8)
 
 
-cart_header_t *boot_load_cart_header(void);
+cart_header_t *boot_load_cart_header(bool ddipl);
 uint16_t boot_get_cic_seed(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);
 void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint32_t ddipl_override);

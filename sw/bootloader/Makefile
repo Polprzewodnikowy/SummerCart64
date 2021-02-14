@@ -34,6 +34,7 @@ ASFLAGS = $(COMMONFLAGS)
 CFLAGS = $(COMMONFLAGS) -std=gnu99 -Os -Wall -I$(ROOTDIR)/mips64-elf/include $(INC_DIRS)
 LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld
 N64_FLAGS = -l $(ROM_SIZE) -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME).z64
+N64_FLAGS_PADDED = -l 1028k -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME)_padded.z64
 
 all: make_output_dir $(BUILD_DIR)/$(PROG_NAME).z64
 
@@ -43,7 +44,9 @@ $(BUILD_DIR)/$(PROG_NAME).z64: $(BUILD_DIR)/$(PROG_NAME).elf
 	$(OBJCOPY) $(BUILD_DIR)/$(PROG_NAME).elf $(BUILD_DIR)/$(PROG_NAME).bin -O binary
 	$(OBJDUMP) -S $(BUILD_DIR)/$(PROG_NAME).elf > $(BUILD_DIR)/$(PROG_NAME).lst
 	$(N64TOOL) $(N64_FLAGS) -t $(PROG_NAME) $(BUILD_DIR)/$(PROG_NAME).bin
+	$(N64TOOL) $(N64_FLAGS_PADDED) -t $(PROG_NAME) $(BUILD_DIR)/$(PROG_NAME).bin
 	$(CHKSUM64) $(BUILD_DIR)/$(PROG_NAME).z64
+	$(CHKSUM64) $(BUILD_DIR)/$(PROG_NAME)_padded.z64
 	$(OBJCOPY) $(BUILD_DIR)/$(PROG_NAME).z64 $(BUILD_DIR)/$(PROG_NAME).hex -I binary -O ihex
 
 $(BUILD_DIR)/$(PROG_NAME).elf: $(OBJ_FILES)

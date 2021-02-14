@@ -30,7 +30,7 @@ module memory_embedded_flash (
         r_onchip_flash_request = 1'b0;
         o_busy = 1'b0;
         o_data = 32'h0000_0000;
-        if (w_onchip_flash_in_address_range) begin
+        if (w_onchip_flash_in_address_range && !r_dummy_ack) begin
             r_onchip_flash_request = i_request;
             o_busy = w_onchip_flash_busy;
             o_data = {

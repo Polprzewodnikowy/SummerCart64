@@ -18,9 +18,11 @@ typedef enum sc64_sd_err_e {
 
 bool sc64_sd_init(void);
 void sc64_sd_deinit(void);
-bool sc64_sd_get_status(void);
-sc64_sd_err_t sc64_sd_read_sectors(uint32_t starting_sector, size_t count, void *buffer);
-sc64_sd_err_t sc64_sd_read_sectors_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address);
+bool sc64_sd_status_get(void);
+sc64_sd_err_t sc64_sd_sectors_read(uint32_t starting_sector, size_t count, uint8_t *buffer);
+sc64_sd_err_t sc64_sd_sectors_write(uint32_t starting_sector, size_t count, uint8_t *buffer);
+sc64_sd_err_t sc64_sd_sectors_read_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address);
+sc64_sd_err_t sc64_sd_sectors_write_dma(uint32_t starting_sector, size_t count, uint8_t bank, uint32_t address);
 
 
 #endif

@@ -178,7 +178,7 @@ set_global_assignment -name TIMING_ANALYZER_DO_REPORT_TIMING ON
 
 # Compiler Assignments
 # ====================
-set_global_assignment -name OPTIMIZATION_MODE "AGGRESSIVE PERFORMANCE"
+set_global_assignment -name OPTIMIZATION_MODE BALANCED
 
 # Analysis & Synthesis Assignments
 # ================================
@@ -266,6 +266,7 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
 	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
+	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "sd_interface:sd_interface_inst|sd_clk:sd_clk_inst|o_sd_clk|q"
 
 	# start DESIGN_PARTITION(Top)
 	# ---------------------------

@@ -72,6 +72,13 @@ typedef struct DP_CMD_regs_s {
     volatile uint32_t tmem;
 } DP_CMD_regs_t;
 
+typedef struct MI_regs_s {
+    volatile uint32_t mode;
+    volatile uint32_t version;
+    volatile uint32_t interrupt;
+    volatile uint32_t interrupt_mask;
+} MI_regs_t;
+
 typedef struct VI_regs_s {
     volatile uint32_t control;
     volatile void *dram_addr;
@@ -118,6 +125,7 @@ typedef struct PI_regs_s {
 #define SP_MEM_BASE                         (0xA4000000)
 #define SP_REGS_BASE                        (0xA4040000)
 #define DP_CMD_REGS_BASE                    (0xA4100000)
+#define MI_REGS_BASE                        (0xA4300000)
 #define VI_REGS_BASE                        (0xA4400000)
 #define AI_REGS_BASE                        (0xA4500000)
 #define PI_REGS_BASE                        (0xA4600000)
@@ -127,6 +135,7 @@ typedef struct PI_regs_s {
 #define SP_MEM                              ((volatile SP_MEM_t *) SP_MEM_BASE)
 #define SP                                  ((volatile SP_regs_t *) SP_REGS_BASE)
 #define DP_CMD                              ((volatile DP_CMD_regs_t *) DP_CMD_REGS_BASE)
+#define MI                                  ((volatile MI_regs_t *) MI_REGS_BASE)
 #define VI                                  ((volatile VI_regs_t *) VI_REGS_BASE)
 #define AI                                  ((volatile AI_regs_t *) AI_REGS_BASE)
 #define PI                                  ((volatile PI_regs_t *) PI_REGS_BASE)
@@ -144,6 +153,13 @@ typedef struct PI_regs_s {
 #define DP_CMD_STATUS_CLEAR_XBUS_DMEM_DMA   (1 << 0)
 #define DP_CMD_STATUS_CLEAR_FREEZE          (1 << 2)
 #define DP_CMD_STATUS_CLEAR_FLUSH           (1 << 4)
+
+#define MI_INT_CLEAR_SP                     (1 << 0)
+#define MI_INT_CLEAR_SI                     (1 << 2)
+#define MI_INT_CLEAR_AI                     (1 << 4)
+#define MI_INT_CLEAR_VI                     (1 << 6)
+#define MI_INT_CLEAR_PI                     (1 << 8)
+#define MI_INT_CLEAR_DP                     (1 << 10)
 
 #define PI_STATUS_DMA_BUSY                  (1 << 0)
 #define PI_STATUS_IO_BUSY                   (1 << 1)

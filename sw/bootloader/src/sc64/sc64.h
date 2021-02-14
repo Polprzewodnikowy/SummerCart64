@@ -10,15 +10,17 @@
 
 uint32_t sc64_get_scr(void);
 void sc64_set_scr(uint32_t scr);
+void sc64_enable_skip_bootloader(void);
+void sc64_disable_skip_bootloader(void);
 void sc64_enable_flashram(void);
 void sc64_disable_flashram(void);
-void sc64_enable_sram(uint8_t mode_768k);
+void sc64_enable_sram(bool mode_768k);
 void sc64_disable_sram(void);
 void sc64_enable_sd(void);
 void sc64_disable_sd(void);
 void sc64_enable_eeprom_pi(void);
 void sc64_disable_eeprom_pi(void);
-void sc64_enable_eeprom(uint8_t mode_16k);
+void sc64_enable_eeprom(bool mode_16k);
 void sc64_disable_eeprom(void);
 void sc64_enable_ddipl(void);
 void sc64_disable_ddipl(void);

@@ -9,7 +9,7 @@ DSTATUS disk_status(BYTE pdrv) {
         return STA_NOINIT;
     }
 
-    return sc64_sd_get_status() ? 0 : STA_NOINIT;
+    return sc64_sd_status_get() ? 0 : STA_NOINIT;
 }
 
 DSTATUS disk_initialize(BYTE pdrv) {
@@ -17,7 +17,7 @@ DSTATUS disk_initialize(BYTE pdrv) {
         return STA_NOINIT;
     }
 
-    if (!sc64_sd_get_status()) {
+    if (!sc64_sd_status_get()) {
         if (sc64_sd_init()) {
             return 0;
         }
@@ -31,18 +31,21 @@ DSTATUS disk_initialize(BYTE pdrv) {
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     sc64_sd_err_t error;
 
-    if ((pdrv > 0) || (count == 0)) {
+    if (pdrv > 0) {
         return RES_PARERR;
     }
 
-    if (!sc64_sd_get_status()) {
-        return RES_NOTRDY;
-    }
-
-    error = sc64_sd_read_sectors(sector, count, buff);
+    error = sc64_sd_sectors_read(sector, count, buff);
 
     if (error != E_OK) {
-        return RES_ERROR;
+        switch (error) {
+            case E_NO_INIT:
+                return RES_NOTRDY;
+            case E_PAR_ERROR:
+                return RES_PARERR;
+            default:
+                return RES_ERROR;
+        }
     }
 
     return RES_OK;
@@ -51,7 +54,26 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
 #if !FF_FS_READONLY
 
 DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
-    return RES_ERROR;
+    sc64_sd_err_t error;
+
+    if (pdrv > 0) {
+        return RES_PARERR;
+    }
+
+    error = sc64_sd_sectors_write(sector, count, (uint8_t *) buff);
+
+    if (error != E_OK) {
+        switch (error) {
+            case E_NO_INIT:
+                return RES_NOTRDY;
+            case E_PAR_ERROR:
+                return RES_PARERR;
+            default:
+                return RES_ERROR;
+        }
+    }
+
+    return RES_OK;
 }
 
 #endif
