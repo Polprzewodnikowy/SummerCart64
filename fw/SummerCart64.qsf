@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 23:45:19  July 29, 2020
+# Date created = 00:33:20  February 17, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -55,7 +55,6 @@ set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
 set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
 set_global_assignment -name SDC_FILE constraints.sdc
 set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
-set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
 set_global_assignment -name VERILOG_FILE rtl/cart/cart_control.v
 set_global_assignment -name VERILOG_FILE rtl/cart/cart_led.v
@@ -78,6 +77,7 @@ set_global_assignment -name VERILOG_FILE rtl/top.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_pc.v
 set_global_assignment -name VERILOG_INCLUDE_FILE rtl/constants.vh
+set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
