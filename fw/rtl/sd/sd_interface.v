@@ -156,7 +156,9 @@ module sd_interface (
     wire w_dat_start;
     wire w_dat_stop;
     wire w_dat_busy;
+    wire w_dat_write_busy;
     wire w_dat_crc_error;
+    wire w_dat_write_error;
 
     sd_dat sd_dat_inst (
         .i_clk(i_clk),
@@ -174,13 +176,16 @@ module sd_interface (
         .i_dat_start(w_dat_start),
         .i_dat_stop(w_dat_stop),
         .o_dat_busy(w_dat_busy),
+        .o_dat_write_busy(w_dat_write_busy),
         .o_dat_crc_error(w_dat_crc_error),
+        .o_dat_write_error(w_dat_write_error),
 
-        .o_rx_fifo_push(w_rx_fifo_push),
         .i_rx_fifo_overrun(w_rx_fifo_overrun),
+        .o_rx_fifo_push(w_rx_fifo_push),
         .o_rx_fifo_data(w_rx_fifo_i_data),
-
-        .i_tx_fifo_full(w_tx_fifo_full),
+        
+        .i_tx_fifo_items(w_tx_fifo_items),
+        .i_tx_fifo_underrun(w_tx_fifo_underrun),
         .o_tx_fifo_pop(w_tx_fifo_pop),
         .i_tx_fifo_data(w_tx_fifo_o_data)
     );
@@ -259,7 +264,9 @@ module sd_interface (
         .o_dat_start(w_dat_start),
         .o_dat_stop(w_dat_stop),
         .i_dat_busy(w_dat_busy),
+        .i_dat_write_busy(w_dat_write_busy),
         .i_dat_crc_error(w_dat_crc_error),
+        .i_dat_write_error(w_dat_write_error),
 
         .o_rx_fifo_flush(w_rx_fifo_flush),
         .o_rx_fifo_pop(w_rx_fifo_regs_pop),

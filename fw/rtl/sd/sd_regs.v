@@ -22,7 +22,9 @@ module sd_regs (
     output reg o_dat_start,
     output reg o_dat_stop,
     input i_dat_busy,
+    input i_dat_write_busy,
     input i_dat_crc_error,
+    input i_dat_write_error,
 
     output reg o_rx_fifo_flush,
     output reg o_rx_fifo_pop,
@@ -202,7 +204,9 @@ module sd_regs (
 
                     SD_REG_DAT: begin
                         o_data <= {
-                            6'd0,
+                            4'd0,
+                            i_dat_write_error,
+                            i_dat_write_busy,
                             i_tx_fifo_items,
                             i_tx_fifo_full,
                             i_tx_fifo_empty,
