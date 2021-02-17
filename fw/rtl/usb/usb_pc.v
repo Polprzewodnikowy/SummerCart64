@@ -54,6 +54,7 @@ module usb_pc (
 
         .i_rx_ready(r_ftdi_rx_ready),
         .o_rx_valid(w_ftdi_rx_valid),
+        .o_rx_channel(1'bZ),
         .o_rx_data(w_ftdi_rx_data),
 
         .o_tx_busy(w_ftdi_tx_busy),
@@ -298,7 +299,8 @@ module usb_pc (
             TX_STAGE_DATA: begin
                 case (r_tx_cmd)
                     CMD_IDENTIFY: r_ftdi_tx_data = IDENTIFY_STRING[r_tx_byte_counter];
-                    CMD_DEBUG_SEND: r_ftdi_tx_data = r_i_data_buffer[(((4 - r_tx_byte_counter) * 8) - 1) -: 8];
+                    CMD_DEBUG_SEND: r_ftdi_tx_data = r_i_data_buffer[(((4 - {2'b00, r_tx_byte_counter}) * 8) - 1) -: 8];
+                    default: begin end
                 endcase
             end
 
@@ -306,6 +308,8 @@ module usb_pc (
                 if (r_tx_byte_counter != 2'd3) r_ftdi_tx_data = RSP_COMPLETE[r_tx_byte_counter];
                 else r_ftdi_tx_data = r_tx_cmd;
             end
+
+            default: begin end
         endcase
     end
 

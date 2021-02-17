@@ -77,7 +77,6 @@ set_global_assignment -name VERILOG_FILE rtl/top.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v
 set_global_assignment -name VERILOG_FILE rtl/usb/usb_pc.v
 set_global_assignment -name VERILOG_INCLUDE_FILE rtl/constants.vh
-set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
@@ -273,10 +272,11 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-		set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 
 	# end DESIGN_PARTITION(Top)
 	# -------------------------
 
 # end ENTITY(top)
 # ---------------
+set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
