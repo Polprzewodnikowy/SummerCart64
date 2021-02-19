@@ -159,6 +159,7 @@ module sd_interface (
     wire w_dat_write_busy;
     wire w_dat_crc_error;
     wire w_dat_write_error;
+    wire w_dat_write_ok;
 
     sd_dat sd_dat_inst (
         .i_clk(i_clk),
@@ -179,6 +180,7 @@ module sd_interface (
         .o_dat_write_busy(w_dat_write_busy),
         .o_dat_crc_error(w_dat_crc_error),
         .o_dat_write_error(w_dat_write_error),
+        .o_dat_write_ok(w_dat_write_ok),
 
         .i_rx_fifo_overrun(w_rx_fifo_overrun),
         .o_rx_fifo_push(w_rx_fifo_push),
@@ -267,6 +269,7 @@ module sd_interface (
         .i_dat_write_busy(w_dat_write_busy),
         .i_dat_crc_error(w_dat_crc_error),
         .i_dat_write_error(w_dat_write_error),
+        .i_dat_write_ok(w_dat_write_ok),
 
         .o_rx_fifo_flush(w_rx_fifo_flush),
         .o_rx_fifo_pop(w_rx_fifo_regs_pop),

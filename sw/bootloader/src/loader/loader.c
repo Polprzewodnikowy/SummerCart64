@@ -97,24 +97,6 @@ void loader_display_logo(void) {
     display_show(display);
 }
 
-void loader_display_message(const char *message) {
-    if (!loader_initialized) {
-        loader_init();
-    }
-
-    display_context_t display;
-
-    display = loader_get_display(true);
-
-    graphics_fill_screen(display, 0);
-
-    loader_draw_version_and_logo(display);
-
-    graphics_draw_text(display, x_offset, y_offset, message);
-
-    display_show(display);
-}
-
 void loader_display_error_and_halt(menu_load_error_t error, const char *message) {
     if (!loader_initialized) {
         loader_init();

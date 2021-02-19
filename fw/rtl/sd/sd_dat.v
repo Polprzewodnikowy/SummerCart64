@@ -17,6 +17,7 @@ module sd_dat (
     output o_dat_write_busy,
     output reg o_dat_crc_error,
     output reg o_dat_write_error,
+    output reg o_dat_write_ok,
 
     input i_rx_fifo_overrun,
     output reg o_rx_fifo_push,
@@ -41,7 +42,7 @@ module sd_dat (
     reg [6:0] r_state;
 
     assign o_dat_busy = !r_state[STATE_IDLE];
-    assign o_dat_write_busy = r_state[STATE_SENDING] || r_state[STATE_STATUS] || r_state[STATE_BUSY];
+    assign o_dat_write_busy = !io_sd_dat[0];
 
 
     // Bit counter logic
@@ -50,13 +51,13 @@ module sd_dat (
     reg r_bit_counter_done;
 
     wire w_read_start = r_state[STATE_READ_WAIT] && !io_sd_dat[0] && i_sd_clk_strobe_rising;
-    wire w_write_start = r_state[STATE_WRITE_WAIT] && (i_tx_fifo_items == ({1'b0, i_dat_block_size} + 1)) && i_sd_clk_strobe_falling;
+    wire w_write_start = r_state[STATE_WRITE_WAIT] && (i_tx_fifo_items >= ({1'b0, i_dat_block_size} + 1)) && i_sd_clk_strobe_falling;
     wire w_status_start = r_state[STATE_SENDING] && r_bit_counter_done;
     wire w_status_done = r_state[STATE_STATUS] && r_bit_counter_done;
     wire w_block_read_done = r_state[STATE_RECEIVING] && r_bit_counter_done;
     wire w_block_write_done = r_state[STATE_SENDING] && r_bit_counter_done;
-    wire w_block_done = w_block_read_done || w_block_write_done;
     wire w_block_write_busy_done = r_state[STATE_BUSY] && io_sd_dat[0];
+    wire w_block_done = w_block_read_done || w_block_write_busy_done;
 
     wire [12:0] w_block_bit_length = i_dat_width ? ({2'b00, {1'b0, i_dat_block_size} + 1'd1, 3'b000}) : ({{1'b0, i_dat_block_size} + 1'd1, 5'b00000});
 
@@ -138,12 +139,14 @@ module sd_dat (
 
     reg [4:0] r_status;
 
+    wire w_no_write_error = r_status == STATUS_NO_ERROR;
     wire w_crc_write_error = r_status == STATUS_CRC_ERROR;
     wire w_data_write_error = r_status == STATUS_WRITE_ERROR;
 
     always @(posedge i_clk) begin
-        if (i_reset) begin
+        if (i_reset || w_block_start) begin
             o_dat_crc_error <= 1'b0;
+            o_dat_write_error <= 1'b0;
         end else begin
             if (w_block_read_done) begin
                 o_dat_crc_error <= w_crc_read_error;
@@ -151,6 +154,7 @@ module sd_dat (
             if (w_status_done) begin
                 o_dat_crc_error <= w_crc_write_error;
                 o_dat_write_error <= w_data_write_error;
+                o_dat_write_ok <= w_no_write_error;
             end
         end
     end
@@ -230,7 +234,7 @@ module sd_dat (
 
                     r_state[STATE_BUSY]: begin
                         if (w_block_write_busy_done) begin
-                            if (w_block_stop) begin
+                            if (w_block_stop || !w_no_write_error) begin
                                 r_state[STATE_IDLE] <= 1'b1;
                             end else begin
                                 r_state[STATE_WRITE_WAIT] <= 1'b1;
@@ -274,7 +278,7 @@ module sd_dat (
     wire w_tx_latch = r_state[STATE_SENDING] && i_sd_clk_strobe_falling;
     wire w_tx_data_phase = r_bit_counter >= 13'd17;
     wire w_tx_crc_phase = r_bit_counter >= 13'd1;
-    wire w_tx_fifo_pop = i_dat_width ? (r_bit_counter[2:0] == 3'd0) : (r_bit_counter[4:0] == 5'd16);
+    wire w_tx_fifo_pop = i_dat_width ? (r_bit_counter[2:0] == 3'd0) : (r_bit_counter[4:0] == 5'd17);
     wire w_tx_shift_load = r_bit_counter[2:0] == 3'd0;
 
     reg [7:0] r_tx_shift [0:3];
@@ -309,7 +313,12 @@ module sd_dat (
                             end
                         end
                     end else begin
-                        r_tx_shift[0] <= i_tx_fifo_data[{3'b000, r_bit_counter[4:3]} +: 8];
+                        case (r_bit_counter[4:3])
+                            2'b10: r_tx_shift[0] <= i_tx_fifo_data[31:24];
+                            2'b01: r_tx_shift[0] <= i_tx_fifo_data[23:16];
+                            2'b00: r_tx_shift[0] <= i_tx_fifo_data[15:8];
+                            2'b11: r_tx_shift[0] <= i_tx_fifo_data[7:0];
+                        endcase
                     end
                 end
             end else if (w_tx_crc_phase) begin

@@ -7,7 +7,6 @@
 
 void loader_cleanup(void);
 void loader_display_logo(void);
-void loader_display_message(const char *message);
 void loader_display_error_and_halt(menu_load_error_t error, const char *message);
 
 
