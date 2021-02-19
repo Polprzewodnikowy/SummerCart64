@@ -146,6 +146,9 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_CMD_INDEX(i)                ((i) & 0x3F)
 
 
+#define SC64_SD_DAT_WRITE_OK                (1 << 28)
+#define SC64_SD_DAT_WRITE_ERROR             (1 << 27)
+#define SC64_SD_DAT_WRITE_BUSY              (1 << 26)
 #define SC64_SD_DAT_TX_FIFO_ITEMS_GET(dat)  (((dat) >> 17) & 0x1FF)
 #define SC64_SD_DAT_TX_FIFO_BYTES_GET(dat)  (SC64_SD_DAT_TX_FIFO_ITEMS_GET(dat) * 4)
 #define SC64_SD_DAT_TX_FIFO_FULL            (1 << 16)
@@ -183,6 +186,7 @@ typedef struct sc64_sd_registers_s {
 #define SC64_SD_DMA_BANK_GET(addr)          (((addr) >> 28) & 0xF)
 
 #define SC64_SD_DMA_BANK_ADDR(b, a)         ((((b) & 0xF) << 28) | ((a) & 0x3FFFFFC))
+
 
 #define SC64_SD_DMA_LEN_GET(len)            (((len) & 0x7FFF) * 4)
 

@@ -53,7 +53,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
 
 #if !FF_FS_READONLY
 
-DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
+DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     sc64_sd_err_t error;
 
     if (pdrv > 0) {
@@ -79,5 +79,15 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
 #endif
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
-    return RES_PARERR;
+    switch (cmd) {
+        case CTRL_SYNC: {
+            sc64_sd_err_t error = sc64_sd_dat_busy_wait();
+            if (error != E_OK) {
+                return RES_ERROR;
+            }
+            break;
+        }
+    }
+
+    return RES_OK;
 }

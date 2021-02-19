@@ -12,6 +12,8 @@
 static uint8_t current_bank = SC64_BANK_INVALID;
 static uint32_t current_offset = 0;
 static uint8_t save_buffer[128 * 1024] __attribute__((aligned(16)));
+static bool fs_initialized = false;
+static FATFS fatfs;
 
 
 static DRESULT sc64_sd_fs_load_with_dma(BYTE pdrv, FSIZE_t offset, LBA_t sector, UINT count) {
@@ -38,13 +40,9 @@ static DRESULT sc64_sd_fs_load_with_dma(BYTE pdrv, FSIZE_t offset, LBA_t sector,
 }
 
 
-static bool fs_initialized = false;
-static FATFS fatfs;
-
-
 sc64_sd_fs_error_t sc64_sd_fs_init(void) {
     FRESULT fresult;
-    
+
     fresult = f_mount(&fatfs, "", 1);
     if (fresult != FR_OK) {
         switch (fresult) {

@@ -43,14 +43,13 @@ set_false_path -from [get_ports {i_ftdi_so i_ftdi_cts}]
 set_output_delay -clock [get_clocks {sd_clk}] -max 6.0 [get_ports {io_sd_cmd io_sd_dat[*]}]
 set_output_delay -clock [get_clocks {sd_clk}] -min -2.0 [get_ports {io_sd_cmd io_sd_dat[*]}]
 
-set_input_delay -clock [get_clocks {sd_clk}] -max 14.0 [get_ports {io_sd_cmd io_sd_dat[*]}]
-set_input_delay -clock [get_clocks {sd_clk}] -min 2.5 [get_ports {io_sd_cmd io_sd_dat[*]}]
+set_input_delay -clock [get_clocks {sd_clk}] -max 15.0 [get_ports {io_sd_cmd io_sd_dat[*]}]
+set_input_delay -clock [get_clocks {sd_clk}] -min 6.5 [get_ports {io_sd_cmd io_sd_dat[*]}]
 
-set_multicycle_path -setup -start 1 -from [get_clocks $sys_clk] -to [get_clocks {sd_clk}]
 set_multicycle_path -hold -start 1 -from [get_clocks $sys_clk] -to [get_clocks {sd_clk}]
 
 set_multicycle_path -setup -end 3 -from [get_clocks {sd_clk}] -to [get_clocks $sys_clk]
-set_multicycle_path -hold -end 2 -from [get_clocks {sd_clk}] -to [get_clocks $sys_clk]
+set_multicycle_path -hold -end 1 -from [get_clocks {sd_clk}] -to [get_clocks $sys_clk]
 
 
 # N64, PI and SI timings

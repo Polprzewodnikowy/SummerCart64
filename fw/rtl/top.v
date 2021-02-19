@@ -539,7 +539,7 @@ module top (
 
     // LED
 
-    wire w_led_trigger = (w_n64_request && !w_n64_busy) || (w_pc_request && !w_pc_busy);
+    wire w_led_trigger = (w_n64_request && !w_n64_busy) || (w_pc_request && !w_pc_busy) || (w_sd_dma_request && !w_sd_dma_busy);
 
     cart_led cart_led_inst (
         .i_clk(w_sys_clk),
