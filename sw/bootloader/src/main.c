@@ -93,15 +93,16 @@ int main(void) {
             switch (config.save_type) {
                 case 1: sc64_enable_eeprom(false); break;
                 case 2: sc64_enable_eeprom(true); break;
-                case 3: sc64_enable_sram(false); break;
-                case 4: sc64_enable_sram(true); break;
-                case 5: sc64_enable_flashram(); break;
+                case 3:
+                case 4: sc64_enable_sram(); break;
+                case 5:
+                case 6: sc64_enable_flashram(); break;
             }
 
-            if (config.save_type == 3) {
-                sc64_set_sram_address(SC64_SDRAM_SIZE - (32 * 1024));
-            } else if (config.save_type == 4) {
-                sc64_set_sram_address(SC64_SDRAM_SIZE - (3 * 32 * 1024));
+            if (config.save_type >= 3 || config.save_type <= 5) {
+                sc64_set_save_address(SC64_SDRAM_SIZE - (128 * 1024));
+            } else if (config.save_type == 6) {
+                sc64_set_save_address(0x01618000);
             }
 
             if (rom_loaded && (config.save[0] != '\0') && config.save_writeback) {

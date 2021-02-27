@@ -20,8 +20,8 @@ module sd_interface (
     input i_dma_ack,
     output [3:0] o_dma_bank,
     output [23:0] o_dma_address,
-    input [31:0] i_dma_data,
-    output [31:0] o_dma_data
+    output [31:0] o_dma_data,
+    input [31:0] i_dma_data
 );
 
     // Clock generator

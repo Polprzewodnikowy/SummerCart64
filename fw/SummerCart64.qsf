@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 01:35:54  February 19, 2021
+# Date created = 15:52:44  February 27, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -51,6 +51,7 @@ set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_sd.qip
 set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
+set_global_assignment -name QIP_FILE rtl/intel/ram/ram_flashram_write_buffer.qip
 set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
 set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
 set_global_assignment -name SDC_FILE constraints.sdc
@@ -58,6 +59,7 @@ set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyze
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
 set_global_assignment -name VERILOG_FILE rtl/cart/cart_control.v
 set_global_assignment -name VERILOG_FILE rtl/cart/cart_led.v
+set_global_assignment -name VERILOG_FILE rtl/flashram/flashram_controller.v
 set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
 set_global_assignment -name VERILOG_FILE rtl/memory/memory_embedded_flash.v
 set_global_assignment -name VERILOG_FILE rtl/memory/memory_sdram.v
@@ -160,12 +162,6 @@ set_location_assignment PIN_114 -to o_sd_clk
 set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
-set_location_assignment PIN_121 -to io_sram_dq[0]
-set_location_assignment PIN_122 -to o_sram_clk
-set_location_assignment PIN_123 -to io_sram_dq[3]
-set_location_assignment PIN_124 -to o_sram_cs
-set_location_assignment PIN_126 -to io_sram_dq[1]
-set_location_assignment PIN_127 -to io_sram_dq[2]
 set_location_assignment PIN_138 -to io_pmod[0]
 set_location_assignment PIN_140 -to io_pmod[1]
 set_location_assignment PIN_141 -to io_pmod[2]

@@ -41,13 +41,8 @@ void sc64_disable_flashram(void) {
     sc64_disable_peripheral(SC64_CART_SCR_FLASHRAM_ENABLE);
 }
 
-void sc64_enable_sram(bool mode_768k) {
+void sc64_enable_sram(void) {
     sc64_enable_peripheral(SC64_CART_SCR_SRAM_ENABLE);
-    if (mode_768k) {
-        sc64_enable_peripheral(SC64_CART_SCR_SRAM_768K_MODE);
-    } else {
-        sc64_disable_peripheral(SC64_CART_SCR_SRAM_768K_MODE);
-    }
 }
 
 void sc64_disable_sram(void) {
@@ -127,10 +122,10 @@ void sc64_set_ddipl_address(uint32_t address) {
     platform_pi_io_write(&SC64_CART->DDIPL_ADDR, address & SC64_CART_DDIPL_ADDR_ADDRESS_MASK);
 }
 
-uint32_t sc64_get_sram_address(void) {
+uint32_t sc64_get_save_address(void) {
     return platform_pi_io_read(&SC64_CART->SRAM_ADDR) & SC64_CART_SRAM_ADDR_ADDRESS_MASK;
 }
 
-void sc64_set_sram_address(uint32_t address) {
+void sc64_set_save_address(uint32_t address) {
     platform_pi_io_write(&SC64_CART->SRAM_ADDR, address & SC64_CART_SRAM_ADDR_ADDRESS_MASK);
 }

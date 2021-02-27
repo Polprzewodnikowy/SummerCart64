@@ -17,7 +17,6 @@ module cart_control (
     output reg o_rom_switch,
     output reg o_ddipl_enable,
     output reg o_sram_enable,
-    output reg o_sram_768k_mode,
     output reg o_flashram_enable,
     output reg o_sd_enable,
     output reg o_eeprom_pi_enable,
@@ -40,7 +39,7 @@ module cart_control (
     input [31:0] i_debug_fifo_data,
     
     output reg [23:0] o_ddipl_address,
-    output reg [23:0] o_sram_address
+    output reg [23:0] o_save_address
 );
 
     // Module parameters
@@ -100,17 +99,16 @@ module cart_control (
             o_rom_switch <= 1'b0;
             o_ddipl_enable <= 1'b0;
             o_sram_enable <= 1'b0;
-            o_sram_768k_mode <= 1'b0;
             o_flashram_enable <= 1'b0;
             o_sd_enable <= 1'b0;
             o_eeprom_pi_enable <= 1'b0;
             o_eeprom_enable <= 1'b0;
             o_eeprom_16k_mode <= 1'b0;
             o_n64_reset_btn <= 1'b1;
-            o_ddipl_address <= 24'hF0_0000;
-            o_sram_address <= 24'hFF_E000;
+            o_ddipl_address <= 24'hEF_8000;
+            o_save_address <= 24'hFF_8000;
             o_debug_dma_bank <= 4'd1;
-            o_debug_dma_address <= 24'hFC_0000;
+            o_debug_dma_address <= 24'hCF_8000;
             o_debug_dma_length <= 20'd0;
             r_bootloader <= 16'h0000;
             r_skip_bootloader <= 1'b0;
@@ -121,7 +119,6 @@ module cart_control (
                         {
                             r_skip_bootloader,
                             o_flashram_enable,
-                            o_sram_768k_mode,
                             o_sram_enable,
                             o_sd_enable,
                             o_eeprom_pi_enable,
@@ -130,31 +127,38 @@ module cart_control (
                             o_ddipl_enable,
                             o_rom_switch,
                             o_sdram_writable
-                        } <= i_data[10:0];
+                        } <= {i_data[10:9], i_data[7:0]};
                     end
+
                     REG_BOOT: begin
                         r_bootloader <= i_data[15:0];
                     end
+
                     REG_GPIO: begin
                         o_n64_reset_btn <= ~i_data[0];
                     end
+
                     REG_USB_SCR: begin
                         {o_debug_fifo_flush, o_debug_dma_start} <= {i_data[2], i_data[0]};
                     end
+
                     REG_USB_DMA_ADDR: begin
                         {o_debug_dma_bank, o_debug_dma_address} <= {i_data[31:28], i_data[25:2]};
                     end
+
                     REG_USB_DMA_LEN: begin
                         o_debug_dma_length <= i_data[19:0];
                     end
+
                     REG_DDIPL_ADDR: begin
                         o_ddipl_address <= i_data[25:2];
                     end
+
                     REG_SRAM_ADDR: begin
-                        o_sram_address <= i_data[25:2];
+                        o_save_address <= i_data[25:2];
                     end
-                    default: begin
-                    end
+
+                    default: begin end
                 endcase
             end
 
@@ -182,7 +186,7 @@ module cart_control (
                         o_data[10:0] <= {
                             r_skip_bootloader,
                             o_flashram_enable,
-                            o_sram_768k_mode,
+                            1'b0,
                             o_sram_enable,
                             o_sd_enable,
                             o_eeprom_pi_enable,
@@ -193,26 +197,32 @@ module cart_control (
                             o_sdram_writable
                         };
                     end
+
                     REG_BOOT: begin
                         o_data[15:0] <= r_bootloader;
                     end
+
                     REG_VERSION: begin
                         o_data <= {"S", "6", "4", VERSION};
                     end
+
                     REG_GPIO: begin
                         o_data[2:0] <= {r_nmi_ff2, r_reset_ff2, ~o_n64_reset_btn};
                     end
+
                     REG_USB_SCR: begin
                         {o_data[13:3], o_data[1:0]} <= {i_debug_fifo_items, i_debug_ready, i_debug_dma_busy};
                     end
+
                     REG_DDIPL_ADDR: begin
                         o_data[25:0] <= {o_ddipl_address, 2'b00};
                     end
+
                     REG_SRAM_ADDR: begin
-                        o_data[25:0] <= {o_sram_address, 2'b00};
+                        o_data[25:0] <= {o_save_address, 2'b00};
                     end
-                    default: begin
-                    end
+
+                    default: begin end
                 endcase
             end else begin
                 o_data <= i_debug_fifo_data;

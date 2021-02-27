@@ -14,7 +14,7 @@ void sc64_enable_skip_bootloader(void);
 void sc64_disable_skip_bootloader(void);
 void sc64_enable_flashram(void);
 void sc64_disable_flashram(void);
-void sc64_enable_sram(bool mode_768k);
+void sc64_enable_sram(void);
 void sc64_disable_sram(void);
 void sc64_enable_sd(void);
 void sc64_disable_sd(void);
@@ -33,8 +33,8 @@ void sc64_set_boot_mode(uint32_t boot);
 uint32_t sc64_get_version(void);
 uint32_t sc64_get_ddipl_address(void);
 void sc64_set_ddipl_address(uint32_t address);
-uint32_t sc64_get_sram_address(void);
-void sc64_set_sram_address(uint32_t address);
+uint32_t sc64_get_save_address(void);
+void sc64_set_save_address(uint32_t address);
 
 
 #endif
