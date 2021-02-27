@@ -20,17 +20,19 @@ module n64_pi (
     input [31:0] i_data,
     output reg [31:0] o_data,
 
-    output o_sram_request,
+    output o_sram_pi_request,
+    output o_flashram_pi_request,
 
     input i_ddipl_enable,
     input i_sram_enable,
-    input i_sram_768k_mode,
     input i_flashram_enable,
     input i_sd_enable,
-    input i_eeprom_enable,
+    input i_eeprom_pi_enable,
 
     input [23:0] i_ddipl_address,
-    input [23:0] i_sram_address
+    input [23:0] i_save_address,
+
+    input i_flashram_read_mode
 );
 
     // Parameters
@@ -88,7 +90,7 @@ module n64_pi (
     // Bank decoder, address translator and prefetch signal
 
     wire w_bank_prefetch;
-    wire w_ddipl_request;
+    wire w_ddipl_pi_request;
 
     wire w_prefetch = !PREFETCH_DISABLE && w_bank_prefetch;
 
@@ -96,19 +98,18 @@ module n64_pi (
         .i_clk(i_clk),
 
         .i_address_high_op(w_address_high_op),
-        .i_address_low_op(w_address_low_op),
         .i_n64_pi_ad(io_n64_pi_ad),
 
         .o_bank(o_bank),
         .o_prefetch(w_bank_prefetch),
-        .o_ddipl_request(w_ddipl_request),
-        .o_sram_request(o_sram_request),
+        .o_ddipl_pi_request(w_ddipl_pi_request),
+        .o_sram_pi_request(o_sram_pi_request),
+        .o_flashram_pi_request(o_flashram_pi_request),
 
         .i_ddipl_enable(i_ddipl_enable),
         .i_sram_enable(i_sram_enable),
-        .i_sram_768k_mode(i_sram_768k_mode),
         .i_flashram_enable(i_flashram_enable),
-        .i_eeprom_enable(i_eeprom_enable),
+        .i_eeprom_pi_enable(i_eeprom_pi_enable),
         .i_sd_enable(i_sd_enable)
     );
 
@@ -124,6 +125,7 @@ module n64_pi (
         if (r_address_valid_op) begin
             r_word_counter <= 1'b0;
         end
+
         if (w_read_op || w_write_op) begin
             r_word_counter <= ~r_word_counter;
         end
@@ -153,11 +155,13 @@ module n64_pi (
         end
         if (i_ack) begin
             r_prefetch_read <= 1'b0;
+
             if (w_prefetch) begin
                 r_pi_read_buffer <= i_data;
             end else begin
                 r_pi_output_data <= i_data;
             end
+
             if (r_prefetch_read) begin
                 r_pi_output_data <= i_data;
             end            
@@ -201,6 +205,7 @@ module n64_pi (
                 o_request <= 1'b0;
                 o_write <= 1'b0;
             end
+
             if (w_bus_request_op) begin
                 if (o_request) begin
                     r_pending_request <= 1'b1;
@@ -210,6 +215,7 @@ module n64_pi (
                     o_write <= w_bus_write_op;
                 end
             end
+
             if (r_pending_request && !i_busy) begin
                 o_request <= 1'b1;
                 o_write <= r_pending_request_write;
@@ -224,7 +230,7 @@ module n64_pi (
     wire [9:0] w_pi_high_address = io_n64_pi_ad[9:0];
     wire [15:0] w_pi_low_address = {io_n64_pi_ad[15:1], 1'b0};
     wire [25:0] w_ddipl_translated_address = o_address + {i_ddipl_address, 2'b00};
-    wire [25:0] w_sram_translated_address = o_address + {i_sram_address, 2'b00};
+    wire [25:0] w_save_translated_address = o_address + {i_save_address, 2'b00};
 
     reg r_first_transfer;
     reg [14:0] r_address_low_buffer;
@@ -241,13 +247,19 @@ module n64_pi (
         if (r_address_valid_op) begin
             r_first_transfer <= w_prefetch;
             r_address_low_buffer <= o_address[15:1];
-            if (w_ddipl_request) begin
+
+            if (w_ddipl_pi_request) begin
                 o_address <= w_ddipl_translated_address;
                 r_address_low_buffer <= w_ddipl_translated_address[15:1];
             end
-            if (o_sram_request) begin
-                o_address <= w_sram_translated_address;
-                r_address_low_buffer <= w_sram_translated_address[15:1];
+
+            if (o_sram_pi_request) begin
+                o_address <= w_save_translated_address;
+                r_address_low_buffer <= w_save_translated_address[15:1];
+            end
+
+            if (o_flashram_pi_request && i_flashram_read_mode) begin
+                o_address <= w_save_translated_address;
             end
         end
 

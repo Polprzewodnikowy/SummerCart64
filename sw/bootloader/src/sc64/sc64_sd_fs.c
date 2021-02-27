@@ -156,14 +156,10 @@ sc64_sd_fs_error_t sc64_sd_fs_load_save(const char *path) {
         length = (scr & SC64_CART_SCR_EEPROM_16K_MODE) ? 2048 : 512;
         current_bank = SC64_BANK_EEPROM;
         current_offset = 0;
-    } else if (scr & SC64_CART_SCR_SRAM_ENABLE) {
-        length = ((scr & SC64_CART_SCR_SRAM_768K_MODE) ? 3 : 1) * (32 * 1024);
+    } else if (scr & (SC64_CART_SCR_SRAM_ENABLE | SC64_CART_SCR_FLASHRAM_ENABLE)) {
+        length = 128 * 1024;
         current_bank = SC64_BANK_SDRAM;
-        current_offset = sc64_get_sram_address();
-    } else if (scr & SC64_CART_SCR_FLASHRAM_ENABLE) {   // TODO: FlashRAM
-        length = 0;
-        current_bank = SC64_BANK_FLASHRAM;
-        current_offset = 0;
+        current_offset = sc64_get_save_address();
     }
 
     if ((length == 0) || (path == NULL)) {
@@ -203,14 +199,10 @@ sc64_sd_fs_error_t sc64_sd_fs_store_save(const char *path) {
         platform_pi_dma_read(save_buffer, &SC64_EEPROM->MEM, length);
         platform_cache_invalidate(save_buffer, length);
         sc64_disable_eeprom_pi();
-    } else if (scr & SC64_CART_SCR_SRAM_ENABLE) {
-        length = ((scr & SC64_CART_SCR_SRAM_768K_MODE) ? 3 : 1) * (32 * 1024);
-        platform_pi_dma_read(save_buffer, sc64_get_sram_address(), length);
+    } else if (scr & (SC64_CART_SCR_SRAM_ENABLE | SC64_CART_SCR_FLASHRAM_ENABLE)) {
+        length = 128 * 1024;
+        platform_pi_dma_read(save_buffer, sc64_get_save_address(), length);
         platform_cache_invalidate(save_buffer, length);
-    } else if (scr & SC64_CART_SCR_FLASHRAM_ENABLE) {   // TODO: FlashRAM
-        length = 0;
-        // platform_pi_dma_read(save_buffer, 0, length);
-        // platform_cache_invalidate(save_buffer, length);
     }
 
     if ((length == 0) || (path == NULL)) {

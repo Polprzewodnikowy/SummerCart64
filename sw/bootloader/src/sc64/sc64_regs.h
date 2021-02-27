@@ -11,8 +11,7 @@
 #define SC64_BANK_SDRAM                     (1)
 #define SC64_BANK_CART                      (2)
 #define SC64_BANK_EEPROM                    (3)
-#define SC64_BANK_FLASHRAM                  (4)
-#define SC64_BANK_SD                        (5)
+#define SC64_BANK_SD                        (4)
 
 
 // Cart Interface Registers

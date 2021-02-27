@@ -33,10 +33,6 @@ module top (
     inout io_sd_cmd,
     inout [3:0] io_sd_dat,
 
-    output o_sram_clk,
-    output o_sram_cs,
-    inout [3:0] io_sram_dq,
-
     output o_rtc_scl,
     inout io_rtc_sda,
 
@@ -57,7 +53,6 @@ module top (
 
     wire w_n64_reset_btn;
 
-    assign {o_sram_clk, o_sram_cs, io_sram_dq} = 6'bZZZZZZ;
     assign {o_rtc_scl, io_rtc_sda} = 2'bZZ;
     assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
     assign {io_pmod[7:4], io_pmod[2:0]} = 7'bZZZZZZZ;
@@ -110,42 +105,63 @@ module top (
     wire w_n64_ack_cart_control;
     wire [31:0] w_n64_i_data_cart_control;
 
-    wire w_n64_busy_sdram;
-    wire w_n64_ack_sdram;
-    wire [31:0] w_n64_i_data_sdram;
-
     wire w_n64_busy_embedded_flash;
     wire w_n64_ack_embedded_flash;
     wire [31:0] w_n64_i_data_embedded_flash;
+
+    wire w_n64_busy_sdram;
+    wire w_n64_ack_sdram;
+    wire [31:0] w_n64_i_data_sdram;
 
     wire w_n64_busy_eeprom;
     wire w_n64_ack_eeprom;
     wire [31:0] w_n64_i_data_eeprom;
 
+    wire w_n64_busy_flashram;
+    wire w_n64_ack_flashram;
+    wire [31:0] w_n64_i_data_flashram;
+
     wire w_n64_busy_sd;
     wire w_n64_ack_sd;
     wire [31:0] w_n64_i_data_sd;
 
-    wire w_sram_request;
+    wire w_sram_pi_request;
+    wire w_flashram_pi_request;
 
     wire w_ddipl_enable;
     wire w_sram_enable;
-    wire w_sram_768k_mode;
     wire w_flashram_enable;
     wire w_sd_enable;
     wire w_eeprom_pi_enable;
 
     wire [23:0] w_ddipl_address;
-    wire [23:0] w_sram_address;
+    wire [23:0] w_save_address;
+
+    wire w_flashram_read_mode;
 
     always @(*) begin
-        w_n64_busy = w_n64_busy_cart_control || w_n64_busy_sdram || w_n64_busy_embedded_flash || w_n64_busy_eeprom || w_n64_busy_sd;
-        w_n64_ack = w_n64_ack_cart_control || w_n64_ack_sdram || w_n64_ack_embedded_flash || w_n64_ack_eeprom || w_n64_ack_sd;
+        w_n64_busy = (
+            w_n64_busy_cart_control ||
+            w_n64_busy_embedded_flash ||
+            w_n64_busy_sdram ||
+            w_n64_busy_eeprom ||
+            w_n64_busy_flashram ||
+            w_n64_busy_sd
+        );
+        w_n64_ack = (
+            w_n64_ack_cart_control ||
+            w_n64_ack_embedded_flash ||
+            w_n64_ack_sdram ||
+            w_n64_ack_eeprom ||
+            w_n64_ack_flashram ||
+            w_n64_ack_sd
+        );
         w_n64_i_data = 32'h0000_0000;
         if (w_n64_ack_cart_control) w_n64_i_data = w_n64_i_data_cart_control;
-        if (w_n64_ack_sdram) w_n64_i_data = w_n64_i_data_sdram;
         if (w_n64_ack_embedded_flash) w_n64_i_data = w_n64_i_data_embedded_flash;
+        if (w_n64_ack_sdram) w_n64_i_data = w_n64_i_data_sdram;
         if (w_n64_ack_eeprom) w_n64_i_data = w_n64_i_data_eeprom;
+        if (w_n64_ack_flashram) w_n64_i_data = w_n64_i_data_flashram;
         if (w_n64_ack_sd) w_n64_i_data = w_n64_i_data_sd;
     end
 
@@ -169,17 +185,19 @@ module top (
         .i_data(w_n64_i_data),
         .o_data(w_n64_o_data),
 
-        .o_sram_request(w_sram_request),
+        .o_sram_pi_request(w_sram_pi_request),
+        .o_flashram_pi_request(w_flashram_pi_request),
 
         .i_ddipl_enable(w_ddipl_enable),
         .i_sram_enable(w_sram_enable),
-        .i_sram_768k_mode(w_sram_768k_mode),
         .i_flashram_enable(w_flashram_enable),
         .i_sd_enable(w_sd_enable),
-        .i_eeprom_enable(w_eeprom_pi_enable),
+        .i_eeprom_pi_enable(w_eeprom_pi_enable),
 
         .i_ddipl_address(w_ddipl_address),
-        .i_sram_address(w_sram_address)
+        .i_save_address(w_save_address),
+
+        .i_flashram_read_mode(w_flashram_read_mode)
     );
 
 
@@ -321,7 +339,6 @@ module top (
         .o_rom_switch(w_rom_switch),
         .o_ddipl_enable(w_ddipl_enable),
         .o_sram_enable(w_sram_enable),
-        .o_sram_768k_mode(w_sram_768k_mode),
         .o_flashram_enable(w_flashram_enable),
         .o_sd_enable(w_sd_enable),
         .o_eeprom_pi_enable(w_eeprom_pi_enable),
@@ -330,7 +347,7 @@ module top (
 
         .o_n64_reset_btn(w_n64_reset_btn),
 
-        .i_debug_ready(1'b1),
+        .i_debug_ready(1'b1),   // TODO: Detect USB cable insertion
 
         .o_debug_dma_start(w_debug_dma_start),
         .i_debug_dma_busy(w_debug_dma_busy),
@@ -344,29 +361,16 @@ module top (
         .i_debug_fifo_data(w_debug_fifo_data),
 
         .o_ddipl_address(w_ddipl_address),
-        .o_sram_address(w_sram_address)
-    );
-
-
-    // Embedded flash
-
-    wire w_embedded_flash_request_n64 = w_n64_request && !w_rom_switch && !w_n64_write && w_n64_bank == `BANK_SDRAM;
-
-    memory_embedded_flash memory_embedded_flash_inst (
-        .i_clk(w_sys_clk),
-        .i_reset(w_sys_reset),
-
-        .i_request(w_embedded_flash_request_n64),
-        .o_busy(w_n64_busy_embedded_flash),
-        .o_ack(w_n64_ack_embedded_flash),
-        .i_address(w_n64_address[20:2]),
-        .o_data(w_n64_i_data_embedded_flash)
+        .o_save_address(w_save_address)
     );
 
 
     // SD card
 
-    wire w_n64_request_sd = w_n64_request && w_n64_bank == `BANK_SD;
+    wire w_n64_request_sd = (
+        w_n64_request &&
+        w_n64_bank == `BANK_SD
+    );
 
     wire w_sd_dma_request;
     wire w_sd_dma_write;
@@ -415,14 +419,83 @@ module top (
         .i_dma_ack(w_sd_dma_ack),
         .o_dma_bank(w_sd_dma_bank),
         .o_dma_address(w_sd_dma_address),
-        .i_dma_data(w_sd_dma_i_data),
-        .o_dma_data(w_sd_dma_o_data)
+        .o_dma_data(w_sd_dma_o_data),
+        .i_dma_data(w_sd_dma_i_data)
+    );
+
+
+    // FlashRAM
+
+    wire w_flashram_request_n64 = (
+        w_n64_request &&
+        w_flashram_pi_request &&
+        w_n64_bank == `BANK_SDRAM
+    );
+
+    wire w_flashram_dma_request;
+    wire w_flashram_dma_write;
+    wire w_flashram_dma_busy;
+    wire w_flashram_dma_ack;
+    wire [3:0] w_flashram_dma_bank;
+    wire [23:0] w_flashram_dma_address;
+    wire [31:0] w_flashram_dma_i_data;
+    wire [31:0] w_flashram_dma_o_data;
+
+    flashram_controller flashram_controller_inst (
+        .i_clk(w_sys_clk),
+        .i_reset(w_sys_reset),
+
+        .i_save_address(w_save_address),
+
+        .o_flashram_read_mode(w_flashram_read_mode),
+
+        .i_request(w_flashram_request_n64),
+        .i_write(w_n64_write),
+        .o_busy(w_n64_busy_flashram),
+        .o_ack(w_n64_ack_flashram),
+        .i_address(w_n64_address[16:2]),
+        .o_data(w_n64_i_data_flashram),
+        .i_data(w_n64_o_data),
+
+        .o_mem_request(w_flashram_dma_request),
+        .o_mem_write(w_flashram_dma_write),
+        .i_mem_busy(w_flashram_dma_busy),
+        .i_mem_ack(w_flashram_dma_ack),
+        .o_mem_bank(w_flashram_dma_bank),
+        .o_mem_address(w_flashram_dma_address),
+        .o_mem_data(w_flashram_dma_o_data),
+        .i_mem_data(w_flashram_dma_i_data)
+    );
+
+
+    // Embedded flash in FPGA
+
+    wire w_embedded_flash_request_n64 = (
+        w_n64_request &&
+        !w_rom_switch &&
+        !w_n64_write &&
+        w_n64_bank == `BANK_SDRAM
+    );
+
+    memory_embedded_flash memory_embedded_flash_inst (
+        .i_clk(w_sys_clk),
+        .i_reset(w_sys_reset),
+
+        .i_request(w_embedded_flash_request_n64),
+        .o_busy(w_n64_busy_embedded_flash),
+        .o_ack(w_n64_ack_embedded_flash),
+        .i_address(w_n64_address[20:2]),
+        .o_data(w_n64_i_data_embedded_flash)
     );
 
 
     // SDRAM
 
-    wire w_sdram_request_n64 = w_n64_request && w_rom_switch && (!w_n64_write || (w_n64_write && (w_sdram_writable || w_sram_request)));
+    wire w_sdram_request_n64 = w_n64_request && (
+        (w_rom_switch && (w_sdram_writable || !w_n64_write) && !w_flashram_pi_request) ||
+        w_sram_pi_request ||
+        (w_flashram_pi_request && w_flashram_read_mode && !w_n64_write)
+    );
 
     wire w_sdram_request;
     wire w_sdram_write;
@@ -433,21 +506,21 @@ module top (
     wire [31:0] w_sdram_i_data;
 
     device_arbiter #(
-        .NUM_CONTROLLERS(3),
+        .NUM_CONTROLLERS(4),
         .ADDRESS_WIDTH(25),
         .DEVICE_BANK(`BANK_SDRAM)
     ) device_arbiter_sdram_inst (
         .i_clk(w_sys_clk),
         .i_reset(w_sys_reset),
 
-        .i_request({w_sd_dma_request, w_pc_request, w_sdram_request_n64}),
-        .i_write({w_sd_dma_write, w_pc_write, w_n64_write}),
-        .o_busy({w_sd_dma_busy_sdram, w_pc_busy_sdram, w_n64_busy_sdram}),
-        .o_ack({w_sd_dma_ack_sdram, w_pc_ack_sdram, w_n64_ack_sdram}),
-        .i_bank({w_sd_dma_bank, w_pc_bank, w_n64_bank}),
-        .i_address({{w_sd_dma_address, 1'b0}, w_pc_address[25:1], w_n64_address[25:1]}),
-        .o_data({w_sd_dma_i_data_sdram, w_pc_i_data_sdram, w_n64_i_data_sdram}),
-        .i_data({w_sd_dma_o_data, w_pc_o_data, w_n64_o_data}),
+        .i_request({w_flashram_dma_request, w_sd_dma_request, w_pc_request, w_sdram_request_n64}),
+        .i_write({w_flashram_dma_write, w_sd_dma_write, w_pc_write, w_n64_write}),
+        .o_busy({w_flashram_dma_busy, w_sd_dma_busy_sdram, w_pc_busy_sdram, w_n64_busy_sdram}),
+        .o_ack({w_flashram_dma_ack, w_sd_dma_ack_sdram, w_pc_ack_sdram, w_n64_ack_sdram}),
+        .i_bank({w_flashram_dma_bank, w_sd_dma_bank, w_pc_bank, w_n64_bank}),
+        .i_address({{w_flashram_dma_address, 1'b0}, {w_sd_dma_address, 1'b0}, w_pc_address[25:1], w_n64_address[25:1]}),
+        .o_data({w_flashram_dma_i_data, w_sd_dma_i_data_sdram, w_pc_i_data_sdram, w_n64_i_data_sdram}),
+        .i_data({w_flashram_dma_o_data, w_sd_dma_o_data, w_pc_o_data, w_n64_o_data}),
 
         .o_device_request(w_sdram_request),
         .o_device_write(w_sdram_write),
@@ -480,7 +553,7 @@ module top (
     );
 
 
-    // EEPROM 4/16k
+    // N64 SI (EEPROM 4/16k and RTC)
 
     wire w_eeprom_request;
     wire w_eeprom_write;
@@ -539,7 +612,11 @@ module top (
 
     // LED
 
-    wire w_led_trigger = (w_n64_request && !w_n64_busy) || (w_pc_request && !w_pc_busy) || (w_sd_dma_request && !w_sd_dma_busy);
+    wire w_led_trigger = (
+        (w_n64_request && !w_n64_busy) ||
+        (w_pc_request && !w_pc_busy) ||
+        (w_sd_dma_request && !w_sd_dma_busy)
+    );
 
     cart_led cart_led_inst (
         .i_clk(w_sys_clk),
