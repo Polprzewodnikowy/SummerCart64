@@ -217,16 +217,16 @@ module flashram_controller (
 
     reg [15:0] r_items_left;
 
-    wire w_execute_done = !r_execute_start && (r_items_left == 16'd0) && r_flashram_state[STATE_EXECUTE];
-    wire w_read_phase_done = w_execute_done && !o_mem_write && i_mem_ack;
-    wire w_write_phase_done = w_execute_done && o_mem_write;
+    wire w_in_execution = !r_execute_start && r_flashram_state[STATE_EXECUTE];
+    wire w_read_phase_done =  w_in_execution && (r_write_buffer_address == 5'h1F) && !o_mem_write && i_mem_ack;
+    wire w_write_phase_done = w_in_execution && (r_items_left == 16'd0) && o_mem_write;
 
     wire w_mem_request_successful = o_mem_request && !i_mem_busy;
     wire w_address_reset = r_execute_start || w_read_phase_done;
     wire w_write_buffer_address_increment = o_mem_write ? w_mem_request_successful : i_mem_ack;
 
-    always @(posedge i_clk) begin
-        r_execute_done <= w_write_phase_done;
+    always @(*) begin
+        r_execute_done = w_write_phase_done;
     end
 
     always @(posedge i_clk) begin
