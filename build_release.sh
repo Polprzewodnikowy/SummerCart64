@@ -16,6 +16,13 @@ if [[ $1 ]]; then
 fi
 
 
+# Build libsc64
+echo "Building libsc64"
+pushd sw/libsc64
+./build.sh
+popd
+
+
 # Build bootloader
 echo "Building bootloader"
 pushd sw/bootloader
