@@ -30,6 +30,10 @@ pushd sw/bootloader
 popd
 
 
+# Cleanup docker space
+docker image prune -a
+
+
 # Build UltraCIC-III
 pushd sw/cic
 echo "Building UltraCIC-III"
