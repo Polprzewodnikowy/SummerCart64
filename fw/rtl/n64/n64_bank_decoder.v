@@ -54,16 +54,16 @@ module n64_bank_decoder (
                     o_prefetch <= 1'b0;
                 end
 
-                16'b0001111000000001: begin // EEPROM
-                    if (i_eeprom_pi_enable) begin
-                        o_bank <= `BANK_EEPROM;
-                    end
-                end
-
-                16'b0001111000000010: begin // SD
+                16'b0001111000000001: begin // SD
                     if (i_sd_enable) begin
                         o_bank <= `BANK_SD;
                         o_prefetch <= 1'b0;
+                    end
+                end
+
+                16'b0001111000000011: begin // EEPROM
+                    if (i_eeprom_pi_enable) begin
+                        o_bank <= `BANK_EEPROM;
                     end
                 end
 
