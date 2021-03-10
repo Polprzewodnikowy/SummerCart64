@@ -51,11 +51,7 @@ module top (
 
     // Temporary signal names
 
-    wire w_n64_reset_btn;
-
     assign {o_rtc_scl, io_rtc_sda} = 2'bZZ;
-    assign io_pmod[3] = w_n64_reset_btn ? 1'bZ : 1'b0;
-    assign {io_pmod[7:4], io_pmod[2:0]} = 7'bZZZZZZZ;
 
 
     // PLL clock generator
@@ -345,7 +341,7 @@ module top (
         .o_eeprom_enable(w_eeprom_enable),
         .o_eeprom_16k_mode(w_eeprom_16k_mode),
 
-        .o_n64_reset_btn(w_n64_reset_btn),
+        .io_gpio(io_pmod),
 
         .i_debug_ready(1'b1),   // TODO: Detect USB cable insertion
 

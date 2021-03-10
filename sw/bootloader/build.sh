@@ -1,10 +1,10 @@
 #!/bin/bash
 
-LIBDRAGON_DOCKER_VERSION=latest
+build_in_docker() {
+    docker run -t \
+        --mount type=bind,src=`realpath $(pwd)`,target="/src" \
+        --mount type=bind,src=`realpath "$(pwd)/../libsc64"`,target="/src/libsc64" \
+        $1 /bin/bash -c "cd /src && make clean && make -f $2 all"
+}
 
-docker \
-    run \
-    -t \
-    --mount type=bind,src=`realpath "$(dirname $0)"`,target="/libdragon" \
-    anacierdem/libdragon:$LIBDRAGON_DOCKER_VERSION \
-    /bin/bash -c "make clean && make all"
+build_in_docker "anacierdem/libdragon:latest" "Makefile"

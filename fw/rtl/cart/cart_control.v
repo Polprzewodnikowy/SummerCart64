@@ -23,7 +23,7 @@ module cart_control (
     output reg o_eeprom_enable,
     output reg o_eeprom_16k_mode,
 
-    output reg o_n64_reset_btn,
+    inout [7:0] io_gpio,
 
     input i_debug_ready,
 
@@ -57,7 +57,7 @@ module cart_control (
     localparam [3:0] REG_USB_DMA_ADDR   = 4'd5;
     localparam [3:0] REG_USB_DMA_LEN    = 4'd6;
     localparam [3:0] REG_DDIPL_ADDR     = 4'd7;
-    localparam [3:0] REG_SRAM_ADDR      = 4'd8;
+    localparam [3:0] REG_SAVE_ADDR      = 4'd8;
 
     localparam [10:0] MEM_USB_FIFO_BASE = 11'h400;
 
@@ -77,6 +77,11 @@ module cart_control (
 
     reg [15:0] r_bootloader;
     reg r_skip_bootloader;
+    reg r_sram_768k_mode;
+    reg [7:0] r_gpio_o;
+    reg [7:0] r_gpio_i;
+    reg [7:0] r_gpio_dir;
+    reg [7:0] r_gpio_od;
 
 
     // Bus controller
@@ -104,7 +109,6 @@ module cart_control (
             o_eeprom_pi_enable <= 1'b0;
             o_eeprom_enable <= 1'b0;
             o_eeprom_16k_mode <= 1'b0;
-            o_n64_reset_btn <= 1'b1;
             o_ddipl_address <= 24'hEF_8000;
             o_save_address <= 24'hFF_8000;
             o_debug_dma_bank <= 4'd1;
@@ -112,22 +116,27 @@ module cart_control (
             o_debug_dma_length <= 20'd0;
             r_bootloader <= 16'h0000;
             r_skip_bootloader <= 1'b0;
+            r_sram_768k_mode <= 1'b0;
+            r_gpio_o <= 8'h00;
+            r_gpio_dir <= 8'h00;
+            r_gpio_od <= 8'h00;
         end else begin
             if (i_request && i_write && !o_busy) begin
                 case (i_address[3:0])
                     REG_SCR: begin
                         {
                             r_skip_bootloader,
-                            o_flashram_enable,
-                            o_sram_enable,
                             o_sd_enable,
+                            o_flashram_enable,
+                            r_sram_768k_mode,
+                            o_sram_enable,
                             o_eeprom_pi_enable,
                             o_eeprom_16k_mode,
                             o_eeprom_enable,
                             o_ddipl_enable,
-                            o_rom_switch,
-                            o_sdram_writable
-                        } <= {i_data[10:9], i_data[7:0]};
+                            o_sdram_writable,
+                            o_rom_switch
+                        } <= i_data[10:0];
                     end
 
                     REG_BOOT: begin
@@ -135,7 +144,7 @@ module cart_control (
                     end
 
                     REG_GPIO: begin
-                        o_n64_reset_btn <= ~i_data[0];
+                        {r_gpio_od, r_gpio_dir, r_gpio_o} <= {i_data[31:16], i_data[7:0]};
                     end
 
                     REG_USB_SCR: begin
@@ -154,7 +163,7 @@ module cart_control (
                         o_ddipl_address <= i_data[25:2];
                     end
 
-                    REG_SRAM_ADDR: begin
+                    REG_SAVE_ADDR: begin
                         o_save_address <= i_data[25:2];
                     end
 
@@ -165,7 +174,6 @@ module cart_control (
             if (!r_reset_ff2 || !r_nmi_ff2) begin
                 o_sdram_writable <= 1'b0;
                 o_rom_switch <= r_skip_bootloader;
-                o_n64_reset_btn <= 1'b1;
                 o_debug_fifo_flush <= 1'b1;
             end
         end
@@ -185,16 +193,16 @@ module cart_control (
                     REG_SCR: begin
                         o_data[10:0] <= {
                             r_skip_bootloader,
-                            o_flashram_enable,
-                            1'b0,
-                            o_sram_enable,
                             o_sd_enable,
+                            o_flashram_enable,
+                            r_sram_768k_mode,
+                            o_sram_enable,
                             o_eeprom_pi_enable,
                             o_eeprom_16k_mode,
                             o_eeprom_enable,
                             o_ddipl_enable,
-                            o_rom_switch,
-                            o_sdram_writable
+                            o_sdram_writable,
+                            o_rom_switch
                         };
                     end
 
@@ -207,7 +215,7 @@ module cart_control (
                     end
 
                     REG_GPIO: begin
-                        o_data[2:0] <= {r_nmi_ff2, r_reset_ff2, ~o_n64_reset_btn};
+                        o_data[31:0] <= {r_gpio_od, r_gpio_dir, io_gpio, r_gpio_o};
                     end
 
                     REG_USB_SCR: begin
@@ -218,7 +226,7 @@ module cart_control (
                         o_data[25:0] <= {o_ddipl_address, 2'b00};
                     end
 
-                    REG_SRAM_ADDR: begin
+                    REG_SAVE_ADDR: begin
                         o_data[25:0] <= {o_save_address, 2'b00};
                     end
 
@@ -227,6 +235,19 @@ module cart_control (
             end else begin
                 o_data <= i_debug_fifo_data;
                 o_debug_fifo_request <= 1'b1;
+            end
+        end
+    end
+
+
+    // GPIO logic
+
+    always @(*) begin
+        for (integer i = 0; i < 8; i = i + 1) begin
+            if (r_gpio_dir[i] && (!r_gpio_od[i] || (r_gpio_od[i] && !r_gpio_o[i]))) begin
+                io_gpio[i] = r_gpio_o[i];
+            end else begin
+                io_gpio[i] = 1'bZ;
             end
         end
     end

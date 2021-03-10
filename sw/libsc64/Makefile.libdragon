@@ -1,0 +1,11 @@
+TOOLCHAIN = $(N64_INST)/bin/mips64-elf-
+CC = $(TOOLCHAIN)gcc
+AR = $(TOOLCHAIN)ar
+
+LIB_NAME = libsc64_libdragon
+
+LIB_BUILD_DIR = libdragon
+
+CFLAGS += -march=vr4300 -mtune=vr4300 -DLIBDRAGON
+
+include Makefile.common
