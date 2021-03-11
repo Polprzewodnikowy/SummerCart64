@@ -31,7 +31,7 @@ popd
 
 
 # Cleanup docker space
-docker image prune -a
+docker image prune -a -f
 
 
 # Build UltraCIC-III
