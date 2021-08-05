@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags="INTERNAL_COMPONENT=true"
+   categories="" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element in_system_sources_probes_0
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="10M08SCE144C8G" />
+ <parameter name="deviceFamily" value="MAX 10" />
+ <parameter name="deviceSpeedGrade" value="8" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="true" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface name="probes" internal="in_system_sources_probes_0.probes" />
+ <interface
+   name="source_clk"
+   internal="in_system_sources_probes_0.source_clk"
+   type="clock"
+   dir="end">
+  <port name="source_clk" internal="source_clk" />
+ </interface>
+ <interface
+   name="sources"
+   internal="in_system_sources_probes_0.sources"
+   type="conduit"
+   dir="end">
+  <port name="source" internal="source" />
+ </interface>
+ <module
+   name="in_system_sources_probes_0"
+   kind="altera_in_system_sources_probes"
+   version="20.1"
+   enabled="1"
+   autoexport="1">
+  <parameter name="create_source_clock" value="true" />
+  <parameter name="create_source_clock_enable" value="false" />
+  <parameter name="device_family" value="MAX 10" />
+  <parameter name="gui_use_auto_index" value="true" />
+  <parameter name="instance_id" value="SC64" />
+  <parameter name="probe_width" value="0" />
+  <parameter name="sld_instance_index" value="0" />
+  <parameter name="source_initial_value" value="0" />
+  <parameter name="source_width" value="1" />
+ </module>
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>

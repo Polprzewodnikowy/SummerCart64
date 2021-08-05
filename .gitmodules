@@ -2,7 +2,7 @@
 	path = sw/cic
 	url = https://github.com/ManCloud/UltraCIC-III.git
 	ignore = dirty
-[submodule "fw/v2/picorv32"]
-	path = fw/v2/picorv32
+[submodule "fw/picorv32"]
+	path = fw/picorv32
 	url = https://github.com/cliffordwolf/picorv32.git
 	ignore = dirty
