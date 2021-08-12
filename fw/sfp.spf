@@ -1,4 +1,4 @@
-<session jtag_chain="Arrow-USB-Blaster [AR5GOOMN]" jtag_device="@1: 10M08SA(.|ES)/10M08SC (0x031820DD)">
+<session jtag_chain="Arrow-USB-Blaster [AR5GOOMN]" jtag_device="@1: 10M08SA(.|ES)/10M08SC (0x031820DD)" sof_file="C:/Dev/SummerCollection/fw/output_files/SummerCart64.sof">
   <display_attributes is_max_probe_read_interval="1" is_write_immediate="1" probe_read_interval="1" probe_read_interval_units="s"/>
   <instance enable_logging="true" entity_name="SC64" is_auto_node="true" name="SC64">
     <node_ip_info instance_id="0" mfg_id="110" node_id="9" version="0"/>

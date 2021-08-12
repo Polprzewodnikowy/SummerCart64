@@ -26,7 +26,7 @@ typedef struct sc64_cart_registers {
     __IO reg_t USB_DMA_LEN;                 // USB transfer length for DMA to PC
     __IO reg_t DDIPL_ADDR;                  // 64 Disk Drive IPL location in SDRAM
     __IO reg_t SRAM_ADDR;                   // SRAM save emulation location in SDRAM
-    __IO reg_t __unused[1015];
+    __IO reg_t ___unused[1015];
     __IO reg_t USB_FIFO[1024];              // USB data from PC read FIFO memory end
 } sc64_cart_registers_t;
 
@@ -117,7 +117,7 @@ typedef struct sc64_sd_registers_s {
     __IO reg_t DMA_SCR;                     // DMA status and configuration
     __IO reg_t DMA_ADDR;                    // DMA current address
     __IO reg_t DMA_LEN;                     // DMA remaining length
-    __IO reg_t __unused[120];
+    __IO reg_t ___unused[120];
     __IO reg_t FIFO[128];                   // SD data path FIFO buffer
 } sc64_sd_registers_t;
 

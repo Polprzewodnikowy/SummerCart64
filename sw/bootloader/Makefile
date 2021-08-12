@@ -16,7 +16,7 @@ HEADER_NAME = header
 
 PROG_NAME = SummerLoader64
 
-ROM_SIZE = 90k
+ROM_SIZE = 1k
 
 SOURCE_DIR = src
 BUILD_DIR = build
@@ -31,7 +31,7 @@ VPATH = $(SRC_DIRS)
 
 COMMONFLAGS = -march=vr4300 -mtune=vr4300
 ASFLAGS = $(COMMONFLAGS)
-CFLAGS = $(COMMONFLAGS) -std=gnu99 -Os -Wall -I$(ROOTDIR)/mips64-elf/include $(INC_DIRS)
+CFLAGS = $(COMMONFLAGS) -std=gnu11 -Os -Wall -I$(ROOTDIR)/mips64-elf/include $(INC_DIRS)
 LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld -L./libsc64/lib -lsc64_libdragon
 N64_FLAGS = -l $(ROM_SIZE) -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME).z64
 N64_FLAGS_PADDED = -l 1028k -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME)_padded.z64

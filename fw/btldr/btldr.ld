@@ -1,8 +1,10 @@
 MEMORY
 {
     ram (rwx)   : org = 0x00000000, len = 24k
-    rom (rx)    : org = 0x01000000, len = 1k
+    rom (rx)    : org = 0xF0000000, len = 1k
 }
+
+__stack_pointer = ORIGIN(ram) + LENGTH(ram) - 16;
 
 ENTRY(reset_handler);
 
@@ -36,5 +38,3 @@ SECTIONS
 		__bss_end = .;
     } > ram AT > ram
 }
-
-__stack_pointer = ORIGIN(ram) + LENGTH(ram) - 16;

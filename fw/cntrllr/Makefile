@@ -9,28 +9,24 @@ FLAGS=\
 	-fverbose-asm \
 	-ffunction-sections \
 	-fdata-sections \
-	-Tbtldr.ld \
 	-Wl,--gc-sections \
 	-ffreestanding \
 	-nostartfiles \
 	-nostdlib
 
-all: btldr.bin btldr.sv print_size
+all: cntrllr.bin print_size
 
-btldr.elf: btldr.ld btldr.c
-	$(CROSS)gcc $(FLAGS) btldr.c -o btldr.elf
+cntrllr.elf: cntrllr.ld main.c rtc.c startup.S
+	$(CROSS)gcc $(FLAGS) -Tcntrllr.ld main.c rtc.c startup.S -o cntrllr.elf
 
-btldr.bin: btldr.elf
-	$(CROSS)objcopy -O binary btldr.elf btldr.bin
-
-btldr.sv: btldr.bin
-	python3 bin2sv.py btldr.bin btldr_template.sv btldr.sv
+cntrllr.bin: cntrllr.elf
+	$(CROSS)objcopy -O binary --gap-fill 0xFF --pad-to 0x6000 cntrllr.elf cntrllr.bin
 
 print_size:
 	@echo 'Size of target .elf file:'
-	$(CROSS)size -B btldr.elf
+	$(CROSS)size -B cntrllr.elf
 
 clean:
-	rm -f btldr.sv btldr.bin btldr.elf
+	rm -f cntrllr.bin cntrllr.elf
 
 .PHONY: clean

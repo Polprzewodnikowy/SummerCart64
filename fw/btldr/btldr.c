@@ -1,17 +1,17 @@
-#define LED     *((volatile unsigned int *) 0x80000000)
+#include "btldr.h"
 
-volatile int counter = 0;
+int reset_handler (void) {
+    io8_t pointer = &RAM;
 
-int main (void) {
+    while (!(UART_SR & UART_SR_TXE));
+    UART_TX = '>';
+
     while (1) {
-        if (counter++ == 0x000FFFFF) {
-            LED ^= 1;
-            counter = 0;
+        if (UART_SR & UART_SR_RXNE) {
+            *pointer++ = UART_RX;
+        }
+        if ((uint32_t)pointer == (24 * 1024)) {
+            __asm__("call 0");
         }
     }
-}
-
-void irq_handler(void) {
-    LED = 1;
-    while (1);
 }

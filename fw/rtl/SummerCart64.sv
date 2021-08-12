@@ -1,6 +1,11 @@
 module SummerCart64 (
     input i_clk,
 
+    output o_usb_clk,
+    output o_usb_cs,
+    input i_usb_miso,
+    inout [3:0] io_usb_miosi,
+
     output o_ftdi_clk,
     output o_ftdi_si,
     input i_ftdi_so,
@@ -8,7 +13,7 @@ module SummerCart64 (
 
     input i_n64_reset,
     input i_n64_nmi,
-    output o_n64_int,
+    output o_n64_irq,
 
     input i_n64_pi_alel,
     input i_n64_pi_aleh,
@@ -41,17 +46,35 @@ module SummerCart64 (
 
     output o_led,
 
-    inout [7:0] io_pmod
+    inout [0:0] io_pmod
 );
 
     if_system system_if (.in_clk(i_clk));
     system system_inst (.system_if(system_if));
 
-    if_cpu_soc cpu_soc_if ();
-    cpu_soc cpu_soc_inst (.system_if(system_if), .cpu_soc_if(cpu_soc_if));
+    wire [7:0] gpio_o;
+    wire [7:0] gpio_i;
+    wire [7:0] gpio_oe;
 
-    assign o_led = cpu_soc_if.peripherals.led;
-    assign io_rtc_scl = cpu_soc_if.peripherals.scl;
-    assign io_rtc_sda = cpu_soc_if.peripherals.sda;
+    assign o_led = gpio_oe[0] ? gpio_o[0] : 1'bZ;
+    assign o_n64_irq = gpio_oe[1] ? gpio_o[1] : 1'bZ;
+    assign gpio_i = {4'd0, i_n64_nmi, i_n64_reset, o_n64_irq, o_led};
+
+    cpu_soc cpu_soc_inst (
+        .*,
+        .gpio_o(gpio_o),
+        .gpio_i(gpio_i),
+        .gpio_oe(gpio_oe),
+        .usb_clk(o_usb_clk),
+        .usb_cs(o_usb_cs),
+        .usb_miso(i_usb_miso),
+        .usb_miosi(io_usb_miosi),
+        .ftdi_clk(o_ftdi_clk),
+        .ftdi_si(o_ftdi_si),
+        .ftdi_so(i_ftdi_so),
+        .ftdi_cts(i_ftdi_cts),
+        .scl(io_rtc_scl),
+        .sda(io_rtc_sda)
+    );
 
 endmodule

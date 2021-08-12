@@ -12,9 +12,9 @@ struct cart_header_s {
     uint32_t release_addr;
     uint32_t crc_1;
     uint32_t crc_2;
-    uint32_t __unused_1[2];
+    uint32_t ___unused_1[2];
     char name[20];
-    uint32_t __unused_2;
+    uint32_t ___unused_2;
     uint32_t format;
     char id[2];
     char country_code;
@@ -33,7 +33,7 @@ struct os_boot_config_s {
     uint32_t version;
     uint32_t mem_size;
     uint8_t app_nmi_buffer[64];
-    uint32_t __unused[37];
+    uint32_t ___unused[37];
     uint32_t mem_size_6105;
 } __attribute__((packed, aligned(1)));
 
