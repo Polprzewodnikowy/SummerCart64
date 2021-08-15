@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 18:00:40  August 15, 2021
+# Date created = 00:18:46  August 16, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -46,12 +46,13 @@ set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
-set_global_assignment -name VERILOG_FILE btldr/btldr.sv
 set_global_assignment -name VERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
+set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo8.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SIGNALTAP_FILE stp.stp
+set_global_assignment -name SYSTEMVERILOG_FILE btldr/btldr.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
@@ -60,13 +61,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/SummerCart64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/old/usb_ftdi_fsi.sv
-set_global_assignment -name SOURCE_FILE sfp.spf
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo8.qip
+set_global_assignment -name SLD_FILE db/stp_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
@@ -75,10 +73,10 @@ set_location_assignment PIN_7 -to io_usb_miosi[3]
 set_location_assignment PIN_8 -to io_usb_miosi[2]
 set_location_assignment PIN_10 -to io_usb_miosi[1]
 set_location_assignment PIN_11 -to io_usb_miosi[0]
-set_location_assignment PIN_12 -to o_ftdi_si
-set_location_assignment PIN_13 -to o_ftdi_clk
-set_location_assignment PIN_14 -to i_ftdi_so
-set_location_assignment PIN_15 -to i_ftdi_cts
+set_location_assignment PIN_12 -to i_uart_rxd
+set_location_assignment PIN_13 -to o_uart_txd
+set_location_assignment PIN_14 -to i_uart_cts
+set_location_assignment PIN_15 -to o_uart_rts
 set_location_assignment PIN_17 -to o_led
 set_location_assignment PIN_21 -to io_rtc_scl
 set_location_assignment PIN_22 -to io_rtc_sda
@@ -159,7 +157,7 @@ set_location_assignment PIN_132 -to io_flash_dq[3]
 set_location_assignment PIN_134 -to o_flash_cs
 set_location_assignment PIN_135 -to io_flash_dq[1]
 set_location_assignment PIN_136 -to io_flash_dq[2]
-set_location_assignment PIN_138 -to io_pmod[0]
+set_location_assignment PIN_138 -to i_usb_powered
 set_location_assignment PIN_140 -to i_usb_miso
 set_location_assignment PIN_141 -to o_usb_cs
 
@@ -223,6 +221,24 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 # --------------------------
 # start ENTITY(SummerCart64)
 
+	# Pin & Location Assignments
+	# ==========================
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[0]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[1]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[2]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[3]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[0]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[1]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[2]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[3]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[0]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[1]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[2]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[3]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
+
 	# Fitter Assignments
 	# ==================
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
@@ -234,11 +250,11 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_n64_irq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_usb_cs
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_usb_miosi[0]
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_usb_miosi[1]
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_usb_miosi[2]
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_usb_miosi[3]
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[0]
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[1]
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[2]
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[3]
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_miso
 
 	# start DESIGN_PARTITION(Top)
 	# ---------------------------
@@ -248,11 +264,10 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+		set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 
 	# end DESIGN_PARTITION(Top)
 	# -------------------------
 
 # end ENTITY(SummerCart64)
 # ------------------------
-set_global_assignment -name SLD_FILE db/stp_auto_stripped.stp
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

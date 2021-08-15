@@ -5,7 +5,8 @@ module cpu_usb (
     output usb_clk,
     output usb_cs,
     input usb_miso,
-    inout [3:0] usb_miosi
+    inout [3:0] usb_miosi,
+    input usb_powered
 );
 
     reg rx_flush;
@@ -66,6 +67,7 @@ module cpu_usb (
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
         .usb_miosi(usb_miosi),
+        .usb_powered(usb_powered),
 
         .rx_flush(rx_flush),
         .rx_empty(rx_empty),

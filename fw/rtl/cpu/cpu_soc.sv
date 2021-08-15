@@ -9,6 +9,7 @@ module cpu_soc (
     output usb_cs,
     input usb_miso,
     inout [3:0] usb_miosi,
+    input usb_powered,
 
     inout i2c_scl,
     inout i2c_sda
@@ -63,7 +64,8 @@ module cpu_soc (
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
-        .usb_miosi(usb_miosi)
+        .usb_miosi(usb_miosi),
+        .usb_powered(usb_powered)
     );
 
 endmodule

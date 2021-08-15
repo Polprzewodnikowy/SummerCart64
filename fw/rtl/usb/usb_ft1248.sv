@@ -5,6 +5,7 @@ module usb_ft1248 (
     output usb_cs,
     input usb_miso,
     inout [3:0] usb_miosi,
+    input usb_powered,
 
     input rx_flush,
     output rx_empty,
@@ -58,7 +59,6 @@ module usb_ft1248 (
         .wrreq(tx_write),
         .data(tx_wdata)
     );
-
 
     // FT1248 interface controller
 
