@@ -1,7 +1,7 @@
 MEMORY
 {
     ram (rwx)   : org = 0x00000000, len = 24k
-    rom (rx)    : org = 0xF0000000, len = 1k
+    rom (rx)    : org = 0x10000000, len = 1k
 }
 
 __stack_pointer = ORIGIN(ram) + LENGTH(ram) - 16;

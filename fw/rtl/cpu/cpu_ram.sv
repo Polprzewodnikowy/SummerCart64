@@ -1,18 +1,4 @@
-module cpu_ram (
-    if_system.sys system_if,
-    if_cpu_bus_out cpu_bus_if,
-    if_cpu_bus_in cpu_ram_if
-);
-
-    wire request;
-    wire [31:0] rdata;
-
-    cpu_bus_glue #(.ADDRESS(4'h0)) cpu_bus_glue_ram_inst (
-        .*,
-        .cpu_peripheral_if(cpu_ram_if),
-        .request(request),
-        .rdata(rdata)
-    );
+module cpu_ram(if_cpu_bus bus);
 
     wire bank;
     reg [3:0][7:0] ram_1 [0:4095];
@@ -20,24 +6,38 @@ module cpu_ram (
     reg [31:0] q_1, q_2;
     wire [31:0] q;
 
-    assign bank = cpu_bus_if.address[14];
-    assign rdata = bank ? q_2 : q_1;
+    assign bank = bus.address[14];
 
-    always_ff @(posedge system_if.clk) begin
-        q_1 <= ram_1[cpu_bus_if.address[13:2]];
-        if (request & !bank) begin
-            if (cpu_bus_if.wstrb[0]) ram_1[cpu_bus_if.address[13:2]][0] <= cpu_bus_if.wdata[7:0];
-            if (cpu_bus_if.wstrb[1]) ram_1[cpu_bus_if.address[13:2]][1] <= cpu_bus_if.wdata[15:8];
-            if (cpu_bus_if.wstrb[2]) ram_1[cpu_bus_if.address[13:2]][2] <= cpu_bus_if.wdata[23:16];
-            if (cpu_bus_if.wstrb[3]) ram_1[cpu_bus_if.address[13:2]][3] <= cpu_bus_if.wdata[31:24];
+    always_comb begin
+        bus.rdata = 32'd0;
+        if (bus.ack) begin
+            bus.rdata = q_1;
+            if (bank) bus.rdata = q_2;
+        end
+    end
+
+    always_ff @(posedge bus.clk) begin
+        bus.ack <= 1'b0;
+        if (bus.request) begin
+            bus.ack <= 1'b1;
+        end
+    end
+
+    always_ff @(posedge bus.clk) begin        
+        q_1 <= ram_1[bus.address[13:2]];
+        if (bus.request & !bank) begin
+            if (bus.wmask[0]) ram_1[bus.address[13:2]][0] <= bus.wdata[7:0];
+            if (bus.wmask[1]) ram_1[bus.address[13:2]][1] <= bus.wdata[15:8];
+            if (bus.wmask[2]) ram_1[bus.address[13:2]][2] <= bus.wdata[23:16];
+            if (bus.wmask[3]) ram_1[bus.address[13:2]][3] <= bus.wdata[31:24];
         end
 
-        q_2 <= ram_2[cpu_bus_if.address[12:2]];
-        if (request & bank) begin
-            if (cpu_bus_if.wstrb[0]) ram_2[cpu_bus_if.address[12:2]][0] <= cpu_bus_if.wdata[7:0];
-            if (cpu_bus_if.wstrb[1]) ram_2[cpu_bus_if.address[12:2]][1] <= cpu_bus_if.wdata[15:8];
-            if (cpu_bus_if.wstrb[2]) ram_2[cpu_bus_if.address[12:2]][2] <= cpu_bus_if.wdata[23:16];
-            if (cpu_bus_if.wstrb[3]) ram_2[cpu_bus_if.address[12:2]][3] <= cpu_bus_if.wdata[31:24];
+        q_2 <= ram_2[bus.address[12:2]];
+        if (bus.request & bank) begin
+            if (bus.wmask[0]) ram_2[bus.address[12:2]][0] <= bus.wdata[7:0];
+            if (bus.wmask[1]) ram_2[bus.address[12:2]][1] <= bus.wdata[15:8];
+            if (bus.wmask[2]) ram_2[bus.address[12:2]][2] <= bus.wdata[23:16];
+            if (bus.wmask[3]) ram_2[bus.address[12:2]][3] <= bus.wdata[31:24];
         end
     end
 

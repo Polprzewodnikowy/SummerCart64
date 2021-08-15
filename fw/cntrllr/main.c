@@ -7,8 +7,8 @@ volatile int counter = 0;
 
 void print (const char *text) {
     while (*text != '\0') {
-        while (!(UART_SR & UART_SR_TXE) && (!(UART_SR & UART_SR_RXNE)));
-        UART_TX = *text++;
+        while (!(UART_SR & UART_SR_TXE));
+        UART_DR = *text++;
     }
 }
 
@@ -77,7 +77,7 @@ __NAKED__ int main (void) {
         counter = 0;
 
         if (UART_SR & UART_SR_RXNE) {
-            rtc_new_data[index++] = UART_RX;
+            rtc_new_data[index++] = UART_DR;
             if (index == 7) {
                 index = 0;
                 rtc_set_time(rtc_new_data);

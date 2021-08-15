@@ -37,9 +37,9 @@ module system (if_system.pll system_if);
         .locked(locked)
     );
 
-    intel_snp intel_snp_inst (
-        .source(external_reset),
-        .source_clk(system_if.clk)
-    );
+    // intel_snp intel_snp_inst (
+    //     .source(external_reset),
+    //     .source_clk(system_if.clk)
+    // );
 
 endmodule

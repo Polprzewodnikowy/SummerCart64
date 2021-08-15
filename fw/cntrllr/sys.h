@@ -11,15 +11,14 @@
 typedef volatile uint8_t *      io8_t;
 typedef volatile uint32_t *     io32_t;
 
-#define I2C_SR                  (*((io8_t)  0xC0000000))
-#define I2C_DR                  (*((io8_t)  0xC0000004))
-#define UART_SR                 (*((io8_t)  0xD0000000))
-#define UART_RX                 (*((io8_t)  0xD0000004))
-#define UART_TX                 (*((io8_t)  0xD0000008))
-#define GPIO                    (*((io32_t) 0xE0000000))
-#define GPIO_O                  (*((io8_t)  0xE0000000))
-#define GPIO_I                  (*((io8_t)  0xE0000001))
-#define GPIO_OE                 (*((io8_t)  0xE0000002))
+#define GPIO                    (*((io32_t) 0x20000000))
+#define GPIO_O                  (*((io8_t)  0x20000000))
+#define GPIO_I                  (*((io8_t)  0x20000001))
+#define GPIO_OE                 (*((io8_t)  0x20000002))
+#define I2C_SR                  (*((io8_t)  0x30000000))
+#define I2C_DR                  (*((io8_t)  0x30000004))
+#define UART_SR                 (*((io8_t)  0x40000000))
+#define UART_DR                 (*((io8_t)  0x40000004))
 
 #define I2C_SR_START            (1 << 0)
 #define I2C_SR_STOP             (1 << 1)

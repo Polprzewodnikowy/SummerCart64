@@ -1,39 +1,35 @@
 module cpu_i2c (
-    if_system.sys system_if,
-    if_cpu_bus_out cpu_bus_if,
-    if_cpu_bus_in cpu_i2c_if,
+    if_cpu_bus bus,
 
-    inout scl,
-    inout sda
+    inout i2c_scl,
+    inout i2c_sda
 );
-
-    wire request;
-    wire [31:0] rdata;
-
-    cpu_bus_glue #(.ADDRESS(4'hC)) cpu_bus_glue_i2c_inst (
-        .*,
-        .cpu_peripheral_if(cpu_i2c_if),
-        .request(request),
-        .rdata(rdata)
-    );
 
     reg [1:0] state;
     reg mack;
     reg [8:0] trx_data;
 
     always_comb begin
-        case (cpu_bus_if.address[2])
-            0: rdata = {27'd0, |state, ~trx_data[0], mack, 2'b00};
-            1: rdata = {23'd0, trx_data[0], trx_data[8:1]};
-            default: rdata = 32'd0;
-        endcase
+        bus.rdata = 32'd0;
+        if (bus.ack) begin
+            case (bus.address[2])
+                0: bus.rdata = {27'd0, |state, ~trx_data[0], mack, 2'b00};
+                1: bus.rdata = {23'd0, trx_data[0], trx_data[8:1]};
+                default: bus.rdata = 32'd0;
+            endcase
+        end
     end
 
-    always_ff @(posedge system_if.clk) begin
-        if (system_if.reset) begin
+    always_ff @(posedge bus.clk) begin
+        bus.ack <= 1'b0;
+        if (bus.request) begin
+            bus.ack <= 1'b1;
+        end
+
+        if (bus.reset) begin
             mack <= 1'b0;
-        end else if (request && cpu_bus_if.wstrb[0] && !cpu_bus_if.address[2]) begin
-            mack <= cpu_bus_if.wdata[2];
+        end else if (bus.request && bus.wmask[0] && !bus.address[2]) begin
+            mack <= bus.wdata[2];
         end
     end
 
@@ -43,14 +39,14 @@ module cpu_i2c (
     wire clock_tick = &clock_div;
     wire [3:0] clock_phase = {4{clock_tick}} & clock_phase_gen;
 
-    always_ff @(posedge system_if.clk) begin
-        if (system_if.reset) begin
+    always_ff @(posedge bus.clk) begin
+        if (bus.reset) begin
             clock_div <= 6'd0;
         end else begin
             clock_div <= clock_div + 1'd1;
         end
 
-        if (system_if.reset || state == 2'd0) begin
+        if (bus.reset || state == 2'd0) begin
             clock_phase_gen <= 4'b0001;
         end else if (clock_tick) begin
             clock_phase_gen <= {clock_phase_gen[2:0], clock_phase_gen[3]};
@@ -63,13 +59,13 @@ module cpu_i2c (
     reg scl_o;
     reg sda_o;
 
-    assign scl = scl_o ? 1'bZ : 1'b0;
-    assign sda = sda_o ? 1'bZ : 1'b0;
+    assign i2c_scl = scl_o ? 1'bZ : 1'b0;
+    assign i2c_sda = sda_o ? 1'bZ : 1'b0;
 
-    always_ff @(posedge system_if.clk) begin
-        {sda_i_ff2, sda_i_ff1} <= {sda_i_ff1, sda};
+    always_ff @(posedge bus.clk) begin
+        {sda_i_ff2, sda_i_ff1} <= {sda_i_ff1, i2c_sda};
 
-        if (system_if.reset) begin
+        if (bus.reset) begin
             state <= 2'd0;
             scl_o <= 1'b1;
             sda_o <= 1'b1;
@@ -78,16 +74,16 @@ module cpu_i2c (
                 2'd0: begin
                     bit_counter <= 4'd0;
 
-                    if (request && cpu_bus_if.wstrb[0]) begin
-                        case (cpu_bus_if.address[2])
+                    if (bus.request && bus.wmask[0]) begin
+                        case (bus.address[2])
                             0: begin
-                                if (cpu_bus_if.wdata[1]) state <= 2'd2;
-                                if (cpu_bus_if.wdata[0]) state <= 2'd1;
+                                if (bus.wdata[1]) state <= 2'd2;
+                                if (bus.wdata[0]) state <= 2'd1;
                             end
 
                             1: begin
                                 state <= 2'd3;
-                                trx_data <= {cpu_bus_if.wdata[7:0], ~mack};
+                                trx_data <= {bus.wdata[7:0], ~mack};
                             end
                         endcase
                     end

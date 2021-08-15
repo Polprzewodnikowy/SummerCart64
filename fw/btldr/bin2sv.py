@@ -23,7 +23,7 @@ try:
         if (not line):
             break
         value = format(struct.unpack('<I', line)[0], '08x')
-        rom_formatted += f'\n            {index}: {var_name} = 32\'h{value};'
+        rom_formatted += f'\n                {index}: {var_name} = 32\'h{value};'
         index += 1
 
     sv_code.write(sv_template.read().format(rom_formatted=rom_formatted))
