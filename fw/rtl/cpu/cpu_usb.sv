@@ -1,23 +1,23 @@
 module cpu_usb (
-    if_system system_if,
+    if_system sys,
     if_cpu_bus bus,
 
     output usb_clk,
     output usb_cs,
     input usb_miso,
     inout [3:0] usb_miosi,
-    input usb_powered
+    input usb_pwren
 );
 
-    reg rx_flush;
-    wire rx_empty;
-    reg rx_read;
-    wire [7:0] rx_rdata;
+    logic rx_flush;
+    logic rx_empty;
+    logic rx_read;
+    logic [7:0] rx_rdata;
 
-    reg tx_flush;
-    wire tx_full;
-    reg tx_write;
-    reg [7:0] tx_wdata;
+    logic tx_flush;
+    logic tx_full;
+    logic tx_write;
+    logic [7:0] tx_wdata;
 
     always_comb begin
         bus.rdata = 32'd0;
@@ -61,13 +61,13 @@ module cpu_usb (
     end
 
     usb_ft1248 usb_ft1248_inst (
-        .system_if(system_if),
+        .sys(sys),
 
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
         .usb_miosi(usb_miosi),
-        .usb_powered(usb_powered),
+        .usb_pwren(usb_pwren),
 
         .rx_flush(rx_flush),
         .rx_empty(rx_empty),

@@ -76,8 +76,8 @@ __NAKED__ int main (void) {
         while (counter++ < 0x0003FFFF);
         counter = 0;
 
-        if (UART_SR & UART_SR_RXNE) {
-            rtc_new_data[index++] = UART_DR;
+        if (USB_SR & USB_SR_RXNE) {
+            rtc_new_data[index++] = USB_DR;
             if (index == 7) {
                 index = 0;
                 rtc_set_time(rtc_new_data);

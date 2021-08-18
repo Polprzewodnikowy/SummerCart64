@@ -1,19 +1,31 @@
-interface if_system (input in_clk);
+interface if_system (
+    input in_clk,
+    input n64_reset,
+    input n64_nmi
+);
 
     logic clk;
     logic sdram_clk;
     logic reset;
+    logic n64_soft_reset;
+    logic n64_hard_reset;
 
-    modport pll (
+    modport internal (
         input in_clk,
+        input n64_reset,
+        input n64_nmi,
         output clk,
         output sdram_clk,
-        output reset
+        output reset,
+        output n64_soft_reset,
+        output n64_hard_reset
     );
 
     modport sys (
         input clk,
-        input reset
+        input reset,
+        input n64_soft_reset,
+        input n64_hard_reset
     );
 
     modport sdram (
@@ -23,23 +35,34 @@ interface if_system (input in_clk);
 endinterface
 
 
-module system (if_system.pll system_if);
+module system (if_system.internal sys);
 
-    wire locked;
-    wire external_reset;
-
-    assign system_if.reset = ~locked | external_reset;
+    logic locked;
+    logic external_reset;
+    logic [1:0] n64_reset_ff;
+    logic [1:0] n64_nmi_ff;
 
     intel_pll intel_pll_inst (
-        .inclk0(system_if.in_clk),
-        .c0(system_if.clk),
-        .c1(system_if.sdram_clk),
+        .inclk0(sys.in_clk),
+        .c0(sys.clk),
+        .c1(sys.sdram_clk),
         .locked(locked)
     );
 
-    // intel_snp intel_snp_inst (
-    //     .source(external_reset),
-    //     .source_clk(system_if.clk)
-    // );
+    intel_snp intel_snp_inst (
+        .source(external_reset),
+        .source_clk(sys.clk)
+    );
+
+    always_ff @(posedge sys.clk) begin
+        n64_reset_ff <= {n64_reset_ff[0], sys.n64_reset};
+        n64_nmi_ff <= {n64_nmi_ff[0], sys.n64_nmi};
+    end
+
+    always_comb begin
+        sys.reset = ~locked | external_reset;
+        sys.n64_hard_reset <= ~n64_reset_ff[1];
+        sys.n64_soft_reset <= ~n64_nmi_ff[1];
+    end
 
 endmodule

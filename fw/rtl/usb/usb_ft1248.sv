@@ -1,11 +1,11 @@
 module usb_ft1248 (
-    if_system.sys system_if,
+    if_system.sys sys,
 
     output usb_clk,
     output usb_cs,
     input usb_miso,
     inout [3:0] usb_miosi,
-    input usb_powered,
+    input usb_pwren,
 
     input rx_flush,
     output rx_empty,
@@ -32,7 +32,7 @@ module usb_ft1248 (
     wire [7:0] tx_rdata;
 
     fifo8 fifo_8_rx_inst (
-        .clock(system_if.clk),
+        .clock(sys.clk),
         .sclr(rx_flush),
 
         .empty(rx_empty),
@@ -47,7 +47,7 @@ module usb_ft1248 (
     );
 
     fifo8 fifo_8_tx_inst (
-        .clock(system_if.clk),
+        .clock(sys.clk),
         .sclr(tx_flush),
 
         .empty(tx_empty),
@@ -86,8 +86,8 @@ module usb_ft1248 (
     reg [3:0] clock_divider;
     wire rising_edge = clock_divider[1];
 
-    always_ff @(posedge system_if.clk) begin
-        if (system_if.reset || state == S_TRY_RX || state == S_TRY_TX) begin
+    always_ff @(posedge sys.clk) begin
+        if (sys.reset || state == S_TRY_RX || state == S_TRY_TX) begin
             clock_divider <= 4'b0001;
         end else begin
             clock_divider <= {clock_divider[2:0], clock_divider[3]};
@@ -120,7 +120,7 @@ module usb_ft1248 (
         usb_miosi = miosi_output_enable ? miosi_output : 4'bZZZZ;
     end
 
-    always_ff @(posedge system_if.clk) begin
+    always_ff @(posedge sys.clk) begin
         clk_output <= clk_data;
         cs_output <= cs_data;
         miosi_input <= usb_miosi;
@@ -133,11 +133,11 @@ module usb_ft1248 (
 
     reg is_write;
 
-    always_ff @(posedge system_if.clk) begin
+    always_ff @(posedge sys.clk) begin
         rx_write <= 1'b0;
         tx_read <= 1'b0;
 
-        if (system_if.reset) begin
+        if (sys.reset) begin
             state <= S_TRY_RX;
             cs_data <= 1'b1;
             miosi_output_enable_data <= 1'b0;
