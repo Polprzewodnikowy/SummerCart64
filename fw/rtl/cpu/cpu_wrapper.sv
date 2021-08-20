@@ -1,20 +1,21 @@
-module cpu_wrapper #(
-    parameter [3:0] ENTRY_DEVICE = 4'h0
-) (
+module cpu_wrapper (
+    if_system.sys sys,
     if_cpu_bus.cpu bus
 );
 
-    typedef enum bit {S_IDLE, S_WAITING} e_bus_state;
+    typedef enum bit [0:0] {
+        S_IDLE,
+        S_WAITING
+    } e_bus_state;
 
     e_bus_state state;
 
-	wire mem_la_read;
-	wire mem_la_write;
+	logic mem_la_read;
+	logic mem_la_write;
 
-    always_ff @(posedge bus.clk) begin
+    always_ff @(posedge sys.clk) begin
         bus.request <= 1'b0;
-
-        if (bus.reset) begin
+        if (sys.reset) begin
             state <= S_IDLE;
         end else begin
             if (state == S_IDLE && (mem_la_read || mem_la_write)) begin
@@ -33,10 +34,10 @@ module cpu_wrapper #(
         .TWO_STAGE_SHIFT(0),
         .CATCH_MISALIGN(0),
         .CATCH_ILLINSN(0),
-        .PROGADDR_RESET({ENTRY_DEVICE, 28'h000_0000})
+        .PROGADDR_RESET({4'(sc64::ID_CPU_BOOTLOADER), 28'h000_0000})
     ) cpu_inst (
-        .clk(bus.clk),
-        .resetn(~bus.reset),
+        .clk(sys.clk),
+        .resetn(~sys.reset),
         .mem_addr(bus.address),
         .mem_wdata(bus.wdata),
         .mem_wstrb(bus.wmask),

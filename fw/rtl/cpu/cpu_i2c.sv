@@ -1,7 +1,8 @@
 module cpu_i2c (
+    if_system.sys sys,
     if_cpu_bus bus,
 
-    inout i2c_scl,
+    output i2c_scl,
     inout i2c_sda
 );
 
@@ -20,13 +21,13 @@ module cpu_i2c (
         end
     end
 
-    always_ff @(posedge bus.clk) begin
+    always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;
         if (bus.request) begin
             bus.ack <= 1'b1;
         end
 
-        if (bus.reset) begin
+        if (sys.reset) begin
             mack <= 1'b0;
         end else if (bus.request && bus.wmask[0] && !bus.address[2]) begin
             mack <= bus.wdata[2];
@@ -39,14 +40,14 @@ module cpu_i2c (
     wire clock_tick = &clock_div;
     wire [3:0] clock_phase = {4{clock_tick}} & clock_phase_gen;
 
-    always_ff @(posedge bus.clk) begin
-        if (bus.reset) begin
+    always_ff @(posedge sys.clk) begin
+        if (sys.reset) begin
             clock_div <= 6'd0;
         end else begin
             clock_div <= clock_div + 1'd1;
         end
 
-        if (bus.reset || state == 2'd0) begin
+        if (sys.reset || state == 2'd0) begin
             clock_phase_gen <= 4'b0001;
         end else if (clock_tick) begin
             clock_phase_gen <= {clock_phase_gen[2:0], clock_phase_gen[3]};
@@ -62,10 +63,10 @@ module cpu_i2c (
     assign i2c_scl = scl_o ? 1'bZ : 1'b0;
     assign i2c_sda = sda_o ? 1'bZ : 1'b0;
 
-    always_ff @(posedge bus.clk) begin
+    always_ff @(posedge sys.clk) begin
         {sda_i_ff2, sda_i_ff1} <= {sda_i_ff1, i2c_sda};
 
-        if (bus.reset) begin
+        if (sys.reset) begin
             state <= 2'd0;
             scl_o <= 1'b1;
             sda_o <= 1'b1;

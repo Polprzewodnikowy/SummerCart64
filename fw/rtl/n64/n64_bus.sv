@@ -1,20 +1,21 @@
-interface if_cpu_bus ();
+interface if_n64_bus ();
 
-    localparam [3:0] NUM_DEVICES = sc64::__ID_CPU_END;
+    localparam sc64::e_n64_id NUM_DEVICES = sc64::__ID_N64_END;
 
+    sc64::e_n64_id id;
     logic request;
     logic ack;
-    logic [3:0] wmask;
+    logic write;
     logic [31:0] address;
-    logic [31:0] wdata;
-    logic [31:0] rdata;
+    logic [15:0] wdata;
+    logic [15:0] rdata;
 
     logic device_ack [(NUM_DEVICES - 1):0];
-    logic [31:0] device_rdata [(NUM_DEVICES - 1):0];
+    logic [15:0] device_rdata [(NUM_DEVICES - 1):0];
 
     always_comb begin
         ack = 1'b0;
-        rdata = 32'd0;
+        rdata = 16'd0;
 
         for (integer i = 0; i < NUM_DEVICES; i++) begin
             ack = ack | device_ack[i];
@@ -22,10 +23,11 @@ interface if_cpu_bus ();
         end
     end
 
-    modport cpu (
+    modport n64 (
+        output id,
         output request,
         input ack,
-        output wmask,
+        output write,
         output address,
         output wdata,
         input rdata
@@ -37,13 +39,13 @@ interface if_cpu_bus ();
             logic device_request;
 
             always_comb begin
-                device_request = request && address[31:28] == n[3:0];
+                device_request = request && id == sc64::e_n64_id'(n);
             end
 
             modport device (
                 input .request(device_request),
                 output .ack(device_ack[n]),
-                input .wmask(wmask),
+                input .write(write),
                 input .address(address),
                 input .wdata(wdata),
                 output .rdata(device_rdata[n])

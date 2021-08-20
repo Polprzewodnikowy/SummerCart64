@@ -1,18 +1,13 @@
 module n64_pi (
     if_system.sys sys,
+    if_config.pi cfg,
+    if_n64_bus.n64 bus,
 
     input n64_pi_alel,
     input n64_pi_aleh,
     input n64_pi_read,
     input n64_pi_write,
-    inout [15:0] n64_pi_ad,
-
-    output request,
-    input ack,
-    output write,
-    output [31:0] address,
-    output [15:0] wdata,
-    input [15:0] rdata
+    inout [15:0] n64_pi_ad
 );
 
     // Control signals input synchronization
@@ -35,7 +30,6 @@ module n64_pi (
     logic pi_read;
     logic pi_read_delayed;
     logic pi_write;
-    logic pi_write_delayed;
 
     always_comb begin
         pi_reset = sys.n64_hard_reset;
@@ -43,8 +37,7 @@ module n64_pi (
         pi_alel = n64_pi_alel_ff[2];
         pi_read = n64_pi_read_ff[1];
         pi_read_delayed = n64_pi_read_ff[2];
-        pi_write = n64_pi_write_ff[1];
-        pi_write_delayed = n64_pi_write_ff[2];
+        pi_write = n64_pi_write_ff[2];
     end
 
     // PI bus state and event generator
@@ -91,10 +84,12 @@ module n64_pi (
     logic [15:0] n64_pi_ad_output_data_buffer;
     logic n64_pi_ad_output_enable;
     logic n64_pi_ad_output_enable_data;
+    
+    logic n64_pi_address_valid;
 
     always_comb begin
         n64_pi_ad = n64_pi_ad_output_enable ? n64_pi_ad_output : 16'hZZZZ;
-        n64_pi_ad_output_enable_data = !pi_reset && pi_mode == PI_MODE_VALID && !pi_read_delayed;
+        n64_pi_ad_output_enable_data = !pi_reset && pi_mode == PI_MODE_VALID && n64_pi_address_valid && !pi_read_delayed;
     end
 
     always_ff @(posedge sys.clk) begin
@@ -118,34 +113,81 @@ module n64_pi (
     logic pending_operation;
     logic pending_write;
 
+    sc64::e_n64_id next_id;
+    logic [25:0] next_offset;
+
     always_ff @(posedge sys.clk) begin
-        request <= 1'b0;
+        if (aleh_op) begin
+            n64_pi_address_valid <= 1'b0;
+            next_offset <= 32'd0;
+            if (cfg.dd_enabled) begin
+                if (n64_pi_ad_input == 16'h0500) begin
+                    n64_pi_address_valid <= 1'b1;
+                    next_id <= sc64::ID_N64_DDREGS;
+                end
+                if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
+                    n64_pi_address_valid <= 1'b1;
+                    next_id <= sc64::ID_N64_SDRAM;
+                    next_offset <= cfg.dd_offset;
+                end
+            end
+            if (n64_pi_ad_input >= 16'h0800 && n64_pi_ad_input < 16'h0802) begin
+                if (cfg.sram_enabled) begin
+                    n64_pi_address_valid <= 1'b1;
+                    next_id <= sc64::ID_N64_SDRAM;
+                    next_offset <= cfg.save_offset;
+                end else if (cfg.flashram_enabled) begin
+                    n64_pi_address_valid <= 1'b1;
+                    next_id <= sc64::ID_N64_FLASHRAM;
+                    if (cfg.flashram_read_mode) begin
+                        next_id <= sc64::ID_N64_SDRAM;
+                        next_offset <= cfg.save_offset;
+                    end
+                end
+            end
+            if (n64_pi_ad_input >= 16'h1000 && n64_pi_ad_input < 16'h1400) begin
+                n64_pi_address_valid <= 1'b1;
+                next_id <= cfg.sdram_switch ? sc64::ID_N64_SDRAM : sc64::ID_N64_BOOTLOADER;
+            end
+            if (n64_pi_ad_input == 16'h1FB0) begin
+                n64_pi_address_valid <= 1'b1;
+                next_id <= sc64::ID_N64_CPU;
+            end
+        end
+    end
+
+    always_ff @(posedge sys.clk) begin
+        bus.request <= 1'b0;
 
         if (sys.reset || sys.n64_hard_reset || sys.n64_soft_reset) begin
             state <= S_IDLE;
-            first_operation <= 1'b0;
             pending_operation <= 1'b0;
         end else begin
             case (state)
                 S_IDLE: begin
-                    if (aleh_op) address[31:16] <= n64_pi_ad_input;
-                    if (alel_op) address[15:0] <= {n64_pi_ad_input[15:1], 1'b0};
-                    if (alel_op || read_op || write_op || pending_operation) begin
+                    if (aleh_op) begin
+                        bus.address[31:16] <= n64_pi_ad_input;
+                    end
+                    if (alel_op) begin
+                        bus.address <= {bus.address[31:16], n64_pi_ad_input[15:1], 1'b0} + next_offset;
+                    end
+                    if (n64_pi_address_valid && (alel_op || read_op || write_op || pending_operation)) begin
                         state <= S_WAIT;
-                        request <= 1'b1;
-                        write <= write_op || (pending_operation && pending_write);
+                        bus.id <= next_id;
+                        bus.request <= 1'b1;
+                        bus.write <= write_op || (pending_operation && pending_write);
                         if (!alel_op && !(first_operation && write_op)) begin
-                            address[31:1] <= address[31:1] + 1'd1;
+                            bus.address[31:1] <= bus.address[31:1] + 1'd1;
                         end
-                        wdata <= n64_pi_ad_input;
+                        bus.wdata <= n64_pi_ad_input;
                         first_operation <= alel_op;
                     end
                 end
 
                 S_WAIT: begin
-                    if (ack) begin
+                    if (bus.ack) begin
                         state <= S_IDLE;
-                        n64_pi_ad_output_data_buffer <= rdata;
+                        n64_pi_ad_output_data_buffer <= bus.rdata;
                     end
                     if (read_op || write_op) begin
                         pending_operation <= 1'b1;
@@ -155,7 +197,6 @@ module n64_pi (
 
                 default: begin
                     state <= S_IDLE;
-                    first_operation <= 1'b0;
                     pending_operation <= 1'b0;
                 end
             endcase

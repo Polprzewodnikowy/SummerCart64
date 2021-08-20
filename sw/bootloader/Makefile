@@ -16,7 +16,7 @@ HEADER_NAME = header
 
 PROG_NAME = SummerLoader64
 
-ROM_SIZE = 32k
+ROM_SIZE = 90k
 
 SOURCE_DIR = src
 BUILD_DIR = build

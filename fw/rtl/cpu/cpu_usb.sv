@@ -19,6 +19,13 @@ module cpu_usb (
     logic tx_write;
     logic [7:0] tx_wdata;
 
+    always_ff @(posedge sys.clk) begin
+        bus.ack <= 1'b0;
+        if (bus.request) begin
+            bus.ack <= 1'b1;
+        end        
+    end
+
     always_comb begin
         bus.rdata = 32'd0;
         if (bus.ack) begin
@@ -30,17 +37,12 @@ module cpu_usb (
         end
     end
 
-    always_ff @(posedge bus.clk) begin
+    always_ff @(posedge sys.clk) begin
         rx_flush <= 1'b0;
         rx_read <= 1'b0;
 
         tx_flush <= 1'b0;
         tx_write <= 1'b0;
-
-        bus.ack <= 1'b0;
-        if (bus.request) begin
-            bus.ack <= 1'b1;
-        end
 
         if (bus.request) begin
             case (bus.address[2:2])
