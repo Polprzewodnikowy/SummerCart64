@@ -86,6 +86,8 @@ module n64_pi (
     logic n64_pi_ad_output_enable_data;
     
     logic n64_pi_address_valid;
+    logic pending_operation;
+    logic pending_write;
 
     always_comb begin
         n64_pi_ad = n64_pi_ad_output_enable ? n64_pi_ad_output : 16'hZZZZ;
@@ -99,6 +101,9 @@ module n64_pi (
         if (read_op) begin
             n64_pi_ad_output_data <= n64_pi_ad_output_data_buffer;
         end
+        if (pending_operation && bus.ack) begin
+            n64_pi_ad_output_data <= bus.rdata;
+        end
     end
 
     // Internal bus controller
@@ -110,8 +115,6 @@ module n64_pi (
 
     e_state state;
     logic first_operation;
-    logic pending_operation;
-    logic pending_write;
 
     sc64::e_n64_id next_id;
     logic [25:0] next_offset;
@@ -157,8 +160,6 @@ module n64_pi (
     end
 
     always_ff @(posedge sys.clk) begin
-        // bus.request <= 1'b0;
-
         if (sys.reset || sys.n64_hard_reset || sys.n64_soft_reset) begin
             state <= S_IDLE;
             bus.request <= 1'b0;
@@ -182,6 +183,7 @@ module n64_pi (
                         end
                         bus.wdata <= n64_pi_ad_input;
                         first_operation <= alel_op;
+                        pending_operation <= 1'b0;
                     end
                 end
 
@@ -195,12 +197,6 @@ module n64_pi (
                         pending_operation <= 1'b1;
                         pending_write <= write_op;
                     end
-                end
-
-                default: begin
-                    state <= S_IDLE;
-                    bus.request <= 1'b0;
-                    pending_operation <= 1'b0;
                 end
             endcase
         end

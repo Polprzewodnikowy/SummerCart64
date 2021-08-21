@@ -6,14 +6,14 @@
     <node_ip_info instance_id="0" mfg_id="110" node_id="0" version="6"/>
     <position_info>
       <single attribute="active tab" value="0"/>
-      <single attribute="data horizontal scroll position" value="757"/>
+      <single attribute="data horizontal scroll position" value="0"/>
       <single attribute="data vertical scroll position" value="0"/>
       <single attribute="setup horizontal scroll position" value="0"/>
       <single attribute="setup vertical scroll position" value="0"/>
       <single attribute="zoom level denominator" value="1"/>
-      <single attribute="zoom level numerator" value="2048"/>
+      <single attribute="zoom level numerator" value="1"/>
       <single attribute="zoom offset denominator" value="1"/>
-      <single attribute="zoom offset numerator" value="28"/>
+      <single attribute="zoom offset numerator" value="130048"/>
     </position_info>
     <signal_set global_temp="1" name="signal_set: 2021/08/21 02:17:34  #0">
       <clock name="system:system_inst|intel_pll:intel_pll_inst|altpll:altpll_component|clk[0]" polarity="posedge" tap_mode="classic"/>
@@ -488,7 +488,7 @@
               <node data_index="173" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_selected="false" is_storage_input="false" is_trigger_input="true" level-0="dont_care" name="o_sdram_ba[1]" pwr_level-0="dont_care" tap_mode="classic" trigger_index="173" type="unknown"/>
               <node data_index="172" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_selected="false" is_storage_input="false" is_trigger_input="true" level-0="dont_care" name="o_sdram_ba[0]" pwr_level-0="dont_care" tap_mode="classic" trigger_index="172" type="unknown"/>
             </node>
-            <node is_selected="true" level-0="alt_or" name="io_sdram_dq[15..0]" order="msb_to_lsb" state="collapse" storage-0="alt_or" storage-1="alt_or" storage-2="alt_or" type="bidir pin">
+            <node is_selected="false" level-0="alt_or" name="io_sdram_dq[15..0]" order="msb_to_lsb" state="collapse" storage-0="alt_or" storage-1="alt_or" storage-2="alt_or" type="bidir pin">
               <node data_index="6" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_selected="false" is_storage_input="false" is_trigger_input="true" level-0="dont_care" name="io_sdram_dq[15]" pwr_level-0="dont_care" tap_mode="classic" trigger_index="6" type="unknown"/>
               <node data_index="5" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_selected="false" is_storage_input="false" is_trigger_input="true" level-0="dont_care" name="io_sdram_dq[14]" pwr_level-0="dont_care" tap_mode="classic" trigger_index="5" type="unknown"/>
               <node data_index="4" duplicate_name_allowed="false" is_data_input="true" is_node_valid="true" is_selected="false" is_storage_input="false" is_trigger_input="true" level-0="dont_care" name="io_sdram_dq[13]" pwr_level-0="dont_care" tap_mode="classic" trigger_index="4" type="unknown"/>
@@ -1026,7 +1026,7 @@ trigger;]]>
     <single attribute="jtag widget visible" value="1"/>
     <single attribute="lock mode" value="0"/>
     <multi attribute="column width" size="23" value="34,34,452,74,146,78,95,96,98,98,88,88,110,101,101,101,101,101,101,101,101,107,78"/>
-    <multi attribute="frame size" size="2" value="1610,1412"/>
+    <multi attribute="frame size" size="2" value="3378,1417"/>
     <multi attribute="jtag widget size" size="2" value="348,135"/>
   </global_info>
 </session>

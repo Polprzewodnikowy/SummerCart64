@@ -1,7 +1,7 @@
 module cpu_soc (
     if_system.sys sys,
     if_config cfg,
-    if_dma.cpu dma,
+    if_dma dma,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,

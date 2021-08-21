@@ -49,10 +49,14 @@ module system (if_system.internal sys);
         .locked(locked)
     );
 
-    // intel_snp intel_snp_inst (
-    //     .source(external_reset),
-    //     .source_clk(sys.clk)
-    // );
+    generate
+        if (sc64::DEBUG_ENABLED) begin
+            intel_snp intel_snp_inst (
+                .source(external_reset),
+                .source_clk(sys.clk)
+            );
+        end
+    endgenerate
 
     always_ff @(posedge sys.clk) begin
         n64_reset_ff <= {n64_reset_ff[0], sys.n64_reset};

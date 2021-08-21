@@ -55,6 +55,7 @@ set_global_assignment -name SIGNALTAP_FILE stp.stp
 set_global_assignment -name SYSTEMVERILOG_FILE btldr/btldr.sv
 set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_ram.sv
@@ -64,6 +65,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv

@@ -8,7 +8,7 @@ module cpu_uart (
     output uart_rts
 );
 
-    localparam BAUD_GEN_VALUE = int'(100_000_000 / sc64::UART_BAUD_RATE) - 1'd1;
+    localparam BAUD_GEN_VALUE = int'(sc64::CLOCK_FREQUENCY / sc64::UART_BAUD_RATE) - 1'd1;
 
     typedef enum bit [1:0] {
         S_TRX_IDLE,

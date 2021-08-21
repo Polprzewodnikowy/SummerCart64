@@ -1,7 +1,7 @@
 module n64_sdram (
     if_system sys,
     if_n64_bus bus,
-    if_dma.device dma,
+    if_dma.memory dma,
 
     output sdram_cs,
     output sdram_ras,

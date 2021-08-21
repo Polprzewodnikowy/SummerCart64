@@ -1,7 +1,7 @@
 module n64_soc (
     if_system sys,
     if_config cfg,
-    if_dma.device dma,
+    if_dma.memory dma,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -49,7 +49,7 @@ module n64_soc (
         .sdram_dq(sdram_dq)
     );
 
-    memory_flash memory_flash_inst (
+    n64_bootloader n64_bootloader_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_BOOTLOADER].device)
     );
