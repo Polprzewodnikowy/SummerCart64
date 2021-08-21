@@ -19,14 +19,51 @@ module n64_sdram (
     logic [15:0] mem_rdata;
     logic [15:0] mem_wdata;
 
+    typedef enum bit [0:0] { 
+        S_IDLE,
+        S_WAIT
+    } e_state;
+
+    typedef enum bit [0:0] { 
+        T_BUS,
+        T_DMA
+    } e_bus_or_dma;
+
+    e_state state;
+    e_bus_or_dma bus_or_dma;
+
+    always_ff @(posedge sys.clk) begin
+        if (sys.reset) begin
+            state <= S_IDLE;
+            mem_request <= 1'b0;
+        end else begin
+            case (state)
+                S_IDLE: begin
+                    if (bus.request || dma.request) begin
+                        state <= S_WAIT;
+                        mem_request <= 1'b1;
+                        mem_write <= bus.request ? bus.write : dma.write;
+                        mem_address <= bus.request ? bus.address : dma.address;
+                        mem_wdata <= bus.request ? bus.wdata : dma.wdata;
+                        bus_or_dma <= bus.request ? T_BUS : T_DMA;
+                    end
+                end
+
+                S_WAIT: begin
+                    if (mem_ack) begin
+                        state <= S_IDLE;
+                        mem_request <= 1'b0;
+                    end
+                end
+            endcase
+        end
+    end
+
     always_comb begin
-        mem_request = bus.request || dma.request;
-        bus.ack = bus.request && mem_ack;
-        dma.ack = dma.request && mem_ack;
-        mem_write = (bus.request && bus.write) || (dma.request && dma.write);
-        mem_address = dma.request ? dma.address : bus.address;
-        mem_wdata = dma.request ? dma.wdata : bus.wdata;
+        bus.ack = bus_or_dma == T_BUS && mem_ack;
         bus.rdata = mem_rdata;
+
+        dma.ack = bus_or_dma == T_DMA && mem_ack;
         dma.rdata = mem_rdata;
     end
 

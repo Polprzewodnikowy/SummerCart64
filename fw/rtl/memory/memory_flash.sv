@@ -35,7 +35,7 @@ module memory_flash (
     e_state state;
 
     always_ff @(posedge sys.clk) begin
-        dummy_ack <= 1'b1;
+        dummy_ack <= 1'b0;
 
         if (sys.reset) begin
             state <= S_IDLE;

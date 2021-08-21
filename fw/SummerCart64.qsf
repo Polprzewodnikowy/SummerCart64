@@ -48,7 +48,8 @@ set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
 set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo8.qip
+# set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo8.qip
+set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SIGNALTAP_FILE stp.stp

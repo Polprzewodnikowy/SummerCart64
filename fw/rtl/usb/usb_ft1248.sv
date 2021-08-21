@@ -9,13 +9,13 @@ module usb_ft1248 (
 
     input rx_flush,
     output rx_empty,
-    output rx_almost_empty,
+    // output rx_almost_empty,
     input rx_read,
     output [7:0] rx_rdata,
 
     input tx_flush,
     output tx_full,
-    output tx_almost_full,
+    // output tx_almost_full,
     input tx_write,
     input [7:0] tx_wdata
 );
@@ -31,22 +31,22 @@ module usb_ft1248 (
     reg tx_read;
     wire [7:0] tx_rdata;
 
-    fifo8 fifo_8_rx_inst (
+    intel_fifo_8 fifo_8_rx_inst (
         .clock(sys.clk),
         .sclr(rx_flush),
 
         .empty(rx_empty),
-        .almost_empty(rx_almost_empty),
+        // .almost_empty(rx_almost_empty),
         .rdreq(rx_read),
         .q(rx_rdata),
 
         .full(rx_full),
-        .almost_full(rx_almost_full),
+        // .almost_full(rx_almost_full),
         .wrreq(rx_write),
         .data(rx_wdata)
     );
 
-    fifo8 fifo_8_tx_inst (
+    intel_fifo_8 fifo_8_tx_inst (
         .clock(sys.clk),
         .sclr(tx_flush),
 
@@ -55,7 +55,7 @@ module usb_ft1248 (
         .q(tx_rdata),
 
         .full(tx_full),
-        .almost_full(tx_almost_full),
+        // .almost_full(tx_almost_full),
         .wrreq(tx_write),
         .data(tx_wdata)
     );
