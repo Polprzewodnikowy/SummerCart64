@@ -62,13 +62,22 @@ module SummerCart64 (
 
     if_config cfg ();
 
+    if_dma dma ();
+
     system system_inst (
         .sys(sys)
+    );
+
+    intel_gpio_ddro sdram_clk_ddro (
+        .outclock(sys.sdram.sdram_clk),
+        .din({1'b0, 1'b1}),
+        .pad_out(o_sdram_clk)
     );
 
     n64_soc n64_soc_inst (
         .sys(sys),
         .cfg(cfg),
+        .dma(dma),
 
         .n64_pi_alel(i_n64_pi_alel),
         .n64_pi_aleh(i_n64_pi_aleh),
@@ -79,7 +88,6 @@ module SummerCart64 (
         .n64_si_clk(i_n64_si_clk),
         .n64_si_dq(io_n64_si_dq),
 
-        .sdram_clk(o_sdram_clk),
         .sdram_cs(o_sdram_cs),
         .sdram_ras(o_sdram_ras),
         .sdram_cas(o_sdram_cas),
@@ -92,6 +100,7 @@ module SummerCart64 (
     cpu_soc cpu_soc_inst (
         .sys(sys),
         .cfg(cfg),
+        .dma(dma),
 
         .gpio_o(gpio_o),
         .gpio_i(gpio_i),

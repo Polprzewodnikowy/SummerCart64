@@ -66,6 +66,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/SummerCart64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv

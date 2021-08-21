@@ -10,7 +10,7 @@ interface if_config ();
     logic [25:0] save_offset;
 
     always_comb begin
-        sdram_switch = 1'b0;
+        sdram_switch = 1'b1;
         sdram_writable = 1'b0;
         dd_enabled = 1'b1;
         sram_enabled = 1'b1;

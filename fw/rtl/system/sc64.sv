@@ -19,6 +19,8 @@ package sc64;
         __ID_CPU_END
     } e_cpu_id;
 
-    parameter UART_BAUD_RATE = 1_000_000;
+    parameter CLOCK_FREQUENCY   = 100_000_000;
+
+    parameter UART_BAUD_RATE    = 1_000_000;
 
 endpackage

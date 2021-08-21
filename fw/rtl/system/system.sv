@@ -49,10 +49,10 @@ module system (if_system.internal sys);
         .locked(locked)
     );
 
-    intel_snp intel_snp_inst (
-        .source(external_reset),
-        .source_clk(sys.clk)
-    );
+    // intel_snp intel_snp_inst (
+    //     .source(external_reset),
+    //     .source_clk(sys.clk)
+    // );
 
     always_ff @(posedge sys.clk) begin
         n64_reset_ff <= {n64_reset_ff[0], sys.n64_reset};

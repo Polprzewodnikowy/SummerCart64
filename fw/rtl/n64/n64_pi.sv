@@ -149,7 +149,7 @@ module n64_pi (
                 n64_pi_address_valid <= 1'b1;
                 next_id <= cfg.sdram_switch ? sc64::ID_N64_SDRAM : sc64::ID_N64_BOOTLOADER;
             end
-            if (n64_pi_ad_input == 16'h1FB0) begin
+            if (n64_pi_ad_input == 16'h1FFF) begin
                 n64_pi_address_valid <= 1'b1;
                 next_id <= sc64::ID_N64_CPU;
             end
@@ -157,10 +157,11 @@ module n64_pi (
     end
 
     always_ff @(posedge sys.clk) begin
-        bus.request <= 1'b0;
+        // bus.request <= 1'b0;
 
         if (sys.reset || sys.n64_hard_reset || sys.n64_soft_reset) begin
             state <= S_IDLE;
+            bus.request <= 1'b0;
             pending_operation <= 1'b0;
         end else begin
             case (state)
@@ -187,6 +188,7 @@ module n64_pi (
                 S_WAIT: begin
                     if (bus.ack) begin
                         state <= S_IDLE;
+                        bus.request <= 1'b0;
                         n64_pi_ad_output_data_buffer <= bus.rdata;
                     end
                     if (read_op || write_op) begin
@@ -197,6 +199,7 @@ module n64_pi (
 
                 default: begin
                     state <= S_IDLE;
+                    bus.request <= 1'b0;
                     pending_operation <= 1'b0;
                 end
             endcase

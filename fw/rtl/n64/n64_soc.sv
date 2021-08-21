@@ -1,6 +1,7 @@
 module n64_soc (
     if_system sys,
     if_config cfg,
+    if_dma.device dma,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -11,7 +12,6 @@ module n64_soc (
     input n64_si_clk,
     inout n64_si_dq,
 
-    output sdram_clk,
     output sdram_cs,
     output sdram_ras,
     output sdram_cas,
@@ -35,11 +35,11 @@ module n64_soc (
         .n64_pi_ad(n64_pi_ad)
     );
 
-    memory_sdram memory_sdram_inst (
+    n64_sdram n64_sdram_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_SDRAM].device),
+        .dma(dma),
 
-        .sdram_clk(sdram_clk),
         .sdram_cs(sdram_cs),
         .sdram_ras(sdram_ras),
         .sdram_cas(sdram_cas),

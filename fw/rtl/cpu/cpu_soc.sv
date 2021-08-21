@@ -1,6 +1,7 @@
 module cpu_soc (
     if_system.sys sys,
     if_config cfg,
+    if_dma.cpu dma,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -60,6 +61,7 @@ module cpu_soc (
     cpu_usb cpu_usb_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_USB].device),
+        .dma(dma),
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
