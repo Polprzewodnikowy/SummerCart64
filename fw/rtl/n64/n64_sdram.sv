@@ -73,7 +73,7 @@ module n64_sdram (
         .request(mem_request),
         .ack(mem_ack),
         .write(mem_write),
-        .address(mem_address),
+        .address(mem_address[25:0]),
         .rdata(mem_rdata),
         .wdata(mem_wdata),
 

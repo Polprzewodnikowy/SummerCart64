@@ -4,7 +4,7 @@ module memory_sdram (
     input request,
     output ack,
     input write,
-    input [31:0] address,
+    input [25:0] address,
     output [15:0] rdata,
     input [15:0] wdata,
 

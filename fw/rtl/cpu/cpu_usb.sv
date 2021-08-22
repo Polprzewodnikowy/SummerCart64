@@ -1,7 +1,7 @@
 module cpu_usb (
     if_system sys,
     if_cpu_bus bus,
-    if_dma.cpu dma,
+    if_dma dma,
 
     output usb_clk,
     output usb_cs,
@@ -20,86 +20,57 @@ module cpu_usb (
     logic tx_write;
     logic [7:0] tx_wdata;
 
-    // always_ff @(posedge sys.clk) begin
-    //     bus.ack <= 1'b0;
-    //     if (bus.request) begin
-    //         bus.ack <= 1'b1;
-    //     end        
-    // end
+    logic cpu_rx_read;
+    logic cpu_tx_write;
 
-    // always_comb begin
-    //     bus.rdata = 32'd0;
-    //     if (bus.ack) begin
-    //         case (bus.address[2:2])
-    //             0: bus.rdata = {30'd0, ~tx_full, ~rx_empty};
-    //             1: bus.rdata = {24'd0, rx_rdata};
-    //             default: bus.rdata = 32'd0;
-    //         endcase
-    //     end
-    // end
+    always_comb begin
+        dma.rx_empty = rx_empty;
+        rx_read = cpu_rx_read || dma.rx_read;
+        dma.rx_rdata = rx_rdata;
 
-    // always_ff @(posedge sys.clk) begin
-    //     rx_flush <= 1'b0;
-    //     rx_read <= 1'b0;
-
-    //     tx_flush <= 1'b0;
-    //     tx_write <= 1'b0;
-
-    //     if (bus.request) begin
-    //         case (bus.address[2:2])
-    //             2'd0: if (bus.wmask[0]) begin
-    //                 {tx_flush, rx_flush} <= bus.wdata[3:2];
-    //             end
-
-    //             2'd1: if (bus.wmask[0]) begin
-    //                 if (!tx_full) begin
-    //                     tx_write <= 1'b1;
-    //                     tx_wdata <= bus.wdata[7:0];
-    //                 end
-    //             end else begin
-    //                 rx_read <= 1'b1;
-    //             end
-    //         endcase
-    //     end
-    // end
-
-    typedef enum bit [0:0] { 
-        S_IDLE,
-        S_WAIT
-    } e_state;
-
-    e_state state;
-
-    logic byte_counter;
+        dma.tx_full = tx_full;
+        tx_write = cpu_tx_write || dma.tx_write;
+        tx_wdata = dma.tx_write ? dma.tx_wdata : bus.wdata[7:0];
+    end
 
     always_ff @(posedge sys.clk) begin
-        rx_read <= 1'b0;
+        bus.ack <= 1'b0;
+        if (bus.request) begin
+            bus.ack <= 1'b1;
+        end        
+    end
 
-        if (sys.reset) begin
-            dma.request <= 1'b0;
-            dma.write <= 1'b1;
-            dma.address <= 32'd0;
-            state <= S_IDLE;
-            byte_counter <= 1'b0;
-        end else begin
-            case (state)
-                S_IDLE: begin
-                    if (!rx_empty && !rx_read) begin
-                        byte_counter <= ~byte_counter;
-                        rx_read <= 1'b1;
-                        dma.wdata <= {dma.wdata[7:0], rx_rdata};
-                        if (byte_counter) begin
-                            dma.request <= 1'b1;
-                            state <= S_WAIT;
-                        end
+    always_comb begin
+        bus.rdata = 32'd0;
+        if (bus.ack) begin
+            case (bus.address[2:2])
+                0: bus.rdata = {30'd0, ~tx_full, ~rx_empty};
+                1: bus.rdata = {24'd0, rx_rdata};
+                default: bus.rdata = 32'd0;
+            endcase
+        end
+    end
+
+    always_ff @(posedge sys.clk) begin
+        rx_flush <= 1'b0;
+        cpu_rx_read <= 1'b0;
+
+        tx_flush <= 1'b0;
+        cpu_tx_write <= 1'b0;
+
+        if (bus.request) begin
+            case (bus.address[2:2])
+                2'd0: begin
+                    if (bus.wmask[0]) begin
+                        {tx_flush, rx_flush} <= bus.wdata[3:2];
                     end
                 end
 
-                S_WAIT: begin
-                    if (dma.ack) begin
-                        dma.address <= dma.address + 2'd2;
-                        dma.request <= 1'b0;
-                        state <= S_IDLE;
+                2'd1: begin
+                    if (bus.wmask[0]) begin
+                        cpu_tx_write <= 1'b1;
+                    end else begin
+                        cpu_rx_read <= 1'b1;
                     end
                 end
             endcase
@@ -120,10 +91,10 @@ module cpu_usb (
         .rx_read(rx_read),
         .rx_rdata(rx_rdata),
 
-        // .tx_flush(tx_flush),
-        // .tx_full(tx_full),
-        // .tx_write(tx_write),
-        // .tx_wdata(tx_wdata)
+        .tx_flush(tx_flush),
+        .tx_full(tx_full),
+        .tx_write(tx_write),
+        .tx_wdata(tx_wdata)
     );
 
 endmodule

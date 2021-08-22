@@ -61,7 +61,7 @@ module cpu_soc (
     cpu_usb cpu_usb_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_USB].device),
-        .dma(dma),
+        .dma(dma.at[sc64::ID_DMA_USB].device),
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
@@ -76,6 +76,12 @@ module cpu_soc (
         .uart_txd(uart_txd),
         .uart_cts(uart_cts),
         .uart_rts(uart_rts)
+    );
+
+    cpu_dma cpu_dma_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_DMA].device),
+        .dma(dma)
     );
 
 endmodule
