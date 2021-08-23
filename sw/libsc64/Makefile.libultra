@@ -1,9 +1,0 @@
-include $(ROOT)/usr/include/make/PRdefs
-
-LIB_NAME = libsc64_libultra
-
-LIB_BUILD_DIR = libultra
-
-CFLAGS += -I$(ROOT)/usr/include/nustd -DLIBULTRA
-
-include Makefile.common
