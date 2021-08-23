@@ -65,7 +65,7 @@ __NAKED__ int main (void) {
     tmp[1] = 0;
 
     GPIO_OE = (1 << 0);
-    GPIO_O = (1 << 0);
+    GPIO_O = 0; // (1 << 0);
 
     DMA_SCR = DMA_SCR_STOP;
     USB_SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_TX;
@@ -74,7 +74,7 @@ __NAKED__ int main (void) {
         arg1 = 0;
         arg2 = 0;
 
-        print("\r\nLoop start\r\n");
+        print("Loop start\r\n");
 
         for (int i = 0; i < 4; i++) {
             while (!(USB_SCR & USB_SCR_RXNE));
@@ -124,11 +124,6 @@ __NAKED__ int main (void) {
 
         while (DMA_SCR & DMA_SCR_BUSY);
 
-        // for (int i = 0; i < arg2; i++) {
-        //     while (!(USB_SCR & USB_SCR_RXNE));
-        //     data = USB_DR;
-        // }
-
         print("Finished DMA\r\n");
 
         for (int i = 0; i < 4; i++) {
@@ -140,10 +135,10 @@ __NAKED__ int main (void) {
             }
         }
 
-        print("Sent response ");
+        print("Sent response CMP");
         tmp[0] = cmd;
         print(tmp);
-        print("\r\n");
+        print("\r\n\r\n");
     }
 }
 
