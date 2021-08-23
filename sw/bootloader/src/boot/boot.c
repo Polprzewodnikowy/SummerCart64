@@ -23,7 +23,7 @@ static const struct crc32_to_cic_seed {
 static cart_header_t global_cart_header __attribute__((aligned(16)));
 
 
-cart_header_t *boot_load_cart_header(bool ddipl) {
+cart_header_t *boot_load_cart_header(void) {
     cart_header_t *cart_header_pointer = &global_cart_header;
 
     platform_pi_dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
@@ -73,10 +73,9 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
     }
 }
 
-void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type, uint32_t ddipl_override) {
+void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
     uint32_t is_x105_boot = (cic_seed == crc32_to_cic_seed[5].cic_seed);
     uint32_t is_ddipl_boot = (
-        ddipl_override || 
         (cic_seed == crc32_to_cic_seed[7].cic_seed) ||
         (cic_seed == crc32_to_cic_seed[8].cic_seed) ||
         (cic_seed == crc32_to_cic_seed[9].cic_seed)

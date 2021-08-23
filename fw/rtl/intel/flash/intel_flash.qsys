@@ -71,8 +71,8 @@
   <parameter name="SECTOR_ACCESS_MODE">Read only,Read only,Hidden,Read only,Read only</parameter>
   <parameter name="autoInitializationFileName">$${FILENAME}_onchip_flash_0</parameter>
   <parameter name="initFlashContent" value="true" />
-  <parameter name="initializationFileName">C:/Dev/SummerCollection/sw/bootloader/what/build/SummerLoader64.hex</parameter>
-  <parameter name="initializationFileNameForSim">C:/Dev/SummerCollection/sw/bootloader/what/build/SummerLoader64.hex</parameter>
+  <parameter name="initializationFileName">C:/Dev/SummerCollection/sw/bootloader/build/SummerLoader64.hex</parameter>
+  <parameter name="initializationFileNameForSim">C:/Dev/SummerCollection/sw/bootloader/build/SummerLoader64.hex</parameter>
   <parameter name="useNonDefaultInitFile" value="true" />
  </module>
  <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />

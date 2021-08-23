@@ -61,7 +61,7 @@ module n64_sdram (
 
     always_comb begin
         bus.ack = bus_or_dma == T_BUS && mem_ack;
-        bus.rdata = mem_rdata;
+        bus.rdata = bus.ack ? mem_rdata : 16'd0;
 
         dma.ack = bus_or_dma == T_DMA && mem_ack;
         dma.rdata = mem_rdata;

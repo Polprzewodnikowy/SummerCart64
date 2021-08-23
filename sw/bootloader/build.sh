@@ -1,9 +1,8 @@
 #!/bin/bash
-
+#--mount type=bind,src=`realpath "$(pwd)/../libsc64"`,target="/src/libsc64" \
 build_in_docker() {
     docker run -t \
         --mount type=bind,src=`realpath $(pwd)`,target="/src" \
-        --mount type=bind,src=`realpath "$(pwd)/../libsc64"`,target="/src/libsc64" \
         $1 /bin/bash -c "cd /src && make clean && make -f $2 all"
 }
 

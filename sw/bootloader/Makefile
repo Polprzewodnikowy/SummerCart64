@@ -24,7 +24,7 @@ BUILD_DIR = build
 SRC_DIRS = $(SOURCE_DIR) $(sort $(dir $(wildcard $(SOURCE_DIR)/*/.)))
 INC_DIRS = $(addprefix -I, . $(SRC_DIRS)) -I./libsc64/inc
 SRC_FILES = $(wildcard $(patsubst %, %/*.c, . $(SRC_DIRS)))
-IMG_FILES = $(wildcard $(patsubst %, %/*.png, . $(SRC_DIRS)))
+# IMG_FILES = $(wildcard $(patsubst %, %/*.png, . $(SRC_DIRS)))
 OBJ_FILES = $(addprefix $(BUILD_DIR)/, $(notdir $(IMG_FILES:.png=.o) $(SRC_FILES:.c=.o)))
 
 VPATH = $(SRC_DIRS)
@@ -32,7 +32,8 @@ VPATH = $(SRC_DIRS)
 COMMONFLAGS = -march=vr4300 -mtune=vr4300
 ASFLAGS = $(COMMONFLAGS)
 CFLAGS = $(COMMONFLAGS) -std=gnu11 -Os -Wall -I$(ROOTDIR)/mips64-elf/include $(INC_DIRS) -ffunction-sections -fdata-sections -Wl,--gc-sections
-LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld -L./libsc64/lib -lsc64_libdragon
+LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld
+#-L./libsc64/lib -lsc64_libdragon
 N64_FLAGS = -l $(ROM_SIZE) -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME).z64
 N64_FLAGS_PADDED = -l 1028k -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME)_padded.z64
 
@@ -55,11 +56,11 @@ $(BUILD_DIR)/$(PROG_NAME).elf: $(OBJ_FILES)
 $(BUILD_DIR)/%.o: %.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
-$(BUILD_DIR)/%.sprite: $(IMG_FILES)
-	$(MKSPRITE) 32 $< $@
+# $(BUILD_DIR)/%.sprite: $(IMG_FILES)
+# 	$(MKSPRITE) 32 $< $@
 
-$(BUILD_DIR)/%.o: $(BUILD_DIR)/%.sprite
-	$(OBJCOPY) -I binary -O elf32-bigmips -B mips:4000 --rename-section .data=.rodata $< $@
+# $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.sprite
+# 	$(OBJCOPY) -I binary -O elf32-bigmips -B mips:4000 --rename-section .data=.rodata $< $@
 
 make_output_dir:
 	$(shell mkdir ./$(BUILD_DIR) 2> /dev/null)

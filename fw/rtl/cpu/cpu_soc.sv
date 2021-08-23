@@ -1,6 +1,6 @@
 module cpu_soc (
     if_system.sys sys,
-    if_config cfg,
+    if_config.cpu cfg,
     if_dma dma,
 
     input [7:0] gpio_i,
@@ -82,6 +82,12 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_DMA].device),
         .dma(dma)
+    );
+
+    cpu_cfg cpu_cfg_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_CFG].device),
+        .cfg(cfg)
     );
 
 endmodule

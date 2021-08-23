@@ -27,6 +27,13 @@ typedef volatile uint32_t *     io32_t;
 #define DMA_MADDR               (*((io32_t) 0x60000004))
 #define DMA_ID_LEN              (*((io32_t) 0x60000008))
 #define SDRAM                   (*((io32_t) 0x68000000))
+#define CFG_SCR                 (*((io32_t) 0x70000000))
+#define CFG_DD_OFFSET           (*((io32_t) 0x70000004))
+#define CFG_SAVE_OFFSET         (*((io32_t) 0x70000008))
+#define CFG_COMMAND             (*((io8_t)  0x7000000C))
+#define CFG_ARG_1               (*((io32_t) 0x70000010))
+#define CFG_ARG_2               (*((io32_t) 0x70000014))
+#define CFG_RESPONSE            (*((io32_t) 0x70000018))
 
 #define I2C_SR_START            (1 << 0)
 #define I2C_SR_STOP             (1 << 1)
@@ -50,6 +57,9 @@ typedef volatile uint32_t *     io32_t;
 
 #define DMA_ID_USB              (0)
 #define DMA_ID_SD               (1)
+
+#define CFG_SCR_CPU_BUSY        (1 << 30)
+#define CFG_SCR_SDRAM_SWITCH    (1 << 0)
 
 
 #endif

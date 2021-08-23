@@ -154,7 +154,7 @@ module n64_pi (
             end
             if (n64_pi_ad_input == 16'h1FFF) begin
                 n64_pi_address_valid <= 1'b1;
-                next_id <= sc64::ID_N64_CPU;
+                next_id <= sc64::ID_N64_CFG;
             end
         end
     end

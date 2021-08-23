@@ -54,4 +54,10 @@ module n64_soc (
         .bus(bus.at[sc64::ID_N64_BOOTLOADER].device)
     );
 
+    n64_cfg n64_cfg_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_N64_CFG].device),
+        .cfg(cfg)
+    );
+
 endmodule

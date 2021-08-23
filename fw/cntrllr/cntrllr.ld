@@ -10,12 +10,7 @@ ENTRY(reset_handler)
 
 SECTIONS
 {
-    .metadata :
-    {
-        KEEP(*(.rodata.metadata));
-    }
-
-    .ram ORIGIN(ram) :
+    .ram :
     {
         . = ALIGN(4);
         *(.text.startup);
@@ -25,5 +20,6 @@ SECTIONS
         *(.bss .bss.* .sbss .sbss.*);
         . = ALIGN(4);
         *(.data .data.* .sdata .stada.*);
+        . = ALIGN(4);
     } > ram AT > ram
 }

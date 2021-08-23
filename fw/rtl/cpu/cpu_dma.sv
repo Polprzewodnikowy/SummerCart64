@@ -55,7 +55,7 @@ interface if_dma ();
         tx_full = 1'b0;
 
         for (integer i = 0; i < NUM_DEVICES; i++) begin
-            rx_rdata = rx_rdata | device_rx_rdata[i];//(device_rx_rdata[i] & {8{id == i[1:0]});
+            rx_rdata = rx_rdata | (id == i[1:0] ? device_rx_rdata[i] : 8'd0);
             rx_empty = rx_empty | (device_rx_empty[i] && id == i[1:0]);
             tx_full = tx_full | (device_tx_full[i] && id == i[1:0]);
         end
@@ -104,6 +104,7 @@ module cpu_dma (
     logic direction;
     logic [27:0] length;
     logic [15:0] rdata_buffer;
+    logic byte_counter;
 
     always_comb begin
         bus.rdata = 32'd0;
@@ -115,8 +116,6 @@ module cpu_dma (
             endcase
         end
     end
-
-    logic byte_counter;
 
     always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;

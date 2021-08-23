@@ -5,7 +5,7 @@ package sc64;
         ID_N64_BOOTLOADER,
         ID_N64_FLASHRAM,
         ID_N64_DDREGS,
-        ID_N64_CPU,
+        ID_N64_CFG,
         __ID_N64_END
     } e_n64_id;
 
@@ -17,6 +17,7 @@ package sc64;
         ID_CPU_USB,
         ID_CPU_UART,
         ID_CPU_DMA,
+        ID_CPU_CFG,
         __ID_CPU_END
     } e_cpu_id;
 
@@ -30,6 +31,6 @@ package sc64;
 
     parameter int UART_BAUD_RATE    = 32'd1_000_000;
 
-    parameter bit DEBUG_ENABLED     = 1'b1;
+    parameter bit DEBUG_ENABLED     = 1'b0;
 
 endpackage

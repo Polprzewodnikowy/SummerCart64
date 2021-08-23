@@ -1,5 +1,12 @@
 interface if_config ();
 
+    logic cpu_bootstrapped;
+    logic cpu_busy;
+    logic request;
+    logic [7:0] command;
+    logic [31:0] arg [0:1];
+    logic [31:0] response;
+    logic boot_write;
     logic sdram_switch;
     logic sdram_writable;
     logic dd_enabled;
@@ -8,17 +15,6 @@ interface if_config ();
     logic flashram_read_mode;
     logic [25:0] dd_offset;
     logic [25:0] save_offset;
-
-    always_comb begin
-        sdram_switch = 1'b1;
-        sdram_writable = 1'b0;
-        dd_enabled = 1'b1;
-        sram_enabled = 1'b1;
-        flashram_enabled = 1'b1;
-        flashram_read_mode = 1'b1;
-        dd_offset = 26'h3BE_0000;
-        save_offset = 26'h3FE_0000;
-    end
 
     modport pi (
         input sdram_switch,
@@ -29,6 +25,37 @@ interface if_config ();
         input flashram_read_mode,
         input dd_offset,
         input save_offset
+    );
+
+    modport flashram (
+        output flashram_read_mode
+    );
+
+    modport n64 (
+        input cpu_bootstrapped,
+        input cpu_busy,
+        output request,
+        output command,
+        output arg,
+        input response,
+        output boot_write
+    );
+
+    modport cpu (
+        output cpu_bootstrapped,
+        output cpu_busy,
+        input request,
+        input command,
+        input arg,
+        output response,
+        input boot_write,
+        output sdram_switch,
+        output sdram_writable,
+        output dd_enabled,
+        output sram_enabled,
+        output flashram_enabled,
+        output dd_offset,
+        output save_offset
     );
 
 endinterface
