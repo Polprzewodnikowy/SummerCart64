@@ -6,6 +6,8 @@ typedef struct sc64_cart_registers {
     __IO reg_t ARG[2];
     __IO reg_t RESPONSE;
     __IO reg_t BOOTSTRAP;
+    __IO reg_t ___unused;
+    __IO reg_t VERSION;
 } sc64_cfg_registers_t;
 
 #define SC64_CFG_BASE                       (0x1FFF0000)

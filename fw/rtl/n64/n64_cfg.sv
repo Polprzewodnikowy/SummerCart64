@@ -26,6 +26,9 @@ module n64_cfg (
                 9: bus.rdata = cfg.response[15:0];
                 10: bus.rdata = cfg.arg[0][31:16];
                 11: bus.rdata = cfg.arg[0][15:0];
+                // ...
+                14: bus.rdata = 16'h5343;
+                15: bus.rdata = 16'h7632;
                 default: bus.rdata = 16'd0;
             endcase
         end
