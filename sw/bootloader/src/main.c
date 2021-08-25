@@ -16,6 +16,19 @@ typedef struct sc64_cart_registers {
 #define SC64_CFG_SCR_CPU_BUSY               (1 << 30)
 
 #define CMD_SDRAM_SWITCH                    'S'
+#define CMD_DEBUG                           'D'
+
+void print_debug(uint32_t a1, uint32_t a2) {
+    
+    uint32_t scr = 0;
+    do {
+        scr = platform_pi_io_read(&SC64_CFG->SCR);
+    } while (scr & SC64_CFG_SCR_CPU_BUSY);
+
+    platform_pi_io_write(&SC64_CFG->ARG[0], a1);
+    platform_pi_io_write(&SC64_CFG->ARG[1], a2);
+    platform_pi_io_write(&SC64_CFG->COMMAND, (uint32_t) CMD_DEBUG);
+}
 
 int main(void) {
     OS_BOOT_CONFIG->tv_type = TV_NTSC;
@@ -40,6 +53,8 @@ int main(void) {
     cart_header_t *cart_header = boot_load_cart_header();
     uint16_t cic_seed = boot_get_cic_seed(cart_header);
     tv_type_t tv_type = boot_get_tv_type(cart_header);
+
+    print_debug(cic_seed << 16 | (tv_type & 0x03), cart_header->pi_conf);
 
     boot(cart_header, cic_seed, tv_type);
 }

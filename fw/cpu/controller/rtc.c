@@ -14,7 +14,7 @@ static const uint8_t rtc_bit_mask[7] = {
 
 
 static uint8_t i2c_is_busy (void) {
-    return (I2C_SR & I2C_SR_BUSY);
+    return (I2C_SCR & I2C_SCR_BUSY);
 }
 
 static void i2c_wait_busy (void) {
@@ -22,22 +22,22 @@ static void i2c_wait_busy (void) {
 }
 
 static uint8_t i2c_has_ack (void) {
-    return (I2C_SR & I2C_SR_ACK);
+    return (I2C_SCR & I2C_SCR_ACK);
 }
 
 static void i2c_start (void) {
     i2c_wait_busy();
-    I2C_SR = I2C_SR_START;
+    I2C_SCR = I2C_SCR_START;
 }
 
 static void i2c_stop (void) {
     i2c_wait_busy();
-    I2C_SR = I2C_SR_STOP;
+    I2C_SCR = I2C_SCR_STOP;
 }
 
 static uint8_t i2c_write (uint8_t data) {
     i2c_wait_busy();
-    I2C_SR = 0;
+    I2C_SCR = 0;
     I2C_DR = data;
     i2c_wait_busy();
     return i2c_has_ack();
@@ -45,7 +45,7 @@ static uint8_t i2c_write (uint8_t data) {
 
 static void i2c_read (uint8_t *data, uint8_t cfg) {
     i2c_wait_busy();
-    I2C_SR = cfg;
+    I2C_SCR = cfg;
     I2C_DR = 0xFF;
     i2c_wait_busy();
     *data = I2C_DR;
@@ -74,7 +74,7 @@ static uint8_t i2c_rx (uint8_t address, uint8_t *data, size_t length) {
     i2c_start();
     result |= i2c_write(RTC_ADDR | I2C_ADDR_READ);
     for (size_t i = 0; i < length; i++) {
-        i2c_read(data++, (i == (length - 1)) ? 0 : I2C_SR_MACK);
+        i2c_read(data++, (i == (length - 1)) ? 0 : I2C_SCR_MACK);
     }
     i2c_stop();
 

@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 16:40:13  August 18, 2021
+# Date created = 23:35:14  August 23, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -48,8 +48,8 @@ set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
 set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
-# set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo8.qip
 set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
+set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SIGNALTAP_FILE stp.stp
@@ -71,6 +71,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/SummerCart64.sv
@@ -302,6 +303,23 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 
 # end ENTITY(SummerCart64)
 # ------------------------
-set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 
+# ------------------------------
+# start ENTITY(altera_gpio_lite)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(altera_gpio_lite)
+# ----------------------------
+
+# -----------------------------
+# start ENTITY(intel_gpio_ddro)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(intel_gpio_ddro)
+# ---------------------------
+set_global_assignment -name SIGNALTAP_FILE output_files/signaltap.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

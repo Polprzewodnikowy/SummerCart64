@@ -33,7 +33,7 @@ cart_header_t *boot_load_cart_header(void) {
 }
 
 uint16_t boot_get_cic_seed(cart_header_t *cart_header) {
-    uint16_t cic_seed = crc32_to_cic_seed[3].cic_seed;
+    uint16_t cic_seed = crc32_to_cic_seed[7].cic_seed;
     uint32_t ipl3_crc32 = crc32_calculate(cart_header->boot_code, sizeof(cart_header->boot_code));
 
     for (size_t i = 0; i < ARRAY_ITEMS(crc32_to_cic_seed); i++) {
@@ -139,6 +139,11 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
     gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
     gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == TV_PAL) ? 341 : 340]);
+
+    print_debug((uint32_t) gpr_regs[CPU_REG_T3], (uint32_t) gpr_regs[CPU_REG_S3]);
+    print_debug((uint32_t) gpr_regs[CPU_REG_S4], (uint32_t) gpr_regs[CPU_REG_S5]);
+    print_debug((uint32_t) gpr_regs[CPU_REG_S6], (uint32_t) gpr_regs[CPU_REG_S7]);
+    print_debug((uint32_t) gpr_regs[CPU_REG_SP], (uint32_t) gpr_regs[CPU_REG_RA]);
 
     __asm__ (
         ".set noat \n\t"

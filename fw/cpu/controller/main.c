@@ -67,6 +67,10 @@ __NAKED__ int main (void) {
     GPIO_OE = (1 << 0);
     GPIO_O = 0; // (1 << 0);
 
+    CFG_SCR |= CFG_SCR_SRAM_EN | CFG_SCR_SDRAM_SWITCH | CFG_SCR_DD_EN;
+    CFG_DD_OFFSET = 0;//0x3BE0000;
+    CFG_SAVE_OFFSET = 0x3FE0000;
+
     DMA_SCR = DMA_SCR_STOP;
     USB_SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_TX;
 
@@ -156,6 +160,19 @@ __NAKED__ int main (void) {
                     CFG_SCR &= ~CFG_SCR_SDRAM_SWITCH;
                 }
             }
+            if (cmd == 'D') {
+                print_02hex(arg1 >> 24);
+                print_02hex(arg1 >> 16);
+                print_02hex(arg1 >> 8);
+                print_02hex(arg1 >> 0);
+                print(" ");
+                print_02hex(arg2 >> 24);
+                print_02hex(arg2 >> 16);
+                print_02hex(arg2 >> 8);
+                print_02hex(arg2 >> 0);
+                print("\r\n");
+            }
+            print("\r\n");
             CFG_RESPONSE = 0;
         }
     }

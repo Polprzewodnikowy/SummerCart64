@@ -42,6 +42,7 @@ module n64_cfg (
                 S_IDLE: begin
                     if (bus.request) begin
                         state <= S_WAIT;
+                        bus.ack <= 1'b1;
                         if (bus.write) begin
                             case (bus.address[4:1])
                                 // ...
@@ -65,7 +66,6 @@ module n64_cfg (
                 end
 
                 S_WAIT: begin
-                    bus.ack <= 1'b1;
                     state <= S_IDLE;
                 end
             endcase

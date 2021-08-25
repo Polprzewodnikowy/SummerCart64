@@ -54,10 +54,63 @@ module n64_soc (
         .bus(bus.at[sc64::ID_N64_BOOTLOADER].device)
     );
 
+    n64_dummy n64_flashram_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_N64_FLASHRAM].device)
+    );
+
+    n64_dummy n64_ddregs_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_N64_DDREGS].device)
+    );
+
     n64_cfg n64_cfg_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_CFG].device),
         .cfg(cfg)
     );
+
+endmodule
+
+
+module n64_dummy (
+    if_system.sys sys,
+    if_n64_bus bus
+);
+
+    typedef enum bit [0:0] {
+        S_IDLE,
+        S_WAIT
+    } e_state;
+
+    e_state state;
+
+    always_comb begin
+        bus.rdata = 16'h0000;
+        if (bus.ack) begin
+            bus.rdata = !bus.address[1] ? 16'h0180 : 16'h0000;
+        end
+    end
+
+    always_ff @(posedge sys.clk) begin
+        bus.ack <= 1'b0;
+
+        if (sys.reset) begin
+            state <= S_IDLE;
+        end else begin            
+            case (state)
+                S_IDLE: begin
+                    if (bus.request) begin
+                        state <= S_WAIT;
+                        bus.ack <= 1'b1;
+                    end
+                end
+
+                S_WAIT: begin
+                    state <= S_IDLE;
+                end
+            endcase
+        end
+    end
 
 endmodule
