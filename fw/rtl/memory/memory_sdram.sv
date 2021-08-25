@@ -203,7 +203,7 @@ module memory_sdram (
 
             S_BUSY: begin
                 if (ack) begin
-                    next_state <= S_ACTIVE;
+                    next_state = S_ACTIVE;
                 end
             end
 

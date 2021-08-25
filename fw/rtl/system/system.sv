@@ -65,8 +65,8 @@ module system (if_system.internal sys);
 
     always_comb begin
         sys.reset = ~locked | external_reset;
-        sys.n64_hard_reset <= ~n64_reset_ff[1];
-        sys.n64_soft_reset <= ~n64_nmi_ff[1];
+        sys.n64_hard_reset = ~n64_reset_ff[1];
+        sys.n64_soft_reset = ~n64_nmi_ff[1];
     end
 
 endmodule

@@ -113,6 +113,7 @@ module cpu_dma (
                 0: bus.rdata = {28'd0, state != S_IDLE, direction, 2'b00};
                 1: bus.rdata = dma.address;
                 2: bus.rdata = {2'b00, dma.id, length};
+                default: bus.rdata = 32'd0;
             endcase
         end
     end

@@ -48,12 +48,6 @@ module SummerCart64 (
     logic [7:0] gpio_i;
     logic [7:0] gpio_oe;
 
-    always_comb begin
-        o_led = gpio_oe[0] ? gpio_o[0] : 1'bZ;
-        o_n64_irq = gpio_oe[1] ? gpio_o[1] : 1'bZ;
-        gpio_i = {4'b0000, i_n64_nmi, i_n64_reset, o_n64_irq, o_led};
-    end
-
     if_system sys (
         .in_clk(i_clk),
         .n64_reset(i_n64_reset),
@@ -124,5 +118,14 @@ module SummerCart64 (
         .sd_cmd(io_sd_cmd),
         .sd_dat(io_sd_dat)
     );
+
+    always_comb begin
+        o_led = gpio_oe[0] ? gpio_o[0] : 1'bZ;
+        o_n64_irq = gpio_oe[1] ? gpio_o[1] : 1'bZ;
+    end
+
+    always_ff @(posedge sys.clk) begin
+        gpio_i <= {4'b0000, i_n64_nmi, i_n64_reset, o_n64_irq, o_led};
+    end
 
 endmodule
