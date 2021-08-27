@@ -101,6 +101,7 @@ module cpu_dma (
     } e_state;
 
     e_state state;
+    logic pending_stop;
     logic direction;
     logic [27:0] length;
     logic [15:0] rdata_buffer;
@@ -129,10 +130,17 @@ module cpu_dma (
 
         if (sys.reset) begin
             state <= S_IDLE;
+            pending_stop <= 1'b0;
             dma.request <= 1'b0;
         end else begin
+            if (bus.request && bus.address[3:2] == 0 && bus.wmask[0]) begin
+                pending_stop <= bus.wdata[1];
+            end
+
             case (state)
                 S_IDLE: begin
+                    pending_stop <= 1'b0;
+
                     if (bus.request) begin
                         case (bus.address[3:2])
                             0: if (bus.wmask[0]) begin
@@ -155,7 +163,7 @@ module cpu_dma (
                 end
 
                 S_FETCH: begin
-                    if (length != 28'd0) begin
+                    if (length != 28'd0 && !pending_stop) begin
                         if (direction) begin 
                             if (!dma.rx_empty && !dma.rx_read) begin
                                 dma.rx_read <= 1'b1;

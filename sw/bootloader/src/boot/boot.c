@@ -1,6 +1,7 @@
 #include "boot.h"
 #include "crc32.h"
 #include "n64_regs.h"
+// #include "sc64.h"
 
 
 static const struct crc32_to_cic_seed {
@@ -140,10 +141,9 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
     gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == TV_PAL) ? 341 : 340]);
 
-    print_debug((uint32_t) gpr_regs[CPU_REG_T3], (uint32_t) gpr_regs[CPU_REG_S3]);
-    print_debug((uint32_t) gpr_regs[CPU_REG_S4], (uint32_t) gpr_regs[CPU_REG_S5]);
-    print_debug((uint32_t) gpr_regs[CPU_REG_S6], (uint32_t) gpr_regs[CPU_REG_S7]);
-    print_debug((uint32_t) gpr_regs[CPU_REG_SP], (uint32_t) gpr_regs[CPU_REG_RA]);
+    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_T3], (uint32_t) gpr_regs[CPU_REG_S3], (uint32_t) gpr_regs[CPU_REG_S4]);
+    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_S5], (uint32_t) gpr_regs[CPU_REG_S6], (uint32_t) gpr_regs[CPU_REG_S7]);
+    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_SP], (uint32_t) gpr_regs[CPU_REG_RA], 0);
 
     __asm__ (
         ".set noat \n\t"

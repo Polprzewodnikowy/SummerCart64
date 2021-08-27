@@ -6,14 +6,14 @@ MEMORY
 __ram_size = LENGTH(ram);
 __stack_pointer = ORIGIN(ram) + LENGTH(ram) - 16;
 
-ENTRY(reset_handler)
+ENTRY(main)
 
 SECTIONS
 {
     .ram :
     {
         . = ALIGN(4);
-        *(.text.startup);
+        *(.text.main);
         . = ALIGN(4);
         *(.text .text* .rodata .rodata* .srodata .srodata*);
         . = ALIGN(4);

@@ -4,6 +4,17 @@ module n64_cfg (
     if_config.n64 cfg
 );
 
+    typedef enum bit [3:0] { 
+        R_SR,
+        R_COMMAND,
+        R_DATA_0_H,
+        R_DATA_0_L,
+        R_DATA_1_H,
+        R_DATA_1_L,
+        R_VERSION_H,
+        R_VERSION_L
+    } e_reg_id;
+
     typedef enum bit [0:0] { 
         S_IDLE,
         S_WAIT
@@ -15,20 +26,14 @@ module n64_cfg (
         bus.rdata = 16'd0;
         if (bus.ack) begin
             case (bus.address[4:1])
-                0: bus.rdata = {cfg.cpu_bootstrapped, cfg.cpu_busy, 14'd0};
-                // ...
-                3: bus.rdata = {8'd0, cfg.command};
-                4: bus.rdata = cfg.arg[0][31:16];
-                5: bus.rdata = cfg.arg[0][15:0];
-                6: bus.rdata = cfg.arg[1][31:16];
-                7: bus.rdata = cfg.arg[1][15:0];
-                8: bus.rdata = cfg.response[31:16];
-                9: bus.rdata = cfg.response[15:0];
-                10: bus.rdata = cfg.arg[0][31:16];
-                11: bus.rdata = cfg.arg[0][15:0];
-                // ...
-                14: bus.rdata = 16'h5343;
-                15: bus.rdata = 16'h7632;
+                R_SR: bus.rdata = {cfg.cpu_ready, cfg.cpu_busy, 14'd0};
+                R_COMMAND: bus.rdata = {8'd0, cfg.cmd};
+                R_DATA_0_H: bus.rdata = cfg.data[0][31:16];
+                R_DATA_0_L: bus.rdata = cfg.data[0][15:0];
+                R_DATA_1_H: bus.rdata = cfg.data[1][31:16];
+                R_DATA_1_L: bus.rdata = cfg.data[1][15:0];
+                R_VERSION_H: bus.rdata = sc64::SC64_VER[31:16];
+                R_VERSION_L: bus.rdata = sc64::SC64_VER[15:0];
                 default: bus.rdata = 16'd0;
             endcase
         end
@@ -36,8 +41,10 @@ module n64_cfg (
 
     always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;
-        cfg.request <= 1'b0;
-        cfg.boot_write <= 1'b0;
+        cfg.cmd_request <= 1'b0;
+
+        if (cfg.data_write[0]) cfg.data[0] <= cfg.wdata;
+        if (cfg.data_write[1]) cfg.data[1] <= cfg.wdata;
 
         if (sys.reset) begin
             state <= S_IDLE;
@@ -49,21 +56,14 @@ module n64_cfg (
                         bus.ack <= 1'b1;
                         if (bus.write) begin
                             case (bus.address[4:1])
-                                // ...
-                                3: begin
-                                    cfg.command <= bus.wdata[7:0];
-                                    cfg.request <= 1'b1;
+                                R_COMMAND: begin
+                                    cfg.cmd <= bus.wdata[7:0];
+                                    cfg.cmd_request <= 1'b1;
                                 end
-                                4: cfg.arg[0][31:16] <= bus.wdata;
-                                5: cfg.arg[0][15:0] <= bus.wdata;
-                                6: cfg.arg[1][31:16] <= bus.wdata;
-                                7: cfg.arg[1][15:0] <= bus.wdata;
-                                // ...
-                                10: cfg.arg[0][31:16] <= bus.wdata;
-                                11: begin
-                                    cfg.arg[0][15:0] <= bus.wdata;
-                                    cfg.boot_write <= 1'b1;
-                                end
+                                R_DATA_0_H: cfg.data[0][31:16] <= bus.wdata;
+                                R_DATA_0_L: cfg.data[0][15:0] <= bus.wdata;
+                                R_DATA_1_H: cfg.data[1][31:16] <= bus.wdata;
+                                R_DATA_1_L: cfg.data[1][15:0] <= bus.wdata;
                             endcase
                         end
                     end

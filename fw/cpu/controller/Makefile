@@ -17,8 +17,8 @@ FLAGS=\
 
 all: controller.bin print_size
 
-controller.elf: prv32_rwx.ld main.c rtc.c startup.S
-	@$(CROSS)gcc $(FLAGS) main.c rtc.c startup.S -o controller.elf
+controller.elf: prv32_rwx.ld main.c init.c process.c
+	@$(CROSS)gcc $(FLAGS) main.c init.c process.c -o controller.elf
 
 controller.bin: controller.elf
 	@$(CROSS)objcopy -O binary controller.elf tmp.bin

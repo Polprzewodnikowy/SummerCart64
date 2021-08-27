@@ -1,12 +1,12 @@
 interface if_config ();
 
-    logic cpu_bootstrapped;
+    logic cpu_ready;
     logic cpu_busy;
-    logic request;
-    logic [7:0] command;
-    logic [31:0] arg [0:1];
-    logic [31:0] response;
-    logic boot_write;
+    logic cmd_request;
+    logic [7:0] cmd;
+    logic [31:0] data [0:1];
+    logic [1:0] data_write;
+    logic [31:0] wdata;
     logic sdram_switch;
     logic sdram_writable;
     logic dd_enabled;
@@ -32,23 +32,23 @@ interface if_config ();
     );
 
     modport n64 (
-        input cpu_bootstrapped,
+        input cpu_ready,
         input cpu_busy,
-        output request,
-        output command,
-        output arg,
-        input response,
-        output boot_write
+        output cmd_request,
+        output cmd,
+        output data,
+        input data_write,
+        input wdata
     );
 
     modport cpu (
-        output cpu_bootstrapped,
+        output cpu_ready,
         output cpu_busy,
-        input request,
-        input command,
-        input arg,
-        output response,
-        input boot_write,
+        input cmd_request,
+        input cmd,
+        input data,
+        output data_write,
+        output wdata,
         output sdram_switch,
         output sdram_writable,
         output dd_enabled,

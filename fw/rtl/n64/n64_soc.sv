@@ -88,7 +88,7 @@ module n64_dummy (
     always_comb begin
         bus.rdata = 16'h0000;
         if (bus.ack) begin
-            bus.rdata = !bus.address[1] ? 16'h0180 : 16'h0000;
+            bus.rdata = !bus.address[1] ? 16'h0040 : 16'h0000;
         end
     end
 

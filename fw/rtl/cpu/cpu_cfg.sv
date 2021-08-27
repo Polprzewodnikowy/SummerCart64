@@ -9,13 +9,9 @@ module cpu_cfg (
         R_DD_OFFSET,
         R_SAVE_OFFSET,
         R_COMMAND,
-        R_ARG_1,
-        R_ARG_2,
-        R_RESPONSE,
-        R_BOOTSTRAP
+        R_DATA_0,
+        R_DATA_1
     } e_reg_id;
-
-    logic bootstrap_pending;
 
     always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;
@@ -29,10 +25,9 @@ module cpu_cfg (
         if (bus.ack) begin
             case (bus.address[4:2])
                 R_SCR: bus.rdata = {
-                    cfg.cpu_bootstrapped,
+                    cfg.cpu_ready,
                     cfg.cpu_busy,
-                    bootstrap_pending,
-                    24'd0,
+                    25'd0,
                     cfg.flashram_enabled,
                     cfg.sram_enabled,
                     cfg.dd_enabled,
@@ -41,18 +36,26 @@ module cpu_cfg (
                 };
                 R_DD_OFFSET: bus.rdata = {6'd0, cfg.dd_offset};
                 R_SAVE_OFFSET: bus.rdata = {6'd0, cfg.save_offset};
-                R_COMMAND: bus.rdata = {24'd0, cfg.command};
-                R_ARG_1: bus.rdata = cfg.arg[0];
-                R_ARG_2: bus.rdata = cfg.arg[1];
-                R_RESPONSE: bus.rdata = cfg.response;
-                R_BOOTSTRAP: bus.rdata = cfg.arg[0];
+                R_COMMAND: bus.rdata = {24'd0, cfg.cmd};
+                R_DATA_0: bus.rdata = cfg.data[0];
+                R_DATA_1: bus.rdata = cfg.data[1];
+                default: bus.rdata = 32'd0;
             endcase
+        end
+    end
+
+    always_comb begin
+        cfg.wdata = bus.wdata;
+        cfg.data_write = 2'b00;
+        if (bus.request && (&bus.wmask)) begin
+            cfg.data_write[0] = bus.address[4:2] == R_DATA_0;
+            cfg.data_write[1] = bus.address[4:2] == R_DATA_1;
         end
     end
 
     always_ff @(posedge sys.clk) begin
         if (sys.reset) begin
-            cfg.cpu_bootstrapped <= 1'b0;
+            cfg.cpu_ready <= 1'b0;
             cfg.cpu_busy <= 1'b0;
             cfg.sdram_switch <= 1'b0;
             cfg.sdram_writable <= 1'b0;
@@ -61,22 +64,20 @@ module cpu_cfg (
             cfg.flashram_enabled <= 1'b0;
             cfg.dd_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
-            bootstrap_pending <= 1'b0;
         end else begin
             if (sys.n64_soft_reset) begin
                 cfg.sdram_switch <= 1'b0;
+                cfg.sdram_writable <= 1'b0;
             end
-            if (cfg.request) begin
+            if (cfg.cmd_request) begin
                 cfg.cpu_busy <= 1'b1;
-            end
-            if (cfg.boot_write) begin
-                bootstrap_pending <= 1'b1;
             end
             if (bus.request) begin
                 case (bus.address[4:2])
                     R_SCR: begin
                         if (bus.wmask[3]) begin
-                            cfg.cpu_bootstrapped <= bus.wdata[31];
+                            cfg.cpu_ready <= bus.wdata[31];
+                            cfg.cpu_busy <= bus.wdata[30];
                         end
                         if (bus.wmask[0]) begin
                             {
@@ -98,19 +99,6 @@ module cpu_cfg (
                     R_SAVE_OFFSET: begin
                         if (&bus.wmask) begin
                             cfg.save_offset <= bus.wdata[25:0];
-                        end
-                    end
-
-                    R_RESPONSE: begin
-                        if (&bus.wmask) begin
-                            cfg.cpu_busy <= 1'b0;
-                            cfg.response <= bus.wdata;
-                        end
-                    end
-
-                    R_BOOTSTRAP: begin
-                        if (!(|bus.wmask)) begin
-                            bootstrap_pending <= 1'b0;
                         end
                     end
                 endcase

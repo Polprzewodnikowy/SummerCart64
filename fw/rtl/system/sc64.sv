@@ -27,6 +27,8 @@ package sc64;
         __ID_DMA_END
     } e_dma_id;
 
+    parameter bit [31:0] SC64_VER   = 32'h53437632;
+
     parameter int CLOCK_FREQUENCY   = 32'd100_000_000;
 
     parameter int UART_BAUD_RATE    = 32'd1_000_000;
