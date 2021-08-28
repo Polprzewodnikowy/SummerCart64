@@ -6,6 +6,10 @@
 #include <stdint.h>
 
 
+#define DEFAULT_SAVE_OFFSET         (0x03FE0000)
+#define DEFAULT_DD_OFFSET           (0x03BE0000)
+
+
 typedef volatile uint8_t            io8_t;
 typedef volatile uint32_t           io32_t;
 
@@ -111,7 +115,7 @@ typedef volatile struct cfg_regs {
 
 
 #define SDRAM_BASE                  (0x80000000)
-#define SDRAM                       (*((io32_t *) SDRAM_BASE)
+#define SDRAM                       (*((io32_t *) SDRAM_BASE))
 #define SDRAM_SIZE                  (64 * 1024 * 1024)
 
 

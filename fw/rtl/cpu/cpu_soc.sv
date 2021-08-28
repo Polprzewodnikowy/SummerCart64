@@ -2,6 +2,7 @@ module cpu_soc (
     if_system.sys sys,
     if_config.cpu cfg,
     if_dma dma,
+    if_sdram.cpu sdram,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -88,6 +89,12 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_CFG].device),
         .cfg(cfg)
+    );
+
+    cpu_sdram cpu_sdram_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_SDRAM].device),
+        .sdram(sdram)
     );
 
 endmodule

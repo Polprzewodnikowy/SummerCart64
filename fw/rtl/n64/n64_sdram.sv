@@ -2,6 +2,7 @@ module n64_sdram (
     if_system sys,
     if_n64_bus bus,
     if_dma.memory dma,
+    if_sdram.memory sdram,
 
     output sdram_cs,
     output sdram_ras,
@@ -24,13 +25,14 @@ module n64_sdram (
         S_WAIT
     } e_state;
 
-    typedef enum bit [0:0] { 
+    typedef enum bit [1:0] { 
         T_BUS,
-        T_DMA
-    } e_bus_or_dma;
+        T_DMA,
+        T_SDRAM
+    } e_source_request;
 
     e_state state;
-    e_bus_or_dma bus_or_dma;
+    e_source_request source_request;
 
     always_ff @(posedge sys.clk) begin
         if (sys.reset) begin
@@ -39,13 +41,25 @@ module n64_sdram (
         end else begin
             case (state)
                 S_IDLE: begin
-                    if (bus.request || dma.request) begin
+                    if (bus.request || sdram.request || dma.request) begin
                         state <= S_WAIT;
                         mem_request <= 1'b1;
-                        mem_write <= bus.request ? bus.write : dma.write;
-                        mem_address <= bus.request ? bus.address : dma.address;
-                        mem_wdata <= bus.request ? bus.wdata : dma.wdata;
-                        bus_or_dma <= bus.request ? T_BUS : T_DMA;
+                        if (bus.request) begin
+                            mem_write <= bus.write;
+                            mem_address <= bus.address;
+                            mem_wdata <= bus.wdata;
+                            source_request <= T_BUS;
+                        end else if (sdram.request) begin
+                            mem_write <= sdram.write;
+                            mem_address <= sdram.address;
+                            mem_wdata <= sdram.wdata;
+                            source_request <= T_SDRAM;
+                        end else if (dma.request) begin
+                            mem_write <= dma.write;
+                            mem_address <= dma.address;
+                            mem_wdata <= dma.wdata;
+                            source_request <= T_DMA;
+                        end
                     end
                 end
 
@@ -60,11 +74,14 @@ module n64_sdram (
     end
 
     always_comb begin
-        bus.ack = bus_or_dma == T_BUS && mem_ack;
+        bus.ack = source_request == T_BUS && mem_ack;
         bus.rdata = bus.ack ? mem_rdata : 16'd0;
 
-        dma.ack = bus_or_dma == T_DMA && mem_ack;
+        dma.ack = source_request == T_DMA && mem_ack;
         dma.rdata = mem_rdata;
+
+        sdram.ack = source_request == T_SDRAM && mem_ack;
+        sdram.rdata = mem_rdata;
     end
 
     memory_sdram memory_sdram_inst (

@@ -8,12 +8,14 @@ static const uint8_t err_token[3] = { 'E', 'R', 'R' };
 static uint8_t save_type = 0;
 static uint16_t cic_type = 0xFFFF;
 static uint8_t tv_type = 0xFF;
+static volatile uint32_t *save_pointer = &SDRAM + DEFAULT_SAVE_OFFSET;
 
 void process_usb (void);
 void process_cfg (void);
 void process_dd (void);
 void process_si (void);
 void process_uart (void);
+void process_rtc (void);
 void cfg_set_save_type (uint8_t type);
 void cfg_update_config (uint32_t *args);
 
@@ -24,6 +26,7 @@ void process (void) {
         process_dd();
         process_si();
         process_uart();
+        process_rtc();
     }
 }
 
@@ -182,6 +185,10 @@ void process_uart (void) {
     }
 }
 
+void process_rtc (void) {
+    
+}
+
 void cfg_update_config (uint32_t *args) {
     switch (args[0]) {
         case 0: {
@@ -263,5 +270,25 @@ void cfg_set_save_type (uint8_t type) {
         }
     }
 
+    save_pointer = &SDRAM + CFG->SAVE_OFFSET;
     save_type = type;
 }
+
+// void print (const char *text) {
+//     while (*text != '\0') {
+//         while (!(UART->SCR & UART_SCR_TXE));
+//         UART->DR = *text++;
+//     }
+// }
+
+// const char hex_char_map[16] = {
+//     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+// };
+
+// void print_02hex (unsigned char number) {
+//     char buffer[3];
+//     buffer[0] = hex_char_map[number >> 4];
+//     buffer[1] = hex_char_map[number & 0x0F];
+//     buffer[2] = '\0';
+//     print(buffer);
+// }
