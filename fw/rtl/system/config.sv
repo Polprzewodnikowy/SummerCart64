@@ -11,6 +11,7 @@ interface if_config ();
     logic sdram_writable;
     logic dd_enabled;
     logic sram_enabled;
+    logic sram_banked;
     logic flashram_enabled;
     logic flashram_read_mode;
     logic [25:0] dd_offset;
@@ -21,6 +22,7 @@ interface if_config ();
         input sdram_writable,
         input dd_enabled,
         input sram_enabled,
+        input sram_banked,
         input flashram_enabled,
         input flashram_read_mode,
         input dd_offset,
@@ -53,6 +55,7 @@ interface if_config ();
         output sdram_writable,
         output dd_enabled,
         output sram_enabled,
+        output sram_banked,
         output flashram_enabled,
         output dd_offset,
         output save_offset

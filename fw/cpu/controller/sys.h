@@ -104,7 +104,8 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_SDRAM_WRITABLE      (1 << 1)
 #define CFG_SCR_DD_EN               (1 << 2)
 #define CFG_SCR_SRAM_EN             (1 << 3)
-#define CFG_SCR_FLASHRAM_EN         (1 << 4)
+#define CFG_SCR_SRAM_BANKED         (1 << 4)
+#define CFG_SCR_FLASHRAM_EN         (1 << 5)
 #define CFG_SCR_CPU_BUSY            (1 << 30)
 #define CFG_SCR_CPU_READY           (1 << 31)
 

@@ -27,8 +27,9 @@ module cpu_cfg (
                 R_SCR: bus.rdata = {
                     cfg.cpu_ready,
                     cfg.cpu_busy,
-                    25'd0,
+                    24'd0,
                     cfg.flashram_enabled,
+                    cfg.sram_banked,
                     cfg.sram_enabled,
                     cfg.dd_enabled,
                     cfg.sdram_writable,
@@ -61,6 +62,7 @@ module cpu_cfg (
             cfg.sdram_writable <= 1'b0;
             cfg.dd_enabled <= 1'b0;
             cfg.sram_enabled <= 1'b0;
+            cfg.sram_banked <= 1'b0;
             cfg.flashram_enabled <= 1'b0;
             cfg.dd_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
@@ -82,11 +84,12 @@ module cpu_cfg (
                         if (bus.wmask[0]) begin
                             {
                                 cfg.flashram_enabled,
+                                cfg.sram_banked,
                                 cfg.sram_enabled,
                                 cfg.dd_enabled,
                                 cfg.sdram_writable,
                                 cfg.sdram_switch
-                            } <= bus.wdata[4:0];
+                            } <= bus.wdata[5:0];
                         end
                     end
 

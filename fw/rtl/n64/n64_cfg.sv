@@ -25,7 +25,7 @@ module n64_cfg (
     always_comb begin
         bus.rdata = 16'd0;
         if (bus.ack) begin
-            case (bus.address[4:1])
+            case (bus.address[3:1])
                 R_SR: bus.rdata = {cfg.cpu_ready, cfg.cpu_busy, 14'd0};
                 R_COMMAND: bus.rdata = {8'd0, cfg.cmd};
                 R_DATA_0_H: bus.rdata = cfg.data[0][31:16];
@@ -34,7 +34,6 @@ module n64_cfg (
                 R_DATA_1_L: bus.rdata = cfg.data[1][15:0];
                 R_VERSION_H: bus.rdata = sc64::SC64_VER[31:16];
                 R_VERSION_L: bus.rdata = sc64::SC64_VER[15:0];
-                default: bus.rdata = 16'd0;
             endcase
         end
     end
@@ -55,7 +54,7 @@ module n64_cfg (
                         state <= S_WAIT;
                         bus.ack <= 1'b1;
                         if (bus.write) begin
-                            case (bus.address[4:1])
+                            case (bus.address[3:1])
                                 R_COMMAND: begin
                                     cfg.cmd <= bus.wdata[7:0];
                                     cfg.cmd_request <= 1'b1;

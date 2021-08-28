@@ -182,49 +182,6 @@ void process_uart (void) {
     }
 }
 
-void cfg_set_save_type (uint8_t type) {
-    CFG->SCR &= ~(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_EN);
-
-    switch (type) {
-        case 0: {
-            break;
-        }
-        case 1: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - 512;
-            break;
-        }
-        case 2: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - 2048;
-            break;
-        }
-        case 3: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (32 * 1024);
-            CFG->SCR |= CFG_SCR_SRAM_EN;
-            break;
-        }
-        case 4: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (256 * 1024);
-            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
-            break;
-        }
-        case 5: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (3 * 32 * 1024);
-            CFG->SCR |= CFG_SCR_SRAM_EN;
-            break;
-        }
-        case 6: {
-            CFG->SAVE_OFFSET = 0x01618000;
-            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
-            break;
-        }
-        default: {
-            return;
-        }
-    }
-
-    save_type = type;
-}
-
 void cfg_update_config (uint32_t *args) {
     switch (args[0]) {
         case 0: {
@@ -264,4 +221,47 @@ void cfg_update_config (uint32_t *args) {
             break;
         }
     }
+}
+
+void cfg_set_save_type (uint8_t type) {
+    CFG->SCR &= ~(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN);
+
+    switch (type) {
+        case 0: {
+            break;
+        }
+        case 1: {
+            CFG->SAVE_OFFSET = SDRAM_SIZE - 512;
+            break;
+        }
+        case 2: {
+            CFG->SAVE_OFFSET = SDRAM_SIZE - 2048;
+            break;
+        }
+        case 3: {
+            CFG->SAVE_OFFSET = SDRAM_SIZE - (32 * 1024);
+            CFG->SCR |= CFG_SCR_SRAM_EN;
+            break;
+        }
+        case 4: {
+            CFG->SAVE_OFFSET = SDRAM_SIZE - (256 * 1024);
+            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            break;
+        }
+        case 5: {
+            CFG->SAVE_OFFSET = SDRAM_SIZE - (3 * 32 * 1024);
+            CFG->SCR |= CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN;
+            break;
+        }
+        case 6: {
+            CFG->SAVE_OFFSET = 0x01618000;
+            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            break;
+        }
+        default: {
+            return;
+        }
+    }
+
+    save_type = type;
 }
