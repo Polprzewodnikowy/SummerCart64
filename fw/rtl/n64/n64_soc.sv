@@ -3,6 +3,7 @@ module n64_soc (
     if_config cfg,
     if_dma.memory dma,
     if_sdram.memory sdram,
+    if_flashram.flashram flashram,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -56,9 +57,11 @@ module n64_soc (
         .bus(bus.at[sc64::ID_N64_BOOTLOADER].device)
     );
 
-    n64_dummy n64_flashram_inst (
+    n64_flashram n64_flashram_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_N64_FLASHRAM].device)
+        .bus(bus.at[sc64::ID_N64_FLASHRAM].device),
+        .cfg(cfg),
+        .flashram(flashram)
     );
 
     n64_dummy n64_ddregs_inst (

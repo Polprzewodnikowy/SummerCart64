@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 03:59:09  August 28, 2021
+# Date created = 17:57:25  August 28, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -58,6 +58,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flashram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_ram.sv
@@ -71,6 +72,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_cfg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_flashram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv
@@ -186,7 +188,7 @@ set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
 
 # Compiler Assignments
 # ====================
-set_global_assignment -name OPTIMIZATION_MODE BALANCED
+set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
 
 # Analysis & Synthesis Assignments
 # ================================
@@ -200,6 +202,7 @@ set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
 set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
+set_global_assignment -name TOP_LEVEL_ENTITY SummerCart64
 
 # Fitter Assignments
 # ==================

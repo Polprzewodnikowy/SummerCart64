@@ -6,19 +6,19 @@
 #include <stdint.h>
 
 
-#define DEFAULT_SAVE_OFFSET         (0x03FE0000)
-#define DEFAULT_DD_OFFSET           (0x03BE0000)
+#define DEFAULT_SAVE_OFFSET         (0x03FE0000UL)
+#define DEFAULT_DD_OFFSET           (0x03BE0000UL)
 
 
 typedef volatile uint8_t            io8_t;
 typedef volatile uint32_t           io32_t;
 
 
-#define RAM_BASE                    (0x00000000)
+#define RAM_BASE                    (0x00000000UL)
 #define RAM                         (*((io32_t *) RAM_BASE))
 
 
-#define BOOTLOADER_BASE             (0x10000000)
+#define BOOTLOADER_BASE             (0x10000000UL)
 #define BOOTLOADER                  (*((io32_t *) BOOTLOADER_BASE))
 
 
@@ -29,7 +29,7 @@ typedef volatile struct gpio_regs {
     io8_t __padding;
 } gpio_regs_t;
 
-#define GPIO_BASE                   (0x20000000)
+#define GPIO_BASE                   (0x20000000UL)
 #define GPIO                        ((gpio_regs_t *) GPIO_BASE)
 
 
@@ -38,7 +38,7 @@ typedef volatile struct i2c_regs {
     io32_t DR;
 } i2c_regs_t;
 
-#define I2C_BASE                    (0x30000000)
+#define I2C_BASE                    (0x30000000UL)
 #define I2C                         ((i2c_regs_t *) I2C_BASE)
 
 #define I2C_SCR_START               (1 << 0)
@@ -55,7 +55,7 @@ typedef volatile struct usb_regs {
     io8_t __padding[3];
 } usb_regs_t;
 
-#define USB_BASE                    (0x40000000)
+#define USB_BASE                    (0x40000000UL)
 #define USB                         ((usb_regs_t *) USB_BASE)
 
 #define USB_SCR_RXNE                (1 << 0)
@@ -70,7 +70,7 @@ typedef volatile struct uart_regs {
     io8_t __padding[3];
 } uart_regs_t;
 
-#define UART_BASE                   (0x50000000)
+#define UART_BASE                   (0x50000000UL)
 #define UART                        ((uart_regs_t *) UART_BASE)
 
 #define UART_SCR_RXNE               (1 << 0)
@@ -83,7 +83,7 @@ typedef volatile struct dma_regs {
     io32_t ID_LEN;
 } dma_regs_t;
 
-#define DMA_BASE                    (0x60000000)
+#define DMA_BASE                    (0x60000000UL)
 #define DMA                         ((dma_regs_t *) DMA_BASE)
 
 #define DMA_SCR_START               (1 << 0)
@@ -101,7 +101,7 @@ typedef volatile struct cfg_regs {
     io32_t DATA[3];
 } cfg_regs_t;
 
-#define CFG_BASE                    (0x70000000)
+#define CFG_BASE                    (0x70000000UL)
 #define CFG                         ((cfg_regs_t *) CFG_BASE)
 
 #define CFG_SCR_SDRAM_SWITCH        (1 << 0)
@@ -114,9 +114,25 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_CPU_READY           (1 << 31)
 
 
-#define SDRAM_BASE                  (0x80000000)
+#define SDRAM_BASE                  (0x80000000UL)
 #define SDRAM                       (*((io32_t *) SDRAM_BASE))
 #define SDRAM_SIZE                  (64 * 1024 * 1024)
+
+
+typedef volatile struct flashram_regs {
+    io32_t SCR;
+    io32_t __padding[31];
+    io32_t BUFFER[32];
+} flashram_regs_t;
+
+#define FLASHRAM_BASE               (0x90000000UL)
+#define FLASHRAM                    ((flashram_regs_t *) FLASHRAM_BASE)
+
+#define FLASHRAM_OPERATION_PENDING  (1 << 0)
+#define FLASHRAM_OPERATION_DONE     (1 << 1)
+#define FLASHRAM_WRITE_OR_ERASE     (1 << 2)
+#define FLASHRAM_SECTOR_OR_ALL      (1 << 3)
+#define FLASHRAM_SECTOR_BIT         (8)
 
 
 #endif

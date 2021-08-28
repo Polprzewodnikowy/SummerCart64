@@ -46,7 +46,7 @@ module cpu_sdram (
 
         sdram.write = current_word ? &bus.wmask[3:2] : &bus.wmask[1:0];
         sdram.address = {1'b0, bus.address[30:2], current_word, 1'b0};
-        sdram.wdata = current_word ? bus.wdata[31:16] : bus.wdata[15:0];
+        sdram.wdata = current_word ? bus.wdata[15:0] : bus.wdata[31:16];
     end
 
     always_ff @(posedge sys.clk) begin

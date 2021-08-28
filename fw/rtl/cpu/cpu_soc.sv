@@ -3,6 +3,7 @@ module cpu_soc (
     if_config.cpu cfg,
     if_dma dma,
     if_sdram.cpu sdram,
+    if_flashram.cpu flashram,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -95,6 +96,12 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_SDRAM].device),
         .sdram(sdram)
+    );
+
+    cpu_flashram cpu_flashram_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_FLASHRAM].device),
+        .flashram(flashram)
     );
 
 endmodule

@@ -19,6 +19,7 @@ package sc64;
         ID_CPU_DMA,
         ID_CPU_CFG,
         ID_CPU_SDRAM,
+        ID_CPU_FLASHRAM,
         __ID_CPU_END
     } e_cpu_id;
 

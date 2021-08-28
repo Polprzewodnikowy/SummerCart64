@@ -60,6 +60,8 @@ module SummerCart64 (
 
     if_sdram sdram ();
 
+    if_flashram flashram ();
+
     system system_inst (
         .sys(sys)
     );
@@ -75,6 +77,7 @@ module SummerCart64 (
         .cfg(cfg),
         .dma(dma),
         .sdram(sdram),
+        .flashram(flashram),
 
         .n64_pi_alel(i_n64_pi_alel),
         .n64_pi_aleh(i_n64_pi_aleh),
@@ -99,6 +102,7 @@ module SummerCart64 (
         .cfg(cfg),
         .dma(dma),
         .sdram(sdram),
+        .flashram(flashram),
 
         .gpio_o(gpio_o),
         .gpio_i(gpio_i),

@@ -114,20 +114,20 @@ module memory_sdram (
         end
     end
 
-    logic [15:0] wait_counter;
-    logic [15:0] refresh_counter;
+    logic [13:0] wait_counter;
+    logic [9:0] refresh_counter;
     logic pending_refresh;
 
     always_ff @(posedge sys.clk) begin
         if (sys.reset || state != next_state) begin
-            wait_counter <= 16'd0;
+            wait_counter <= 14'd0;
         end else begin
             wait_counter <= wait_counter + 1'd1;
         end
 
         if (sdram_next_cmd == CMD_REF) begin
-            refresh_counter <= 16'd0;
-        end else begin
+            refresh_counter <= 10'd0;
+        end else if (refresh_counter < 10'h3FF) begin
             refresh_counter <= refresh_counter + 1'd1;
         end
     end

@@ -8,7 +8,7 @@ static const uint8_t err_token[3] = { 'E', 'R', 'R' };
 static uint8_t save_type = 0;
 static uint16_t cic_type = 0xFFFF;
 static uint8_t tv_type = 0xFF;
-static volatile uint32_t *save_pointer = &SDRAM + DEFAULT_SAVE_OFFSET;
+static uint32_t *save_pointer = (uint32_t *) (SDRAM_BASE + DEFAULT_SAVE_OFFSET);
 
 void process_usb (void);
 void process_cfg (void);
@@ -16,8 +16,12 @@ void process_dd (void);
 void process_si (void);
 void process_uart (void);
 void process_rtc (void);
+void process_flashram (void);
 void cfg_set_save_type (uint8_t type);
 void cfg_update_config (uint32_t *args);
+
+// void print (const char *text);
+// void print_02hex (unsigned char number);
 
 void process (void) {
     while (1) {
@@ -27,6 +31,7 @@ void process (void) {
         process_si();
         process_uart();
         process_rtc();
+        process_flashram();
     }
 }
 
@@ -189,6 +194,32 @@ void process_rtc (void) {
     
 }
 
+void process_flashram (void) {
+    uint32_t scr = FLASHRAM->SCR;
+    volatile uint32_t *offset_pointer = save_pointer;
+    size_t length;
+
+    if (scr & FLASHRAM_OPERATION_PENDING) {
+        if (scr & FLASHRAM_WRITE_OR_ERASE) {
+            if (scr & FLASHRAM_SECTOR_OR_ALL) {
+                length = 128 * 1024;
+            } else {
+                offset_pointer += 32 * (scr >> FLASHRAM_SECTOR_BIT);
+                length = 16 * 1024;
+            }
+            for (size_t i = 0; i < (length / 4); i++) {
+                offset_pointer[i] = 0xFFFFFFFF;
+            }
+        } else {
+            offset_pointer += 32 * (scr >> FLASHRAM_SECTOR_BIT);
+            for (size_t i = 0; i < 32; i++) {
+                offset_pointer[i] &= FLASHRAM->BUFFER[i];
+            }
+        }
+        FLASHRAM->SCR = FLASHRAM_OPERATION_DONE;
+    }
+}
+
 void cfg_update_config (uint32_t *args) {
     switch (args[0]) {
         case 0: {
@@ -232,36 +263,37 @@ void cfg_update_config (uint32_t *args) {
 
 void cfg_set_save_type (uint8_t type) {
     CFG->SCR &= ~(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN);
+    uint32_t save_offset = 0;
 
     switch (type) {
         case 0: {
             break;
         }
         case 1: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - 512;
+            save_offset = SDRAM_SIZE - 512;
             break;
         }
         case 2: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - 2048;
+            save_offset = SDRAM_SIZE - 2048;
             break;
         }
         case 3: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (32 * 1024);
+            save_offset = SDRAM_SIZE - (32 * 1024);
             CFG->SCR |= CFG_SCR_SRAM_EN;
             break;
         }
         case 4: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (256 * 1024);
+            save_offset = SDRAM_SIZE - (256 * 1024);
             CFG->SCR |= CFG_SCR_FLASHRAM_EN;
             break;
         }
         case 5: {
-            CFG->SAVE_OFFSET = SDRAM_SIZE - (3 * 32 * 1024);
+            save_offset = SDRAM_SIZE - (3 * 32 * 1024);
             CFG->SCR |= CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN;
             break;
         }
         case 6: {
-            CFG->SAVE_OFFSET = 0x01618000;
+            save_offset = 0x01608000;
             CFG->SCR |= CFG_SCR_FLASHRAM_EN;
             break;
         }
@@ -270,8 +302,10 @@ void cfg_set_save_type (uint8_t type) {
         }
     }
 
-    save_pointer = &SDRAM + CFG->SAVE_OFFSET;
+    save_pointer = (uint32_t *) (SDRAM_BASE + save_offset);
     save_type = type;
+
+    CFG->SAVE_OFFSET = save_offset;
 }
 
 // void print (const char *text) {
