@@ -100,6 +100,28 @@ void process_usb (void) {
             } else if (cmd == 'C') {
                 cfg_update_config(args);
                 state = 3;
+            } else if (cmd == 'Q') {
+                if (USB->SCR & USB_SCR_TXE) {
+                    switch (current_byte) {
+                        case 0: USB->DR = cic_type >> 8; break;
+                        case 1: USB->DR = cic_type; break;
+                        case 2: USB->DR = ((tv_type & 0x3) << 4) | (save_type & 0x7); break;
+                        case 3: USB->DR = CFG->SCR; break;
+                        case 4: USB->DR = (CFG->SAVE_OFFSET >> 24); break;
+                        case 5: USB->DR = (CFG->SAVE_OFFSET >> 16); break;
+                        case 6: USB->DR = (CFG->SAVE_OFFSET >> 8); break;
+                        case 7: USB->DR = (CFG->SAVE_OFFSET >> 0); break;
+                        case 8: USB->DR = (CFG->DD_OFFSET >> 24); break;
+                        case 9: USB->DR = (CFG->DD_OFFSET >> 16); break;
+                        case 10: USB->DR = (CFG->DD_OFFSET >> 8); break;
+                        case 11: USB->DR = (CFG->DD_OFFSET >> 0); break;
+                    }
+                    current_byte += 1;
+                    if (current_byte == 12) {
+                        state = 3;
+                        current_byte = 0;
+                    }
+                }
             } else {
                 state = 3;
                 is_error = 1;

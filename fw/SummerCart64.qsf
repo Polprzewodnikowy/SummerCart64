@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 17:57:25  August 28, 2021
+# Date created = 21:34:30  August 28, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -196,7 +196,6 @@ set_global_assignment -name FAMILY "MAX 10"
 set_global_assignment -name DEVICE_FILTER_PACKAGE EQFP
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
-set_global_assignment -name TOP_LEVEL_ENTITY SummerCart64
 set_global_assignment -name PROJECT_IP_REGENERATION_POLICY ALWAYS_REGENERATE_IP
 set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
 set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
