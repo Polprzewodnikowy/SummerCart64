@@ -9,8 +9,8 @@ void init (void) {
     GPIO->OER = (1 << 0);
 
     CFG->SCR = CFG_SCR_SDRAM_SWITCH;
-    CFG->DD_OFFSET = 0x3BE0000;
-    CFG->SAVE_OFFSET = 0x3FE0000;
+    CFG->DD_OFFSET = DEFAULT_DD_OFFSET;
+    CFG->SAVE_OFFSET = DEFAULT_SAVE_OFFSET;
 
     while (!(UART->SCR & UART_SCR_TXE));
     UART->DR = '$';
