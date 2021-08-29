@@ -31,7 +31,6 @@ module cpu_wrapper (
     picorv32 #(
         .ENABLE_COUNTERS(0),
         .ENABLE_COUNTERS64(0),
-        .TWO_STAGE_SHIFT(0),
         .CATCH_MISALIGN(0),
         .CATCH_ILLINSN(0),
         .PROGADDR_RESET({4'(sc64::ID_CPU_BOOTLOADER), 28'h000_0000})

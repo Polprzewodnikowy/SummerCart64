@@ -24,13 +24,13 @@ bootloader.bin: bootloader.elf
 	@$(CROSS)objcopy -O binary bootloader.elf bootloader.bin
 
 cpu_bootloader.sv: bootloader.bin
-	@python3 bin2sv.py bootloader.bin cpu_bootloader_template.sv cpu_bootloader.sv
+	@python3 bin2sv.py bootloader.bin cpu_bootloader_template.sv ../../rtl/cpu/cpu_bootloader.sv
 
 print_size:
 	@echo 'Size of target .elf file:'
 	$(CROSS)size -B bootloader.elf
 
 clean:
-	@rm -f cpu_bootloader.sv bootloader.bin bootloader.elf
+	@rm -f bootloader.bin bootloader.elf
 
 .PHONY: clean

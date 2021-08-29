@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 21:34:30  August 28, 2021
+# Date created = 02:09:23  August 29, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -53,8 +53,8 @@ set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SIGNALTAP_FILE stp.stp
-set_global_assignment -name SYSTEMVERILOG_FILE cpu/bootloader/cpu_bootloader.sv
-set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
+set_global_assignment -name SYSTEMVERILOG_FILE cpu/picorv32/picorv32.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
