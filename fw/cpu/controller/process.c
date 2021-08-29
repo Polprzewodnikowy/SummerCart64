@@ -285,7 +285,7 @@ void cfg_update_config (uint32_t *args) {
 
 void cfg_set_save_type (uint8_t type) {
     CFG->SCR &= ~(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN);
-    uint32_t save_offset = 0;
+    uint32_t save_offset = DEFAULT_SAVE_OFFSET;
 
     switch (type) {
         case 0: {

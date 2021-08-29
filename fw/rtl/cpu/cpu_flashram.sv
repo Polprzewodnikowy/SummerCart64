@@ -68,7 +68,7 @@ module cpu_flashram (
         flashram.operation_done <= 1'b0;
 
         if (bus.request) begin
-            if (!bus.address[5] && bus.wmask[0]) begin
+            if (!bus.address[7] && bus.wmask[0]) begin
                 flashram.operation_done <= bus.wdata[1];
             end
         end

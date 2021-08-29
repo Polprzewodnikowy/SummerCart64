@@ -44,21 +44,25 @@ module n64_flashram (
     logic [7:0] flashram_command;
     logic flashram_erase_enabled;
 
-    logic [1:0][15:0] write_buffer [0:31];
+    logic [31:0] write_buffer [0:31];
     logic [1:0] write_buffer_wmask;
+    logic [15:0] high_buffer;
 
     always_comb begin
         write_buffer_wmask = 2'b00;
         if (bus.request && bus.write && !bus.address[16] && flashram_state == FS_BUFFER) begin
-            write_buffer_wmask[0] = bus.address[1];
-            write_buffer_wmask[1] = !bus.address[1];
+            write_buffer_wmask[0] = !bus.address[1];
+            write_buffer_wmask[1] = bus.address[1];
         end
     end
 
+    always_ff @(posedge sys.clk) begin
+        if (write_buffer_wmask[0]) high_buffer <= bus.wdata;
+    end
+
     always @(posedge sys.clk) begin
-        flashram.rdata <= {write_buffer[flashram.address][1], write_buffer[flashram.address][0]};
-        if (write_buffer_wmask[0]) write_buffer[bus.address[6:2]][0] <= bus.wdata;
-        if (write_buffer_wmask[1]) write_buffer[bus.address[6:2]][1] <= bus.wdata;
+        flashram.rdata <= write_buffer[flashram.address];
+        if (write_buffer_wmask[1]) write_buffer[bus.address[6:2]] <= {high_buffer, bus.wdata};
     end
 
     always_comb begin
