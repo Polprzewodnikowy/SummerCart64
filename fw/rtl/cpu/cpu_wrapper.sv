@@ -10,8 +10,8 @@ module cpu_wrapper (
 
     e_bus_state state;
 
-	logic mem_la_read;
-	logic mem_la_write;
+    logic mem_la_read;
+    logic mem_la_write;
 
     always_ff @(posedge sys.clk) begin
         bus.request <= 1'b0;
