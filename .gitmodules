@@ -1,7 +1,3 @@
-[submodule "fw/cpu/picorv32"]
-	path = fw/cpu/picorv32
-	url = https://github.com/cliffordwolf/picorv32.git
-	ignore = dirty
 [submodule "sw/cic"]
 	path = sw/cic
 	url = https://github.com/ManCloud/UltraCIC-III.git
