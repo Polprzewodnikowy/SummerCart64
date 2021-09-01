@@ -2,6 +2,8 @@ interface if_config ();
 
     logic cpu_ready;
     logic cpu_busy;
+    logic usb_waiting;
+    logic cmd_error;
     logic cmd_request;
     logic [7:0] cmd;
     logic [31:0] data [0:1];
@@ -36,6 +38,8 @@ interface if_config ();
     modport n64 (
         input cpu_ready,
         input cpu_busy,
+        input usb_waiting,
+        input cmd_error,
         output cmd_request,
         output cmd,
         output data,
@@ -46,6 +50,8 @@ interface if_config ();
     modport cpu (
         output cpu_ready,
         output cpu_busy,
+        output usb_waiting,
+        output cmd_error,
         input cmd_request,
         input cmd,
         input data,

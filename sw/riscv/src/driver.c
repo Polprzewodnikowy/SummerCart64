@@ -1,0 +1,257 @@
+#include "driver.h"
+#include "sys.h"
+
+
+// DMA
+
+bool dma_start (uint32_t address, uint32_t length, e_dma_id_t id, e_dma_dir_t dir) {
+    if (DMA->SCR & DMA_SCR_BUSY) {
+        return false;
+    }
+
+    DMA->MADDR = address;
+    DMA->ID_LEN = ((id & 0x03) << 30) | (length & 0x3FFFFFFF);
+    DMA->SCR = ((dir == DMA_DIR_TO_SDRAM) ? DMA_SCR_DIR : 0) | DMA_SCR_START;
+
+    return true;
+}
+
+void dma_abort (void) {
+    DMA->SCR = DMA_SCR_STOP;
+}
+
+bool dma_busy (void) {
+    return DMA->SCR & DMA_SCR_BUSY;
+}
+
+
+// FLASHRAM
+
+e_flashram_op_t flashram_get_pending_operation (void) {
+    uint32_t scr = FLASHRAM->SCR;
+    
+    if (!(scr & FLASHRAM_OPERATION_PENDING)) {
+        return FLASHRAM_OP_NONE;
+    }
+
+    if (scr & FLASHRAM_WRITE_OR_ERASE) {
+        if (scr & FLASHRAM_SECTOR_OR_ALL) {
+            return FLASHRAM_OP_ERASE_ALL;
+        } else {
+            return FLASHRAM_OP_ERASE_SECTOR;
+        }
+    } else {
+        return FLASHRAM_OP_WRITE_PAGE;
+    }
+}
+
+uint32_t flashram_get_operation_length (e_flashram_op_t op) {
+    switch (op) {
+        case FLASHRAM_OP_ERASE_ALL: return FLASHRAM_SIZE;
+        case FLASHRAM_OP_ERASE_SECTOR: return FLASHRAM_SECTOR_SIZE;
+        case FLASHRAM_OP_WRITE_PAGE: return FLASHRAM_PAGE_SIZE;
+        default: return 0;
+    }
+}
+
+void flashram_set_operation_done (void) {
+    FLASHRAM->SCR = FLASHRAM_OPERATION_DONE;
+}
+
+uint32_t flashram_get_page (void) {
+    return (FLASHRAM->SCR >> FLASHRAM_PAGE_BIT);
+}
+
+volatile uint32_t * flashram_get_page_buffer (void) {
+    return FLASHRAM->BUFFER;
+}
+
+
+// USB
+
+bool usb_rx_byte (uint8_t *data) {
+    if (!(USB->SCR & USB_SCR_RXNE)) {
+        return false;
+    }
+
+    *data = USB->DR;
+
+    return true;
+}
+
+bool usb_rx_word (uint32_t *data) {
+    static uint8_t current_byte = 0;
+    static uint32_t buffer = 0;
+    uint8_t tmp;
+
+    while (usb_rx_byte(&tmp)) {
+        buffer = (buffer << 8) | tmp;
+        current_byte += 1;
+        if (current_byte == 4) {
+            current_byte = 0;
+            *data = buffer;
+            buffer = 0;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool usb_tx_byte (uint8_t data) {
+    if (!(USB->SCR & USB_SCR_TXE)) {
+        return false;
+    }
+
+    USB->DR = data;
+
+    return true;
+}
+
+bool usb_tx_word (uint32_t data) {
+    static uint8_t current_byte = 0;
+    while (usb_tx_byte(data >> ((3 - current_byte) * 8))) {
+        current_byte += 1;
+        if (current_byte == 4) {
+            current_byte = 0;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void usb_flush_rx (void) {
+    USB->SCR = USB_SCR_FLUSH_RX;
+}
+
+void usb_flush_tx (void) {
+    USB->SCR = USB_SCR_FLUSH_TX;
+}
+
+
+// CFG
+
+uint32_t cfg_get_status (void) {
+    return CFG->SCR;
+}
+
+void cfg_set_cpu_ready (bool enabled) {
+    if (enabled) {
+        CFG->SCR |= CFG_SCR_CPU_READY;
+    } else {
+        CFG->SCR &= ~CFG_SCR_CPU_READY;
+    }    
+}
+
+void cfg_set_sdram_switch (bool enabled) {
+    if (enabled) {
+        CFG->SCR |= CFG_SCR_SDRAM_SWITCH;
+    } else {
+        CFG->SCR &= ~CFG_SCR_SDRAM_SWITCH;
+    }
+}
+
+void cfg_set_sdram_writable (bool enabled) {
+    if (enabled) {
+        CFG->SCR |= CFG_SCR_SDRAM_WRITABLE;
+    } else {
+        CFG->SCR &= ~CFG_SCR_SDRAM_WRITABLE;
+    }
+}
+
+void cfg_set_dd_enable (bool enabled) {
+    if (enabled) {
+        CFG->SCR |= CFG_SCR_DD_EN;
+    } else {
+        CFG->SCR &= ~CFG_SCR_DD_EN;
+    }
+}
+
+void cfg_set_usb_waiting (bool enabled) {
+    if (enabled) {
+        CFG->SCR |= CFG_SCR_USB_WAITING;
+    } else {
+        CFG->SCR &= ~CFG_SCR_USB_WAITING;
+    }
+}
+
+void cfg_set_save_type (e_cfg_save_type_t save_type) {
+    uint32_t save_offset = 0;
+
+    CFG->SCR &= ~(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN);
+
+    switch (save_type) {
+        case CFG_SAVE_TYPE_NONE:
+            break;
+        case CFG_SAVE_TYPE_EEPROM_4K:
+            save_offset = SDRAM_SIZE - CFG_SAVE_SIZE_EEPROM_4K;
+            break;
+        case CFG_SAVE_TYPE_EEPROM_16K:
+            save_offset = SDRAM_SIZE - CFG_SAVE_SIZE_EEPROM_16K;
+            break;
+        case CFG_SAVE_TYPE_SRAM:
+            save_offset = SDRAM_SIZE - CFG_SAVE_SIZE_SRAM;
+            CFG->SCR |= CFG_SCR_SRAM_EN;
+            break;
+        case CFG_SAVE_TYPE_FLASHRAM:
+            save_offset = SDRAM_SIZE - CFG_SAVE_SIZE_FLASHRAM;
+            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            break;
+        case CFG_SAVE_TYPE_SRAM_BANKED:
+            save_offset = SDRAM_SIZE - CFG_SAVE_SIZE_SRAM_BANKED;
+            CFG->SCR |= CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN;
+            break;
+        case CFG_SAVE_TYPE_FLASHRAM_PKST2:
+            save_offset = CFG_SAVE_OFFSET_PKST2;
+            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            break;
+        default:
+            break;
+    }
+
+    CFG->SAVE_OFFSET = save_offset;
+}
+
+void cfg_set_save_offset (uint32_t offset) {
+    CFG->SAVE_OFFSET = offset;
+}
+
+uint32_t cfg_get_save_offset (void) {
+    return CFG->SAVE_OFFSET;
+}
+
+void cfg_set_dd_offset (uint32_t offset) {
+    CFG->DD_OFFSET = offset;
+}
+
+uint32_t cfg_get_dd_offset (void) {
+    return CFG->DD_OFFSET;
+}
+
+bool cfg_get_command (uint8_t *cmd, uint32_t *args) {
+    if (!(CFG->SCR & CFG_SCR_CPU_BUSY)) {
+        return false;
+    }
+
+    *cmd = CFG->CMD;
+    for (size_t i = 0; i < 2; i++) {
+        args[i] = CFG->DATA[i];
+    }
+
+    return true;
+}
+
+void cfg_set_response (uint32_t *args, bool error) {
+    for (size_t i = 0; i < 2; i++) {
+        CFG->DATA[i] = args[i];
+    }
+    if (error) {
+        CFG->SCR |= CFG_SCR_CMD_ERROR;
+    } else {
+        CFG->SCR &= ~CFG_SCR_CMD_ERROR;
+    }
+    CFG->SCR &= ~(CFG_SCR_CPU_BUSY);
+}

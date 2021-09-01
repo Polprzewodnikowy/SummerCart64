@@ -26,7 +26,13 @@ module n64_cfg (
         bus.rdata = 16'd0;
         if (bus.ack) begin
             case (bus.address[3:1])
-                R_SR: bus.rdata = {cfg.cpu_ready, cfg.cpu_busy, 14'd0};
+                R_SR: bus.rdata = {
+                    cfg.cpu_ready,
+                    cfg.cpu_busy,
+                    cfg.usb_waiting,
+                    cfg.cmd_error,
+                    12'd0
+                };
                 R_COMMAND: bus.rdata = {8'd0, cfg.cmd};
                 R_DATA_0_H: bus.rdata = cfg.data[0][31:16];
                 R_DATA_0_L: bus.rdata = cfg.data[0][15:0];

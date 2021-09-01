@@ -21,7 +21,7 @@ void sc64_wait_cpu_ready(void) {
     uint32_t sr;
     do {
         sr = platform_pi_io_read(&SC64_CFG->SR_CMD);
-    } while (sr & SC64_CFG_SCR_CPU_READY);
+    } while (!(sr & SC64_CFG_SCR_CPU_READY));
 }
 
 void sc64_wait_cpu_busy(void) {

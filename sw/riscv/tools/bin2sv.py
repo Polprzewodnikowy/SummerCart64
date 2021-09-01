@@ -2,16 +2,13 @@
 import struct
 import sys
 
-binary = None
 sv_template = None
 sv_code = None
 
-binary_name = sys.argv[1] or 'binary.bin'
-template_name = sys.argv[2] or 'binary_template.sv'
-code_name = sys.argv[3] or 'binary.sv'
+template_name = sys.argv[1] or 'template.sv'
+code_name = sys.argv[2] or 'result.sv'
 
 try:
-    binary = open(binary_name, mode='rb')
     sv_template = open(template_name, mode='r')
     sv_code = open(code_name, mode='w')
 
@@ -19,7 +16,7 @@ try:
 
     rom_formatted = ''
     index = 0
-    for line in iter(lambda: binary.read(4), ''):
+    for line in iter(lambda: sys.stdin.buffer.read(4), ''):
         if (not line):
             break
         value = format(struct.unpack('<I', line)[0], '08x')
@@ -33,6 +30,5 @@ except Exception as e:
     sys.exit(-1)
 
 finally:
-    if (binary): binary.close()
     if (sv_template): sv_template.close()
     if (sv_code): sv_code.close()

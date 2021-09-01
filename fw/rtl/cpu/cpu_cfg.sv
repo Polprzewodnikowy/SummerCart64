@@ -10,7 +10,8 @@ module cpu_cfg (
         R_SAVE_OFFSET,
         R_COMMAND,
         R_DATA_0,
-        R_DATA_1
+        R_DATA_1,
+        R_VERSION
     } e_reg_id;
 
     always_ff @(posedge sys.clk) begin
@@ -27,7 +28,9 @@ module cpu_cfg (
                 R_SCR: bus.rdata = {
                     cfg.cpu_ready,
                     cfg.cpu_busy,
-                    24'd0,
+                    cfg.usb_waiting,
+                    cfg.cmd_error,
+                    22'd0,
                     cfg.flashram_enabled,
                     cfg.sram_banked,
                     cfg.sram_enabled,
@@ -40,6 +43,7 @@ module cpu_cfg (
                 R_COMMAND: bus.rdata = {24'd0, cfg.cmd};
                 R_DATA_0: bus.rdata = cfg.data[0];
                 R_DATA_1: bus.rdata = cfg.data[1];
+                R_VERSION: bus.rdata = sc64::SC64_VER;
                 default: bus.rdata = 32'd0;
             endcase
         end
@@ -58,6 +62,8 @@ module cpu_cfg (
         if (sys.reset) begin
             cfg.cpu_ready <= 1'b0;
             cfg.cpu_busy <= 1'b0;
+            cfg.usb_waiting <= 1'b0;
+            cfg.cmd_error <= 1'b0;
             cfg.sdram_switch <= 1'b0;
             cfg.sdram_writable <= 1'b0;
             cfg.dd_enabled <= 1'b0;
@@ -78,8 +84,12 @@ module cpu_cfg (
                 case (bus.address[4:2])
                     R_SCR: begin
                         if (bus.wmask[3]) begin
-                            cfg.cpu_ready <= bus.wdata[31];
-                            cfg.cpu_busy <= bus.wdata[30];
+                            {
+                                cfg.cpu_ready,
+                                cfg.cpu_busy,
+                                cfg.usb_waiting,
+                                cfg.cmd_error
+                            } <= bus.wdata[31:28];
                         end
                         if (bus.wmask[0]) begin
                             {

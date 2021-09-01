@@ -7,19 +7,25 @@ import sys
 class SC64:
     __SDRAM_SIZE = 64 * 1024 * 1024
 
+    __CONFIG_QUERY_SAVE_TYPE = 1
+    __CONFIG_QUERY_SAVE_OFFSET = 4
+
     def __init__(self, port):
         self.__serial = serial.Serial(port)
-        self.__query_config()
+        self.__save_type = self.__query_config(self.__CONFIG_QUERY_SAVE_TYPE)
+        self.__save_offset = self.__query_config(self.__CONFIG_QUERY_SAVE_OFFSET)
+        print('{:08X}'.format(self.__save_type))
+        print('{:08X}'.format(self.__save_offset))
 
 
-    def __query_config(self):
+    def __query_config(self, query):
         self.__serial.write(b'CMDQ')
-        self.__serial.write(bytes(8))
-        config_raw = self.__serial.read(12)
+        self.__serial.write(query.to_bytes(4, byteorder='big'))
+        self.__serial.write(bytes(4))
+        value = self.__serial.read(4)
         if (self.__serial.read(4).decode() != 'CMPQ'):
             raise Exception('Bad query response')
-        self.__save_type = config_raw[2] & 0x07
-        self.__save_offset = int.from_bytes(config_raw[4:8], byteorder='big')
+        return int.from_bytes(value, byteorder='big')
 
 
     def __save_length(self):
@@ -83,7 +89,7 @@ class SC64:
 
 mode = 'r'
 file = 'save.dat'
-port = 'COM5'
+port = 'COM7'
 
 if (len(sys.argv) >= 2):
     mode = sys.argv[1]

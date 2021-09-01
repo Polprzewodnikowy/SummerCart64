@@ -169,12 +169,13 @@ module n64_flashram (
                                         end
                                     endcase
                                 end
-                            end else begin
-                                if (flashram_state == FS_STATUS) begin
-                                    flashram_status[B_ERASE_DONE] <= bus.wdata[B_ERASE_DONE];
-                                    flashram_status[B_WRITE_DONE] <= bus.wdata[B_WRITE_DONE];
-                                end
                             end
+                            // else begin
+                            //     if (bus.address[1] && flashram_state == FS_STATUS) begin
+                            //         flashram_status[B_ERASE_DONE] <= bus.wdata[B_ERASE_DONE];
+                            //         flashram_status[B_WRITE_DONE] <= bus.wdata[B_WRITE_DONE];
+                            //     end
+                            // end
                         end
                     end
                 end

@@ -98,7 +98,7 @@ typedef volatile struct cfg_regs {
     io32_t SAVE_OFFSET;
     io8_t CMD;
     io8_t __padding[3];
-    io32_t DATA[3];
+    io32_t DATA[2];
 } cfg_regs_t;
 
 #define CFG_BASE                    (0x70000000UL)
@@ -110,6 +110,8 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_SRAM_EN             (1 << 3)
 #define CFG_SCR_SRAM_BANKED         (1 << 4)
 #define CFG_SCR_FLASHRAM_EN         (1 << 5)
+#define CFG_SCR_CMD_ERROR           (1 << 28)
+#define CFG_SCR_USB_WAITING         (1 << 29)
 #define CFG_SCR_CPU_BUSY            (1 << 30)
 #define CFG_SCR_CPU_READY           (1 << 31)
 
@@ -132,7 +134,7 @@ typedef volatile struct flashram_regs {
 #define FLASHRAM_OPERATION_DONE     (1 << 1)
 #define FLASHRAM_WRITE_OR_ERASE     (1 << 2)
 #define FLASHRAM_SECTOR_OR_ALL      (1 << 3)
-#define FLASHRAM_SECTOR_BIT         (8)
+#define FLASHRAM_PAGE_BIT           (8)
 
 
 #endif
