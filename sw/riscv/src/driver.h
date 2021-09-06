@@ -104,6 +104,16 @@ void cfg_set_response (uint32_t *args, bool error);
 #define SI_EEPROM_ID_4K             (0x80)
 #define SI_EEPROM_ID_16K            (0xC0)
 
+#define SI_RTC_ID                   (0x10)
+
+#define SI_RTC_STATUS_STOPPED       (0x80)
+#define SI_RTC_STATUS_RUNNING       (0x00)
+#define SI_RTC_STATUS(running)      (running ? SI_RTC_STATUS_RUNNING : SI_RTC_STATUS_STOPPED)
+
+#define SI_RTC_WP_MASK              (0x03)
+#define SI_RTC_ST_MASK              (0x04)
+#define SI_RTC_CENTURY_20XX         (0x01)
+
 bool si_rx_ready (void);
 bool si_rx_stop_bit (void);
 bool si_tx_busy (void);
@@ -111,6 +121,16 @@ void si_rx_reset (void);
 void si_reset (void);
 void si_rx (uint8_t *data);
 void si_tx (uint8_t *data, size_t length);
+
+
+// I2C
+
+bool i2c_busy (void);
+bool i2c_ack (void);
+void i2c_start (void);
+void i2c_stop (void);
+void i2c_begin_trx (uint8_t data, bool mack);
+uint8_t i2c_get_data (void);
 
 
 // misc

@@ -6,7 +6,14 @@
 static e_cfg_save_type_t save_type = CFG_SAVE_TYPE_NONE;
 static uint16_t cic_seed = 0xFFFF;
 static uint8_t tv_type = 0xFF;
+
 static bool eeprom_enabled = false;
+
+static bool rtc_running = true;
+static uint8_t rtc_wp_bits = SI_RTC_WP_MASK;
+static uint8_t current_time[7];
+static uint8_t new_time[7];
+static bool new_time_pending = false;
 
 static bool n64_to_pc_pending = false;
 static uint32_t n64_to_pc_address;
@@ -17,10 +24,13 @@ static uint32_t pc_to_n64_arg;
 static uint32_t pc_to_n64_address;
 static uint32_t pc_to_n64_length;
 
+
 void process_usb (void);
 void process_cfg (void);
 void process_flashram (void);
 void process_si (void);
+void process_rtc (void);
+
 
 bool debug_decide (uint32_t *args);
 void config_update (uint32_t *args);
@@ -28,8 +38,7 @@ void config_query (uint32_t *args);
 
 
 void main (void) {
-    UART->DR = 'X';
-    GPIO->ODR = 0;
+    GPIO->ODR = 0x00;
     GPIO->OER = (1 << 0);
 
     dma_abort();
@@ -42,11 +51,20 @@ void main (void) {
     cfg_set_dd_offset(CFG_DEFAULT_DD_OFFSET);
     cfg_set_cpu_ready(true);
 
+    current_time[0] = 0x10;
+    current_time[1] = 0x30;
+    current_time[2] = 0x90;
+    current_time[3] = 0x06;
+    current_time[4] = 0x01;
+    current_time[5] = 0x09;
+    current_time[6] = 0x21;
+
     while (1) {
         process_usb();
         process_cfg();
         process_flashram();
         process_si();
+        process_rtc();
     }
 }
 
@@ -220,8 +238,8 @@ void process_flashram (void) {
 }
 
 void process_si (void) {
-    uint8_t rx_data[10];
-    uint8_t tx_data[10];
+    uint8_t rx_data[12];
+    uint8_t tx_data[12];
     uint32_t *save_data;
     uint32_t *data_offset;
 
@@ -229,27 +247,29 @@ void process_si (void) {
         if (si_rx_stop_bit()) {
             si_rx(rx_data);
 
+            for (size_t i = 0; i < sizeof(tx_data); i++) {
+                tx_data[i] = 0x00;
+            }
+
             if (eeprom_enabled) {
                 save_data = (uint32_t *) (SDRAM_BASE + cfg_get_save_offset() + (rx_data[1] * 8));
-
                 switch (rx_data[0]) {
                     case SI_CMD_EEPROM_STATUS:
-                        tx_data[0] = 0x00;
                         tx_data[1] = save_type == CFG_SAVE_TYPE_EEPROM_4K ? SI_EEPROM_ID_4K : SI_EEPROM_ID_16K;
-                        tx_data[2] = 0x00;
                         si_tx(tx_data, 3);
                         break;
+
                     case SI_CMD_EEPROM_READ:
                         data_offset = (uint32_t *) (&tx_data[0]);
                         data_offset[0] = swapb(save_data[0]);
                         data_offset[1] = swapb(save_data[1]);
                         si_tx(tx_data, 8);
                         break;
+
                     case SI_CMD_EEPROM_WRITE:
                         data_offset = (uint32_t *) (&rx_data[2]);
                         save_data[0] = swapb(data_offset[0]);
                         save_data[1] = swapb(data_offset[1]);
-                        tx_data[0] = 0x00;
                         si_tx(tx_data, 1);
                         break;
                 }
@@ -257,36 +277,43 @@ void process_si (void) {
 
             switch (rx_data[0]) {
                 case SI_CMD_RTC_STATUS:
-                    tx_data[0] = 0x00;
-                    tx_data[1] = 0x10;
-                    tx_data[2] = 0x00;
+                    tx_data[1] = SI_RTC_ID;
+                    tx_data[2] = SI_RTC_STATUS(rtc_running);
                     si_tx(tx_data, 3);
                     break;
+
                 case SI_CMD_RTC_READ:
                     if (rx_data[1] == 0) {
-                        tx_data[0] = 0x03;
-                        tx_data[1] = 0x00;
-                        tx_data[2] = 0x00;
-                        tx_data[3] = 0x00;
-                        tx_data[4] = 0x00;
-                        tx_data[5] = 0x00;
-                        tx_data[6] = 0x00;
-                        tx_data[7] = 0x00;
+                        tx_data[0] = rtc_wp_bits;
+                        if (!rtc_running) {
+                            tx_data[1] = SI_RTC_ST_MASK;
+                        }
+                    } else if (rx_data[1] == 1) {
+                        // Backup SRAM
                     } else {
-                        tx_data[0] = 0x00;
-                        tx_data[1] = 0x00;
-                        tx_data[2] = 0x92;
-                        tx_data[3] = 0x06;
-                        tx_data[4] = 0x01;
-                        tx_data[5] = 0x09;
-                        tx_data[6] = 0x21;
-                        tx_data[7] = 0x01;
+                        for (size_t i = 0; i < 7; i++) {
+                            tx_data[i] = current_time[i];
+                        }
+                        tx_data[2] |= 0x80;
+                        tx_data[7] = SI_RTC_CENTURY_20XX;
                     }
-                    tx_data[8] = 0x00;
+                    tx_data[8] = SI_RTC_STATUS(rtc_running);
                     si_tx(tx_data, 9);
                     break;
+
                 case SI_CMD_RTC_WRITE:
-                    tx_data[0] = 0x00;
+                    if (rx_data[1] == 0) {
+                        rtc_wp_bits = rx_data[2] & SI_RTC_WP_MASK;
+                        rtc_running = (!(rx_data[3] & SI_RTC_ST_MASK));
+                    } else if (rx_data[1] == 1) {
+                        // Backup SRAM
+                    } else {
+                        for (size_t i = 0; i < 7; i++) {
+                            new_time[i] = rx_data[i + 2];
+                        }
+                        new_time_pending = !rtc_running;
+                    }
+                    tx_data[0] = SI_RTC_STATUS(rtc_running);
                     si_tx(tx_data, 1);
                     break;
             }
@@ -295,6 +322,16 @@ void process_si (void) {
         si_rx_reset();
     }
 }
+
+void process_rtc (void) {
+    if (new_time_pending) {
+        for (int i = 0; i < 7; i++) {
+            current_time[i] = new_time[i];
+        }
+        new_time_pending = false;
+    }
+}
+
 
 bool debug_decide (uint32_t *args) {
     switch (args[0]) {

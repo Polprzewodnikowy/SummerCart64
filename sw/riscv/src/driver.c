@@ -295,6 +295,34 @@ void si_tx (uint8_t *data, size_t length) {
 }
 
 
+// I2C
+
+bool i2c_busy (void) {
+    return I2C->SCR & I2C_SCR_BUSY;
+}
+
+bool i2c_ack (void) {
+    return I2C->SCR & I2C_SCR_ACK;
+}
+
+void i2c_start (void) {
+    I2C->SCR = I2C_SCR_START;
+}
+
+void i2c_stop (void) {
+    I2C->SCR = I2C_SCR_STOP;
+}
+
+void i2c_begin_trx (uint8_t data, bool mack) {
+    I2C->SCR = mack ? I2C_SCR_MACK : 0;
+    I2C->DR = data;
+}
+
+uint8_t i2c_get_data (void) {
+    return I2C->DR;
+}
+
+
 // misc
 
 const char hex_char_map[16] = {
