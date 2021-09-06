@@ -4,7 +4,7 @@ package sc64;
         ID_N64_SDRAM,
         ID_N64_BOOTLOADER,
         ID_N64_FLASHRAM,
-        ID_N64_DDREGS,
+        ID_N64_DD,
         ID_N64_CFG,
         __ID_N64_END
     } e_n64_id;
@@ -20,6 +20,7 @@ package sc64;
         ID_CPU_CFG,
         ID_CPU_SDRAM,
         ID_CPU_FLASHRAM,
+        ID_CPU_SI,
         __ID_CPU_END
     } e_cpu_id;
 

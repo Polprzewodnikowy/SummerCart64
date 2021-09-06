@@ -137,4 +137,23 @@ typedef volatile struct flashram_regs {
 #define FLASHRAM_PAGE_BIT           (8)
 
 
+typedef volatile struct si_regs {
+    io32_t SCR;
+    io32_t DATA[3];
+} si_regs_t;
+
+#define SI_BASE                     (0xA0000000UL)
+#define SI                          ((si_regs_t *) SI_BASE)
+
+#define SI_SCR_RX_READY             (1 << 0)
+#define SI_SCR_RX_STOP_BIT          (1 << 1)
+#define SI_SCR_TX_START             (1 << 2)
+#define SI_SCR_TX_BUSY              (1 << 3)
+#define SI_SCR_RX_RESET             (1 << 6)
+#define SI_SCR_TX_RESET             (1 << 7)
+#define SI_SCR_RX_LENGTH_BIT        (8)
+#define SI_SCR_RX_LENGTH_MASK       (0x7F << SI_SCR_RX_LENGTH_BIT)
+#define SI_SCR_TX_LENGTH_BIT        (16)
+
+
 #endif

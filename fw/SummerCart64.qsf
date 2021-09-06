@@ -63,6 +63,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_ram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_si.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
@@ -72,10 +73,12 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_cfg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_dd.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_flashram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_si.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/SummerCart64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
@@ -241,66 +244,66 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 	# Pin & Location Assignments
 	# ==========================
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_cts
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_si_dq
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_pi_ad[*]
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_aleh
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_read
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_write
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_pwren
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_rts
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_*
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sd_clk
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[*]
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_n64_pi_ad[*]
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_rtc_sda
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_cts
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_si_dq
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_pi_ad[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_aleh
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_read
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_write
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sdram_dq[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sd_*
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_pwren
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_rts
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_*
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sd_clk
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sd_*
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_n64_pi_ad[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sdram_dq[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sd_*
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_rtc_sda
 
 	# Fitter Assignments
 	# ==================
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[*]
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_rxd
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_cts
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_n64_irq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_pwren
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_miso
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[*]
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_rxd
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_cts
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_n64_irq
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_pwren
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_miso
 
 	# start DESIGN_PARTITION(Top)
 	# ---------------------------
 
 		# Incremental Compilation Assignments
 		# ===================================
-		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
-		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 
 	# end DESIGN_PARTITION(Top)
 	# -------------------------

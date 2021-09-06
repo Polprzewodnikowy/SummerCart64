@@ -255,3 +255,79 @@ void cfg_set_response (uint32_t *args, bool error) {
     }
     CFG->SCR &= ~(CFG_SCR_CPU_BUSY);
 }
+
+
+// SI
+
+bool si_rx_ready (void) {
+    return SI->SCR & SI_SCR_RX_READY;
+}
+
+bool si_rx_stop_bit (void) {
+    return SI->SCR & SI_SCR_RX_STOP_BIT;
+}
+
+bool si_tx_busy (void) {
+    return SI->SCR & SI_SCR_TX_BUSY;
+}
+
+void si_rx_reset (void) {
+    SI->SCR = SI_SCR_RX_RESET;
+}
+
+void si_reset (void) {
+    SI->SCR = SI_SCR_TX_RESET | SI_SCR_RX_RESET;
+}
+
+void si_rx (uint8_t *data) {
+    uint32_t rx_length = (SI->SCR & SI_SCR_RX_LENGTH_MASK) >> SI_SCR_RX_LENGTH_BIT;
+    for (size_t i = 0; i < rx_length; i++) {
+        data[i] = ((uint8_t *) SI->DATA)[(10 - rx_length) + i];
+    }
+}
+
+void si_tx (uint8_t *data, size_t length) {
+    for (size_t i = 0; i < ((length + 3) / 4); i++) {
+        SI->DATA[i] = ((uint32_t *) data)[i];
+    }
+    SI->DATA[length / 4] |= (0x80 << ((length % 4) * 8));
+    SI->SCR = (((length * 8) + 1) << SI_SCR_TX_LENGTH_BIT) | SI_SCR_TX_START;
+}
+
+
+// misc
+
+const char hex_char_map[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
+
+void print (const char *text) {
+    while (*text != '\0') {
+        while (!(UART->SCR & UART_SCR_TXE));
+        UART->DR = *text++;
+    }
+}
+
+void print_02hex (uint8_t number) {
+    char buffer[3];
+    buffer[0] = hex_char_map[(number >> 4) & 0x0F];
+    buffer[1] = hex_char_map[number & 0x0F];
+    buffer[2] = '\0';
+    print(buffer);
+}
+
+void print_08hex (uint32_t number) {
+    print_02hex((number >> 24) & 0xFF);
+    print_02hex((number >> 16) & 0xFF);
+    print_02hex((number >> 8) & 0xFF);
+    print_02hex((number >> 0) & 0xFF);
+}
+
+uint32_t swapb (uint32_t data) {
+    return (
+        (data << 24) |
+        ((data << 8) & 0x00FF0000) |
+        ((data >> 8) & 0x0000FF00) |
+        (data >> 24)
+    );
+}

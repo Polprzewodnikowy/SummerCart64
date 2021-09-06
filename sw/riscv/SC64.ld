@@ -3,7 +3,7 @@ MEMORY {
     ROM (rx)        : org = 0x10000000, len = 128
 }
 
-__stack_pointer = ORIGIN(RAM) + LENGTH(RAM) - 4;
+__stack_pointer = ORIGIN(RAM) + LENGTH(RAM) - 16;
 
 ENTRY(reset_handler)
 

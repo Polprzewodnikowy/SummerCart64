@@ -61,7 +61,7 @@ module n64_pi (
     );
 
 
-    // Control signals input synchronization
+    // Control signals and input synchronization
 
     logic [2:0] n64_pi_alel_ff;
     logic [2:0] n64_pi_aleh_ff;
@@ -207,7 +207,7 @@ module n64_pi (
             if (cfg.dd_enabled) begin
                 if (n64_pi_ad_input == 16'h0500) begin
                     n64_pi_address_valid <= 1'b1;
-                    next_id <= sc64::ID_N64_DDREGS;
+                    next_id <= sc64::ID_N64_DD;
                 end
                 if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
                     n64_pi_address_valid <= 1'b1;

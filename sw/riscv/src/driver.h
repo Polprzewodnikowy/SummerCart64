@@ -92,4 +92,33 @@ bool cfg_get_command (uint8_t *cmd, uint32_t *args);
 void cfg_set_response (uint32_t *args, bool error);
 
 
+// SI
+
+#define SI_CMD_EEPROM_STATUS        (0x00)
+#define SI_CMD_EEPROM_READ          (0x04)
+#define SI_CMD_EEPROM_WRITE         (0x05)
+#define SI_CMD_RTC_STATUS           (0x06)
+#define SI_CMD_RTC_READ             (0x07)
+#define SI_CMD_RTC_WRITE            (0x08)
+
+#define SI_EEPROM_ID_4K             (0x80)
+#define SI_EEPROM_ID_16K            (0xC0)
+
+bool si_rx_ready (void);
+bool si_rx_stop_bit (void);
+bool si_tx_busy (void);
+void si_rx_reset (void);
+void si_reset (void);
+void si_rx (uint8_t *data);
+void si_tx (uint8_t *data, size_t length);
+
+
+// misc
+
+void print (const char *text);
+void print_02hex (uint8_t number);
+void print_08hex (uint32_t number);
+uint32_t swapb (uint32_t data);
+
+
 #endif

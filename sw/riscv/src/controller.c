@@ -1,16 +1,28 @@
 #include "sys.h"
 #include "driver.h"
+#include "controller.h"
 
 
 static e_cfg_save_type_t save_type = CFG_SAVE_TYPE_NONE;
 static uint16_t cic_seed = 0xFFFF;
 static uint8_t tv_type = 0xFF;
+static bool eeprom_enabled = false;
 
+static bool n64_to_pc_pending = false;
+static uint32_t n64_to_pc_address;
+static uint32_t n64_to_pc_length;
+
+static bool pc_to_n64_ready = false;
+static uint32_t pc_to_n64_arg;
+static uint32_t pc_to_n64_address;
+static uint32_t pc_to_n64_length;
 
 void process_usb (void);
 void process_cfg (void);
 void process_flashram (void);
+void process_si (void);
 
+bool debug_decide (uint32_t *args);
 void config_update (uint32_t *args);
 void config_query (uint32_t *args);
 
@@ -23,6 +35,7 @@ void main (void) {
     dma_abort();
     usb_flush_rx();
     usb_flush_tx();
+    si_reset();
 
     cfg_set_sdram_switch(true);
     cfg_set_save_type(CFG_SAVE_TYPE_NONE);
@@ -33,20 +46,10 @@ void main (void) {
         process_usb();
         process_cfg();
         process_flashram();
+        process_si();
     }
 }
 
-
-typedef enum {
-    USB_STATE_IDLE,
-    USB_STATE_ARGS,
-    USB_STATE_DATA,
-    USB_STATE_RESPONSE,
-} e_usb_state_t;
-
-#define USB_CMD_TOKEN   (0x434D4400)
-#define USB_CMP_TOKEN   (0x434D5000)
-#define USB_ERR_TOKEN   (0x45525200)
 
 void process_usb (void) {
     static e_usb_state_t state = USB_STATE_IDLE;
@@ -60,14 +63,20 @@ void process_usb (void) {
         case USB_STATE_IDLE:
             if (usb_rx_word(&args[0])) {
                 if ((args[0] & 0xFFFFFF00) == USB_CMD_TOKEN) {
-                    state = USB_STATE_ARGS;
                     cmd = args[0] & 0xFF;
                     error = false;
                     processing = false;
                     current_word = 0;
+                    state = USB_STATE_ARGS;
                 } else {
-                    state = USB_STATE_RESPONSE;
+                    cmd = '!';
                     error = true;
+                    state = USB_STATE_RESPONSE;
+                }
+            } else if (n64_to_pc_pending) {
+                if (!dma_busy()) {
+                    dma_start(n64_to_pc_address, n64_to_pc_length, DMA_ID_USB, DMA_DIR_FROM_SDRAM);
+                    state = USB_STATE_N64_TO_PC;
                 }
             }
             break;
@@ -112,11 +121,15 @@ void process_usb (void) {
                     break;
 
                 case 'D':
+                    cfg_set_usb_waiting(true);
+                    pc_to_n64_arg = args[0];
+                    pc_to_n64_length = args[1];
+                    state = USB_STATE_PC_TO_N64;
                     break;
 
                 default:
-                    state = USB_STATE_RESPONSE;
                     error = true;
+                    state = USB_STATE_RESPONSE;
                     break;
             }
             break;
@@ -124,6 +137,28 @@ void process_usb (void) {
         case USB_STATE_RESPONSE:
             if (usb_tx_word(error ? USB_ERR_TOKEN : (USB_CMP_TOKEN | cmd))) {
                 state = USB_STATE_IDLE;
+            }
+            break;
+
+        case USB_STATE_N64_TO_PC:
+            if (!dma_busy()) {
+                n64_to_pc_pending = false;
+                state = USB_STATE_IDLE;
+            }
+            break;
+
+        case USB_STATE_PC_TO_N64:
+            if (!dma_busy()) {
+                if (!processing) {
+                    if (pc_to_n64_ready) {
+                        dma_start(pc_to_n64_address, pc_to_n64_length, DMA_ID_USB, DMA_DIR_TO_SDRAM);
+                        processing = true;
+                    }
+                } else {
+                    pc_to_n64_ready = false;
+                    processing = false;
+                    state = USB_STATE_IDLE;
+                }
             }
             break;
         
@@ -136,6 +171,7 @@ void process_usb (void) {
 void process_cfg (void) {
     uint8_t cmd;
     uint32_t args[2];
+    bool error;
 
     if (cfg_get_command(&cmd, args)) {
         switch (cmd) {
@@ -148,8 +184,10 @@ void process_cfg (void) {
                 config_query(args);
                 cfg_set_response(args, false);
                 break;
-
+            
             case 'D':
+                error = debug_decide(args);
+                cfg_set_response(args, error);
                 break;
 
             default:
@@ -181,15 +219,124 @@ void process_flashram (void) {
     }
 }
 
+void process_si (void) {
+    uint8_t rx_data[10];
+    uint8_t tx_data[10];
+    uint32_t *save_data;
+    uint32_t *data_offset;
 
-typedef enum {
-    CONFIG_UPDATE_SDRAM_SWITCH,
-    CONFIG_UPDATE_SDRAM_WRITABLE,
-    CONFIG_UPDATE_DD_ENABLE,
-    CONFIG_UPDATE_SAVE_TYPE,
-    CONFIG_UPDATE_CIC_SEED,
-    CONFIG_UPDATE_TV_TYPE
-} e_config_update_t;
+    if (si_rx_ready()) {
+        if (si_rx_stop_bit()) {
+            si_rx(rx_data);
+
+            if (eeprom_enabled) {
+                save_data = (uint32_t *) (SDRAM_BASE + cfg_get_save_offset() + (rx_data[1] * 8));
+
+                switch (rx_data[0]) {
+                    case SI_CMD_EEPROM_STATUS:
+                        tx_data[0] = 0x00;
+                        tx_data[1] = save_type == CFG_SAVE_TYPE_EEPROM_4K ? SI_EEPROM_ID_4K : SI_EEPROM_ID_16K;
+                        tx_data[2] = 0x00;
+                        si_tx(tx_data, 3);
+                        break;
+                    case SI_CMD_EEPROM_READ:
+                        data_offset = (uint32_t *) (&tx_data[0]);
+                        data_offset[0] = swapb(save_data[0]);
+                        data_offset[1] = swapb(save_data[1]);
+                        si_tx(tx_data, 8);
+                        break;
+                    case SI_CMD_EEPROM_WRITE:
+                        data_offset = (uint32_t *) (&rx_data[2]);
+                        save_data[0] = swapb(data_offset[0]);
+                        save_data[1] = swapb(data_offset[1]);
+                        tx_data[0] = 0x00;
+                        si_tx(tx_data, 1);
+                        break;
+                }
+            }
+
+            switch (rx_data[0]) {
+                case SI_CMD_RTC_STATUS:
+                    tx_data[0] = 0x00;
+                    tx_data[1] = 0x10;
+                    tx_data[2] = 0x00;
+                    si_tx(tx_data, 3);
+                    break;
+                case SI_CMD_RTC_READ:
+                    if (rx_data[1] == 0) {
+                        tx_data[0] = 0x03;
+                        tx_data[1] = 0x00;
+                        tx_data[2] = 0x00;
+                        tx_data[3] = 0x00;
+                        tx_data[4] = 0x00;
+                        tx_data[5] = 0x00;
+                        tx_data[6] = 0x00;
+                        tx_data[7] = 0x00;
+                    } else {
+                        tx_data[0] = 0x00;
+                        tx_data[1] = 0x00;
+                        tx_data[2] = 0x92;
+                        tx_data[3] = 0x06;
+                        tx_data[4] = 0x01;
+                        tx_data[5] = 0x09;
+                        tx_data[6] = 0x21;
+                        tx_data[7] = 0x01;
+                    }
+                    tx_data[8] = 0x00;
+                    si_tx(tx_data, 9);
+                    break;
+                case SI_CMD_RTC_WRITE:
+                    tx_data[0] = 0x00;
+                    si_tx(tx_data, 1);
+                    break;
+            }
+        }
+
+        si_rx_reset();
+    }
+}
+
+bool debug_decide (uint32_t *args) {
+    switch (args[0]) {
+        case DEBUG_WRITE_ADDRESS:
+            if (!n64_to_pc_pending) {
+                n64_to_pc_address = args[1];
+            } else {
+                return true;
+            }
+            break;
+        case DEBUG_WRITE_LENGTH_START:
+            if (!n64_to_pc_pending) {
+                n64_to_pc_length = args[1];
+                n64_to_pc_pending = true;
+            } else {
+                return true;
+            }
+            break;
+        case DEBUG_WRITE_STATUS:
+            args[1] = n64_to_pc_pending;
+            break;
+        case DEBUG_READ_ARG:
+            args[1] = pc_to_n64_arg;
+            break;
+        case DEBUG_READ_LENGTH:
+            args[1] = pc_to_n64_length;
+            break;
+        case DEBUG_READ_ADDRESS_START:
+            if (!pc_to_n64_ready) {
+                pc_to_n64_ready = true;
+                pc_to_n64_address = args[1];
+                cfg_set_usb_waiting(false);
+            } else {
+                return true;
+            }
+            break;
+        default:
+            return true;
+    }
+
+    return false;
+}
 
 void config_update (uint32_t *args) {
     switch (args[0]) {
@@ -204,6 +351,10 @@ void config_update (uint32_t *args) {
             break;
         case CONFIG_UPDATE_SAVE_TYPE:
             save_type = args[1] & 0x07;
+            eeprom_enabled = (
+                save_type == CFG_SAVE_TYPE_EEPROM_4K ||
+                save_type == CFG_SAVE_TYPE_EEPROM_16K
+            );
             cfg_set_save_type(save_type);
             break;
         case CONFIG_UPDATE_CIC_SEED:
@@ -214,15 +365,6 @@ void config_update (uint32_t *args) {
             break;
     }
 }
-
-typedef enum {
-    CONFIG_QUERY_STATUS,
-    CONFIG_QUERY_SAVE_TYPE,
-    CONFIG_QUERY_CIC_SEED,
-    CONFIG_QUERY_TV_TYPE,
-    CONFIG_QUERY_SAVE_OFFSET,
-    CONFIG_QUERY_DD_OFFSET,
-} e_config_query_t;
 
 void config_query (uint32_t *args) {
     switch (args[0]) {
