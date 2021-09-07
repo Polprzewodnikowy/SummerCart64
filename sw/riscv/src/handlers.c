@@ -5,7 +5,7 @@
 #define BOOT_UART
 
 
-__attribute__ ((naked, section(".bootloader"))) int reset_handler (void) {
+__attribute__ ((naked, section(".bootloader"))) void reset_handler (void) {
     register uint32_t length = 0;
 
 #if defined(BOOT_UART)

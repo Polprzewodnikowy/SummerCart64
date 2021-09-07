@@ -156,4 +156,8 @@ typedef volatile struct si_regs {
 #define SI_SCR_TX_LENGTH_BIT        (16)
 
 
+void reset_handler (void);
+void app_handler (void);
+
+
 #endif

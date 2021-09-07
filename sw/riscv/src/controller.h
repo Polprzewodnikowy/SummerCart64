@@ -17,6 +17,11 @@ typedef enum {
 } e_usb_state_t;
 
 typedef enum {
+    RTC_STATE_READ,
+    RTC_STATE_WRITE,
+} e_rtc_state_t;
+
+typedef enum {
     DEBUG_WRITE_ADDRESS,
     DEBUG_WRITE_LENGTH_START,
     DEBUG_WRITE_STATUS,

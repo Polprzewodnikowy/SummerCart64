@@ -30,6 +30,7 @@ void process_cfg (void);
 void process_flashram (void);
 void process_si (void);
 void process_rtc (void);
+void process_uart (void);
 
 
 bool debug_decide (uint32_t *args);
@@ -45,19 +46,14 @@ void main (void) {
     usb_flush_rx();
     usb_flush_tx();
     si_reset();
+    i2c_stop();
 
     cfg_set_sdram_switch(true);
     cfg_set_save_type(CFG_SAVE_TYPE_NONE);
     cfg_set_dd_offset(CFG_DEFAULT_DD_OFFSET);
     cfg_set_cpu_ready(true);
 
-    current_time[0] = 0x10;
-    current_time[1] = 0x30;
-    current_time[2] = 0x90;
-    current_time[3] = 0x06;
-    current_time[4] = 0x01;
-    current_time[5] = 0x09;
-    current_time[6] = 0x21;
+    print("App ready!\r\n");
 
     while (1) {
         process_usb();
@@ -65,6 +61,7 @@ void main (void) {
         process_flashram();
         process_si();
         process_rtc();
+        process_uart();
     }
 }
 
@@ -238,7 +235,7 @@ void process_flashram (void) {
 }
 
 void process_si (void) {
-    uint8_t rx_data[12];
+    uint8_t rx_data[10];
     uint8_t tx_data[12];
     uint32_t *save_data;
     uint32_t *data_offset;
@@ -288,13 +285,10 @@ void process_si (void) {
                         if (!rtc_running) {
                             tx_data[1] = SI_RTC_ST_MASK;
                         }
-                    } else if (rx_data[1] == 1) {
-                        // Backup SRAM
-                    } else {
+                    } else if (rx_data[1] == 2) {
                         for (size_t i = 0; i < 7; i++) {
                             tx_data[i] = current_time[i];
                         }
-                        tx_data[2] |= 0x80;
                         tx_data[7] = SI_RTC_CENTURY_20XX;
                     }
                     tx_data[8] = SI_RTC_STATUS(rtc_running);
@@ -305,9 +299,7 @@ void process_si (void) {
                     if (rx_data[1] == 0) {
                         rtc_wp_bits = rx_data[2] & SI_RTC_WP_MASK;
                         rtc_running = (!(rx_data[3] & SI_RTC_ST_MASK));
-                    } else if (rx_data[1] == 1) {
-                        // Backup SRAM
-                    } else {
+                    } else if (rx_data[1] == 2) {
                         for (size_t i = 0; i < 7; i++) {
                             new_time[i] = rx_data[i + 2];
                         }
@@ -324,11 +316,142 @@ void process_si (void) {
 }
 
 void process_rtc (void) {
+    static e_rtc_state_t state = RTC_STATE_READ;
+    static e_rtc_state_t next_state = RTC_STATE_READ;
+    static uint8_t phase = 0;
+    static uint8_t sub_phase = 0;
+    static uint8_t rtc_current_time[7];
+    static uint8_t rtc_new_time[7];
+
     if (new_time_pending) {
+        new_time_pending = false;
+
         for (int i = 0; i < 7; i++) {
             current_time[i] = new_time[i];
         }
-        new_time_pending = false;
+
+        rtc_convert_from_n64(new_time, rtc_new_time);
+
+        rtc_new_time[RTC_RTCSEC] |= RTC_RTCSEC_ST;
+        rtc_new_time[RTC_RTCWKDAY] |= RTC_RTCWKDAY_VBAT;
+
+        next_state = RTC_STATE_WRITE;
+    }
+
+    // TODO: Rewrite this mess
+    if (!i2c_busy()) {
+        if (state == RTC_STATE_READ) {
+            switch (phase) {
+                case 0: phase++; i2c_start(); break;
+                case 1: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 2: phase++; i2c_begin_trx(RTC_RTCSEC, false); break;
+                case 3: phase++; i2c_start(); break;
+                case 4: phase++; i2c_begin_trx(RTC_ADDR | I2C_ADDR_READ, false); break;
+                case 5:
+                    if (sub_phase > 0) {
+                        rtc_current_time[sub_phase - 1] = i2c_get_data();
+                    }
+                    if (sub_phase < 7) {
+                        i2c_begin_trx(0xFF, true);
+                    }
+                    if (sub_phase == 7) {
+                        phase++;
+                        sub_phase = 0;
+                        if (next_state != RTC_STATE_WRITE) {
+                            rtc_convert_to_n64(rtc_current_time, current_time);
+                        }
+                        break;
+                    }
+                    sub_phase++;
+                    break;
+                case 6: phase = 0; i2c_stop(); state = next_state; break;
+            }
+        } else if (state == RTC_STATE_WRITE) {
+            switch (phase) {
+                case 0: phase++; break;
+
+                case 1: phase++; i2c_start(); break;
+                case 2: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 3: phase++; i2c_begin_trx(RTC_RTCSEC, false); break;
+                case 4: phase++; i2c_begin_trx(0x00, false); break;
+                case 5: phase++; i2c_stop(); break;
+
+                case 6: phase++; i2c_start(); break;
+                case 7: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 8: phase++; i2c_begin_trx(RTC_RTCWKDAY, false); break;
+                case 9: phase++; i2c_start(); break;
+                case 10: phase++; i2c_begin_trx(RTC_ADDR | I2C_ADDR_READ, false); break;
+                case 11: phase++; i2c_begin_trx(0xFF, false); break;
+                case 12: phase = (i2c_get_data() & RTC_RTCWKDAY_OSCRUN) ? 6 : 13; i2c_stop(); break;
+
+                case 13: phase++; i2c_start(); break;
+                case 14: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 15: phase++; i2c_begin_trx(RTC_RTCMIN, false); break;
+                case 16:
+                    if (sub_phase < 6) {
+                        i2c_begin_trx(rtc_new_time[RTC_RTCMIN + sub_phase], false);
+                        sub_phase++;
+                    } else {
+                        phase++;
+                        sub_phase = 0;
+                        i2c_stop();
+                    }
+                    break;
+
+                case 17: phase++; i2c_start(); break;
+                case 18: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 19: phase++; i2c_begin_trx(RTC_RTCSEC, false); break;
+                case 20: phase++; i2c_begin_trx(rtc_new_time[RTC_RTCSEC], false); break;
+                case 21: phase++; i2c_stop(); break;
+
+                case 22: phase++; i2c_start(); break;
+                case 23: phase++; i2c_begin_trx(RTC_ADDR, false); break;
+                case 24: phase++; i2c_begin_trx(RTC_RTCWKDAY, false); break;
+                case 25: phase++; i2c_start(); break;
+                case 26: phase++; i2c_begin_trx(RTC_ADDR | I2C_ADDR_READ, false); break;
+                case 27: phase++; i2c_begin_trx(0xFF, false); break;
+                case 28: 
+                    if (i2c_get_data() & RTC_RTCWKDAY_OSCRUN) {
+                        phase = 0;
+                        state = RTC_STATE_READ;
+                        next_state = RTC_STATE_READ;
+                    } else {
+                        phase = 22;
+                    }
+                    i2c_stop();
+                    break;
+            }
+        } else {
+            state = RTC_STATE_READ;
+            phase = 0;
+            sub_phase = 0;
+        }
+    }
+}
+
+void process_uart (void) {
+    if (UART->SCR & USB_SCR_RXNE) {
+        char cmd = UART->DR;
+
+        switch (cmd) {
+            case '/':
+                print("Bootloader reset...\r\n");
+                reset_handler();
+                break;
+
+            case '\'':
+                print("App reset...\r\n");
+                app_handler();
+                break;
+
+            case 't':
+                print("Current time: ");
+                for (int i = 0; i < 7; i++) {
+                    print_02hex(current_time[i]);
+                    print(" ");
+                }
+                print("\r\n");
+        }
     }
 }
 

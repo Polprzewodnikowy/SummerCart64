@@ -60,7 +60,7 @@ module n64_flashram (
         if (write_buffer_wmask[0]) high_buffer <= bus.wdata;
     end
 
-    always @(posedge sys.clk) begin
+    always_ff @(posedge sys.clk) begin
         flashram.rdata <= write_buffer[flashram.address];
         if (write_buffer_wmask[1]) write_buffer[bus.address[6:2]] <= {high_buffer, bus.wdata};
     end

@@ -323,9 +323,50 @@ uint8_t i2c_get_data (void) {
 }
 
 
-// misc
+// RTC
 
-const char hex_char_map[16] = {
+static const uint8_t rtc_bit_mask[7] = {
+    0b01111111,
+    0b01111111,
+    0b00111111,
+    0b00000111,
+    0b00111111,
+    0b00011111,
+    0b11111111
+};
+
+void rtc_sanitize_time_data (uint8_t *time_data) {
+    for (int i = 0; i < 7; i++) {
+        time_data[i] &= rtc_bit_mask[i];
+    }
+}
+
+void rtc_convert_to_n64 (uint8_t *rtc_data, uint8_t *n64_data) {
+    rtc_sanitize_time_data(rtc_data);
+    n64_data[0] = rtc_data[RTC_RTCSEC];
+    n64_data[1] = rtc_data[RTC_RTCMIN];
+    n64_data[2] = rtc_data[RTC_RTCHOUR] | 0x80;
+    n64_data[4] = rtc_data[RTC_RTCWKDAY] - 1;
+    n64_data[3] = rtc_data[RTC_RTCDATE];
+    n64_data[5] = rtc_data[RTC_RTCMTH];
+    n64_data[6] = rtc_data[RTC_RTCYEAR];
+}
+
+void rtc_convert_from_n64 (uint8_t *n64_data, uint8_t *rtc_data) {
+    rtc_data[RTC_RTCSEC] = n64_data[0];
+    rtc_data[RTC_RTCMIN] = n64_data[1];
+    rtc_data[RTC_RTCHOUR] = n64_data[2];
+    rtc_data[RTC_RTCWKDAY] = n64_data[4] + 1;
+    rtc_data[RTC_RTCDATE] = n64_data[3];
+    rtc_data[RTC_RTCMTH] = n64_data[5];
+    rtc_data[RTC_RTCYEAR] = n64_data[6];
+    rtc_sanitize_time_data(rtc_data);
+}
+
+
+// Misc
+
+static const char hex_char_map[16] = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
 };
 
