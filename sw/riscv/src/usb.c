@@ -149,7 +149,7 @@ void process_usb (void) {
             break;
 
         case STATE_RESPONSE:
-            if (tx_word(p.error ? USB_ERR_TOKEN : (USB_CMP_TOKEN | p.cmd))) {
+            if (tx_word((p.error ? USB_ERR_TOKEN : USB_CMP_TOKEN) | p.cmd)) {
                 p.state = STATE_IDLE;
             }
             break;
