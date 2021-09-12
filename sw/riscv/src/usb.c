@@ -142,7 +142,7 @@ void process_usb (void) {
                     break;
 
                 default:
-                    p.error = false;
+                    p.error = true;
                     p.state = STATE_RESPONSE;
                     break;
             }
