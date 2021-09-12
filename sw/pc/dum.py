@@ -7,8 +7,8 @@ import sys
 class SC64:
     __SDRAM_SIZE = 64 * 1024 * 1024
 
-    __CONFIG_QUERY_SAVE_TYPE = 1
-    __CONFIG_QUERY_SAVE_OFFSET = 4
+    __CONFIG_QUERY_SAVE_TYPE = 4
+    __CONFIG_QUERY_SAVE_OFFSET = 7
 
     def __init__(self, port):
         self.__serial = serial.Serial(port)

@@ -29,6 +29,8 @@ $(BUILD_DIR)/controller.rom: $(BUILD_DIR)/uc.elf
 	$(OBJCOPY) -R .bootloader $(BUILD_DIR)/uc.elf $(BUILD_DIR)/controller.elf
 	$(OBJCOPY) -O binary --set-section-flags .bss=alloc,contents $(BUILD_DIR)/controller.elf $(BUILD_DIR)/controller.bin
 	python3 tools/bin2rom.py $@ < $(BUILD_DIR)/controller.bin
+	@echo 'Size of controller modules:'
+	@$(SIZE) -B -t --common $(OBJS)
 	@echo 'Size of controller:'
 	@$(SIZE) -B build/controller.elf
 

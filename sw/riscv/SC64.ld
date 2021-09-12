@@ -9,7 +9,6 @@ ENTRY(reset_handler)
 
 SECTIONS {
     .text : {
-        PROVIDE(__app_entry_point = .);
         *(.text.app_handler)
         *(.text.unlikely .text.unlikely.*)
         *(.text.startup .text.startup.*)

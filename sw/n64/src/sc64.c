@@ -46,15 +46,3 @@ void sc64_set_config(uint32_t type, uint32_t value) {
     uint32_t args[2] = { type, value };
     sc64_perform_cmd(SC64_CMD_CONFIG, args);
 }
-
-void sc64_get_config(sc64_config_t *config) {
-    uint32_t args[2] = { SC64_CONFIG_NOP, 0 };
-    sc64_perform_cmd(SC64_CMD_CONFIG, args);
-    config->___raw_data[0] = args[0];
-    config->___raw_data[1] = args[1];
-}
-
-void sc64_print_debug(uint32_t a1, uint32_t a2, uint32_t a3) {
-    // uint32_t args[3] = { a1, a2, a3 };
-    // sc64_perform_cmd(SC64_CMD_DEBUG, args);
-}

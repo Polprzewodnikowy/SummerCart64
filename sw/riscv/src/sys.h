@@ -4,10 +4,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 
-#define DEFAULT_SAVE_OFFSET         (0x03FE0000UL)
-#define DEFAULT_DD_OFFSET           (0x03BE0000UL)
+#define DEBUG_ENABLED
 
 
 typedef volatile uint8_t            io8_t;
@@ -46,7 +46,6 @@ typedef volatile struct i2c_regs {
 #define I2C_SCR_MACK                (1 << 2)
 #define I2C_SCR_ACK                 (1 << 3)
 #define I2C_SCR_BUSY                (1 << 4)
-#define I2C_ADDR_READ               (1 << 0)
 
 
 typedef volatile struct usb_regs {
@@ -137,23 +136,23 @@ typedef volatile struct flashram_regs {
 #define FLASHRAM_PAGE_BIT           (8)
 
 
-typedef volatile struct si_regs {
+typedef volatile struct joybus_regs {
     io32_t SCR;
     io32_t DATA[3];
-} si_regs_t;
+} joybus_regs_t;
 
-#define SI_BASE                     (0xA0000000UL)
-#define SI                          ((si_regs_t *) SI_BASE)
+#define JOYBUS_BASE                 (0xA0000000UL)
+#define JOYBUS                      ((joybus_regs_t *) JOYBUS_BASE)
 
-#define SI_SCR_RX_READY             (1 << 0)
-#define SI_SCR_RX_STOP_BIT          (1 << 1)
-#define SI_SCR_TX_START             (1 << 2)
-#define SI_SCR_TX_BUSY              (1 << 3)
-#define SI_SCR_RX_RESET             (1 << 6)
-#define SI_SCR_TX_RESET             (1 << 7)
-#define SI_SCR_RX_LENGTH_BIT        (8)
-#define SI_SCR_RX_LENGTH_MASK       (0x7F << SI_SCR_RX_LENGTH_BIT)
-#define SI_SCR_TX_LENGTH_BIT        (16)
+#define JOYBUS_SCR_RX_READY         (1 << 0)
+#define JOYBUS_SCR_RX_STOP_BIT      (1 << 1)
+#define JOYBUS_SCR_TX_START         (1 << 2)
+#define JOYBUS_SCR_TX_BUSY          (1 << 3)
+#define JOYBUS_SCR_RX_RESET         (1 << 6)
+#define JOYBUS_SCR_TX_RESET         (1 << 7)
+#define JOYBUS_SCR_RX_LENGTH_BIT    (8)
+#define JOYBUS_SCR_RX_LENGTH_MASK   (0x7F << JOYBUS_SCR_RX_LENGTH_BIT)
+#define JOYBUS_SCR_TX_LENGTH_BIT    (16)
 
 
 void reset_handler (void);

@@ -9,15 +9,19 @@
 #define SC64_CFG_SCR_CPU_BUSY               (1 << 30)
 
 #define SC64_CMD_CONFIG                     'C'
-#define SC64_CMD_DEBUG                      'D'
+#define SC64_CMD_QUERY                      'Q'
 
-#define SC64_CONFIG_SDRAM_SWITCH            0
-#define SC64_CONFIG_SDRAM_WRITABLE          1
-#define SC64_CONFIG_DD_ENABLE               2
-#define SC64_CONFIG_SAVE_TYPE               3
-#define SC64_CONFIG_CIC_TYPE                4
-#define SC64_CONFIG_TV_TYPE                 5
-#define SC64_CONFIG_NOP                     0xFFFFFFFF
+enum cfg_id {
+    CFG_ID_SCR,
+    CFG_ID_SDRAM_SWITCH,
+    CFG_ID_SDRAM_WRITABLE,
+    CFG_ID_DD_ENABLE,
+    CFG_ID_SAVE_TYPE,
+    CFG_ID_CIC_SEED,
+    CFG_ID_TV_TYPE,
+    CFG_ID_SAVE_OFFEST,
+    CFG_ID_DD_OFFEST,
+};
 
 
 typedef struct sc64_config {
@@ -43,8 +47,6 @@ void sc64_wait_cpu_ready(void);
 void sc64_wait_cpu_busy(void);
 void sc64_perform_cmd(uint8_t cmd, uint32_t *args);
 void sc64_set_config(uint32_t type, uint32_t value);
-void sc64_get_config(sc64_config_t *config);
-void sc64_print_debug(uint32_t a1, uint32_t a2, uint32_t a3);
 
 
 #endif
