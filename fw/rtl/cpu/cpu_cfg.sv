@@ -4,6 +4,8 @@ module cpu_cfg (
     if_config.cpu cfg
 );
 
+    logic skip_bootloader;
+
     typedef enum bit [2:0] { 
         R_SCR,
         R_DD_OFFSET,
@@ -30,7 +32,8 @@ module cpu_cfg (
                     cfg.cpu_busy,
                     cfg.usb_waiting,
                     cfg.cmd_error,
-                    22'd0,
+                    21'd0,
+                    skip_bootloader,
                     cfg.flashram_enabled,
                     cfg.sram_banked,
                     cfg.sram_enabled,
@@ -72,9 +75,10 @@ module cpu_cfg (
             cfg.flashram_enabled <= 1'b0;
             cfg.dd_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
+            skip_bootloader <= 1'b0;
         end else begin
             if (sys.n64_soft_reset) begin
-                cfg.sdram_switch <= 1'b0;
+                cfg.sdram_switch <= skip_bootloader;
                 cfg.sdram_writable <= 1'b0;
             end
             if (cfg.cmd_request) begin
@@ -93,13 +97,14 @@ module cpu_cfg (
                         end
                         if (bus.wmask[0]) begin
                             {
+                                skip_bootloader,
                                 cfg.flashram_enabled,
                                 cfg.sram_banked,
                                 cfg.sram_enabled,
                                 cfg.dd_enabled,
                                 cfg.sdram_writable,
                                 cfg.sdram_switch
-                            } <= bus.wdata[5:0];
+                            } <= bus.wdata[6:0];
                         end
                     end
 

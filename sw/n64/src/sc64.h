@@ -21,6 +21,7 @@ enum cfg_id {
     CFG_ID_TV_TYPE,
     CFG_ID_SAVE_OFFEST,
     CFG_ID_DD_OFFEST,
+    CFG_ID_SKIP_BOOTLOADER,
 };
 
 

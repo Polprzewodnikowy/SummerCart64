@@ -24,6 +24,7 @@ enum cfg_id {
     CFG_ID_TV_TYPE,
     CFG_ID_SAVE_OFFEST,
     CFG_ID_DD_OFFEST,
+    CFG_ID_SKIP_BOOTLOADER,
 };
 
 enum save_type {
@@ -46,18 +47,18 @@ struct process {
 static struct process p;
 
 
-static void scr_set_bit (uint32_t mask) {
-    CFG->SCR |= mask;
-}
-
-static void scr_clr_bit (uint32_t mask) {
-    CFG->SCR &= ~(mask);
+static void change_scr_bits (uint32_t mask, bool value) {
+    if (value) {
+        CFG->SCR |= mask;
+    } else {
+        CFG->SCR &= ~(mask);
+    }
 }
 
 static void set_save_type (enum save_type save_type) {
     uint32_t save_offset = DEFAULT_SAVE_OFFSET;
 
-    scr_clr_bit(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN);
+    change_scr_bits(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN, false);
     joybus_set_eeprom(EEPROM_NONE);
 
     switch (save_type) {
@@ -73,19 +74,19 @@ static void set_save_type (enum save_type save_type) {
             break;
         case SAVE_TYPE_SRAM:
             save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM;
-            CFG->SCR |= CFG_SCR_SRAM_EN;
+            change_scr_bits(CFG_SCR_SRAM_EN, true);
             break;
         case SAVE_TYPE_FLASHRAM:
             save_offset = SDRAM_SIZE - SAVE_SIZE_FLASHRAM;
-            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         case SAVE_TYPE_SRAM_BANKED:
             save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM_BANKED;
-            CFG->SCR |= CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN;
+            change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN, true);
             break;
         case SAVE_TYPE_FLASHRAM_PKST2:
             save_offset = SAVE_OFFSET_PKST2;
-            CFG->SCR |= CFG_SCR_FLASHRAM_EN;
+            change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         default:
             break;
@@ -103,13 +104,13 @@ void cfg_update (uint32_t *args) {
             CFG->SCR = args[1];
             break;
         case CFG_ID_SDRAM_SWITCH:
-            (args[1] ? scr_set_bit : scr_clr_bit)(CFG_SCR_SDRAM_SWITCH);
+            change_scr_bits(CFG_SCR_SDRAM_SWITCH, args[1]);
             break;
         case CFG_ID_SDRAM_WRITABLE:
-            (args[1] ? scr_set_bit : scr_clr_bit)(CFG_SCR_SDRAM_WRITABLE);
+            change_scr_bits(CFG_SCR_SDRAM_WRITABLE, args[1]);
             break;
         case CFG_ID_DD_ENABLE:
-            (args[1] ? scr_set_bit : scr_clr_bit)(CFG_SCR_DD_EN);
+            change_scr_bits(CFG_SCR_DD_EN, args[1]);
             break;
         case CFG_ID_SAVE_TYPE:
             set_save_type((enum save_type)(args[1]));
@@ -125,6 +126,9 @@ void cfg_update (uint32_t *args) {
             break;
         case CFG_ID_DD_OFFEST:
             CFG->DD_OFFSET = args[1];
+            break;
+        case CFG_ID_SKIP_BOOTLOADER:
+            change_scr_bits(CFG_SCR_SKIP_BOOTLOADER, args[1]);
             break;
     }
 }
@@ -158,6 +162,9 @@ void cfg_query (uint32_t *args) {
         case CFG_ID_DD_OFFEST:
             args[1] = CFG->DD_OFFSET;
             break;
+        case CFG_ID_SKIP_BOOTLOADER:
+            args[1] = CFG->SCR & CFG_SCR_SKIP_BOOTLOADER;
+            break;
     }
 }
 
@@ -175,7 +182,7 @@ void process_cfg (void) {
     uint32_t args[2];
 
     if (CFG->SCR & CFG_SCR_CPU_BUSY) {
-        scr_clr_bit(CFG_SCR_CMD_ERROR);
+        change_scr_bits(CFG_SCR_CMD_ERROR, false);
 
         args[0] = CFG->DATA[0];
         args[1] = CFG->DATA[1];
@@ -190,13 +197,13 @@ void process_cfg (void) {
                 break;
 
             default:
-                scr_set_bit(CFG_SCR_CMD_ERROR);
+                change_scr_bits(CFG_SCR_CMD_ERROR, true);
                 break;
         }
 
         CFG->DATA[0] = args[0];
         CFG->DATA[1] = args[1];
 
-        scr_clr_bit(CFG_SCR_CPU_BUSY);
+        change_scr_bits(CFG_SCR_CPU_BUSY, false);
     }
 }
