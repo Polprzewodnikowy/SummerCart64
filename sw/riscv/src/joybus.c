@@ -19,33 +19,29 @@
 #define RTC_STATUS_RUNNING      (0x00)
 #define RTC_STATUS(running)     (running ? RTC_STATUS_RUNNING : RTC_STATUS_STOPPED)
 
-#define RTC_WP_MASK             (0x03)
-#define RTC_ST_MASK             (0x04)
+#define RTC_BLOCK_CFG           (0)
+#define RTC_BLOCK_BACKUP        (1)
+#define RTC_BLOCK_TIME          (2)
+
+#define RTC_WP_BACKUP           (1 << 0)
+#define RTC_WP_TIME             (1 << 1)
+#define RTC_WP_MASK             (RTC_WP_TIME | RTC_WP_BACKUP)
+#define RTC_ST                  (1 << 2)
 #define RTC_CENTURY_20XX        (0x01)
 
 
-static void rx (uint8_t *data) {
+static void joybus_rx (uint8_t *data) {
     uint32_t rx_length = (JOYBUS->SCR & JOYBUS_SCR_RX_LENGTH_MASK) >> JOYBUS_SCR_RX_LENGTH_BIT;
     for (size_t i = 0; i < rx_length; i++) {
         data[i] = ((uint8_t *) JOYBUS->DATA)[(10 - rx_length) + i];
     }
 }
 
-static void tx (uint8_t *data, size_t length) {
+static void joybus_tx (uint8_t *data, size_t length) {
     for (size_t i = 0; i < ((length + 3) / 4); i++) {
         JOYBUS->DATA[i] = ((uint32_t *) data)[i];
     }
-    JOYBUS->DATA[length / 4] |= (0x80 << ((length % 4) * 8));
-    JOYBUS->SCR = (((length * 8) + 1) << JOYBUS_SCR_TX_LENGTH_BIT) | JOYBUS_SCR_TX_START;
-}
-
-static uint32_t swapb (uint32_t data) {
-    return (
-        (data << 24) |
-        ((data << 8) & 0x00FF0000) |
-        ((data >> 8) & 0x0000FF00) |
-        (data >> 24)
-    );
+    JOYBUS->SCR = ((length * 8) << JOYBUS_SCR_TX_LENGTH_BIT) | JOYBUS_SCR_TX_START;
 }
 
 
@@ -79,7 +75,7 @@ void process_joybus (void) {
 
     if (JOYBUS->SCR & JOYBUS_SCR_RX_READY) {
         if (JOYBUS->SCR & JOYBUS_SCR_RX_STOP_BIT) {
-            rx(rx_data);
+            joybus_rx(rx_data);
 
             for (size_t i = 0; i < sizeof(tx_data); i++) {
                 tx_data[i] = 0x00;
@@ -90,21 +86,21 @@ void process_joybus (void) {
                 switch (rx_data[0]) {
                     case CMD_EEPROM_STATUS:
                         tx_data[1] = p.eeprom_type == EEPROM_16K ? EEPROM_ID_16K : EEPROM_ID_4K;
-                        tx(tx_data, 3);
+                        joybus_tx(tx_data, 3);
                         break;
 
                     case CMD_EEPROM_READ:
                         data_offset = (uint32_t *) (&tx_data[0]);
-                        data_offset[0] = swapb(save_data[0]);
-                        data_offset[1] = swapb(save_data[1]);
-                        tx(tx_data, 8);
+                        data_offset[0] = save_data[0];
+                        data_offset[1] = save_data[1];
+                        joybus_tx(tx_data, 8);
                         break;
 
                     case CMD_EEPROM_WRITE:
                         data_offset = (uint32_t *) (&rx_data[2]);
-                        save_data[0] = swapb(data_offset[0]);
-                        save_data[1] = swapb(data_offset[1]);
-                        tx(tx_data, 1);
+                        save_data[0] = data_offset[0];
+                        save_data[1] = data_offset[1];
+                        joybus_tx(tx_data, 1);
                         break;
                 }
             }
@@ -113,16 +109,16 @@ void process_joybus (void) {
                 case CMD_RTC_STATUS:
                     tx_data[1] = RTC_ID;
                     tx_data[2] = RTC_STATUS(p.rtc_running);
-                    tx(tx_data, 3);
+                    joybus_tx(tx_data, 3);
                     break;
 
                 case CMD_RTC_READ:
-                    if (rx_data[1] == 0) {
+                    if (rx_data[1] == RTC_BLOCK_CFG) {
                         tx_data[0] = p.rtc_write_protect;
                         if (!p.rtc_running) {
-                            tx_data[1] = RTC_ST_MASK;
+                            tx_data[1] = RTC_ST;
                         }
-                    } else if (rx_data[1] == 2) {
+                    } else if (rx_data[1] == RTC_BLOCK_TIME) {
                         rtc_time_t *rtc_time = rtc_get_time();
                         tx_data[0] = rtc_time->seconds;
                         tx_data[1] = rtc_time->minutes;
@@ -134,14 +130,14 @@ void process_joybus (void) {
                         tx_data[7] = RTC_CENTURY_20XX;
                     }
                     tx_data[8] = RTC_STATUS(p.rtc_running);
-                    tx(tx_data, 9);
+                    joybus_tx(tx_data, 9);
                     break;
 
                 case CMD_RTC_WRITE:
-                    if (rx_data[1] == 0) {
+                    if (rx_data[1] == RTC_BLOCK_CFG) {
                         p.rtc_write_protect = rx_data[2] & RTC_WP_MASK;
-                        p.rtc_running = (!(rx_data[3] & RTC_ST_MASK));
-                    } else if (rx_data[1] == 2) {
+                        p.rtc_running = (!(rx_data[3] & RTC_ST));
+                    } else if (rx_data[1] == RTC_BLOCK_TIME && (!(p.rtc_write_protect & RTC_WP_TIME))) {
                         rtc_time_t rtc_time;
                         rtc_time.seconds = rx_data[2];
                         rtc_time.minutes = rx_data[3];
@@ -153,7 +149,7 @@ void process_joybus (void) {
                         rtc_set_time(&rtc_time);
                     }
                     tx_data[0] = RTC_STATUS(p.rtc_running);
-                    tx(tx_data, 1);
+                    joybus_tx(tx_data, 1);
                     break;
             }
         }

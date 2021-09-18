@@ -57,7 +57,7 @@ module cpu_flashram (
                 flashram.operation_pending
             };
             if (bus.address[7]) begin
-                bus.rdata = flashram.rdata;
+                bus.rdata = {flashram.rdata[7:0], flashram.rdata[15:8], flashram.rdata[23:16], flashram.rdata[31:24]};
             end
         end
 

@@ -201,14 +201,16 @@ module n64_si (
                         tx_sub_bit_counter <= tx_sub_bit_counter + 1'd1;
                         if (tx_sub_bit_counter == 3'd7) begin
                             tx_shift <= 1'b1;
-                            if (tx_bit_counter > 7'd1) begin
+                            if (tx_bit_counter >= 7'd1) begin
                                 tx_bit_counter <= tx_bit_counter - 1'd1;
                             end else begin
                                 tx_state <= S_TX_IDLE;
                                 si.tx_busy <= 1'b0;
                             end
                         end
-                        if (trx_data[80]) begin
+                        if (tx_bit_counter == 7'd0) begin
+                            si_dq_output_enable_data <= tx_sub_bit_counter < 3'd4;
+                        end else if (trx_data[80]) begin
                             si_dq_output_enable_data <= tx_sub_bit_counter < 3'd2;
                         end else begin
                             si_dq_output_enable_data <= tx_sub_bit_counter < 3'd6;

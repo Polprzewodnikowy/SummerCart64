@@ -41,12 +41,12 @@ module cpu_sdram (
     always_comb begin
         bus.rdata = 32'd0;
         if (bus.ack) begin
-            bus.rdata = rdata;
+            bus.rdata = {rdata[7:0], rdata[15:8], rdata[23:16], rdata[31:24]};
         end
 
         sdram.write = current_word ? &bus.wmask[1:0] : &bus.wmask[3:2];
         sdram.address = {1'b0, bus.address[30:2], current_word, 1'b0};
-        sdram.wdata = current_word ? bus.wdata[15:0] : bus.wdata[31:16];
+        sdram.wdata = current_word ? {bus.wdata[23:16], bus.wdata[31:24]} : {bus.wdata[7:0], bus.wdata[15:8]};
     end
 
     always_ff @(posedge sys.clk) begin
