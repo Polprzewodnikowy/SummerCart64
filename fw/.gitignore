@@ -7,3 +7,6 @@
 *.rpt
 *.txt
 *.sopcinfo
+**/*.elf
+**/*.bin
+**/*.dat

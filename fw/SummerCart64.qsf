@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 00:00:00  November 06, 2020
+# Date created = 21:23:28  September 18, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -40,55 +40,65 @@
 
 # Project-Wide Assignments
 # ========================
-set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.0
-set_global_assignment -name PROJECT_CREATION_TIME_DATE "23:45:19  JULY 29, 2020"
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.1
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "10:53:32  AUGUST 01, 2021"
 set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
-set_global_assignment -name SMART_RECOMPILE OFF
-set_global_assignment -name NUM_PARALLEL_PROCESSORS 16
-set_global_assignment -name QIP_FILE rtl/intel/fifo/fifo_usb.qip
-set_global_assignment -name QIP_FILE rtl/intel/gpio/gpio_ddro.qip
-set_global_assignment -name QIP_FILE rtl/intel/pll/pll.qip
-set_global_assignment -name QIP_FILE rtl/intel/ram/ram_n64_eeprom.qip
-set_global_assignment -name QSYS_FILE rtl/intel/flash/onchip_flash.qsys
-set_global_assignment -name SDC_FILE constraints.sdc
-set_global_assignment -name SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/intel/gpio/gpio_ddro/altera_gpio_lite.sv -library gpio_ddro
-set_global_assignment -name VERILOG_FILE rtl/cart/cart_control.v
-set_global_assignment -name VERILOG_FILE rtl/cart/cart_led.v
-set_global_assignment -name VERILOG_FILE rtl/glue/device_arbiter.v
-set_global_assignment -name VERILOG_FILE rtl/memory/memory_embedded_flash.v
-set_global_assignment -name VERILOG_FILE rtl/memory/memory_sdram.v
-set_global_assignment -name VERILOG_FILE rtl/n64/n64_bank_decoder.v
-set_global_assignment -name VERILOG_FILE rtl/n64/n64_pi.v
-set_global_assignment -name VERILOG_FILE rtl/n64/n64_si.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_clk.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_cmd.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_crc_16.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_crc_7.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_dat.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_dma.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_fifo.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_interface.v
-set_global_assignment -name VERILOG_FILE rtl/sd/sd_regs.v
-set_global_assignment -name VERILOG_FILE rtl/top.v
-set_global_assignment -name VERILOG_FILE rtl/usb/usb_ftdi_fsi.v
-set_global_assignment -name VERILOG_FILE rtl/usb/usb_pc.v
-set_global_assignment -name VERILOG_INCLUDE_FILE rtl/constants.vh
-set_global_assignment -name SLD_FILE db/signal_tap_logic_analyzer_auto_stripped.stp
+set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
+set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
+set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
+set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
+set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
+set_global_assignment -name SDC_FILE SummerCart64.sdc
+set_global_assignment -name SIGNALTAP_FILE stp.stp
+set_global_assignment -name SYSTEMVERILOG_FILE cpu/picorv32/picorv32.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flashram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_ram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_si.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_flash.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_cfg.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_dd.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_flashram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_pi_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_si.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_soc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/SummerCart64.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
+set_global_assignment -name SIGNALTAP_FILE output_files/signaltap.stp
+set_global_assignment -name SLD_FILE db/signaltap_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
-set_location_assignment PIN_6 -to io_pmod[3]
-set_location_assignment PIN_7 -to io_pmod[4]
-set_location_assignment PIN_8 -to io_pmod[5]
-set_location_assignment PIN_10 -to io_pmod[6]
-set_location_assignment PIN_11 -to io_pmod[7]
-set_location_assignment PIN_12 -to o_ftdi_si
-set_location_assignment PIN_13 -to o_ftdi_clk
-set_location_assignment PIN_14 -to i_ftdi_so
-set_location_assignment PIN_15 -to i_ftdi_cts
+set_location_assignment PIN_6 -to o_usb_clk
+set_location_assignment PIN_7 -to io_usb_miosi[2]
+set_location_assignment PIN_8 -to io_usb_miosi[3]
+set_location_assignment PIN_10 -to io_usb_miosi[0]
+set_location_assignment PIN_11 -to io_usb_miosi[1]
+set_location_assignment PIN_12 -to i_uart_rxd
+set_location_assignment PIN_13 -to o_uart_txd
+set_location_assignment PIN_14 -to i_uart_cts
+set_location_assignment PIN_15 -to o_uart_rts
 set_location_assignment PIN_17 -to o_led
 set_location_assignment PIN_21 -to o_rtc_scl
 set_location_assignment PIN_22 -to io_rtc_sda
@@ -97,6 +107,8 @@ set_location_assignment PIN_25 -to i_n64_nmi
 set_location_assignment PIN_26 -to i_clk
 set_location_assignment PIN_27 -to i_n64_reset
 set_location_assignment PIN_28 -to i_n64_si_clk
+set_location_assignment PIN_29 -to io_n64_cic_clk
+set_location_assignment PIN_30 -to io_n64_cic_dq
 set_location_assignment PIN_32 -to io_n64_pi_ad[7]
 set_location_assignment PIN_33 -to io_n64_pi_ad[8]
 set_location_assignment PIN_38 -to io_n64_pi_ad[6]
@@ -159,26 +171,27 @@ set_location_assignment PIN_114 -to o_sd_clk
 set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
-set_location_assignment PIN_121 -to io_sram_dq[0]
-set_location_assignment PIN_122 -to o_sram_clk
-set_location_assignment PIN_123 -to io_sram_dq[3]
-set_location_assignment PIN_124 -to o_sram_cs
-set_location_assignment PIN_126 -to io_sram_dq[1]
-set_location_assignment PIN_127 -to io_sram_dq[2]
-set_location_assignment PIN_138 -to io_pmod[0]
-set_location_assignment PIN_140 -to io_pmod[1]
-set_location_assignment PIN_141 -to io_pmod[2]
+set_location_assignment PIN_123 -to o_n64_irq
+set_location_assignment PIN_127 -to io_avr_mosi
+set_location_assignment PIN_130 -to io_flash_dq[0]
+set_location_assignment PIN_131 -to o_flash_clk
+set_location_assignment PIN_132 -to io_flash_dq[3]
+set_location_assignment PIN_134 -to o_flash_cs
+set_location_assignment PIN_135 -to io_flash_dq[1]
+set_location_assignment PIN_136 -to io_flash_dq[2]
+set_location_assignment PIN_138 -to i_usb_pwren
+set_location_assignment PIN_140 -to o_usb_cs
+set_location_assignment PIN_141 -to i_usb_miso
 
 # Classic Timing Assignments
 # ==========================
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
-set_global_assignment -name TIMING_ANALYZER_DO_REPORT_TIMING ON
 
 # Compiler Assignments
 # ====================
-set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
+set_global_assignment -name OPTIMIZATION_MODE BALANCED
 
 # Analysis & Synthesis Assignments
 # ================================
@@ -186,9 +199,12 @@ set_global_assignment -name FAMILY "MAX 10"
 set_global_assignment -name DEVICE_FILTER_PACKAGE EQFP
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
 set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
+set_global_assignment -name PROJECT_IP_REGENERATION_POLICY ALWAYS_REGENERATE_IP
+set_global_assignment -name VHDL_INPUT_VERSION VHDL_2008
+set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
-set_global_assignment -name TOP_LEVEL_ENTITY top
+set_global_assignment -name TOP_LEVEL_ENTITY SummerCart64
 
 # Fitter Assignments
 # ==================
@@ -196,13 +212,9 @@ set_global_assignment -name DEVICE 10M08SCE144C8G
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
 set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE COMP IMAGE"
 set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
-set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED WITH WEAK PULL-UP"
-set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE COMP IMAGE"
-set_global_assignment -name PHYSICAL_SYNTHESIS_ASYNCHRONOUS_SIGNAL_PIPELINING OFF
-set_global_assignment -name ROUTER_CLOCKING_TOPOLOGY_ANALYSIS ON
-set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
 
 # Assembler Assignments
 # =====================
@@ -210,14 +222,10 @@ set_global_assignment -name ENABLE_OCT_DONE OFF
 set_global_assignment -name EXTERNAL_FLASH_FALLBACK_ADDRESS 00000000
 set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 
-# Programmer Assignments
-# ======================
-set_global_assignment -name GENERATE_SVF_FILE ON
-
 # Signal Tap Assignments
 # ======================
 set_global_assignment -name ENABLE_SIGNALTAP ON
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/signal_tap_logic_analyzer.stp
+set_global_assignment -name USE_SIGNALTAP_FILE output_files/signaltap.stp
 
 # Power Estimation Assignments
 # ============================
@@ -232,40 +240,62 @@ set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
 set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 
-# ------------------------------
-# start ENTITY(altera_gpio_lite)
+# --------------------------
+# start ENTITY(SummerCart64)
 
-	# Project-Wide Assignments
-	# ========================
-
-# end ENTITY(altera_gpio_lite)
-# ----------------------------
-
-# -----------------------
-# start ENTITY(gpio_ddro)
-
-	# Project-Wide Assignments
-	# ========================
-
-# end ENTITY(gpio_ddro)
-# ---------------------
-
-# -----------------
-# start ENTITY(top)
+	# Pin & Location Assignments
+	# ==========================
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_cts
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_si_dq
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_pi_ad[*]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_aleh
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_read
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_write
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sd_*
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_pwren
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_rts
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_*
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sd_clk
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sd_*
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[*]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_n64_pi_ad[*]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sd_*
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_rtc_sda
 
 	# Fitter Assignments
 	# ==================
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[*]
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_rxd
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_cts
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
-	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to i_clk
-	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[0]"
-	set_instance_assignment -name GLOBAL_SIGNAL GLOBAL_CLOCK -to "pll:sys_pll|altpll:altpll_component|pll_altpll:auto_generated|wire_pll1_clk[1]"
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_aleh
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_read
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_n64_irq
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_pwren
+	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_miso
 
 	# start DESIGN_PARTITION(Top)
 	# ---------------------------
@@ -280,5 +310,23 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	# end DESIGN_PARTITION(Top)
 	# -------------------------
 
-# end ENTITY(top)
-# ---------------
+# end ENTITY(SummerCart64)
+# ------------------------
+
+# ------------------------------
+# start ENTITY(altera_gpio_lite)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(altera_gpio_lite)
+# ----------------------------
+
+# -----------------------------
+# start ENTITY(intel_gpio_ddro)
+
+	# Project-Wide Assignments
+	# ========================
+
+# end ENTITY(intel_gpio_ddro)
+# ---------------------------

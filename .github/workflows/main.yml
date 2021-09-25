@@ -1,4 +1,4 @@
-name: Build
+name: Build fw/hw/sw
 
 on:
   push:
@@ -18,19 +18,14 @@ jobs:
         with:
           submodules: true
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install avra
-
       - name: Build script
-        run: ./build_release.sh
+        run: ./build.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: SummerCart64
-          path: packages/SummerCart64.zip
+          path: SummerCart64.zip
 
       - name: Get release
         if: github.event_name == 'release' && github.event.action == 'created'
