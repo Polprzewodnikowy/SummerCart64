@@ -121,9 +121,9 @@ void process_rtc (void) {
                 } else if (p.time_valid) {
                     p.running = p.data[RTCSEC] & RTCSEC_ST;
                     sanitize_time(p.data);
-                    p.time.seconds = p.data[RTCSEC];
-                    p.time.minutes = p.data[RTCMIN];
-                    p.time.hours = p.data[RTCHOUR];
+                    p.time.second = p.data[RTCSEC];
+                    p.time.minute = p.data[RTCMIN];
+                    p.time.hour = p.data[RTCHOUR];
                     p.time.weekday = p.data[RTCWKDAY];
                     p.time.day = p.data[RTCDATE];
                     p.time.month = p.data[RTCMTH];
@@ -162,8 +162,8 @@ void process_rtc (void) {
                 p.i2c_write = true;
                 p.i2c_length = 7;
                 p.data[0] = RTCMIN;
-                p.data[1] = p.time.minutes;
-                p.data[2] = p.time.hours;
+                p.data[1] = p.time.minute;
+                p.data[2] = p.time.hour;
                 p.data[3] = p.time.weekday | RTCWKDAY_VBAT;
                 p.data[4] = p.time.day;
                 p.data[5] = p.time.month;
@@ -177,7 +177,7 @@ void process_rtc (void) {
                 p.i2c_length = 2;
                 p.i2c_first_read_done = false;
                 p.data[0] = RTCSEC;
-                p.data[1] = p.time.seconds | RTCSEC_ST;
+                p.data[1] = p.time.second | RTCSEC_ST;
                 p.rtc_phase = RTC_PHASE_WAIT_START;
                 break;
 

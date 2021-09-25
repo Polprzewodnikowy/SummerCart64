@@ -83,6 +83,7 @@ static struct process p;
 
 void usb_init (void) {
     USB->SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
+
     p.state = STATE_IDLE;
 }
 

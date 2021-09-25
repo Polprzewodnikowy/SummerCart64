@@ -34,8 +34,8 @@ __attribute__ ((naked, section(".bootloader"))) void reset_handler (void) {
 #endif
         if (length == 0) {
             __asm__ volatile (
-                "la t0, app_handler\n"
-                "jalr zero, t0\n"
+                "la t0, app_handler \n"
+                "jalr zero, t0 \n"
             );
         }
     }
@@ -44,8 +44,8 @@ __attribute__ ((naked, section(".bootloader"))) void reset_handler (void) {
 
 __attribute__ ((naked)) void app_handler (void) {
     __asm__ volatile (
-        "la sp, __stack_pointer\n"
-        "la gp, __global_pointer\n"
-        "jal zero, main\n"
+        "la sp, __stack_pointer \n"
+        "la gp, __global_pointer \n"
+        "jal zero, main \n"
     );
 }

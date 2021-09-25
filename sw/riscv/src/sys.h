@@ -7,9 +7,6 @@
 #include <stdbool.h>
 
 
-#define DEBUG_ENABLED
-
-
 typedef volatile uint8_t            io8_t;
 typedef volatile uint32_t           io32_t;
 

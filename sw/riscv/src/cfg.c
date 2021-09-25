@@ -89,6 +89,7 @@ static void set_save_type (enum save_type save_type) {
             change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         default:
+            save_type = SAVE_TYPE_NONE;
             break;
     }
 
@@ -113,13 +114,13 @@ void cfg_update (uint32_t *args) {
             change_scr_bits(CFG_SCR_DD_EN, args[1]);
             break;
         case CFG_ID_SAVE_TYPE:
-            set_save_type((enum save_type)(args[1]));
+            set_save_type((enum save_type) (args[1]));
             break;
         case CFG_ID_CIC_SEED:
-            p.cic_seed = (uint16_t)(args[1] & 0xFFFF);
+            p.cic_seed = (uint16_t) (args[1] & 0xFFFF);
             break;
         case CFG_ID_TV_TYPE:
-            p.tv_type = (uint8_t)(args[1] & 0x03);
+            p.tv_type = (uint8_t) (args[1] & 0x03);
             break;
         case CFG_ID_SAVE_OFFEST:
             CFG->SAVE_OFFSET = args[1];
@@ -148,13 +149,13 @@ void cfg_query (uint32_t *args) {
             args[1] = CFG->SCR & CFG_SCR_DD_EN;
             break;
         case CFG_ID_SAVE_TYPE:
-            args[1] = (uint32_t)(p.save_type);
+            args[1] = (uint32_t) (p.save_type);
             break;
         case CFG_ID_CIC_SEED:
-            args[1] = (uint32_t)(p.cic_seed);
+            args[1] = (uint32_t) (p.cic_seed);
             break;
         case CFG_ID_TV_TYPE:
-            args[1] = (uint32_t)(p.tv_type);
+            args[1] = (uint32_t) (p.tv_type);
             break;
         case CFG_ID_SAVE_OFFEST:
             args[1] = CFG->SAVE_OFFSET;
@@ -171,8 +172,10 @@ void cfg_query (uint32_t *args) {
 
 void cfg_init (void) {
     set_save_type(SAVE_TYPE_NONE);
+
     CFG->DD_OFFSET = DEFAULT_DD_OFFSET;
     CFG->SCR = CFG_SCR_CPU_READY | CFG_SCR_SDRAM_SWITCH;
+
     p.cic_seed = 0xFFFF;
     p.tv_type = 0x03;
 }

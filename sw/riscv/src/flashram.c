@@ -54,7 +54,7 @@ void process_flashram (void) {
 
     if (op != OP_NONE) {
         length = get_operation_length(op);
-        save_data = (io32_t *)(SDRAM_BASE + CFG->SAVE_OFFSET + ((FLASHRAM->SCR >> FLASHRAM_PAGE_BIT) * FLASHRAM_PAGE_SIZE));
+        save_data = (io32_t *) (SDRAM_BASE + CFG->SAVE_OFFSET + ((FLASHRAM->SCR >> FLASHRAM_PAGE_BIT) * FLASHRAM_PAGE_SIZE));
 
         for (uint32_t i = 0; i < (length / 4); i++) {
             if (op == OP_WRITE_PAGE) {

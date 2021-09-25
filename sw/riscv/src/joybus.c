@@ -31,15 +31,15 @@
 
 
 static void joybus_rx (uint8_t *data) {
-    uint32_t rx_length = (JOYBUS->SCR & JOYBUS_SCR_RX_LENGTH_MASK) >> JOYBUS_SCR_RX_LENGTH_BIT;
+    size_t rx_length = (JOYBUS->SCR & JOYBUS_SCR_RX_LENGTH_MASK) >> JOYBUS_SCR_RX_LENGTH_BIT;
     for (size_t i = 0; i < rx_length; i++) {
-        data[i] = ((uint8_t *) JOYBUS->DATA)[(10 - rx_length) + i];
+        data[i] = ((uint8_t *) (JOYBUS->DATA))[(10 - rx_length) + i];
     }
 }
 
 static void joybus_tx (uint8_t *data, size_t length) {
     for (size_t i = 0; i < ((length + 3) / 4); i++) {
-        JOYBUS->DATA[i] = ((uint32_t *) data)[i];
+        JOYBUS->DATA[i] = ((uint32_t *) (data))[i];
     }
     JOYBUS->SCR = ((length * 8) << JOYBUS_SCR_TX_LENGTH_BIT) | JOYBUS_SCR_TX_START;
 }
@@ -61,6 +61,7 @@ void joybus_set_eeprom (enum eeprom_type eeprom_type) {
 
 void joybus_init (void) {
     JOYBUS->SCR = JOYBUS_SCR_TX_RESET | JOYBUS_SCR_RX_RESET;
+
     p.eeprom_type = EEPROM_NONE;
     p.rtc_running = true;
     p.rtc_write_protect = RTC_WP_MASK;
@@ -120,9 +121,9 @@ void process_joybus (void) {
                         }
                     } else if (rx_data[1] == RTC_BLOCK_TIME) {
                         rtc_time_t *rtc_time = rtc_get_time();
-                        tx_data[0] = rtc_time->seconds;
-                        tx_data[1] = rtc_time->minutes;
-                        tx_data[2] = rtc_time->hours | 0x80;
+                        tx_data[0] = rtc_time->second;
+                        tx_data[1] = rtc_time->minute;
+                        tx_data[2] = rtc_time->hour | 0x80;
                         tx_data[4] = rtc_time->weekday - 1;
                         tx_data[3] = rtc_time->day;
                         tx_data[5] = rtc_time->month;
@@ -139,9 +140,9 @@ void process_joybus (void) {
                         p.rtc_running = (!(rx_data[3] & RTC_ST));
                     } else if (rx_data[1] == RTC_BLOCK_TIME && (!(p.rtc_write_protect & RTC_WP_TIME))) {
                         rtc_time_t rtc_time;
-                        rtc_time.seconds = rx_data[2];
-                        rtc_time.minutes = rx_data[3];
-                        rtc_time.hours = rx_data[4] & 0x7F;
+                        rtc_time.second = rx_data[2];
+                        rtc_time.minute = rx_data[3];
+                        rtc_time.hour = rx_data[4] & 0x7F;
                         rtc_time.weekday = rx_data[6] + 1;
                         rtc_time.day = rx_data[5];
                         rtc_time.month = rx_data[7];
