@@ -1,4 +1,4 @@
-# SummerCollection [![Build Status](https://travis-ci.org/Polprzewodnikowy/SummerCollection.svg?branch=main)](https://travis-ci.org/Polprzewodnikowy/SummerCollection)
+# SummerCollection
 
 A collection of hardware, firmware and software designs of SummerCart64 - Nintendo 64 FlashCart/DevKit.
 
