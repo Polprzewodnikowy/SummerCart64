@@ -5,7 +5,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sc64env
+  IMAGE_NAME: polprzewodnikowy/sc64env
 
 jobs:
   build-and-push-image:
