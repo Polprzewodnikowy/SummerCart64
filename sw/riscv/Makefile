@@ -1,4 +1,4 @@
-TOOLCHAIN = riscv64-unknown-elf-
+TOOLCHAIN = riscv32-unknown-elf-
 CC = $(TOOLCHAIN)gcc
 OBJCOPY = $(TOOLCHAIN)objcopy
 SIZE = $(TOOLCHAIN)size
@@ -9,7 +9,6 @@ LDFLAGS = -nostartfiles -Wl,--gc-sections
 
 SRC_DIR = src
 BUILD_DIR = build
-BOOTLOADER_DIR = ../../fw/rtl/cpu
 
 SRCS = $(wildcard $(patsubst %, %/*.c, . $(SRC_DIR)))
 OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(SRCS:.c=.o)))
@@ -19,7 +18,7 @@ VPATH = $(SRC_DIR)
 
 $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
 
-all: $(BOOTLOADER_DIR)/cpu_bootloader.sv $(BUILD_DIR)/controller.rom
+all: $(BUILD_DIR)/cpu_bootloader.sv $(BUILD_DIR)/controller.rom
 
 $(BUILD_DIR)/%.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
@@ -36,7 +35,7 @@ $(BUILD_DIR)/controller.rom: $(BUILD_DIR)/uc.elf
 	@echo 'Size of controller:'
 	@$(SIZE) -B $(BUILD_DIR)/controller.elf
 
-$(BOOTLOADER_DIR)/cpu_bootloader.sv: $(BUILD_DIR)/uc.elf
+$(BUILD_DIR)/cpu_bootloader.sv: $(BUILD_DIR)/uc.elf
 	$(OBJCOPY) -j .bootloader $(BUILD_DIR)/uc.elf $(BUILD_DIR)/bootloader.elf
 	$(OBJCOPY) -O binary $(BUILD_DIR)/bootloader.elf $(BUILD_DIR)/bootloader.bin
 	python3 tools/bin2sv.py tools/cpu_bootloader_template.sv $@ < $(BUILD_DIR)/bootloader.bin
