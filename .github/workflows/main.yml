@@ -2,11 +2,14 @@ name: Build fw/hw/sw
 
 on:
   push:
-    branches: [ main ]
+    branches: 
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
   release:
-    types: [ created ]
+    types:
+      - created
   workflow_dispatch:
 
 jobs:
