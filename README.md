@@ -66,8 +66,8 @@ Current goal is to fix bugs in SDRAM and PC modules.
 
 ## Finished sample
 
-![SummerCart64 clean PCB](.media/sc64_clean_pcb.jpg)
+![SummerCart64 clean PCB](.github/sc64_clean_pcb.jpg)
 
-![SummerCart64 on table](.media/sc64_on_table.jpg)
+![SummerCart64 on table](.github/sc64_on_table.jpg)
 
-![SummerCart64 in partialy disassembled Nintendo 64](.media/sc64_in_n64.jpg)
+![SummerCart64 in partialy disassembled Nintendo 64](.github/sc64_in_n64.jpg)

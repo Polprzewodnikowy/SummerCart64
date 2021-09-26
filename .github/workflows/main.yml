@@ -1,4 +1,4 @@
-name: Build fw/hw/sw
+name: build
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           submodules: true
 
       - name: Build script
-        run: ./build.sh
+        run: ./build_in_docker.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
