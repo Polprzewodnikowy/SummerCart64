@@ -1,5 +1,6 @@
 #include "cfg.h"
 #include "joybus.h"
+#include "usb.h"
 
 
 #define SAVE_SIZE_EEPROM_4K     (512)
@@ -197,6 +198,37 @@ void process_cfg (void) {
 
             case 'Q':
                 cfg_query(args);
+                break;
+
+            case 'S':
+                args[0] = usb_debug_tx_ready();
+                break;
+
+            case 'D':
+                if (!usb_debug_tx_data(args[0], (size_t) args[1])) {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                }
+                break;
+
+            case 'A':
+                if (!usb_debug_rx_ready(&args[0], (size_t *) (&args[1]))) {
+                    args[0] = 0;
+                    args[1] = 0;
+                }
+                break;
+
+            case 'F':
+                args[0] = usb_debug_rx_busy();
+                break;
+            
+            case 'E':
+                if (!usb_debug_rx_data(args[0], (size_t) args[1])) {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                }
+                break;
+
+            case 'B':
+                usb_debug_reset();
                 break;
 
             default:
