@@ -29,6 +29,7 @@ $(BUILD_DIR)/uc.elf: $(OBJS) SC64.ld
 $(BUILD_DIR)/controller.rom: $(BUILD_DIR)/uc.elf
 	$(OBJCOPY) -R .bootloader $(BUILD_DIR)/uc.elf $(BUILD_DIR)/controller.elf
 	$(OBJCOPY) -O binary --set-section-flags .bss=alloc,contents $(BUILD_DIR)/controller.elf $(BUILD_DIR)/controller.bin
+	$(OBJCOPY) -I binary -O ihex $(BUILD_DIR)/controller.bin $(BUILD_DIR)/controller.hex
 	python3 tools/bin2rom.py $@ < $(BUILD_DIR)/controller.bin
 	@echo 'Size of controller modules:'
 	@$(SIZE) -B -t --common $(OBJS)

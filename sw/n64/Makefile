@@ -1,69 +1,28 @@
-ROOTDIR = $(N64_INST)
-
-GCCN64PREFIX = $(ROOTDIR)/bin/mips64-elf-
-CC = $(GCCN64PREFIX)gcc
-AS = $(GCCN64PREFIX)as
-LD = $(GCCN64PREFIX)ld
-OBJCOPY = $(GCCN64PREFIX)objcopy
-OBJDUMP = $(GCCN64PREFIX)objdump
-
-CHKSUM64 = $(ROOTDIR)/bin/chksum64
-MKSPRITE = $(ROOTDIR)/bin/mksprite
-N64TOOL = $(ROOTDIR)/bin/n64tool
-
-HEADER_PATH = $(ROOTDIR)/mips64-elf/lib
-HEADER_NAME = header
-
-PROG_NAME = SummerLoader64
-
-ROM_SIZE = 1028k
-
-SOURCE_DIR = src
 BUILD_DIR = build
+SOURCE_DIR = src
+PROGRAM_NAME = SummerLoader64
 
-SRC_DIRS = $(SOURCE_DIR) $(sort $(dir $(wildcard $(SOURCE_DIR)/*/.)))
-INC_DIRS = $(addprefix -I, . $(SRC_DIRS)) -I./libsc64/inc
-SRC_FILES = $(wildcard $(patsubst %, %/*.c, . $(SRC_DIRS)))
-# IMG_FILES = $(wildcard $(patsubst %, %/*.png, . $(SRC_DIRS)))
-OBJ_FILES = $(addprefix $(BUILD_DIR)/, $(notdir $(IMG_FILES:.png=.o) $(SRC_FILES:.c=.o)))
+include $(N64_INST)/include/n64.mk
 
-VPATH = $(SRC_DIRS)
+src = main.c sc64.c boot.c crc32.c
 
-COMMONFLAGS = -march=vr4300 -mtune=vr4300
-ASFLAGS = $(COMMONFLAGS)
-CFLAGS = $(COMMONFLAGS) -std=gnu11 -Os -Wall -I$(ROOTDIR)/mips64-elf/include $(INC_DIRS) -ffunction-sections -fdata-sections -Wl,--gc-sections
-LINK_FLAGS = -L$(ROOTDIR)/mips64-elf/lib -ldragon -lc -lm -ldragonsys -Tn64.ld
-#-L./libsc64/lib -lsc64_libdragon
-N64_FLAGS = -l $(ROM_SIZE) -h $(HEADER_PATH)/$(HEADER_NAME) -o $(BUILD_DIR)/$(PROG_NAME).z64
+all: $(BUILD_DIR)/$(PROGRAM_NAME).hex
 
-all: make_output_dir $(BUILD_DIR)/$(PROG_NAME).z64
+$(BUILD_DIR)/$(PROGRAM_NAME).elf: $(src:%.c=$(BUILD_DIR)/%.o)
 
-$(OBJ_FILES): Makefile
+$(PROGRAM_NAME).z64: N64_ROM_TITLE="$(PROGRAM_NAME)"
 
-$(BUILD_DIR)/$(PROG_NAME).z64: $(BUILD_DIR)/$(PROG_NAME).elf
-	$(OBJCOPY) $(BUILD_DIR)/$(PROG_NAME).elf $(BUILD_DIR)/$(PROG_NAME).bin -O binary
-	$(OBJDUMP) -S $(BUILD_DIR)/$(PROG_NAME).elf > $(BUILD_DIR)/$(PROG_NAME).lst
-	$(N64TOOL) $(N64_FLAGS) -t $(PROG_NAME) $(BUILD_DIR)/$(PROG_NAME).bin
-	$(CHKSUM64) $(BUILD_DIR)/$(PROG_NAME).z64
-	truncate --size=90k $(BUILD_DIR)/$(PROG_NAME).z64
-	$(OBJCOPY) $(BUILD_DIR)/$(PROG_NAME).z64 $(BUILD_DIR)/$(PROG_NAME).hex -I binary -O ihex
-
-$(BUILD_DIR)/$(PROG_NAME).elf: $(OBJ_FILES)
-	$(LD) -o $(BUILD_DIR)/$(PROG_NAME).elf $(OBJ_FILES) $(LINK_FLAGS)
-
-$(BUILD_DIR)/%.o: %.c
-	$(COMPILE.c) $(OUTPUT_OPTION) $<
-
-# $(BUILD_DIR)/%.sprite: $(IMG_FILES)
-# 	$(MKSPRITE) 32 $< $@
-
-# $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.sprite
-# 	$(OBJCOPY) -I binary -O elf32-bigmips -B mips:4000 --rename-section .data=.rodata $< $@
-
-make_output_dir:
-	$(shell mkdir ./$(BUILD_DIR) 2> /dev/null)
+$(BUILD_DIR)/$(PROGRAM_NAME).hex: $(PROGRAM_NAME).z64
+	sed 's/\x00*$$//' $(PROGRAM_NAME).z64 > $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64
+	@if [ $$(stat -L -c %s $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64) -gt 92160 ]; then\
+		echo "\n    Error: stripped file size is larger than 90kB thus cannot fit inside FPGA flash.\n"; exit 1;\
+	fi
+	truncate --size=90k $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64
+	$(N64_OBJCOPY) -I binary -O ihex $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64 $(BUILD_DIR)/$(PROGRAM_NAME).hex
 
 clean:
-	$(shell rm -rf ./$(BUILD_DIR) 2> /dev/null)
+	rm -rf ./$(BUILD_DIR) ./$(PROGRAM_NAME).z64
 
-.PHONY: all clean make_output_dir
+-include $(wildcard $(BUILD_DIR)/*.d)
+
+.PHONY: all clean

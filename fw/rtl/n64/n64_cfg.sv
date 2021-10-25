@@ -29,7 +29,7 @@ module n64_cfg (
                 R_SR: bus.rdata = {
                     cfg.cpu_ready,
                     cfg.cpu_busy,
-                    cfg.usb_waiting,
+                    1'b0,
                     cfg.cmd_error,
                     12'd0
                 };

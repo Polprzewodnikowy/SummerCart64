@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 21:23:28  September 18, 2021
+# Date created = 23:19:06  October 24, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -86,7 +86,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
 set_global_assignment -name SIGNALTAP_FILE output_files/signaltap.stp
-set_global_assignment -name SLD_FILE db/signaltap_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================

@@ -3,10 +3,10 @@
 
 PACKAGE_FILE_NAME="SummerCart64"
 FILES=(
-    "./fw/output_files/SummerCart64.pof"
-    "./hw/v1/ftdi-template.xml"
+    "./fw/output_files/SC64_update.bin"
+    "./fw/output_files/SC64_update.pof"
+    "./hw/ftdi-template.xml"
     "./sw/cic/UltraCIC-III.hex"
-    "./sw/riscv/build/controller.rom"
     "./LICENSE"
 )
 
@@ -35,6 +35,10 @@ popd
 pushd fw
 echo "Building FPGA firmware"
 quartus_sh --flow compile ./SummerCart64.qpf
+quartus_cpf -c ./SummerCart64.cof
+cp output_files/SC64_firmware.pof output_files/SC64_update.pof
+cat output_files/sc64_firmware_ufm_auto.rpd output_files/sc64_firmware_cfm0_auto.rpd > output_files/SC64_update_LE.bin
+riscv32-unknown-elf-objcopy -I binary -O binary --reverse-bytes=4 output_files/SC64_update_LE.bin output_files/SC64_update.bin
 popd
 
 
