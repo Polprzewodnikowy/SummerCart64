@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 23:19:06  October 24, 2021
+# Date created = 00:50:07  October 26, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -58,6 +58,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flashram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
@@ -68,7 +69,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
@@ -224,7 +224,6 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # Signal Tap Assignments
 # ======================
 set_global_assignment -name ENABLE_SIGNALTAP ON
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/signaltap.stp
 
 # Power Estimation Assignments
 # ============================

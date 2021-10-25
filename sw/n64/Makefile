@@ -13,7 +13,7 @@ $(BUILD_DIR)/$(PROGRAM_NAME).elf: $(src:%.c=$(BUILD_DIR)/%.o)
 $(PROGRAM_NAME).z64: N64_ROM_TITLE="$(PROGRAM_NAME)"
 
 $(BUILD_DIR)/$(PROGRAM_NAME).hex: $(PROGRAM_NAME).z64
-	sed 's/\x00*$$//' $(PROGRAM_NAME).z64 > $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64
+	sed '$$ s/\x00*$$//' $(PROGRAM_NAME).z64 > $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64
 	@if [ $$(stat -L -c %s $(BUILD_DIR)/$(PROGRAM_NAME)_stripped.z64) -gt 92160 ]; then\
 		echo "\n    Error: stripped file size is larger than 90kB thus cannot fit inside FPGA flash.\n"; exit 1;\
 	fi

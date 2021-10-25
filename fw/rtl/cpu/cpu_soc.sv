@@ -5,6 +5,7 @@ module cpu_soc (
     if_sdram.cpu sdram,
     if_flashram.cpu flashram,
     if_si.cpu si,
+    if_flash.cpu flash,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -109,6 +110,12 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_SI].device),
         .si(si)
+    );
+
+    cpu_flash cpu_flash_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_FLASH].device),
+        .flash(flash)
     );
 
 endmodule

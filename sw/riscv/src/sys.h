@@ -13,6 +13,7 @@ typedef volatile uint32_t           io32_t;
 
 #define RAM_BASE                    (0x00000000UL)
 #define RAM                         (*((io32_t *) RAM_BASE))
+#define RAM_SIZE                    (16 * 1024)
 
 
 #define BOOTLOADER_BASE             (0x10000000UL)
@@ -151,6 +152,21 @@ typedef volatile struct joybus_regs {
 #define JOYBUS_SCR_RX_LENGTH_BIT    (8)
 #define JOYBUS_SCR_RX_LENGTH_MASK   (0x7F << JOYBUS_SCR_RX_LENGTH_BIT)
 #define JOYBUS_SCR_TX_LENGTH_BIT    (16)
+
+
+#define FLASH_BASE                  (0xB0000000UL)
+#define FLASH                       (*((io32_t *) FLASH_BASE))
+
+#define FLASH_IMAGE_OFFSET          (0x35800)
+
+
+typedef volatile struct flash_regs {
+    io32_t SR;
+    io32_t CR;
+} flash_regs_t;
+
+#define FLASH_SCR_BASE              (0xB8000000UL)
+#define FLASH_SCR                   ((flash_regs_t *) FLASH_SCR_BASE)
 
 
 void reset_handler (void);

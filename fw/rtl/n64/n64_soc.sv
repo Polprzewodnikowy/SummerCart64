@@ -5,6 +5,7 @@ module n64_soc (
     if_sdram.memory sdram,
     if_flashram.flashram flashram,
     if_si.si si,
+    if_flash.memory flash,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -63,7 +64,8 @@ module n64_soc (
 
     n64_bootloader n64_bootloader_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_N64_BOOTLOADER].device)
+        .bus(bus.at[sc64::ID_N64_BOOTLOADER].device),
+        .flash(flash)
     );
 
     n64_flashram n64_flashram_inst (
