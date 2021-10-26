@@ -4,7 +4,7 @@
 
 __attribute__ ((naked, section(".bootloader"))) void reset_handler (void) {
     io32_t *ram = (io32_t *) &RAM;
-    io32_t *flash = (io32_t *) (FLASH_BASE + FLASH_IMAGE_OFFSET);
+    io32_t *flash = (io32_t *) (FLASH_BASE + FLASH_CPU_IMAGE_OFFSET);
 
     for (int i = 0; i < RAM_SIZE; i += 4) {
         *ram++ = *flash++;

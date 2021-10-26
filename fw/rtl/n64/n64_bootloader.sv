@@ -7,6 +7,7 @@ module n64_bootloader (
     logic mem_request;
     logic csr_ack;
     logic data_ack;
+    logic write_ack;
     logic data_busy;
     logic mem_write;
     logic [31:0] mem_address;
@@ -29,6 +30,7 @@ module n64_bootloader (
 
     always_ff @(posedge sys.clk) begin
         csr_ack <= 1'b0;
+        write_ack <= 1'b0;
 
         if (sys.reset) begin
             state <= S_IDLE;
@@ -61,7 +63,10 @@ module n64_bootloader (
                     if ((!mem_address[27] || source_request == T_N64) && !data_busy) begin
                         mem_request <= 1'b0;
                     end
-                    if (csr_ack || data_ack) begin
+                    if (!mem_address[27] && mem_write && !data_busy && !write_ack) begin
+                        write_ack <= 1'b1;
+                    end
+                    if (csr_ack || data_ack || write_ack) begin
                         state <= S_IDLE;
                     end
                 end
@@ -89,7 +94,7 @@ module n64_bootloader (
             else bus.rdata = {data_rdata[7:0], data_rdata[15:8]};
         end
 
-        flash.ack = source_request == T_CPU && (csr_ack || data_ack);
+        flash.ack = source_request == T_CPU && (csr_ack || data_ack || write_ack);
         flash.rdata = 32'd0;
         if (flash.ack) begin
             flash.rdata = csr_or_data ? csr_rdata : data_rdata;

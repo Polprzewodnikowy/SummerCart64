@@ -157,16 +157,33 @@ typedef volatile struct joybus_regs {
 #define FLASH_BASE                  (0xB0000000UL)
 #define FLASH                       (*((io32_t *) FLASH_BASE))
 
-#define FLASH_IMAGE_OFFSET          (0x35800)
+#define FLASH_CPU_IMAGE_OFFSET      (0x35800)
+#define FLASH_SIZE                  (0x39800)
+#define FLASH_NUM_SECTORS           (4)
 
 
-typedef volatile struct flash_regs {
+typedef volatile struct flash_config_regs {
     io32_t SR;
     io32_t CR;
-} flash_regs_t;
+} flash_config_regs_t;
 
-#define FLASH_SCR_BASE              (0xB8000000UL)
-#define FLASH_SCR                   ((flash_regs_t *) FLASH_SCR_BASE)
+#define FLASH_CONFIG_BASE           (0xB8000000UL)
+#define FLASH_CONFIG                ((flash_config_regs_t *) FLASH_CONFIG_BASE)
+
+#define FLASH_SR_STATUS_MASK        (3 << 0)
+#define FLASH_SR_STATUS_IDLE        (0)
+#define FLASH_SR_STATUS_BUSY_ERASE  (1)
+#define FLASH_SR_STATUS_BUSY_WRITE  (2)
+#define FLASH_SR_STATUS_BUSY_READ   (3)
+#define FLASH_SR_READ_SUCCESSFUL    (1 << 2)
+#define FLASH_SR_WRITE_SUCCESSFUL   (1 << 3)
+#define FLASH_SR_ERASE_SUCCESSFUL   (1 << 4)
+#define FLASH_SR_WRITE_PROTECT_BIT  (5)
+
+#define FLASH_CR_PAGE_ERASE_BIT     (0)
+#define FLASH_CR_SECTOR_ERASE_BIT   (20)
+#define FLASH_CR_SECTOR_ERASE_MASK  (7 << FLASH_CR_SECTOR_ERASE_BIT)
+#define FLASH_CR_WRITE_PROTECT_BIT  (23)
 
 
 void reset_handler (void);
