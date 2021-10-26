@@ -30,7 +30,7 @@ module cpu_cfg (
                 R_SCR: bus.rdata = {
                     cfg.cpu_ready,
                     cfg.cpu_busy,
-                    cfg.usb_waiting,
+                    1'b0,
                     cfg.cmd_error,
                     21'd0,
                     skip_bootloader,
@@ -65,7 +65,6 @@ module cpu_cfg (
         if (sys.reset) begin
             cfg.cpu_ready <= 1'b0;
             cfg.cpu_busy <= 1'b0;
-            cfg.usb_waiting <= 1'b0;
             cfg.cmd_error <= 1'b0;
             cfg.sdram_switch <= 1'b0;
             cfg.sdram_writable <= 1'b0;
@@ -91,9 +90,8 @@ module cpu_cfg (
                             {
                                 cfg.cpu_ready,
                                 cfg.cpu_busy,
-                                cfg.usb_waiting,
                                 cfg.cmd_error
-                            } <= bus.wdata[31:28];
+                            } <= {bus.wdata[31:30], bus.wdata[28]};
                         end
                         if (bus.wmask[0]) begin
                             {

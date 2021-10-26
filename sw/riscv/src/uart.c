@@ -38,7 +38,7 @@ void uart_print_08hex (uint32_t number) {
 
 void uart_init (void) {
 #ifdef DEBUG
-    uart_print("App ready!\n");
+    uart_print("App ready from flash!\n");
 #endif
 }
 
@@ -72,7 +72,8 @@ void process_uart (void) {
                     uart_print_02hex(((uint8_t *) (time))[i]);
                     uart_print(" ");
                 }
-                uart_print("\r\n");
+                uart_print("\n");
+                break;
         }
     }
 #endif

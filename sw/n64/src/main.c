@@ -1,5 +1,5 @@
 #include "sc64.h"
-#include "boot/boot.h"
+#include "boot.h"
 
 
 int main(void) {

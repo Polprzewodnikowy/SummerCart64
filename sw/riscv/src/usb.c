@@ -77,6 +77,7 @@ struct process {
     uint32_t args[2];
     bool error;
     bool dma_in_progress;
+    bool queried;
 
     bool debug_rx_busy;
     uint32_t debug_rx_address;
@@ -173,6 +174,7 @@ void process_usb (void) {
                     p.counter = 0;
                     p.error = false;
                     p.dma_in_progress = false;
+                    p.queried = false;
                     p.state = STATE_ARGS;
                 } else {
                     p.cmd = '!';
@@ -199,7 +201,10 @@ void process_usb (void) {
                     break;
 
                 case 'Q':
-                    cfg_query(p.args);
+                    if (!p.queried) {
+                        cfg_query(p.args);
+                        p.queried = true;
+                    }
                     if (tx_word(p.args[1])) {
                         p.state = STATE_RESPONSE;
                     }

@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include "flash.h"
 #include "joybus.h"
 #include "usb.h"
 
@@ -26,6 +27,7 @@ enum cfg_id {
     CFG_ID_SAVE_OFFEST,
     CFG_ID_DD_OFFEST,
     CFG_ID_SKIP_BOOTLOADER,
+    CFG_ID_FLASH_OPERATION,
 };
 
 enum save_type {
@@ -132,6 +134,9 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_SKIP_BOOTLOADER:
             change_scr_bits(CFG_SCR_SKIP_BOOTLOADER, args[1]);
             break;
+        case CFG_ID_FLASH_OPERATION:
+            flash_program(args[1]);
+            break;
     }
 }
 
@@ -166,6 +171,9 @@ void cfg_query (uint32_t *args) {
             break;
         case CFG_ID_SKIP_BOOTLOADER:
             args[1] = CFG->SCR & CFG_SCR_SKIP_BOOTLOADER;
+            break;
+        case CFG_ID_FLASH_OPERATION:
+            args[1] = flash_read(args[1]);
             break;
     }
 }

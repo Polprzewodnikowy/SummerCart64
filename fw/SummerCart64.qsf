@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 21:23:28  September 18, 2021
+# Date created = 22:44:04  October 26, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -58,6 +58,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flashram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
@@ -68,7 +69,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
@@ -86,7 +86,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
 set_global_assignment -name SIGNALTAP_FILE output_files/signaltap.stp
-set_global_assignment -name SLD_FILE db/signaltap_auto_stripped.stp
 
 # Pin & Location Assignments
 # ==========================
@@ -225,7 +224,6 @@ set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
 # Signal Tap Assignments
 # ======================
 set_global_assignment -name ENABLE_SIGNALTAP ON
-set_global_assignment -name USE_SIGNALTAP_FILE output_files/signaltap.stp
 
 # Power Estimation Assignments
 # ============================
@@ -305,7 +303,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-		set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 
 	# end DESIGN_PARTITION(Top)
 	# -------------------------
