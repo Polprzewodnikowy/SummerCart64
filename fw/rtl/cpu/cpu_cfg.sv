@@ -5,6 +5,7 @@ module cpu_cfg (
 );
 
     logic skip_bootloader;
+    logic trigger_reconfiguration;
 
     typedef enum bit [2:0] { 
         R_SCR,
@@ -13,8 +14,11 @@ module cpu_cfg (
         R_COMMAND,
         R_DATA_0,
         R_DATA_1,
-        R_VERSION
+        R_VERSION,
+        R_RECONFIGURE
     } e_reg_id;
+
+    const logic [31:0] RECONFIGURE_MAGIC = 32'h52535446;
 
     always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;
@@ -47,6 +51,7 @@ module cpu_cfg (
                 R_DATA_0: bus.rdata = cfg.data[0];
                 R_DATA_1: bus.rdata = cfg.data[1];
                 R_VERSION: bus.rdata = sc64::SC64_VER;
+                R_RECONFIGURE: bus.rdata = {31'd0, trigger_reconfiguration};
                 default: bus.rdata = 32'd0;
             endcase
         end
@@ -75,6 +80,7 @@ module cpu_cfg (
             cfg.dd_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
             skip_bootloader <= 1'b0;
+            trigger_reconfiguration <= 1'b0;
         end else begin
             if (sys.n64_soft_reset) begin
                 cfg.sdram_switch <= skip_bootloader;
@@ -117,9 +123,51 @@ module cpu_cfg (
                             cfg.save_offset <= bus.wdata[25:0];
                         end
                     end
+
+                    R_RECONFIGURE: begin
+                        if (&bus.wmask && bus.wdata == RECONFIGURE_MAGIC) begin
+                            trigger_reconfiguration <= 1'b1;
+                        end
+                    end
                 endcase
             end
         end
     end
+
+    logic reconfig_clk;
+    logic reconfig_write;
+    logic [31:0] reconfig_rdata;
+    logic reconfig_write_done;
+
+    const logic [31:0] TRIGGER_RECONFIGURATION = 32'h00000001;
+
+    always_ff @(posedge sys.clk) begin
+        if (sys.reset) begin
+            reconfig_clk <= 1'b0;
+            reconfig_write <= 1'b0;
+            reconfig_write_done <= 1'b0;
+        end else begin
+            reconfig_clk <= ~reconfig_clk;
+
+            if (!reconfig_clk) begin
+                reconfig_write <= 1'b0;
+
+                if (trigger_reconfiguration && !reconfig_write_done) begin
+                    reconfig_write <= 1'b1;
+                    reconfig_write_done <= 1'b1;
+                end
+            end
+        end
+    end
+
+    intel_config intel_config_inst (
+        .clk(reconfig_clk),
+        .nreset(~sys.reset),
+        .avmm_rcv_address(3'd0),
+        .avmm_rcv_read(1'b0),
+        .avmm_rcv_writedata(TRIGGER_RECONFIGURATION),
+        .avmm_rcv_write(reconfig_write),
+        .avmm_rcv_readdata(reconfig_rdata)
+    );
 
 endmodule

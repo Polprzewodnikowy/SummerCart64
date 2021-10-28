@@ -28,6 +28,7 @@ enum cfg_id {
     CFG_ID_DD_OFFEST,
     CFG_ID_SKIP_BOOTLOADER,
     CFG_ID_FLASH_OPERATION,
+    CFG_ID_RECONFIGURE,
 };
 
 enum save_type {
@@ -137,6 +138,14 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_FLASH_OPERATION:
             flash_program(args[1]);
             break;
+        case CFG_ID_RECONFIGURE:
+            if (args[1] == CFG_RECONFIGURE_MAGIC) {
+                CFG->RECONFIGURE = CFG_RECONFIGURE_MAGIC;
+                __asm__ volatile (
+                    "ebreak \n"
+                );
+            }
+            break;
     }
 }
 
@@ -174,6 +183,9 @@ void cfg_query (uint32_t *args) {
             break;
         case CFG_ID_FLASH_OPERATION:
             args[1] = flash_read(args[1]);
+            break;
+        case CFG_ID_RECONFIGURE:
+            args[1] = CFG_RECONFIGURE_MAGIC;
             break;
     }
 }

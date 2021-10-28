@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags="INTERNAL_COMPONENT=true"
+   categories="System" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element dual_boot_0
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="10M08SCE144C8G" />
+ <parameter name="deviceFamily" value="MAX 10" />
+ <parameter name="deviceSpeedGrade" value="8" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="true" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface name="avalon" internal="dual_boot_0.avalon" type="avalon" dir="end">
+  <port name="avmm_rcv_address" internal="avmm_rcv_address" />
+  <port name="avmm_rcv_read" internal="avmm_rcv_read" />
+  <port name="avmm_rcv_writedata" internal="avmm_rcv_writedata" />
+  <port name="avmm_rcv_write" internal="avmm_rcv_write" />
+  <port name="avmm_rcv_readdata" internal="avmm_rcv_readdata" />
+ </interface>
+ <interface name="clk" internal="dual_boot_0.clk" type="clock" dir="end">
+  <port name="clk" internal="clk" />
+ </interface>
+ <interface name="nreset" internal="dual_boot_0.nreset" type="reset" dir="end">
+  <port name="nreset" internal="nreset" />
+ </interface>
+ <module
+   name="dual_boot_0"
+   kind="altera_dual_boot"
+   version="20.1"
+   enabled="1"
+   autoexport="1">
+  <parameter name="CLOCK_FREQUENCY" value="50.0" />
+  <parameter name="INTENDED_DEVICE_FAMILY" value="MAX 10" />
+ </module>
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>
