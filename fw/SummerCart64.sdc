@@ -10,6 +10,11 @@ create_generated_clock -name sdram_clk -source [get_pins $sdram_pll_clk] [get_po
 # create_generated_clock -name sd_reg_clk -source [get_pins {sd_interface_inst|sd_clk_inst|o_sd_clk|clk}] -divide_by 2 [get_pins $sd_reg_clk]
 # create_generated_clock -name sd_clk -source [get_pins $sd_reg_clk] [get_ports {o_sd_clk}]
 
+create_generated_clock -name config_clk \
+    -source [get_pins {cpu_soc_inst|cpu_cfg_inst|reconfig_clk|clk}] \
+    -divide_by 2 \
+    [get_pins {cpu_soc_inst|cpu_cfg_inst|reconfig_clk|q}]
+
 create_generated_clock -name flash_se_neg_reg \
     -source [get_pins -compatibility_mode {*altera_onchip_flash:*onchip_flash_0|altera_onchip_flash_avmm_data_controller:avmm_data_controller|flash_se_neg_reg|clk}] \
     -divide_by 2 \

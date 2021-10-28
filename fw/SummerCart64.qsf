@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 22:44:04  October 26, 2021
+# Date created = 23:38:22  October 28, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -46,13 +46,13 @@ set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
+set_global_assignment -name QSYS_FILE rtl/intel/config/intel_config.qsys
 set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
 set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
 set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
-set_global_assignment -name SIGNALTAP_FILE stp.stp
 set_global_assignment -name SYSTEMVERILOG_FILE cpu/picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
@@ -85,7 +85,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
-set_global_assignment -name SIGNALTAP_FILE output_files/signaltap.stp
 
 # Pin & Location Assignments
 # ==========================
@@ -190,7 +189,7 @@ set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
 
 # Compiler Assignments
 # ====================
-set_global_assignment -name OPTIMIZATION_MODE BALANCED
+set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
 
 # Analysis & Synthesis Assignments
 # ================================
@@ -220,10 +219,6 @@ set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 set_global_assignment -name ENABLE_OCT_DONE OFF
 set_global_assignment -name EXTERNAL_FLASH_FALLBACK_ADDRESS 00000000
 set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
-
-# Signal Tap Assignments
-# ======================
-set_global_assignment -name ENABLE_SIGNALTAP ON
 
 # Power Estimation Assignments
 # ============================
@@ -303,6 +298,7 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 		set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 		set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 		set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+		set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
 
 	# end DESIGN_PARTITION(Top)
 	# -------------------------

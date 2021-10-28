@@ -153,6 +153,33 @@ void usb_debug_reset (void) {
 }
 
 
+static bool rx_cmd (uint32_t *data) {
+    static uint8_t current_byte = 0;
+    static uint32_t buffer = 0;
+    uint8_t tmp;
+
+    while (rx_byte(&tmp)) {
+        current_byte += 1;
+        if ((current_byte != 4) && (tmp != (USB_CMD_TOKEN >> (8 * (4 - current_byte)) & 0xFF))) {
+            current_byte = 0;
+            buffer = 0;
+
+            return false;
+        }
+        buffer = (buffer << 8) | tmp;
+        if (current_byte == 4) {
+            current_byte = 0;
+            *data = buffer;
+            buffer = 0;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 void usb_init (void) {
     USB->SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
 
@@ -168,7 +195,7 @@ void process_usb (void) {
             if (p.debug_tx_busy) {
                 p.state = STATE_DEBUG_TX;
                 p.dma_in_progress = false;
-            } else if (rx_word(&p.args[0])) {
+            } else if (rx_cmd(&p.args[0])) {
                 if ((p.args[0] & 0xFFFFFF00) == USB_CMD_TOKEN) {
                     p.cmd = p.args[0] & 0xFF;
                     p.counter = 0;
