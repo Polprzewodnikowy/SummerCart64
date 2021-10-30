@@ -139,8 +139,8 @@ void cfg_update (uint32_t *args) {
             flash_program(args[1]);
             break;
         case CFG_ID_RECONFIGURE:
-            if (args[1] == CFG_RECONFIGURE_MAGIC) {
-                CFG->RECONFIGURE = CFG_RECONFIGURE_MAGIC;
+            if (args[1] == CFG->RECONFIGURE) {
+                CFG->RECONFIGURE = args[1];
                 __asm__ volatile (
                     "ebreak \n"
                 );
@@ -185,7 +185,7 @@ void cfg_query (uint32_t *args) {
             args[1] = flash_read(args[1]);
             break;
         case CFG_ID_RECONFIGURE:
-            args[1] = CFG_RECONFIGURE_MAGIC;
+            args[1] = CFG->RECONFIGURE;
             break;
     }
 }

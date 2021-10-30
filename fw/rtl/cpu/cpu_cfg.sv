@@ -51,7 +51,7 @@ module cpu_cfg (
                 R_DATA_0: bus.rdata = cfg.data[0];
                 R_DATA_1: bus.rdata = cfg.data[1];
                 R_VERSION: bus.rdata = sc64::SC64_VER;
-                R_RECONFIGURE: bus.rdata = {31'd0, trigger_reconfiguration};
+                R_RECONFIGURE: bus.rdata = RECONFIGURE_MAGIC;
                 default: bus.rdata = 32'd0;
             endcase
         end

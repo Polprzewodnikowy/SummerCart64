@@ -115,8 +115,6 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_CPU_BUSY            (1 << 30)
 #define CFG_SCR_CPU_READY           (1 << 31)
 
-#define CFG_RECONFIGURE_MAGIC       (0x52535446)
-
 
 #define SDRAM_BASE                  (0x80000000UL)
 #define SDRAM                       (*((io32_t *) SDRAM_BASE))

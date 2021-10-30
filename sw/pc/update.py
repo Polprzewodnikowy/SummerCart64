@@ -11,7 +11,7 @@ class SC64:
 
 
     def __init__(self, port):
-        self.__serial = serial.Serial(port)
+        self.__serial = serial.Serial(port, timeout=10.0, write_timeout=10.0)
 
 
     def __query_config(self, query, arg=0):
@@ -35,12 +35,12 @@ class SC64:
     def reconfigure(self):
         magic = self.__query_config(self.__CFG_ID_RECONFIGURE)
         self.__change_config(self.__CFG_ID_RECONFIGURE, magic, ignore_response=True)
-        time.sleep(1)
+        time.sleep(0.2)
 
 
     def read_flash(self, file):
         size = self.__query_config(self.__CFG_ID_FLASH_OPERATION)
-        print('Flash size: {:08X}'.format(size))
+        print(f'Flash size: {(size / 1024.0):1.1f} kB')
         self.__serial.write(b'CMDR')
         self.__serial.write((0).to_bytes(4, byteorder='big'))
         self.__serial.write((size).to_bytes(4, byteorder='big'))
