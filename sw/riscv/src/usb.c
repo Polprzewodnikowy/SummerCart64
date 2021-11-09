@@ -181,7 +181,7 @@ static bool rx_cmd (uint32_t *data) {
 
 
 void usb_init (void) {
-    USB->SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
+    USB->SCR = USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
 
     p.state = STATE_IDLE;
     p.debug_rx_busy = false;

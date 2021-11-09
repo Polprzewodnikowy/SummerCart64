@@ -1,11 +1,12 @@
 module usb_ft1248 (
     if_system.sys sys,
 
+    input usb_enabled,
+
     output usb_clk,
     output usb_cs,
     input usb_miso,
     inout [3:0] usb_miosi,
-    input usb_pwren,
 
     input rx_flush,
     output rx_empty,
@@ -30,7 +31,7 @@ module usb_ft1248 (
 
     intel_fifo_8 fifo_8_rx_inst (
         .clock(sys.clk),
-        .sclr(rx_flush),
+        .sclr(rx_flush || !usb_enabled),
 
         .empty(rx_empty),
         .rdreq(rx_read),
@@ -43,7 +44,7 @@ module usb_ft1248 (
 
     intel_fifo_8 fifo_8_tx_inst (
         .clock(sys.clk),
-        .sclr(tx_flush),
+        .sclr(tx_flush || !usb_enabled),
 
         .empty(tx_empty),
         .rdreq(tx_read),
@@ -88,7 +89,6 @@ module usb_ft1248 (
     logic usb_miosi_output_enable;
     logic usb_miosi_output_enable_data;
     logic usb_miso_input;
-    logic usb_pwren_input;
 
     logic is_cmd_write;
     logic [1:0] nibble_counter;
@@ -111,7 +111,6 @@ module usb_ft1248 (
         usb_miosi_output_enable <= usb_miosi_output_enable_data;
         
         usb_miso_input <= usb_miso;
-        usb_pwren_input <= usb_pwren;
 
         tx_buffer <= tx_rdata;
     end
@@ -157,7 +156,7 @@ module usb_ft1248 (
             nibble_counter <= nibble_counter + 1'd1;
         end
 
-        if (sys.reset) begin
+        if (sys.reset || !usb_enabled) begin
             state <= S_TRY_RX;
         end else begin
             case (state)

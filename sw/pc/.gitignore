@@ -1,10 +1,12 @@
+/backup
+/saves
+*.bak
+*.bin
 *.dat
-*.srm
+*.data
 *.eep
 *.fla
 *.n64
-*.z64
+*.srm
 *.v64
-*.data
-*.bak
-*.bin
+*.z64

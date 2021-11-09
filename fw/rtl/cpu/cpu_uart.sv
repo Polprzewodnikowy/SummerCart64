@@ -3,9 +3,7 @@ module cpu_uart (
     if_cpu_bus bus,
 
     input uart_rxd,
-    output uart_txd,
-    input uart_cts,
-    output uart_rts
+    output uart_txd
 );
 
     localparam BAUD_GEN_VALUE = int'(sc64::CLOCK_FREQUENCY / sc64::UART_BAUD_RATE) - 1'd1;

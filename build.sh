@@ -3,8 +3,8 @@
 
 PACKAGE_FILE_NAME="SummerCart64"
 FILES=(
+    "./fw/output_files/SC64_firmware.pof"
     "./fw/output_files/SC64_update.bin"
-    "./fw/output_files/SC64_update.pof"
     "./hw/ftdi-template.xml"
     "./sw/cic/UltraCIC-III.hex"
     "./LICENSE"

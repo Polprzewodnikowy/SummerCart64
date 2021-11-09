@@ -3,10 +3,11 @@
 /incremental_db
 /output_files
 **/.qsys_edit
-*.qws
-*.rpt
-*.txt
-*.sopcinfo
-**/*.elf
 **/*.bin
 **/*.dat
+**/*.elf
+*.qws
+*.rpt
+*.sopcinfo
+*.srf
+*.txt
