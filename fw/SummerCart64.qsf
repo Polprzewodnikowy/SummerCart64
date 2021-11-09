@@ -51,7 +51,7 @@ set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
-set_global_assignment -name SYSTEMVERILOG_FILE cpu/picorv32/picorv32.v
+set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
