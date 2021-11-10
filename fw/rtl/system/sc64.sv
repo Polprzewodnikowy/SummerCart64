@@ -37,6 +37,4 @@ package sc64;
 
     parameter int UART_BAUD_RATE    = 32'd1_000_000;
 
-    parameter bit DEBUG_ENABLED     = 1'b0;
-
 endpackage

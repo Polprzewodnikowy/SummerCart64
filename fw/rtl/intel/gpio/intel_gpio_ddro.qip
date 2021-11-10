@@ -1,5 +1,5 @@
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_TOOL_NAME "altera_gpio_lite"
-set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_TOOL_VERSION "20.1"
+set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_TOOL_VERSION "21.1"
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_TOOL_ENV "mwpim"
 set_global_assignment -library "intel_gpio_ddro" -name MISC_FILE [file join $::quartus(qip_path) "intel_gpio_ddro.cmp"]
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_TARGETED_DEVICE_FAMILY "MAX 10"
@@ -11,14 +11,14 @@ set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_INTERNAL "Off"
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
-set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_VERSION "MjAuMQ=="
+set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_VERSION "MjEuMQ=="
 set_global_assignment -entity "intel_gpio_ddro" -library "intel_gpio_ddro" -name IP_COMPONENT_DESCRIPTION "R1BJTyBMaXRlIEludGVsIEZQR0EgSVA="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_NAME "YWx0ZXJhX2dwaW9fbGl0ZQ=="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_DISPLAY_NAME "R1BJTyBMaXRlIEludGVsIEZQR0EgSVA="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_INTERNAL "Off"
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
-set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_VERSION "MjAuMQ=="
+set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_VERSION "MjEuMQ=="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_DESCRIPTION "R1BJTyBMaXRlIEludGVsIEZQR0EgSVA="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_PARAMETER "REVWSUNFX0ZBTUlMWQ==::TUFYIDEw::RGV2aWNlIGZhbWlseQ=="
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_COMPONENT_PARAMETER "UElOX1RZUEU=::b3V0cHV0::RGF0YSBkaXJlY3Rpb24="
@@ -73,5 +73,5 @@ set_global_assignment -library "intel_gpio_ddro" -name VERILOG_FILE [file join $
 set_global_assignment -library "intel_gpio_ddro" -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) "intel_gpio_ddro/altera_gpio_lite.sv"]
 
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_TOOL_NAME "altera_gpio_lite"
-set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_TOOL_VERSION "20.1"
+set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_TOOL_VERSION "21.1"
 set_global_assignment -entity "altera_gpio_lite" -library "intel_gpio_ddro" -name IP_TOOL_ENV "mwpim"

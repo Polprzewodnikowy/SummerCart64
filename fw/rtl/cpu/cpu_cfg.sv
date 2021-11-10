@@ -51,7 +51,7 @@ module cpu_cfg (
                 R_DATA_0: bus.rdata = cfg.data[0];
                 R_DATA_1: bus.rdata = cfg.data[1];
                 R_VERSION: bus.rdata = sc64::SC64_VER;
-                R_RECONFIGURE: bus.rdata = {31'd0, trigger_reconfiguration};
+                R_RECONFIGURE: bus.rdata = RECONFIGURE_MAGIC;
                 default: bus.rdata = 32'd0;
             endcase
         end
@@ -134,40 +134,31 @@ module cpu_cfg (
         end
     end
 
-    logic reconfig_clk;
-    logic reconfig_write;
-    logic [31:0] reconfig_rdata;
-    logic reconfig_write_done;
-
-    const logic [31:0] TRIGGER_RECONFIGURATION = 32'h00000001;
+    logic [1:0] ru_clk;
+    logic ru_rconfig;
+    logic ru_regout;
 
     always_ff @(posedge sys.clk) begin
         if (sys.reset) begin
-            reconfig_clk <= 1'b0;
-            reconfig_write <= 1'b0;
-            reconfig_write_done <= 1'b0;
+            ru_clk <= 2'd0;
+            ru_rconfig <= 1'b0;
         end else begin
-            reconfig_clk <= ~reconfig_clk;
+            ru_clk <= ru_clk + 1'd1;
 
-            if (!reconfig_clk) begin
-                reconfig_write <= 1'b0;
-
-                if (trigger_reconfiguration && !reconfig_write_done) begin
-                    reconfig_write <= 1'b1;
-                    reconfig_write_done <= 1'b1;
-                end
+            if (ru_clk == 2'd1) begin
+                ru_rconfig <= trigger_reconfiguration;
             end
         end
     end
 
-    intel_config intel_config_inst (
-        .clk(reconfig_clk),
-        .nreset(~sys.reset),
-        .avmm_rcv_address(3'd0),
-        .avmm_rcv_read(1'b0),
-        .avmm_rcv_writedata(TRIGGER_RECONFIGURATION),
-        .avmm_rcv_write(reconfig_write),
-        .avmm_rcv_readdata(reconfig_rdata)
+    fiftyfivenm_rublock fiftyfivenm_rublock_inst (
+        .clk(ru_clk[1]),
+        .shiftnld(1'b0),
+        .captnupdt(1'b0),
+        .regin(1'b0),
+        .rsttimer(1'b0),
+        .rconfig(ru_rconfig),
+        .regout(ru_regout)
     );
 
 endmodule

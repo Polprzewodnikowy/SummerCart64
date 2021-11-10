@@ -1,6 +1,6 @@
 # -------------------------------------------------------------------------- #
 #
-# Copyright (C) 2020  Intel Corporation. All rights reserved.
+# Copyright (C) 2021  Intel Corporation. All rights reserved.
 # Your use of Intel Corporation's design tools, logic functions 
 # and other software and tools, and any partner logic 
 # functions, and any output files from any of the foregoing 
@@ -18,8 +18,8 @@
 # -------------------------------------------------------------------------- #
 #
 # Quartus Prime
-# Version 20.1.1 Build 720 11/11/2020 SJ Lite Edition
-# Date created = 23:38:22  October 28, 2021
+# Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
+# Date created = 23:52:20  November 09, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -30,7 +30,7 @@
 #    If this file doesn't exist, see file:
 #		assignment_defaults.qdf
 #
-# 2) Altera recommends that you do not modify this file. This
+# 2) Intel recommends that you do not modify this file. This
 #    file is updated automatically by the Quartus Prime software
 #    and any changes you make may be lost or overwritten.
 #
@@ -42,18 +42,16 @@
 # ========================
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 20.1.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "10:53:32  AUGUST 01, 2021"
-set_global_assignment -name LAST_QUARTUS_VERSION "20.1.1 Lite Edition"
+set_global_assignment -name LAST_QUARTUS_VERSION "21.1.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
-set_global_assignment -name QSYS_FILE rtl/intel/config/intel_config.qsys
 set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
-set_global_assignment -name QSYS_FILE rtl/intel/snp/intel_snp.qsys
 set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
-set_global_assignment -name SYSTEMVERILOG_FILE cpu/picorv32/picorv32.v
+set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
@@ -85,6 +83,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
+set_global_assignment -name POST_FLOW_SCRIPT_FILE "quartus_sh:scripts/post_flow.tcl"
 
 # Pin & Location Assignments
 # ==========================
@@ -95,8 +94,6 @@ set_location_assignment PIN_10 -to io_usb_miosi[0]
 set_location_assignment PIN_11 -to io_usb_miosi[1]
 set_location_assignment PIN_12 -to i_uart_rxd
 set_location_assignment PIN_13 -to o_uart_txd
-set_location_assignment PIN_14 -to i_uart_cts
-set_location_assignment PIN_15 -to o_uart_rts
 set_location_assignment PIN_17 -to o_led
 set_location_assignment PIN_21 -to o_rtc_scl
 set_location_assignment PIN_22 -to io_rtc_sda
@@ -105,8 +102,6 @@ set_location_assignment PIN_25 -to i_n64_nmi
 set_location_assignment PIN_26 -to i_clk
 set_location_assignment PIN_27 -to i_n64_reset
 set_location_assignment PIN_28 -to i_n64_si_clk
-set_location_assignment PIN_29 -to io_n64_cic_clk
-set_location_assignment PIN_30 -to io_n64_cic_dq
 set_location_assignment PIN_32 -to io_n64_pi_ad[7]
 set_location_assignment PIN_33 -to io_n64_pi_ad[8]
 set_location_assignment PIN_38 -to io_n64_pi_ad[6]
@@ -170,13 +165,6 @@ set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
 set_location_assignment PIN_123 -to o_n64_irq
-set_location_assignment PIN_127 -to io_avr_mosi
-set_location_assignment PIN_130 -to io_flash_dq[0]
-set_location_assignment PIN_131 -to o_flash_clk
-set_location_assignment PIN_132 -to io_flash_dq[3]
-set_location_assignment PIN_134 -to o_flash_cs
-set_location_assignment PIN_135 -to io_flash_dq[1]
-set_location_assignment PIN_136 -to io_flash_dq[2]
 set_location_assignment PIN_138 -to i_usb_pwren
 set_location_assignment PIN_140 -to o_usb_cs
 set_location_assignment PIN_141 -to i_usb_miso
@@ -240,7 +228,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	# ==========================
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_cts
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_si_dq
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
@@ -258,7 +245,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_rts
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
@@ -278,7 +264,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[*]
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_rxd
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_cts
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_reset
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_si_clk

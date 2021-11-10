@@ -34,8 +34,6 @@ module SummerCart64 (
 
     input i_uart_rxd,
     output o_uart_txd,
-    input i_uart_cts,
-    output o_uart_rts,
 
     output o_sd_clk,
     inout io_sd_cmd,
@@ -127,8 +125,6 @@ module SummerCart64 (
 
         .uart_rxd(i_uart_rxd),
         .uart_txd(o_uart_txd),
-        .uart_cts(i_uart_cts),
-        .uart_rts(o_uart_rts),
 
         .sd_clk(o_sd_clk),
         .sd_cmd(io_sd_cmd),
@@ -141,7 +137,7 @@ module SummerCart64 (
     end
 
     always_ff @(posedge sys.clk) begin
-        gpio_i <= {4'b0000, i_n64_nmi, i_n64_reset, o_n64_irq, o_led};
+        gpio_i <= {4'b0000, i_n64_nmi, i_n64_reset, gpio_o[1:0]};
     end
 
 endmodule

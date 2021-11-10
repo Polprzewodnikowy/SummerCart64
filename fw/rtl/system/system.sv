@@ -38,7 +38,6 @@ endinterface
 module system (if_system.internal sys);
 
     logic locked;
-    logic external_reset;
     logic [1:0] n64_reset_ff;
     logic [1:0] n64_nmi_ff;
 
@@ -49,22 +48,13 @@ module system (if_system.internal sys);
         .locked(locked)
     );
 
-    generate
-        if (sc64::DEBUG_ENABLED) begin
-            intel_snp intel_snp_inst (
-                .source(external_reset),
-                .source_clk(sys.clk)
-            );
-        end
-    endgenerate
-
     always_ff @(posedge sys.clk) begin
         n64_reset_ff <= {n64_reset_ff[0], sys.n64_reset};
         n64_nmi_ff <= {n64_nmi_ff[0], sys.n64_nmi};
     end
 
     always_comb begin
-        sys.reset = ~locked | external_reset;
+        sys.reset = ~locked;
         sys.n64_hard_reset = ~n64_reset_ff[1];
         sys.n64_soft_reset = ~n64_nmi_ff[1];
     end

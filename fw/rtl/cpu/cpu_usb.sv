@@ -23,6 +23,8 @@ module cpu_usb (
     logic cpu_rx_read;
     logic cpu_tx_write;
 
+    logic usb_enabled;
+
     always_comb begin
         dma.rx_empty = rx_empty;
         rx_read = cpu_rx_read || dma.rx_read;
@@ -44,7 +46,7 @@ module cpu_usb (
         bus.rdata = 32'd0;
         if (bus.ack) begin
             case (bus.address[2:2])
-                0: bus.rdata = {30'd0, ~tx_full, ~rx_empty};
+                0: bus.rdata = {26'd0, usb_pwren, usb_enabled, 2'b00, ~tx_full, ~rx_empty};
                 1: bus.rdata = {24'd0, rx_rdata};
                 default: bus.rdata = 32'd0;
             endcase
@@ -58,33 +60,38 @@ module cpu_usb (
         tx_flush <= 1'b0;
         cpu_tx_write <= 1'b0;
 
-        if (bus.request) begin
-            case (bus.address[2:2])
-                2'd0: begin
-                    if (bus.wmask[0]) begin
-                        {tx_flush, rx_flush} <= bus.wdata[3:2];
+        if (sys.reset) begin
+            usb_enabled <= 1'b0;
+        end else begin
+            if (bus.request) begin
+                case (bus.address[2:2])
+                    2'd0: begin
+                        if (bus.wmask[0]) begin
+                            {usb_enabled, tx_flush, rx_flush} <= bus.wdata[4:2];
+                        end
                     end
-                end
 
-                2'd1: begin
-                    if (bus.wmask[0]) begin
-                        cpu_tx_write <= 1'b1;
-                    end else begin
-                        cpu_rx_read <= 1'b1;
+                    2'd1: begin
+                        if (bus.wmask[0]) begin
+                            cpu_tx_write <= 1'b1;
+                        end else begin
+                            cpu_rx_read <= 1'b1;
+                        end
                     end
-                end
-            endcase
+                endcase
+            end
         end
     end
 
     usb_ft1248 usb_ft1248_inst (
         .sys(sys),
 
+        .usb_enabled(usb_enabled),
+
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
         .usb_miosi(usb_miosi),
-        .usb_pwren(usb_pwren),
 
         .rx_flush(rx_flush),
         .rx_empty(rx_empty),

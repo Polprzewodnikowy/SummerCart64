@@ -59,6 +59,8 @@ typedef volatile struct usb_regs {
 #define USB_SCR_TXE                 (1 << 1)
 #define USB_SCR_FLUSH_RX            (1 << 2)
 #define USB_SCR_FLUSH_TX            (1 << 3)
+#define USB_SCR_ENABLED             (1 << 4)
+#define USB_SCR_PWREN               (1 << 5)
 
 
 typedef volatile struct uart_regs {
@@ -114,8 +116,6 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_USB_WAITING         (1 << 29)
 #define CFG_SCR_CPU_BUSY            (1 << 30)
 #define CFG_SCR_CPU_READY           (1 << 31)
-
-#define CFG_RECONFIGURE_MAGIC       (0x52535446)
 
 
 #define SDRAM_BASE                  (0x80000000UL)

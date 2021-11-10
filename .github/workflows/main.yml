@@ -22,7 +22,7 @@ jobs:
           submodules: true
 
       - name: Build script
-        run: ./build_in_docker.sh
+        run: ./docker_build.sh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2

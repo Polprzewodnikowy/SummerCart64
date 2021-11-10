@@ -22,8 +22,6 @@ module cpu_soc (
 
     input uart_rxd,
     output uart_txd,
-    input uart_cts,
-    output uart_rts,
 
     output sd_clk,
     inout sd_cmd,
@@ -77,9 +75,7 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_UART].device),
         .uart_rxd(uart_rxd),
-        .uart_txd(uart_txd),
-        .uart_cts(uart_cts),
-        .uart_rts(uart_rts)
+        .uart_txd(uart_txd)
     );
 
     cpu_dma cpu_dma_inst (
@@ -117,5 +113,9 @@ module cpu_soc (
         .bus(bus.at[sc64::ID_CPU_FLASH].device),
         .flash(flash)
     );
+
+    assign sd_clk = 1'bZ;
+    assign sd_cmd = 1'bZ;
+    assign sd_dat = 4'bZZZZ;
 
 endmodule

@@ -10,11 +10,6 @@ create_generated_clock -name sdram_clk -source [get_pins $sdram_pll_clk] [get_po
 # create_generated_clock -name sd_reg_clk -source [get_pins {sd_interface_inst|sd_clk_inst|o_sd_clk|clk}] -divide_by 2 [get_pins $sd_reg_clk]
 # create_generated_clock -name sd_clk -source [get_pins $sd_reg_clk] [get_ports {o_sd_clk}]
 
-create_generated_clock -name config_clk \
-    -source [get_pins {cpu_soc_inst|cpu_cfg_inst|reconfig_clk|clk}] \
-    -divide_by 2 \
-    [get_pins {cpu_soc_inst|cpu_cfg_inst|reconfig_clk|q}]
-
 create_generated_clock -name flash_se_neg_reg \
     -source [get_pins -compatibility_mode {*altera_onchip_flash:*onchip_flash_0|altera_onchip_flash_avmm_data_controller:avmm_data_controller|flash_se_neg_reg|clk}] \
     -divide_by 2 \
@@ -54,7 +49,7 @@ set_multicycle_path -setup -end 2 -from [get_clocks {sdram_clk}] -to [get_clocks
 # FT1248 timings
 
 set_false_path -to [get_ports {o_usb_clk io_usb_miosi[*] o_usb_cs}]
-set_false_path -from [get_ports {io_usb_miosi[*] i_usb_miso}]
+set_false_path -from [get_ports {io_usb_miosi[*] i_usb_miso i_usb_pwren}]
 
 
 # N64, PI and SI timings
@@ -76,17 +71,11 @@ set_false_path -to [get_ports {o_led}]
 
 # UART timings
 
-set_false_path -to [get_ports {o_uart_txd o_uart_rts}]
-set_false_path -from [get_ports {i_uart_rxd i_uart_cts}]
+set_false_path -to [get_ports {o_uart_txd}]
+set_false_path -from [get_ports {i_uart_rxd}]
 
 
 # I2C timings
 
 set_false_path -to [get_ports {o_rtc_scl io_rtc_sda}]
 set_false_path -from [get_ports {io_rtc_sda}]
-
-
-# JTAG timings
-
-# set_false_path -to [get_ports {altera_reserved_tdo}]
-# set_false_path -from [get_ports {altera_reserved_tdi altera_reserved_tms}]

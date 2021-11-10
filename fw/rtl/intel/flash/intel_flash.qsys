@@ -6,7 +6,7 @@
    version="1.0"
    description=""
    tags="INTERNAL_COMPONENT=true"
-   categories="System" />
+   categories="" />
  <parameter name="bonusData"><![CDATA[bonusData 
 {
    element onchip_flash_0
@@ -64,7 +64,7 @@
  <module
    name="onchip_flash_0"
    kind="altera_onchip_flash"
-   version="20.1"
+   version="21.1"
    enabled="1"
    autoexport="1">
   <parameter name="AUTO_CLOCK_RATE" value="0" />
