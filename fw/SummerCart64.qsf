@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
-# Date created = 20:25:39  November 08, 2021
+# Date created = 23:52:20  November 09, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -83,6 +83,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
+set_global_assignment -name POST_FLOW_SCRIPT_FILE "quartus_sh:scripts/post_flow.tcl"
 
 # Pin & Location Assignments
 # ==========================
