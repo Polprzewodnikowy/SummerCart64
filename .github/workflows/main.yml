@@ -22,7 +22,7 @@ jobs:
           submodules: true
 
       - name: Build script
-        run: ./docker_build.sh release
+        run: ./docker_build.sh release --force-clean
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2

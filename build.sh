@@ -19,6 +19,9 @@ BUILT_FPGA=false
 BUILT_UPDATE=false
 BUILT_RELEASE=false
 
+FORCE_CLEAN=false
+SKIP_FPGA_REBUILD=false
+
 build_cic () {
     if [ "$BUILT_CIC" = true ]; then return; fi
 
@@ -33,7 +36,10 @@ build_n64 () {
     if [ "$BUILT_N64" = true ]; then return; fi
 
     pushd sw/n64
-    make clean all
+    if [ "$FORCE_CLEAN" = true ]; then
+        make clean
+    fi
+    make all
     popd
 
     BUILT_N64=true
@@ -43,7 +49,10 @@ build_riscv () {
     if [ "$BUILT_RISCV" = true ]; then return; fi
 
     pushd sw/riscv
-    make clean all
+    if [ "$FORCE_CLEAN" = true ]; then
+        make clean
+    fi
+    make all
     popd
 
     BUILT_RISCV=true
@@ -56,7 +65,12 @@ build_fpga () {
     build_riscv
 
     pushd fw
-    quartus_sh --flow compile ./SummerCart64.qpf
+    if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.done ]; then
+        quartus_asm SummerCart64
+        quartus_cpf -c SummerCart64.cof
+    else
+        quartus_sh --flow compile ./SummerCart64.qpf
+    fi
     popd
 
     BUILT_FPGA=true
@@ -92,15 +106,19 @@ build_release () {
 
 print_usage () {
     echo "builder script for SummerCart64"
-    echo "usage: ./build.sh [cic] [n64] [riscv] [fpga] [update] [release] [--help]"
+    echo "usage: ./build.sh [cic] [n64] [riscv] [fpga] [update] [release] [-c] [-s] [--help]"
     echo "parameters:"
-    echo "  cic - assemble UltraCIC-III software"
-    echo "  n64 - compile N64 bootloader software"
-    echo "  riscv - compile cart governor software"
-    echo "  fpga - compile FPGA design (triggers 'n64' and 'riscv' build)"
-    echo "  update - convert programming .pof file to raw binary for user upgrade (triggers 'fpga' build)"
-    echo "  release - collect and zip files for release (triggers 'cic' and 'update' build)"
-    echo "  --help - print this guide"
+    echo "  cic       - assemble UltraCIC-III software"
+    echo "  n64       - compile N64 bootloader software"
+    echo "  riscv     - compile cart governor software"
+    echo "  fpga      - compile FPGA design (triggers 'n64' and 'riscv' build)"
+    echo "  update    - convert programming .pof file to raw binary for self-upgrade (triggers 'fpga' build)"
+    echo "  release   - collect and zip files for release (triggers 'cic' and 'update' build)"
+    echo "  -c | --force-clean"
+    echo "            - clean software compilation result directories before build"
+    echo "  -s | --skip-fpga-rebuild"
+    echo "            - do not recompile whole FPGA design if it's already done, just update software binaries"
+    echo "  --help    - print this guide"
 }
 
 if test $# -eq 0; then
@@ -136,6 +154,12 @@ while test $# -gt 0; do
             ;;
         release)
             TRIGGER_RELEASE=true
+            ;;
+        -c|--force-clean)
+            FORCE_CLEAN=true
+            ;;
+        -s|--skip-fpga-rebuild)
+            SKIP_FPGA_REBUILD=true
             ;;
         --help)
             print_usage
