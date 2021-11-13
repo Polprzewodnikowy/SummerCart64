@@ -40,9 +40,10 @@ module cpu_soc (
         .bus(bus.at[sc64::ID_CPU_RAM].device)
     );
 
-    cpu_bootloader cpu_bootloader_inst (
+    cpu_flash cpu_flash_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_BOOTLOADER].device)
+        .bus(bus.at[sc64::ID_CPU_FLASH].device),
+        .flash(flash)
     );
 
     cpu_gpio cpu_gpio_inst (
@@ -106,12 +107,6 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_SI].device),
         .si(si)
-    );
-
-    cpu_flash cpu_flash_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_FLASH].device),
-        .flash(flash)
     );
 
     assign sd_clk = 1'bZ;

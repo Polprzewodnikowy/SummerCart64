@@ -11,7 +11,7 @@ package sc64;
 
     typedef enum bit [3:0] {
         ID_CPU_RAM,
-        ID_CPU_BOOTLOADER,
+        ID_CPU_FLASH,
         ID_CPU_GPIO,
         ID_CPU_I2C,
         ID_CPU_USB,
@@ -21,7 +21,6 @@ package sc64;
         ID_CPU_SDRAM,
         ID_CPU_FLASHRAM,
         ID_CPU_SI,
-        ID_CPU_FLASH,
         __ID_CPU_END
     } e_cpu_id;
 

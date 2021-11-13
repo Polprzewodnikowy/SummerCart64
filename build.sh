@@ -65,8 +65,7 @@ build_fpga () {
     build_riscv
 
     pushd fw
-    if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.done ]; then
-        quartus_asm SummerCart64
+    if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
         quartus_cpf -c SummerCart64.cof
     else
         quartus_sh --flow compile ./SummerCart64.qpf
@@ -96,10 +95,10 @@ build_release () {
     build_cic
     build_update
 
-    if [[ -e "./${PACKAGE_FILE_NAME}.zip" ]]; then
+    if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
         rm -f "./${PACKAGE_FILE_NAME}.zip"
     fi
-    zip -r "./${PACKAGE_FILE_NAME}.zip" ${FILES[@]}
+    zip -j -r "./${PACKAGE_FILE_NAME}.zip" ${FILES[@]}
 
     BUILT_RELEASE=true
 }

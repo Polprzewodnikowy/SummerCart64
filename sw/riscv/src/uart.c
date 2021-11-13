@@ -54,11 +54,6 @@ void process_uart (void) {
                 reset_handler();
                 break;
 
-            case '\'':
-                uart_print("App reset...\n");
-                app_handler();
-                break;
-
             case 't':
                 time = rtc_get_time();
                 uart_print("Current time: ");

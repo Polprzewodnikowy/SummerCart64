@@ -33,7 +33,7 @@ module cpu_wrapper (
         .ENABLE_COUNTERS64(0),
         .CATCH_MISALIGN(0),
         .CATCH_ILLINSN(0),
-        .PROGADDR_RESET({4'(sc64::ID_CPU_BOOTLOADER), 28'h000_0000})
+        .PROGADDR_RESET({4'(sc64::ID_CPU_FLASH), 28'h003_5800})
     ) cpu_inst (
         .clk(sys.clk),
         .resetn(~sys.reset),

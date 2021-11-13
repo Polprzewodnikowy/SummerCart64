@@ -86,7 +86,13 @@ bool rtc_is_time_running (void) {
 }
 
 void rtc_set_time (rtc_time_t *time) {
-    p.time = *time;
+    p.time.second = time->second;
+    p.time.minute = time->minute;
+    p.time.hour = time->hour;
+    p.time.weekday = time->weekday;
+    p.time.day = time->day;
+    p.time.month = time->month;
+    p.time.year = time->year;
     p.new_time_valid = true;
 }
 
