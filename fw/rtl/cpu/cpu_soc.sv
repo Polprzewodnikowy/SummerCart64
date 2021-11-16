@@ -40,9 +40,10 @@ module cpu_soc (
         .bus(bus.at[sc64::ID_CPU_RAM].device)
     );
 
-    cpu_bootloader cpu_bootloader_inst (
+    cpu_flash cpu_flash_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_BOOTLOADER].device)
+        .bus(bus.at[sc64::ID_CPU_FLASH].device),
+        .flash(flash)
     );
 
     cpu_gpio cpu_gpio_inst (
@@ -71,12 +72,16 @@ module cpu_soc (
         .usb_pwren(usb_pwren)
     );
 
-    cpu_uart cpu_uart_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_UART].device),
-        .uart_rxd(uart_rxd),
-        .uart_txd(uart_txd)
-    );
+    generate
+        if (sc64::CPU_HAS_UART) begin
+            cpu_uart cpu_uart_inst (
+                .sys(sys),
+                .bus(bus.at[sc64::ID_CPU_UART].device),
+                .uart_rxd(uart_rxd),
+                .uart_txd(uart_txd)
+            );
+        end
+    endgenerate
 
     cpu_dma cpu_dma_inst (
         .sys(sys),
@@ -106,12 +111,6 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_SI].device),
         .si(si)
-    );
-
-    cpu_flash cpu_flash_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_FLASH].device),
-        .flash(flash)
     );
 
     assign sd_clk = 1'bZ;

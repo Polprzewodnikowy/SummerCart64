@@ -19,8 +19,3 @@ void dma_stop (void) {
 void dma_init (void) {
     dma_stop();
 }
-
-
-void process_dma (void) {
-
-}

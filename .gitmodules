@@ -1,4 +1,4 @@
-[submodule "fw/cpu/picorv32"]
+[submodule "fw/picorv32"]
 	path = fw/picorv32
 	url = https://github.com/cliffordwolf/picorv32.git
 	ignore = dirty

@@ -1,51 +1,49 @@
 MEMORY {
-    RAM (rwx)       : org = 0x00000000, len = 16k
-    ROM (rx)        : org = 0x10000000, len = 128
+    ram (rwx)   : org = 0x00000000, len = 16k
+    rom (rx)    : org = 0x10035800, len = 16k
 }
-
-__stack_pointer = ORIGIN(RAM) + LENGTH(RAM) - 16;
 
 ENTRY(reset_handler)
 
 SECTIONS {
-    .text : {
-        *(.text.app_handler)
-        *(.text.unlikely .text.unlikely.*)
-        *(.text.startup .text.startup.*)
-        *(.text .text.*)
-        *(.gnu.linkonce.t.*)
-    } > RAM
+    .text.reset_handler : {
+        *(.text.reset_handler)
+    } > rom
 
-    .rodata : {
-        *(.rdata)
-        *(.rodata .rodata.*)
-        *(.gnu.linkonce.r.*)
-        . = ALIGN(8);
-        *(.srodata.cst16)
-        *(.srodata.cst8)
-        *(.srodata.cst4)
-        *(.srodata.cst2)
-        *(.srodata .srodata.*)
-    } > RAM
+    .text : {
+        _sitext = LOADADDR(.text);
+        . = ALIGN(4);
+        _stext = .;
+        *(.text .text.* .gnu.linkonce.t.*)
+        *(.rodata .rodata.* .gnu.linkonce.r.*)
+        . = ALIGN(4);
+        _etext = .;
+    } > ram AT > rom
 
     .data : {
-        *(.data .data.*)
-        *(.gnu.linkonce.d.*)
-        . = ALIGN(8);
-        PROVIDE(__global_pointer = . + 0x800);
-        *(.sdata .sdata.* .sdata2.*)
-        *(.gnu.linkonce.s.*)
-    } > RAM
+        _sidata = LOADADDR(.data);
+        . = ALIGN(4);
+        _sdata = .;
+        *(.data .data.* .gnu.linkonce.d.*)
+        . = ALIGN(4);
+        _ssdata = .;
+        *(.srodata.cst16) *(.srodata.cst8) *(.srodata.cst4) *(.srodata.cst2) *(.srodata .srodata.*)
+        *(.sdata .sdata.* .gnu.linkonce.s.*)
+        . = ALIGN(4);
+        _edata = .;
+    } > ram AT > rom
 
-    .bss : ALIGN(8) {
-        *(.sbss*)
-        *(.gnu.linkonce.sb.*)
-        *(.bss .bss.*)
-        *(.gnu.linkonce.b.*)
+    .bss : {
+        . = ALIGN(4);
+        _sbss = .;
+        *(.sbss .sbss.* .gnu.linkonce.sb.*)
+        *(.scommon)
+        *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
-    } > RAM
+        . = ALIGN(4);
+        _ebss = .;
+    } > ram
 
-    .bootloader : {
-        *(.text.reset_handler)
-    } > ROM
+    __global_pointer$ = MIN(_ssdata + 0x800, MAX(_sdata + 0x800, _ebss - 0x800));
+    __stack_pointer$ = ORIGIN(ram) + LENGTH(ram);
 }

@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
-# Date created = 23:52:20  November 09, 2021
+# Date created = 13:29:40  November 11, 2021
 #
 # -------------------------------------------------------------------------- #
 #
@@ -52,7 +52,6 @@ set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
 set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
-set_global_assignment -name SYSTEMVERILOG_FILE ../sw/riscv/build/cpu_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
@@ -83,7 +82,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
-set_global_assignment -name POST_FLOW_SCRIPT_FILE "quartus_sh:scripts/post_flow.tcl"
+set_global_assignment -name POST_MODULE_SCRIPT_FILE "quartus_sh:scripts/post_module.tcl"
 
 # Pin & Location Assignments
 # ==========================
@@ -290,21 +289,3 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 # end ENTITY(SummerCart64)
 # ------------------------
-
-# ------------------------------
-# start ENTITY(altera_gpio_lite)
-
-	# Project-Wide Assignments
-	# ========================
-
-# end ENTITY(altera_gpio_lite)
-# ----------------------------
-
-# -----------------------------
-# start ENTITY(intel_gpio_ddro)
-
-	# Project-Wide Assignments
-	# ========================
-
-# end ENTITY(intel_gpio_ddro)
-# ---------------------------

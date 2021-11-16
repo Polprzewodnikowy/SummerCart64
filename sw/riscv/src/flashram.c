@@ -14,6 +14,17 @@ enum operation {
 };
 
 
+struct process {
+    bool save_in_progress;
+    enum operation op;
+    io32_t *save_pointer;
+    uint32_t num_words;
+    uint32_t current_word;
+};
+
+static struct process p;
+
+
 static enum operation get_operation_type (void) {
     uint32_t scr = FLASHRAM->SCR;
 
@@ -44,26 +55,38 @@ static size_t get_operation_length (enum operation op) {
 
 void flashram_init (void) {
     FLASHRAM->SCR = FLASHRAM_OPERATION_DONE;
+
+    p.save_in_progress = false;
 }
 
 
 void process_flashram (void) {
-    enum operation op = get_operation_type();
-    size_t length;
-    io32_t *save_data;
+    if (!p.save_in_progress) {
+        p.op = get_operation_type();
 
-    if (op != OP_NONE) {
-        length = get_operation_length(op);
-        save_data = (io32_t *) (SDRAM_BASE + CFG->SAVE_OFFSET + ((FLASHRAM->SCR >> FLASHRAM_PAGE_BIT) * FLASHRAM_PAGE_SIZE));
+        if (p.op != OP_NONE) {
+            uint32_t sdram_address = SDRAM_BASE + CFG->SAVE_OFFSET;
 
-        for (uint32_t i = 0; i < (length / 4); i++) {
-            if (op == OP_WRITE_PAGE) {
-                *save_data++ &= FLASHRAM->BUFFER[i];       
-            } else {
-                *save_data++ = FLASHRAM_ERASE_VALUE;
+            p.save_in_progress = true;
+            if (p.op != OP_ERASE_ALL) {
+                sdram_address += (FLASHRAM->SCR >> FLASHRAM_PAGE_BIT) * FLASHRAM_PAGE_SIZE;
             }
+            p.save_pointer = (io32_t *) (sdram_address);
+            p.num_words = get_operation_length(p.op) / sizeof(uint32_t);
+            p.current_word = 0;
+        }
+    } else {
+        if (p.op == OP_WRITE_PAGE) {
+            *p.save_pointer++ &= FLASHRAM->BUFFER[p.current_word];
+        } else {
+            *p.save_pointer++ = FLASHRAM_ERASE_VALUE;
         }
 
-        FLASHRAM->SCR = FLASHRAM_OPERATION_DONE;
+        p.current_word += 1;
+
+        if (p.current_word >= p.num_words) {
+            p.save_in_progress = false;
+            FLASHRAM->SCR = FLASHRAM_OPERATION_DONE;
+        }
     }
 }
