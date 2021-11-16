@@ -72,12 +72,16 @@ module cpu_soc (
         .usb_pwren(usb_pwren)
     );
 
-    cpu_uart cpu_uart_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_UART].device),
-        .uart_rxd(uart_rxd),
-        .uart_txd(uart_txd)
-    );
+    generate
+        if (sc64::CPU_HAS_UART) begin
+            cpu_uart cpu_uart_inst (
+                .sys(sys),
+                .bus(bus.at[sc64::ID_CPU_UART].device),
+                .uart_rxd(uart_rxd),
+                .uart_txd(uart_txd)
+            );
+        end
+    endgenerate
 
     cpu_dma cpu_dma_inst (
         .sys(sys),

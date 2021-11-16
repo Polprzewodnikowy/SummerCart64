@@ -9,7 +9,20 @@
 #include "uart.h"
 
 
-void process_init (void) {
+static const void (*process_table[])(void) = {
+    process_usb,
+    process_cfg,
+    process_rtc,
+    process_i2c,
+    process_flashram,
+    process_uart,
+    NULL,
+};
+
+
+__attribute__((naked)) void process_loop (void) {
+    void (**process_func)(void) = process_table;
+
     usb_init();
     cfg_init();
     dma_init();
@@ -18,18 +31,12 @@ void process_init (void) {
     i2c_init();
     flashram_init();
     uart_init();
-}
 
-
-void process_loop (void) {
     while (1) {
-        process_usb();
-        process_cfg();
-        process_dma();
         process_joybus();
-        process_rtc();
-        process_i2c();
-        process_flashram();
-        process_uart();
+        (*process_func++)();
+        if (*process_func == NULL) {
+            process_func = process_table;
+        }
     }
 }

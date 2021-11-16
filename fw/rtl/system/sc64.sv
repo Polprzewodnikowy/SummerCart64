@@ -34,6 +34,8 @@ package sc64;
 
     parameter int CLOCK_FREQUENCY   = 32'd100_000_000;
 
+    parameter bit CPU_HAS_UART      = 1'b0;
+
     parameter int UART_BAUD_RATE    = 32'd1_000_000;
 
 endpackage

@@ -20,7 +20,6 @@ bool dma_busy (void);
 void dma_start (uint32_t memory_address, size_t length, enum dma_id id, enum dma_dir dir);
 void dma_stop (void);
 void dma_init (void);
-void process_dma (void);
 
 
 #endif

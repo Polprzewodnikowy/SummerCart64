@@ -32,12 +32,9 @@ init_bss:
     blt a0, a1, 1b
 2:
 
-run:
-    call process_init
-    call process_loop
-
-loop:
-    j loop
+run_in_ram:
+    la ra, process_loop
+    jalr zero, 0(ra)
 
 copy_section:
     bge a1, a2, 2f
