@@ -39,7 +39,7 @@ build_n64 () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all
+    make all -j
     popd
 
     BUILT_N64=true
@@ -50,7 +50,7 @@ build_riscv () {
 
     pushd sw/riscv
     if [ "$FORCE_CLEAN" = true ]; then
-        make clean
+        make clean -j
     fi
     make all
     popd

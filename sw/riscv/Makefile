@@ -1,11 +1,10 @@
 TOOLCHAIN = riscv32-unknown-elf-
 CC = $(TOOLCHAIN)gcc
-AS = $(TOOLCHAIN)as
 OBJCOPY = $(TOOLCHAIN)objcopy
 OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
-FLAGS = -mabi=ilp32 -march=rv32i
+FLAGS = -mabi=ilp32 -march=rv32i $(USER_FLAGS)
 CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 LDFLAGS = -nostartfiles -Wl,--gc-sections
 
@@ -25,10 +24,10 @@ $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
 all: $(BUILD_DIR)/governor.hex
 
 $(BUILD_DIR)/%.c.o: %.c
-	$(CC) $(FLAGS) $(CFLAGS) $(USER_FLAGS) -c $< -o $@
+	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.S.o: %.S
-	$(AS) $(FLAGS) $(ASFLAGS) -c $< -o $@
+	$(CC) -x assembler $(FLAGS) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/governor.hex: $(OBJS) SC64.ld
 	$(CC) $(FLAGS) $(LDFLAGS) -TSC64.ld $(OBJS) -o $(BUILD_DIR)/governor.elf
