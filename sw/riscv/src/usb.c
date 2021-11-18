@@ -222,6 +222,12 @@ void process_usb (void) {
 
         case STATE_DATA:
             switch (p.cmd) {
+                case 'V':
+                    if (tx_word(cfg_get_version())) {
+                        p.state = STATE_RESPONSE;
+                    }
+                    break;
+
                 case 'C':
                     cfg_update(p.args);
                     p.state = STATE_RESPONSE;

@@ -103,6 +103,10 @@ static void set_save_type (enum save_type save_type) {
 }
 
 
+uint32_t cfg_get_version (void) {
+    return CFG->VERSION;
+}
+
 void cfg_update (uint32_t *args) {
     switch (args[0]) {
         case CFG_ID_SCR:
