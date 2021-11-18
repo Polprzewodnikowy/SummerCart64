@@ -30,6 +30,8 @@ class SC64:
 
     __UPDATE_OFFSET = 0x03B60000
 
+    __CHUNK_SIZE = 1024 * 1024
+
     __MIN_ROM_LENGTH = 0x101000
     __DDIPL_ROM_LENGTH = 0x400000
 
@@ -87,7 +89,7 @@ class SC64:
         for p in ports:
             if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC64")):
                 try:
-                    self.__serial = Serial(p.device, timeout=10.0, write_timeout=10.0)
+                    self.__serial = Serial(p.device, timeout=5.0, write_timeout=5.0)
                     self.__probe_device()
                 except SerialException or SC64Exception:
                     if (self.__serial):
@@ -125,7 +127,11 @@ class SC64:
         with open(file, "wb") as f:
             transfer_size = self.__align(length, align)
             self.__write_cmd("R", offset, transfer_size)
-            f.write(self.__read(length))
+            current_position = 0
+            while (current_position < length):
+                chunk_size = min(self.__CHUNK_SIZE, length - current_position)
+                f.write(self.__read(chunk_size))
+                current_position += chunk_size
             if (transfer_size != length):
                 self.__read(transfer_size - length)
             self.__read_cmd_status("R")
@@ -136,7 +142,8 @@ class SC64:
             length = os.fstat(f.fileno()).st_size
             transfer_size = self.__align(max(length, min_length), align)
             self.__write_cmd("W", offset, transfer_size)
-            self.__write(f.read())
+            while (f.tell() < length):
+                self.__write(f.read(min(self.__CHUNK_SIZE, length - f.tell())))
             if (transfer_size != length):
                 self.__write_dummy(transfer_size - length)
             self.__read_cmd_status("W")
@@ -167,7 +174,10 @@ class SC64:
             backup_length = self.__query_config(self.__CFG_ID_FLASH_OPERATION, self.__UPDATE_OFFSET)
             self.__read_file_from_sdram(backup_file, self.__UPDATE_OFFSET, backup_length)
         self.__write_file_to_sdram(file, self.__UPDATE_OFFSET)
+        saved_timeout = self.__serial.timeout
+        self.__serial.timeout = 20.0
         self.__change_config(self.__CFG_ID_FLASH_OPERATION, self.__UPDATE_OFFSET)
+        self.__serial.timeout = saved_timeout
         self.__reconfigure()
         self.__probe_device()
 
