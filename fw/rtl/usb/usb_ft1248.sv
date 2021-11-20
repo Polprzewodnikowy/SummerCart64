@@ -16,8 +16,14 @@ module usb_ft1248 (
     input tx_flush,
     output tx_full,
     input tx_write,
-    input [7:0] tx_wdata
+    input [7:0] tx_wdata,
+
+    output rx_escape_valid,
+    input rx_escape_ack,
+    output [7:0] rx_escape
 );
+
+    parameter bit [7:0] ESCAPE_CHARACTER    = 8'h1B;
 
     // FIFOs
 
@@ -28,6 +34,9 @@ module usb_ft1248 (
     logic tx_empty;
     logic tx_read;
     logic [7:0] tx_rdata;
+
+    logic rx_wdata_valid;
+    logic rx_escape_active;
 
     intel_fifo_8 fifo_8_rx_inst (
         .clock(sys.clk),
@@ -54,6 +63,41 @@ module usb_ft1248 (
         .wrreq(tx_write),
         .data(tx_wdata)
     );
+
+
+    // Escape character detection
+
+    always_comb begin
+        rx_write = 1'b0;
+        if (rx_wdata_valid) begin
+            rx_write = rx_escape_active ? rx_wdata == ESCAPE_CHARACTER : rx_wdata != ESCAPE_CHARACTER;
+        end
+    end
+
+    always_ff @(posedge sys.clk) begin
+        if (sys.reset || !usb_enabled) begin
+            rx_escape_valid <= 1'b0;
+            rx_escape_active <= 1'b0;
+        end else begin
+            if (rx_escape_ack) begin
+                rx_escape_valid <= 1'b0;
+            end
+
+            if (rx_wdata_valid) begin
+                if (!rx_escape_active) begin
+                    if (rx_wdata == ESCAPE_CHARACTER) begin
+                        rx_escape_active <= 1'b1;
+                    end
+                end else begin
+                    rx_escape_active <= 1'b0;
+                    rx_escape <= rx_wdata;
+                    if (rx_wdata != ESCAPE_CHARACTER) begin
+                        rx_escape_valid <= 1'b1;
+                    end
+                end
+            end
+        end
+    end
 
 
     // FT1248 interface controller
@@ -149,7 +193,7 @@ module usb_ft1248 (
     end
 
     always_ff @(posedge sys.clk) begin
-        rx_write <= 1'b0;
+        rx_wdata_valid <= 1'b0;
         tx_read <= 1'b0;
 
         if (clock_phase[P_RISING]) begin
@@ -161,7 +205,7 @@ module usb_ft1248 (
         end else begin
             case (state)
                 S_TRY_RX: begin
-                    if (!rx_full) begin
+                    if (!rx_full && !rx_escape_valid) begin
                         state <= S_COMMAND;
                         is_cmd_write <= 1'b0;
                         nibble_counter <= 2'b11;
@@ -202,9 +246,9 @@ module usb_ft1248 (
                     if (clock_phase[P_RISING]) begin
                         rx_wdata <= {usb_miosi_input, rx_wdata[7:4]};
                         if (nibble_counter[0]) begin
-                            rx_write <= !is_cmd_write;
+                            rx_wdata_valid <= !is_cmd_write;
                         end
-                        if (usb_miso_input || (!is_cmd_write && rx_full) || (is_cmd_write && tx_empty)) begin
+                        if (usb_miso_input || (!is_cmd_write && (rx_full || rx_escape_valid)) || (is_cmd_write && tx_empty)) begin
                             state <= is_cmd_write ? S_TRY_RX : S_TRY_TX;
                         end
                     end
