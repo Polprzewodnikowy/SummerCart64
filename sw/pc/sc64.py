@@ -3,6 +3,7 @@
 from serial import Serial, SerialException
 from serial.tools import list_ports
 import argparse
+import filecmp
 import os
 import progressbar
 import re
@@ -73,11 +74,11 @@ class SC64:
 
 
     def __escape(self, data: bytes) -> bytes:
-        return re.sub(b'\x1B', b'\x1B\x1B', data)
+        return re.sub(b"\x1B", b"\x1B\x1B", data)
 
 
     def __reset_link(self) -> None:
-        self.__serial.write(b'\x1BR')
+        self.__serial.write(b"\x1BR")
 
 
     def __read(self, bytes: int) -> bytes:
@@ -335,7 +336,7 @@ class SC64ProgressBar:
             " ",
             progressbar.Percentage(),
             " | ",
-            progressbar.DataSize(prefixes=('  ', 'Ki', 'Mi')),
+            progressbar.DataSize(prefixes=("  ", "Ki", "Mi")),
             " | ",
             progressbar.AdaptiveTransferSpeed(),
             " ]"
@@ -379,18 +380,18 @@ class SC64ProgressBar:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='SummerCart64 one stop control center')
-    parser.add_argument('-b', default=False, action='store_true', required=False, help="skip internal bootloader")
-    parser.add_argument('-t', default="3", required=False, help='set TV type (0 - 2)')
-    parser.add_argument('-c', default="0xFFFF", required=False, help='set CIC seed')
-    parser.add_argument('-s', default="0", required=False, help='set save type (0 - 6)')
-    parser.add_argument('-d', default=False, action='store_true', required=False, help='enable 64DD emulation')
-    parser.add_argument('-r', default=False, action='store_true', required=False, help='perform reading operation instead of writing')
-    parser.add_argument('-l', default="0x101000", required=False, help='specify ROM length to read')
-    parser.add_argument('-u', default=None, required=False, help='path to update file')
-    parser.add_argument('-e', default=None, required=False, help='path to save file')
-    parser.add_argument('-i', default=None, required=False, help='path to DDIPL file')
-    parser.add_argument('rom', default=None, help='path to ROM file', nargs='?')
+    parser = argparse.ArgumentParser(description="SummerCart64 one stop control center")
+    parser.add_argument("-b", default=False, action="store_true", required=False, help="skip internal bootloader")
+    parser.add_argument("-t", default="3", required=False, help="set TV type (0 - 2)")
+    parser.add_argument("-c", default="0xFFFF", required=False, help="set CIC seed")
+    parser.add_argument("-s", default="0", required=False, help="set save type (0 - 6)")
+    parser.add_argument("-d", default=False, action="store_true", required=False, help="enable 64DD emulation")
+    parser.add_argument("-r", default=False, action="store_true", required=False, help="perform reading operation instead of writing")
+    parser.add_argument("-l", default="0x101000", required=False, help="specify ROM length to read")
+    parser.add_argument("-u", default=None, required=False, help="path to update file")
+    parser.add_argument("-e", default=None, required=False, help="path to save file")
+    parser.add_argument("-i", default=None, required=False, help="path to DDIPL file")
+    parser.add_argument("rom", default=None, help="path to ROM file", nargs="?")
 
     args = parser.parse_args()
 
@@ -413,12 +414,20 @@ if __name__ == "__main__":
         dd_ipl_file = args.i
         rom_file = args.rom
 
+        firmware_backup_file = "sc64firmware.bin.bak"
+
         with SC64ProgressBar(sc64):
             if (update_file):
                 if (is_read):
                     sc64.backup_firmware(update_file)
                 else:
-                    sc64.update_firmware(update_file)
+                    sc64.backup_firmware(firmware_backup_file)
+                    if (not filecmp.cmp(update_file, firmware_backup_file)):
+                        print("Update file different than contents of flash - updating SummerCart64")
+                        sc64.update_firmware(update_file)
+                    else:
+                        print("SummerCart64 is already updated to latest version")
+                    os.remove(firmware_backup_file)
 
             if (not is_read):
                 print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
@@ -430,7 +439,7 @@ if __name__ == "__main__":
                 print(f"Setting TV type to [{sc64.get_tv_type_label(tv_type)}]")
                 sc64.set_tv_type(tv_type)
 
-                print(f"Setting CIC seed to [0x{cic_seed:02X}]")
+                print(f"Setting CIC seed to [{hex(cic_seed) if cic_seed != 0xFFFF else 'Unknown'}]")
                 sc64.set_cic_seed(cic_seed)
 
                 print(f"Setting 64DD emulation to [{'Enabled' if skip_bootloader else 'Disabled'}]")
