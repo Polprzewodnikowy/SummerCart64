@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from serial import Serial, SerialException
 from serial.tools import list_ports
 import argparse
@@ -418,10 +420,10 @@ if __name__ == "__main__":
                 else:
                     sc64.update_firmware(update_file)
 
-            print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
-            sc64.set_save_type(save_type)
-
             if (not is_read):
+                print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
+                sc64.set_save_type(save_type)
+
                 print(f"Setting skip internal bootloader to [{'True' if skip_bootloader else 'False'}]")
                 sc64.set_skip_bootloader(skip_bootloader)
 
