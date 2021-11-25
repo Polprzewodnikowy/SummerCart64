@@ -25,9 +25,9 @@ SKIP_FPGA_REBUILD=false
 build_cic () {
     if [ "$BUILT_CIC" = true ]; then return; fi
 
-    pushd sw/cic
+    pushd sw/cic > /dev/null
     avra UltraCIC-III.asm -D attiny45
-    popd
+    popd > /dev/null
 
     BUILT_CIC=true
 }
@@ -35,12 +35,12 @@ build_cic () {
 build_n64 () {
     if [ "$BUILT_N64" = true ]; then return; fi
 
-    pushd sw/n64
+    pushd sw/n64 > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all -j
-    popd
+    make all -j USER_FLAGS="-D__SC64_VERSION=\"$__SC64_VERSION\""
+    popd > /dev/null
 
     BUILT_N64=true
 }
@@ -48,12 +48,12 @@ build_n64 () {
 build_riscv () {
     if [ "$BUILT_RISCV" = true ]; then return; fi
 
-    pushd sw/riscv
+    pushd sw/riscv > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
         make clean -j
     fi
-    make all
-    popd
+    make all USER_FLAGS="-D__SC64_VERSION=\"$__SC64_VERSION\""
+    popd > /dev/null
 
     BUILT_RISCV=true
 }
@@ -64,13 +64,13 @@ build_fpga () {
     build_n64
     build_riscv
 
-    pushd fw
+    pushd fw > /dev/null
     if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
         quartus_cpf -c SummerCart64.cof
     else
         quartus_sh --flow compile ./SummerCart64.qpf
     fi
-    popd
+    popd > /dev/null
 
     BUILT_FPGA=true
 }
@@ -80,11 +80,11 @@ build_update () {
 
     build_fpga
 
-    pushd fw/output_files
+    pushd fw/output_files > /dev/null
     cat sc64_firmware_ufm_auto.rpd sc64_firmware_cfm0_auto.rpd > SC64_update_tmp.bin
     objcopy -I binary -O binary --reverse-bytes=4 SC64_update_tmp.bin SC64_update.bin
     rm SC64_update_tmp.bin
-    popd
+    popd > /dev/null
 
     BUILT_UPDATE=true
 }

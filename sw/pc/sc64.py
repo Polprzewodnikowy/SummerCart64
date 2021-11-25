@@ -442,7 +442,7 @@ if __name__ == "__main__":
                 print(f"Setting CIC seed to [{hex(cic_seed) if cic_seed != 0xFFFF else 'Unknown'}]")
                 sc64.set_cic_seed(cic_seed)
 
-                print(f"Setting 64DD emulation to [{'Enabled' if skip_bootloader else 'Disabled'}]")
+                print(f"Setting 64DD emulation to [{'Enabled' if dd_enable else 'Disabled'}]")
                 sc64.set_dd_enable(dd_enable)
 
             if (rom_file):

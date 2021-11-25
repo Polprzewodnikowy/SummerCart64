@@ -15,7 +15,7 @@ SECTIONS {
         . = ALIGN(4);
         _stext = .;
         *(.text .text.* .gnu.linkonce.t.*)
-        *(.rodata .rodata.* .gnu.linkonce.r.*)
+        *(.rdata .rodata .rodata.* .gnu.linkonce.r.*)
         . = ALIGN(4);
         _etext = .;
     } > ram AT > rom
@@ -37,7 +37,7 @@ SECTIONS {
         . = ALIGN(4);
         _sbss = .;
         *(.sbss .sbss.* .gnu.linkonce.sb.*)
-        *(.scommon)
+        *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
         . = ALIGN(4);

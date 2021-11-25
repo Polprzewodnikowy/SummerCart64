@@ -27,7 +27,7 @@
 		<verify_protect>0</verify_protect>
 		<epof>0</epof>
 		<ufm_source>2</ufm_source>
-		<ufm_filepath>../sw/n64/build/SummerLoader64.hex</ufm_filepath>
+		<ufm_filepath>../sw/n64/build/n64boot.hex</ufm_filepath>
 		<cfm0_filepath>../sw/riscv/build/governor.hex</cfm0_filepath>
 		<cfm0_file_start_addr>305152</cfm0_file_start_addr>
 	</MAX10_device_options>
