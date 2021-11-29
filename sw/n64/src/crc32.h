@@ -2,7 +2,7 @@
 #define CRC32_H__
 
 
-#include "platform.h"
+#include "sys.h"
 
 
 uint32_t crc32_calculate(void *buffer, size_t length);

@@ -5,43 +5,43 @@ MEMORY {
 
 ENTRY(entry_handler)
 
+__stack_size = 64k;
+
 SECTIONS {
     .flash : {
-        KEEP(*(.text.bootcode));
+        KEEP(*(.text.rom_header));
+        KEEP(*(.text.ipl3));
+        __ipl3_font = LOADADDR(.flash) + 0xB70;
     } > flash
 
     .text : {
         *(.text.entry_handler)
         *(.text .text.* .gnu.linkonce.t.*)
-        *(.rdata .rodata .rodata.* .gnu.linkonce.r.*)
-    } > rdram AT > flash
-
-    .data : {
-        . = ALIGN(8);
-        _sdata = .;
+        *(.rodata .rodata.* .gnu.linkonce.r.*)
         *(.data .data.* .gnu.linkonce.d.*)
-        . = ALIGN(8);
-        _ssdata = .;
+        _gp = . + 0x8000;
         *(.sdata .sdata.* .gnu.linkonce.s.*)
         *(.lit8)
         *(.lit4)
+        . = ALIGN(4);
     } > rdram AT > flash
 
     .bss : {
-        . = ALIGN(8);
-        _sbss = .;
         *(.sbss .sbss.* .gnu.linkonce.sb.*)
         *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
-        . = ALIGN(8);
-        _ebss = .;
+        . = ALIGN(4);
     } > rdram
+
+    _sheap = .;
+    . = ORIGIN(rdram) + LENGTH(rdram) - __stack_size;
+    _eheap = .;
+
+    . += __stack_size;
+    _sp = .;
 
     /DISCARD/ : {
         *(.MIPS.*)
     }
-
-    _gp = MIN(_ssdata + 0x8000, MAX(_sdata + 0x8000, _ebss - 0x8000));
-    _sp = ORIGIN(rdram) + LENGTH(rdram);
 }

@@ -189,4 +189,7 @@ typedef volatile struct joybus_regs {
 #define JOYBUS_SCR_TX_LENGTH_BIT    (16)
 
 
+void reset_handler(void);
+
+
 #endif

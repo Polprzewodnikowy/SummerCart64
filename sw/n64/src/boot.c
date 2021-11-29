@@ -1,7 +1,7 @@
 #include "boot.h"
 #include "crc32.h"
 #include "n64_regs.h"
-// #include "sc64.h"
+#include "sc64.h"
 
 
 static const struct crc32_to_cic_seed {
@@ -26,9 +26,15 @@ static cart_header_t global_cart_header __attribute__((aligned(16)));
 
 cart_header_t *boot_load_cart_header(void) {
     cart_header_t *cart_header_pointer = &global_cart_header;
+    
+    uint32_t *src = (uint32_t *)(CART_BASE);
+    uint32_t *dst = (uint32_t *) cart_header_pointer;
 
-    platform_pi_dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
-    platform_cache_invalidate(cart_header_pointer, sizeof(cart_header_t));
+    for (int i = 0; i < sizeof(cart_header_t); i += 4) {
+        *dst++ = pio_read(src++);
+        // while (PI->status & 0x03);
+        // ((uint32_t *)cart_header_pointer)[i] = (((uint32_t *)(CART_BASE))[i]);
+    }
 
     return cart_header_pointer;
 }
@@ -74,7 +80,7 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
     }
 }
 
-void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
+__attribute__((noreturn)) void bootX(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
     uint32_t is_x105_boot = (cic_seed == crc32_to_cic_seed[5].cic_seed);
     uint32_t is_ddipl_boot = (
         (cic_seed == crc32_to_cic_seed[7].cic_seed) ||
@@ -140,11 +146,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
     gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
     gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
     gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == TV_PAL) ? 341 : 340]);
-
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_T3], (uint32_t) gpr_regs[CPU_REG_S3], (uint32_t) gpr_regs[CPU_REG_S4]);
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_S5], (uint32_t) gpr_regs[CPU_REG_S6], (uint32_t) gpr_regs[CPU_REG_S7]);
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_SP], (uint32_t) gpr_regs[CPU_REG_RA], 0);
-
+    // return;
     __asm__ (
         ".set noat \n\t"
         ".set noreorder \n\t"
@@ -175,7 +177,7 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
         "nop \n\t"
         "ctc1 $t0, $31 \n\t"
         "nop \n\t"
-        "add $ra, $zero, %[gpr_regs] \n\t"
+        "move $ra, %[gpr_regs] \n\t"
         "ld $at, 0x08($ra) \n\t"
         "ld $v0, 0x10($ra) \n\t"
         "ld $v1, 0x18($ra) \n\t"
@@ -213,6 +215,4 @@ void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
         : [gpr_regs] "r" (gpr_regs)
         : "t0", "ra"
     );
-
-    while (1);
 }

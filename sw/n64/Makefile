@@ -6,13 +6,14 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
 FLAGS = -march=vr4300 -mtune=vr4300 -falign-functions=32 $(USER_FLAGS)
-CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
+CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -G 0 -MMD -MP
+ASFLAGS = -Wa,-I$(N64_INST)/mips64-elf/lib
 LDFLAGS = -lc -nostartfiles -Wl,--gc-sections
 
 SRC_DIR = src
 BUILD_DIR = build
 
-SRC_FILES = startup.S main.c sc64.c boot.c crc32.c
+SRC_FILES = startup.S main.c sys.c sc64.c syscalls.c crc32.c
 
 SRCS = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(patsubst %,%.o,$(SRCS))))
@@ -23,7 +24,7 @@ VPATH = $(SRC_DIR)
 $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
 
 $(BUILD_DIR)/%.S.o: %.S
-	$(CC) -x assembler-with-cpp $(FLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) -x assembler-with-cpp $(FLAGS) $(ASFLAGS) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.c.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
@@ -34,8 +35,8 @@ $(BUILD_DIR)/n64boot.elf: $(OBJS) N64.ld
 
 $(BUILD_DIR)/n64boot.bin: $(BUILD_DIR)/n64boot.elf
 	@$(OBJCOPY) -O binary $< $@
-	@truncate --size=90k $@
 	@chksum64 $@ > /dev/null
+	@truncate --size=90k $@
 
 $(BUILD_DIR)/n64boot.hex: $(BUILD_DIR)/n64boot.bin
 	@$(OBJCOPY) -I binary -O ihex $< $@

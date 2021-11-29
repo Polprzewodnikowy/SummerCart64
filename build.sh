@@ -21,6 +21,8 @@ BUILT_RELEASE=false
 
 FORCE_CLEAN=false
 SKIP_FPGA_REBUILD=false
+DEBUG_ENABLED=false
+USER_FLAGS+=" -D__SC64_VERSION=\"$__SC64_VERSION\""
 
 build_cic () {
     if [ "$BUILT_CIC" = true ]; then return; fi
@@ -39,7 +41,7 @@ build_n64 () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all -j USER_FLAGS="-D__SC64_VERSION=\"$__SC64_VERSION\""
+    make all -j USER_FLAGS="$USER_FLAGS"
     popd > /dev/null
 
     BUILT_N64=true
@@ -52,7 +54,7 @@ build_riscv () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean -j
     fi
-    make all USER_FLAGS="-D__SC64_VERSION=\"$__SC64_VERSION\""
+    make all USER_FLAGS="$USER_FLAGS"
     popd > /dev/null
 
     BUILT_RISCV=true
@@ -68,7 +70,11 @@ build_fpga () {
     if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
         quartus_cpf -c SummerCart64.cof
     else
+        if [ "$DEBUG_ENABLED" = true ]; then
+            quartus_sh --set VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
+        fi
         quartus_sh --flow compile ./SummerCart64.qpf
+        quartus_sh --set -remove VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
     fi
     popd > /dev/null
 
@@ -105,7 +111,7 @@ build_release () {
 
 print_usage () {
     echo "builder script for SummerCart64"
-    echo "usage: ./build.sh [cic] [n64] [riscv] [fpga] [update] [release] [-c] [-s] [--help]"
+    echo "usage: ./build.sh [cic] [n64] [riscv] [fpga] [update] [release] [-c] [-s] [-d] [--help]"
     echo "parameters:"
     echo "  cic       - assemble UltraCIC-III software"
     echo "  n64       - compile N64 bootloader software"
@@ -117,6 +123,8 @@ print_usage () {
     echo "            - clean software compilation result directories before build"
     echo "  -s | --skip-fpga-rebuild"
     echo "            - do not recompile whole FPGA design if it's already done, just update software binaries"
+    echo "  -d | --debug"
+    echo "            - enable debug features"
     echo "  --help    - print this guide"
 }
 
@@ -160,6 +168,9 @@ while test $# -gt 0; do
         -s|--skip-fpga-rebuild)
             SKIP_FPGA_REBUILD=true
             ;;
+        -d|--debug)
+            DEBUG_ENABLED=true
+            ;;
         --help)
             print_usage
             exit 0
@@ -174,6 +185,7 @@ while test $# -gt 0; do
     shift
 done
 
+if [ "$DEBUG_ENABLED" = true ]; then USER_FLAGS+=" -DDEBUG"; fi
 if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_N64" = true ]; then build_n64; fi
 if [ "$TRIGGER_RISCV" = true ]; then build_riscv; fi

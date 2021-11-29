@@ -39,6 +39,12 @@ struct os_boot_config_s {
 
 typedef struct os_boot_config_s os_boot_config_t;
 
+typedef enum {
+    TV_PAL = 0,
+    TV_NTSC = 1,
+    TV_MPAL = 2,
+} tv_type_t;
+
 
 #define OS_BOOT_CONFIG_BASE         (0xA0000300)
 #define OS_BOOT_CONFIG              ((os_boot_config_t *) OS_BOOT_CONFIG_BASE)
@@ -57,7 +63,7 @@ typedef struct os_boot_config_s os_boot_config_t;
 cart_header_t *boot_load_cart_header(void);
 uint16_t boot_get_cic_seed(cart_header_t *cart_header);
 tv_type_t boot_get_tv_type(cart_header_t *cart_header);
-void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type);
+void bootX(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type);
 
 
 #endif

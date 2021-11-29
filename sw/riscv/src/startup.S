@@ -2,6 +2,7 @@
 #define XSTR(s) STR(s)
 #define VERSION XSTR(__SC64_VERSION)
 
+
 .section .text.reset_handler
 reset_handler:
     .global reset_handler
@@ -13,16 +14,15 @@ reset_handler:
 
     la sp, __stack_pointer$
 
-    j init_text
+    la ra, init_text
+    jalr zero, 0(ra)
 
-    .org 0x18, 0x00
-
+    .org 0x20, 0x00
 header_text_info:
-    .ascii "byMFinPL"
-    .ascii "SummerGovernor64"
+    .global header_text_info
+    .ascii "SummerGovernor64 "
     .ascii VERSION
-
-    .org 0x40, 0x20
+    .org 0x40, 0x00
 
 init_text:
     la a0, _sitext

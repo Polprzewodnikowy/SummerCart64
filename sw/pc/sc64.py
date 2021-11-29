@@ -27,9 +27,11 @@ class SC64:
     __CFG_ID_TV_TYPE = 6
     __CFG_ID_SAVE_OFFEST = 7
     __CFG_ID_DD_OFFEST = 8
-    __CFG_ID_SKIP_BOOTLOADER = 9
-    __CFG_ID_FLASH_OPERATION = 10
-    __CFG_ID_RECONFIGURE = 11
+    __CFG_ID_BOOT_MODE = 9
+    __CFG_ID_FLASH_SIZE = 10
+    __CFG_ID_FLASH_READ = 11
+    __CFG_ID_FLASH_PROGRAM = 12
+    __CFG_ID_RECONFIGURE = 13
 
     __SC64_VERSION_V2 = 0x53437632
 
@@ -39,6 +41,8 @@ class SC64:
 
     __MIN_ROM_LENGTH = 0x101000
     __DDIPL_ROM_LENGTH = 0x400000
+
+    __DEBUG_ID_TEXT = 0x01
 
 
     def __init__(self) -> None:
@@ -88,7 +92,14 @@ class SC64:
     def __write(self, data: bytes) -> None:
         self.__serial.write(self.__escape(data))
 
-    
+
+    def __read_long(self, length: int) -> bytes:
+        data = bytearray()
+        while (len(data) < length):
+            data += self.__read(length - len(data))
+        return bytes(data)
+
+
     def __write_dummy(self, length: int) -> None:
         self.__write(bytes(length))
 
@@ -148,8 +159,8 @@ class SC64:
             raise SC64Exception(f"Unknown hardware version: {hex(version)}")
 
 
-    def __query_config(self, id: int, arg: int = 0) -> int:
-        self.__write_cmd("Q", id, arg)
+    def __query_config(self, id: int) -> int:
+        self.__write_cmd("Q", id, 0)
         value = self.__read_int()
         self.__read_cmd_status("Q")
         return value
@@ -211,7 +222,8 @@ class SC64:
 
 
     def backup_firmware(self, file: str) -> None:
-        length = self.__query_config(self.__CFG_ID_FLASH_OPERATION, self.__UPDATE_OFFSET)
+        length = self.__query_config(self.__CFG_ID_FLASH_SIZE)
+        self.__change_config(self.__CFG_ID_FLASH_READ, self.__UPDATE_OFFSET)
         self.__read_file_from_sdram(file, self.__UPDATE_OFFSET, length)
 
 
@@ -219,14 +231,28 @@ class SC64:
         self.__write_file_to_sdram(file, self.__UPDATE_OFFSET)
         saved_timeout = self.__serial.timeout
         self.__serial.timeout = 20.0
-        self.__change_config(self.__CFG_ID_FLASH_OPERATION, self.__UPDATE_OFFSET)
+        self.__change_config(self.__CFG_ID_FLASH_PROGRAM, self.__UPDATE_OFFSET)
         self.__serial.timeout = saved_timeout
         self.__reconfigure()
         self.__find_sc64()
 
 
-    def set_skip_bootloader(self, enable: bool) -> None:
-        self.__change_config(self.__CFG_ID_SKIP_BOOTLOADER, 1 if enable else 0)
+    def set_boot_mode(self, mode: int) -> None:
+        if (mode >= 0 and mode <= 3):
+            self.__change_config(self.__CFG_ID_BOOT_MODE, mode)
+        else:
+            raise SC64Exception("Boot mode outside of supported values")
+
+
+    def get_boot_mode_label(self, mode: int) -> None:
+        if (mode < 0 or mode > 3):
+            return "Unknown"
+        return {
+            0: "Load menu from SD card",
+            1: "Load ROM from SDRAM through bootloader",
+            2: "Load DDIPL from SDRAM",
+            3: "Load ROM from SDRAM directly without bootloader"
+        }[mode]
 
 
     def set_tv_type(self, type: int = None) -> None:
@@ -321,6 +347,34 @@ class SC64:
         self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
 
 
+    def debug_loop(self) -> None:
+        print("\r\nDebug server started\r\n")
+
+        self.__serial.timeout = 0.01
+
+        while (True):
+            start_indicator = self.__read_long(4)
+            if (start_indicator == b"DMA@"):
+                header = self.__read_long(4)
+                id = int(header[0])
+                length = int.from_bytes(header[1:4], byteorder="big")
+                align = self.__align(length, 4) - length
+                data = self.__read_long(length)
+
+                if (id == self.__DEBUG_ID_TEXT):
+                    print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
+                    sys.stdout.flush()
+                else:
+                    print(f"Got unknown id: {id}, length: {length}")
+
+                self.__read_long(align)
+                end_indicator = self.__read_long(4)
+                if (end_indicator != b"CMPH"):
+                    print(f"Got unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}")
+            else:
+                print(f"Got unknown start indicator: {start_indicator.decode(encoding='ascii', errors='backslashreplace')}")
+
+
 
 class SC64ProgressBar:
     __LABEL_LENGTH = 30
@@ -381,17 +435,18 @@ class SC64ProgressBar:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SummerCart64 one stop control center")
-    parser.add_argument("-b", default=False, action="store_true", required=False, help="skip internal bootloader")
-    parser.add_argument("-t", default="3", required=False, help="set TV type (0 - 2)")
-    parser.add_argument("-c", default="0xFFFF", required=False, help="set CIC seed")
-    parser.add_argument("-s", default="0", required=False, help="set save type (0 - 6)")
+    parser.add_argument("-b", metavar="boot_mode", default="1", required=False, help="set boot mode (0 - 3)")
+    parser.add_argument("-t", metavar="tv_type", default="3", required=False, help="set TV type (0 - 2)")
+    parser.add_argument("-c", metavar="cic_seed", default="0xFFFF", required=False, help="set CIC seed")
+    parser.add_argument("-s", metavar="save_type", default="0", required=False, help="set save type (0 - 6)")
     parser.add_argument("-d", default=False, action="store_true", required=False, help="enable 64DD emulation")
     parser.add_argument("-r", default=False, action="store_true", required=False, help="perform reading operation instead of writing")
-    parser.add_argument("-l", default="0x101000", required=False, help="specify ROM length to read")
-    parser.add_argument("-u", default=None, required=False, help="path to update file")
-    parser.add_argument("-e", default=None, required=False, help="path to save file")
-    parser.add_argument("-i", default=None, required=False, help="path to DDIPL file")
-    parser.add_argument("rom", default=None, help="path to ROM file", nargs="?")
+    parser.add_argument("-l", metavar="length", default="0x101000", required=False, help="specify ROM length to read")
+    parser.add_argument("-u", metavar="update_path", default=None, required=False, help="path to update file")
+    parser.add_argument("-e", metavar="save_path", default=None, required=False, help="path to save file")
+    parser.add_argument("-i", metavar="ddipl_path", default=None, required=False, help="path to DDIPL file")
+    parser.add_argument("-q", default=None, action="store_true", required=False, help="start debug server")
+    parser.add_argument("rom", metavar="rom_path", default=None, help="path to ROM file", nargs="?")
 
     args = parser.parse_args()
 
@@ -402,7 +457,7 @@ if __name__ == "__main__":
     try:
         sc64 = SC64()
 
-        skip_bootloader = args.b
+        boot_mode = int(args.b)
         save_type = int(args.s)
         tv_type = int(args.t)
         cic_seed = int(args.c, 0)
@@ -413,6 +468,7 @@ if __name__ == "__main__":
         save_file = args.e
         dd_ipl_file = args.i
         rom_file = args.rom
+        debug_server = args.q
 
         firmware_backup_file = "sc64firmware.bin.bak"
 
@@ -430,11 +486,11 @@ if __name__ == "__main__":
                     os.remove(firmware_backup_file)
 
             if (not is_read):
+                print(f"Setting boot mode to [{sc64.get_boot_mode_label(boot_mode)}]")
+                sc64.set_boot_mode(boot_mode)
+
                 print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
                 sc64.set_save_type(save_type)
-
-                print(f"Setting skip internal bootloader to [{'True' if skip_bootloader else 'False'}]")
-                sc64.set_skip_bootloader(skip_bootloader)
 
                 print(f"Setting TV type to [{sc64.get_tv_type_label(tv_type)}]")
                 sc64.set_tv_type(tv_type)
@@ -466,6 +522,13 @@ if __name__ == "__main__":
                 else:
                     sc64.upload_save(save_file)
 
+            if (debug_server):
+                sc64.debug_loop()
+
     except SC64Exception as e:
         print(f"Error: {e}")
         parser.exit(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\033[0m")
