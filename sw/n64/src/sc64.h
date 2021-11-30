@@ -95,7 +95,7 @@ typedef struct {
     io32_t *dd_offset;
     boot_mode_t boot_mode;
     char bootloader_version[32];
-} info_t;
+} cart_info_t;
 
 
 extern char header_text_info;
@@ -107,7 +107,7 @@ bool sc64_wait_cpu_busy(void);
 bool sc64_perform_cmd(uint8_t cmd, uint32_t *args, uint32_t *result);
 uint32_t sc64_get_config(cfg_id_t id);
 void sc64_set_config(cfg_id_t id, uint32_t value);
-void sc64_get_info(info_t *info);
+void sc64_get_info(cart_info_t *info);
 void sc64_wait_usb_tx_ready(void);
 void sc64_usb_tx_data(io32_t *address, uint32_t length);
 void sc64_debug_write(uint8_t type, const void *data, uint32_t len);

@@ -24,7 +24,7 @@ void main(void) {
     LOG_I("  Mask ROM version:  %d\r\n", header.version);
     LOG_I("\r\n");
 
-    info_t info;
+    cart_info_t info;
 
     sc64_get_info(&info);
 

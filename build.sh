@@ -52,9 +52,9 @@ build_riscv () {
 
     pushd sw/riscv > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        make clean -j
+        make clean
     fi
-    make all USER_FLAGS="$USER_FLAGS"
+    make all -j USER_FLAGS="$USER_FLAGS"
     popd > /dev/null
 
     BUILT_RISCV=true

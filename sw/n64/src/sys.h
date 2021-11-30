@@ -107,7 +107,6 @@ typedef struct {
 #define PIFRAM                      ((io8_t *) PIFRAM_BASE)
 
 
-
 void wait_ms(uint32_t ms);
 uint32_t io_read(io32_t *address);
 void io_write(io32_t *address, uint32_t value);

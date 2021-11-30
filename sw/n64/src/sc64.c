@@ -46,7 +46,7 @@ void sc64_set_config(cfg_id_t id, uint32_t value) {
     sc64_perform_cmd(SC64_CMD_CONFIG, args, NULL);
 }
 
-void sc64_get_info(info_t *info) {
+void sc64_get_info(cart_info_t *info) {
     io32_t *src = UNCACHED(&header_text_info);
     uint32_t *dst = (uint32_t *) info->bootloader_version;
 
@@ -60,8 +60,8 @@ void sc64_get_info(info_t *info) {
     info->save_type = (save_type_t) sc64_get_config(CFG_ID_SAVE_TYPE);
     info->cic_seed = (uint8_t) sc64_get_config(CFG_ID_CIC_SEED);
     info->tv_type = (tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
-    info->save_offset = (io32_t *) sc64_get_config(CFG_ID_SAVE_OFFEST);
-    info->dd_offset = (io32_t *) sc64_get_config(CFG_ID_DD_OFFEST);
+    info->save_offset = (io32_t *) (0x10000000 | sc64_get_config(CFG_ID_SAVE_OFFEST));
+    info->dd_offset = (io32_t *) (0x10000000 | sc64_get_config(CFG_ID_DD_OFFEST));
     info->boot_mode = (boot_mode_t) sc64_get_config(CFG_ID_BOOT_MODE);
 }
 
