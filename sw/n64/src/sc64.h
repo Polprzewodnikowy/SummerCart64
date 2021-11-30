@@ -18,11 +18,6 @@
 #endif
 
 
-extern char *header_text_info;
-
-#define SC64_BL_VERSION_BASE        (PHYSICAL((io32_t *) (header_text_info)))
-
-
 typedef struct {
     io32_t SR_CMD;
     io32_t DATA[2];
@@ -101,6 +96,9 @@ typedef struct {
     boot_mode_t boot_mode;
     char bootloader_version[32];
 } info_t;
+
+
+extern char header_text_info;
 
 
 bool sc64_check_presence(void);

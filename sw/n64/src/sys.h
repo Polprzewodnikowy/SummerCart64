@@ -12,7 +12,6 @@ typedef volatile uint32_t io32_t;
 
 #define	ALIGN(value, align)         (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
 
-#define PHYSICAL(address)           ((io32_t *) (((io32_t) (address)) & 0x1FFFFFFFUL))
 #define CACHED(address)             ((io32_t *) ((((io32_t) (address)) & 0x1FFFFFFFUL) | 0x80000000UL))
 #define UNCACHED(address)           ((io32_t *) ((((io32_t) (address)) & 0x1FFFFFFFUL) | 0xA0000000UL))
 

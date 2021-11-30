@@ -47,15 +47,13 @@ void sc64_set_config(cfg_id_t id, uint32_t value) {
 }
 
 void sc64_get_info(info_t *info) {
-    io32_t *src = UNCACHED(SC64_BL_VERSION_BASE);
+    io32_t *src = UNCACHED(&header_text_info);
     uint32_t *dst = (uint32_t *) info->bootloader_version;
 
     sc64_set_config(CFG_ID_SDRAM_SWITCH, false);
-
     for (int i = 0; i < sizeof(info->bootloader_version); i += sizeof(uint32_t)) {
         *dst++ = pi_io_read(src++);
     }
-
     sc64_set_config(CFG_ID_SDRAM_SWITCH, true);
 
     info->dd_enabled = (bool) sc64_get_config(CFG_ID_DD_ENABLE);
