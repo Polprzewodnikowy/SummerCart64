@@ -1,35 +1,44 @@
-#include <stdio.h>
 #include <errno.h>
-#include <sys/types.h>
+#include <stdio.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "sc64.h"
 
 
-int _close_r(struct _reent *prt, int fd) {
+extern char _sheap __attribute__((section(".data")));
+extern char _eheap __attribute__((section(".data")));
+
+
+int _close_r (struct _reent *prt, int fd) {
+    errno = ENOSYS;
     return -1;
 }
 
-int _fstat_r(struct _reent *prt, int fd, struct stat *pstat) {
-    pstat->st_mode = S_IFCHR;
+int _fstat_r (struct _reent *prt, int fd, struct stat *pstat) {
+    errno = ENOSYS;
+    return -1;
+}
+
+int _isatty_r (struct _reent *prt, int fd) {
+    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO){
+        return 1;
+    }
+    errno = EBADF;
     return 0;
 }
 
-int _isatty_r(struct _reent *prt, int fd) {
-    return 1;
+off_t _lseek_r (struct _reent *prt, int fd, off_t pos, int whence) {
+    errno = ENOSYS;
+    return -1;
 }
 
-off_t _lseek_r(struct _reent *prt, int fd, off_t pos, int whence) {
-    return 0;
+ssize_t _read_r (struct _reent *prt, int fd, void *buf, size_t cnt) {
+    errno = ENOSYS;
+    return -1;
 }
 
-ssize_t _read_r(struct _reent *prt, int fd, void *buf, size_t cnt) {
-    return 0;
-}
-
-caddr_t _sbrk_r(struct _reent *prt, ptrdiff_t incr) {
-    extern char _sheap;
-    extern char _eheap;
-
+caddr_t _sbrk_r (struct _reent *prt, ptrdiff_t incr) {
     static char *curr_heap_end = &_sheap;
     char *prev_heap_end;
 
@@ -44,12 +53,19 @@ caddr_t _sbrk_r(struct _reent *prt, ptrdiff_t incr) {
     return (caddr_t) prev_heap_end;
 }
 
-ssize_t _write_r(struct _reent *prt, int fd, const void *buf, size_t cnt) {
-    sc64_debug_write(SC64_DEBUG_TYPE_TEXT, buf, cnt);
-    return cnt;
+ssize_t _write_r (struct _reent *prt, int fd, const void *buf, size_t cnt) {
+    if (fd == STDIN_FILENO) {
+        errno = EBADF;
+        return -1;
+    } else if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
+        sc64_debug_write(SC64_DEBUG_TYPE_TEXT, buf, cnt);
+        return cnt;
+    }
+    errno = ENOSYS;
+    return -1;
 }
 
-void __assert_func(const char *file, int line, const char *func, const char *failedexpr) {
+void __assert_func (const char *file, int line, const char *func, const char *failedexpr) {
     LOG_E("\r\nassertion \"%s\" failed: file \"%s\", line %d%s%s\r\n", failedexpr, file, line, func ? ", function: " : "", func ? func : "");
     while (1);
 }

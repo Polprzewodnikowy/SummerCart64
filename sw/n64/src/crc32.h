@@ -2,10 +2,11 @@
 #define CRC32_H__
 
 
-#include "sys.h"
+#include <stddef.h>
+#include <stdint.h>
 
 
-uint32_t crc32_calculate(void *buffer, size_t length);
+uint32_t crc32_calculate (void *buffer, size_t length);
 
 
 #endif

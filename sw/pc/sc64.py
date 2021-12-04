@@ -43,6 +43,8 @@ class SC64:
     __DDIPL_ROM_LENGTH = 0x400000
 
     __DEBUG_ID_TEXT = 0x01
+    __DEBUG_ID_FSD_READ = 0xF1
+    __DEBUG_ID_FSD_WRITE = 0xF2
 
 
     def __init__(self) -> None:
@@ -50,12 +52,15 @@ class SC64:
         self.__progress_init = None
         self.__progress_value = None
         self.__progress_finish = None
+        self.__fsd_file = None
         self.__find_sc64()
 
 
     def __del__(self) -> None:
         if (self.__serial):
             self.__serial.close()
+        if (self.__fsd_file):
+            self.__fsd_file.close()
 
 
     def __set_progress_init(self, value: int, label: str) -> None:
@@ -172,6 +177,11 @@ class SC64:
             self.__read_cmd_status("C")
 
 
+    def __debug_write(self, type: int, data: bytes) -> None:
+        self.__write_cmd("D", type, len(data))
+        self.__write(data)
+
+
     def __read_file_from_sdram(self, file: str, offset: int, length: int, align: int = 2) -> None:
         with open(file, "wb") as f:
             transfer_size = self.__align(length, align)
@@ -274,11 +284,13 @@ class SC64:
         }[type]
 
 
-    def set_cic_seed(self, type: int = None) -> None:
-        if (type == None):
+    def set_cic_seed(self, seed: int = None) -> None:
+        if (seed == None or seed == 0xFFFF):
             self.__change_config(self.__CFG_ID_CIC_SEED, 0xFFFF)
+        elif (seed >= 0 and seed <= 0x1FF):
+            self.__change_config(self.__CFG_ID_CIC_SEED, seed)
         else:
-            self.__change_config(self.__CFG_ID_CIC_SEED, type)
+            raise SC64Exception("CIC seed outside of supported values")
 
 
     def download_rom(self, file: str, length: int, offset: int = 0) -> None:
@@ -347,10 +359,23 @@ class SC64:
         self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
 
 
-    def debug_loop(self) -> None:
-        print("\r\nDebug server started\r\n")
+    def __debug_process_fsd_read(self, file: str, id: int, data: bytes) -> None:
+        sector = int.from_bytes(data[0:4], byteorder='big')
+        count = int.from_bytes(data[4:8], byteorder='big')
+        if (file):
+            if (self.__fsd_file == None):
+                self.__fsd_file = open(file, "rb")
+            self.__fsd_file.seek(sector * 512)
+            self.__debug_write(id, self.__fsd_file.read(count * 512))
+        else:
+            self.__debug_write(id, bytes(count * 512))
+
+
+    def debug_loop(self, file: str = None) -> None:
+        print("\033[34m --- Debug server started --- \033[0m")
 
         self.__serial.timeout = 0.01
+        self.__serial.write_timeout = 1
 
         while (True):
             start_indicator = self.__read_long(4)
@@ -358,19 +383,28 @@ class SC64:
                 header = self.__read_long(4)
                 id = int(header[0])
                 length = int.from_bytes(header[1:4], byteorder="big")
+
+                if (length > 0):
                 align = self.__align(length, 4) - length
                 data = self.__read_long(length)
 
-                if (id == self.__DEBUG_ID_TEXT):
-                    print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
-                    sys.stdout.flush()
-                else:
-                    print(f"Got unknown id: {id}, length: {length}")
+                    if (id == self.__DEBUG_ID_TEXT):
+                        print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
+                    elif (id == self.__DEBUG_ID_FSD_READ):
+                        pass
+                    elif (id == self.__DEBUG_ID_FSD_WRITE):
+                        pass
+                    else:
+                        print(f"Got unknown id: {id}, length: {length}")
 
-                self.__read_long(align)
-                end_indicator = self.__read_long(4)
-                if (end_indicator != b"CMPH"):
-                    print(f"Got unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}")
+                    self.__read_long(align)
+                    end_indicator = self.__read_long(4)
+                    if (end_indicator != b"CMPH"):
+                        print(f"Got unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}")
+
+                    if (id == self.__DEBUG_ID_FSD_READ):
+                        self.__debug_process_fsd_read(file, id, data)
+
             else:
                 print(f"Got unknown start indicator: {start_indicator.decode(encoding='ascii', errors='backslashreplace')}")
 
@@ -446,13 +480,14 @@ if __name__ == "__main__":
     parser.add_argument("-e", metavar="save_path", default=None, required=False, help="path to save file")
     parser.add_argument("-i", metavar="ddipl_path", default=None, required=False, help="path to DDIPL file")
     parser.add_argument("-q", default=None, action="store_true", required=False, help="start debug server")
+    parser.add_argument("-f", metavar="sd_path", default=None, required=False, help="path to disk or file for fake SD card emulation")
     parser.add_argument("rom", metavar="rom_path", default=None, help="path to ROM file", nargs="?")
-
-    args = parser.parse_args()
 
     if (len(sys.argv) <= 1):
         parser.print_help()
         parser.exit()
+
+    args = parser.parse_args()
 
     try:
         sc64 = SC64()
@@ -469,6 +504,7 @@ if __name__ == "__main__":
         dd_ipl_file = args.i
         rom_file = args.rom
         debug_server = args.q
+        sd_file = args.f
 
         firmware_backup_file = "sc64firmware.bin.bak"
 
@@ -486,19 +522,24 @@ if __name__ == "__main__":
                     os.remove(firmware_backup_file)
 
             if (not is_read):
-                print(f"Setting boot mode to [{sc64.get_boot_mode_label(boot_mode)}]")
+                if (boot_mode != 1):
+                    print(f"Setting boot mode to [{sc64.get_boot_mode_label(boot_mode)}]")
                 sc64.set_boot_mode(boot_mode)
 
-                print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
+                if (save_type):
+                    print(f"Setting save type to [{sc64.get_save_type_label(save_type)}]")
                 sc64.set_save_type(save_type)
 
-                print(f"Setting TV type to [{sc64.get_tv_type_label(tv_type)}]")
+                if (tv_type != 3):
+                    print(f"Setting TV type to [{sc64.get_tv_type_label(tv_type)}]")
                 sc64.set_tv_type(tv_type)
 
-                print(f"Setting CIC seed to [{hex(cic_seed) if cic_seed != 0xFFFF else 'Unknown'}]")
+                if (cic_seed != 0xFFFF):
+                    print(f"Setting CIC seed to [{hex(cic_seed) if cic_seed != 0xFFFF else 'Unknown'}]")
                 sc64.set_cic_seed(cic_seed)
 
-                print(f"Setting 64DD emulation to [{'Enabled' if dd_enable else 'Disabled'}]")
+                if (dd_enable):
+                    print(f"Setting 64DD emulation to [{'Enabled' if dd_enable else 'Disabled'}]")
                 sc64.set_dd_enable(dd_enable)
 
             if (rom_file):
@@ -523,7 +564,7 @@ if __name__ == "__main__":
                     sc64.upload_save(save_file)
 
             if (debug_server):
-                sc64.debug_loop()
+                sc64.debug_loop(sd_file)
 
     except SC64Exception as e:
         print(f"Error: {e}")

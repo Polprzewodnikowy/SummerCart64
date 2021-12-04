@@ -1,8 +1,3 @@
-#define STR(x)  #x
-#define XSTR(s) STR(s)
-#define VERSION XSTR(__SC64_VERSION)
-
-
 .section .text.reset_handler
 reset_handler:
     .global reset_handler
@@ -13,16 +8,6 @@ reset_handler:
     .option pop
 
     la sp, __stack_pointer$
-
-    la ra, init_text
-    jalr zero, 0(ra)
-
-    .org 0x20, 0x00
-header_text_info:
-    .global header_text_info
-    .ascii "SummerGovernor64 "
-    .ascii VERSION
-    .org 0x40, 0x00
 
 init_text:
     la a0, _sitext

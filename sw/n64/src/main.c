@@ -1,41 +1,68 @@
+#include "boot.h"
 #include "sc64.h"
 
 
-void main(void) {
-    sc64_init();
+void main (void) {
+    boot_info_t boot_info;
+    sc64_info_t sc64_info;
 
-    rom_header_t header;
+    sc64_get_info(&sc64_info);
 
-    io32_t *src = (io32_t *) (ROM_HEADER_CART);
-    uint32_t *dst = (uint32_t *) (&header);
+    LOG_I("Bootloader version: %.32s\r\n", sc64_info.bootloader_version);
 
-    for (int i = 0; i < sizeof(rom_header_t); i += 4) {
-        *dst++ = pi_io_read(src++);
+    switch (sc64_info.boot_mode) {
+        case BOOT_MODE_MENU:
+            LOG_E("Menu boot mode not implemented!\r\n");
+            while (1);
+
+        case BOOT_MODE_ROM:
+            boot_info.device_type = BOOT_DEVICE_TYPE_ROM;
+            LOG_I("Running ROM from SDRAM\r\n");
+            break;
+
+        case BOOT_MODE_DD:
+            boot_info.device_type = BOOT_DEVICE_TYPE_DD;
+            LOG_I("Running DDIPL from SDRAM\r\n");
+            break;
+
+        case BOOT_MODE_DIRECT:
+            LOG_I("Running bootloader from SDRAM - assuming FSD available\r\n");
+            while (1);
+
+        default:
+            LOG_E("Unknown boot mode! - %d\r\n", sc64_info.boot_mode);
+            while (1);
     }
 
-    LOG_I("Booting ROM:\r\n");
-    LOG_I("  PI Config:         0x%08lX\r\n", header.pi_config);
-    LOG_I("  Clock rate:        0x%08lX\r\n", header.clock_rate);
-    LOG_I("  Load address:      0x%08lX\r\n", header.load_addr);
-    LOG_I("  SDK vesrion:       %d.%d%c\r\n", header.sdk_version.major / 10, header.sdk_version.major % 10, header.sdk_version.minor);
-    LOG_I("  1MB CRC:           0x%08lX, 0x%08lX\r\n", header.crc[0], header.crc[1]);
-    LOG_I("  Name:              %.20s\r\n", header.name);
-    LOG_I("  ID:                %.4s\r\n", header.id);
-    LOG_I("  Mask ROM version:  %d\r\n", header.version);
-    LOG_I("\r\n");
+    boot_info.reset_type = OS_INFO->reset_type;
 
-    cart_info_t info;
+    if (sc64_info.tv_type != TV_TYPE_UNKNOWN) {
+        boot_info.tv_type = sc64_info.tv_type;
+        LOG_I("Using provided TV type: %d\r\n", boot_info.tv_type);
+    } else {
+        if (boot_get_tv_type(&boot_info)) {
+            LOG_I("Using TV type guessed from ROM header: %d\r\n", boot_info.tv_type);
+        } else {
+            boot_info.tv_type = OS_INFO->tv_type;
+            LOG_I("Using console TV type: %d\r\n", boot_info.tv_type);
+        }
+    }
 
-    sc64_get_info(&info);
+    if (sc64_info.cic_seed != 0xFFFF) {
+        boot_info.cic_seed = sc64_info.cic_seed & 0xFF;
+        boot_info.version = (sc64_info.cic_seed >> 8) & 0x01;
+        LOG_I("Using provided CIC seed and version: 0x%02X / %d\r\n", boot_info.cic_seed, boot_info.version);
+    } else {
+        if (boot_get_cic_seed_version(&boot_info)) {
+            LOG_I("Using CIC seed and version guessed from IPL3: 0x%02X / %d\r\n", boot_info.cic_seed, boot_info.version);
+        } else {
+            boot_info.cic_seed = 0x3F;
+            boot_info.version = 0;
+            LOG_I("Using 6102/7101 CIC seed and version: 0x%02X / %d\r\n", boot_info.cic_seed, boot_info.version);
+        }
+    }
 
-    LOG_I("SC64 settings:\r\n");
-    LOG_I("  DD enabled:        %d\r\n", info.dd_enabled);
-    LOG_I("  Save type:         %d\r\n", info.save_type);
-    LOG_I("  CIC seed:          0x%02X\r\n", info.cic_seed);
-    LOG_I("  TV type:           %d\r\n", info.tv_type);
-    LOG_I("  Save offset:       0x%08lX\r\n", (uint32_t) info.save_offset);
-    LOG_I("  DD offset:         0x%08lX\r\n", (uint32_t) info.dd_offset);
-    LOG_I("  Boot mode:         %d\r\n", info.boot_mode);
-    LOG_I("  Bootloader ver:    %s\r\n", info.bootloader_version);
-    LOG_I("\r\n");
+    LOG_I("Booting IPL3\r\n");
+
+    boot(&boot_info);
 }

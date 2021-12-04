@@ -37,14 +37,14 @@ static const uint32_t crc32_table[256] = {
 };
 
 
-uint32_t crc32_calculate(void *buffer, size_t length) {
-   uint32_t crc32 = 0xFFFFFFFF;
+uint32_t crc32_calculate (void *buffer, size_t length) {
+   uint32_t crc32 = 0xFFFFFFFFUL;
 
-   uint8_t *byte_pointer = (uint8_t *) buffer;
+   uint8_t *byte_pointer = (uint8_t *) (buffer);
 
    while (length--) {
         crc32 = (crc32 >> 8) ^ crc32_table[(crc32 & 0xFF) ^ (*byte_pointer++)];
    }
 
-   return ~crc32;
+   return ~(crc32);
 }
