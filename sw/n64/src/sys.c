@@ -2,7 +2,7 @@
 
 
 void c0_set_status (uint32_t status) {
-    __asm__ volatile (
+    asm volatile (
         ".set noat \n"
         ".set noreorder \n"
         "mtc0 %[status], $12 \n"
@@ -14,7 +14,7 @@ void c0_set_status (uint32_t status) {
 
 uint32_t c0_get_count (void) {
     uint32_t count;
-    __asm__ volatile (
+    asm volatile (
         ".set noat \n"
         ".set noreorder \n"
         "mfc0 %[count], $9 \n"
@@ -31,17 +31,17 @@ void wait_ms (uint32_t ms) {
 
 uint32_t io_read (io32_t *address) {
     io32_t *uncached = UNCACHED(address);
-    __asm__ volatile ("" : : : "memory");
+    asm volatile ("" : : : "memory");
     uint32_t value = *uncached;
-    __asm__ volatile ("" : : : "memory");
+    asm volatile ("" : : : "memory");
     return value;
 }
 
 void io_write (io32_t *address, uint32_t value) {
     io32_t *uncached = UNCACHED(address);
-    __asm__ volatile ("" : : : "memory");
+    asm volatile ("" : : : "memory");
     *uncached = value;
-    __asm__ volatile ("" : : : "memory");
+    asm volatile ("" : : : "memory");
 }
 
 uint32_t pi_busy (void) {

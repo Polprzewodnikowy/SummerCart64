@@ -21,8 +21,7 @@ SECTIONS {
         *(.data .data.* .gnu.linkonce.d.*)
         _gp = . + 0x8000;
         *(.sdata .sdata.* .gnu.linkonce.s.*)
-        *(.lit8)
-        *(.lit4)
+        *(.lit8 .lit4)
         . = ALIGN(4);
     } > rdram AT > flash
 

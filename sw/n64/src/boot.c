@@ -28,13 +28,18 @@ static const ipl3_crc32_t ipl3_crc32[] = {
 };
 
 
-bool boot_get_tv_type (boot_info_t *info) {
+static io32_t *boot_get_device_base (boot_info_t *info) {
     io32_t *device_base_address = ROM_CART;
     if (info->device_type == BOOT_DEVICE_TYPE_DD) {
         device_base_address = ROM_DDIPL;
     }
+    return device_base_address;
+}
 
-    char region = ((pi_io_read(&device_base_address[15]) >> 8) & 0xFF);
+bool boot_get_tv_type (boot_info_t *info) {
+    io32_t *base = boot_get_device_base(info);
+
+    char region = ((pi_io_read(&base[15]) >> 8) & 0xFF);
 
     switch (region) {
         case 'D':
@@ -73,14 +78,11 @@ bool boot_get_tv_type (boot_info_t *info) {
 }
 
 bool boot_get_cic_seed_version (boot_info_t *info) {
-    io32_t *device_base_address = ROM_CART;
-    if (info->device_type == BOOT_DEVICE_TYPE_DD) {
-        device_base_address = ROM_DDIPL;
-    }
+    io32_t *base = boot_get_device_base(info);
 
     uint32_t ipl3[1008];
 
-    io32_t *ipl3_src = &device_base_address[16];
+    io32_t *ipl3_src = &base[16];
     uint32_t *ipl3_dst = ipl3;
 
     for (int i = 0; i < sizeof(ipl3); i += sizeof(uint32_t)) {
@@ -120,12 +122,9 @@ void boot (boot_info_t *info) {
     io_write(&AI->MADDR, 0);
     io_write(&AI->LEN, 0);
 
-    io32_t *device_base_address = ROM_CART;
-    if (info->device_type == BOOT_DEVICE_TYPE_DD) {
-        device_base_address = ROM_DDIPL;
-    }
+    io32_t *base = boot_get_device_base(info);
 
-    uint32_t pi_config = pi_io_read(device_base_address);
+    uint32_t pi_config = pi_io_read(base);
 
     io_write(&PI->DOM[0].LAT, pi_config & 0xFF);
     io_write(&PI->DOM[0].PWD, pi_config >> 8);
@@ -143,44 +142,39 @@ void boot (boot_info_t *info) {
         io_write(&ipl2_dst[i], ipl2_src[i]);
     }
 
-    io32_t *ipl3_src = device_base_address;
+    io32_t *ipl3_src = base;
     io32_t *ipl3_dst = SP_MEM->DMEM;
-    uint32_t tmp;
 
     for (int i = 16; i < 1024; i++) {
-        tmp = pi_io_read(&ipl3_src[i]);
-        io_write(&ipl3_dst[i], tmp);
+        io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
     }
 
-    uint32_t boot_device = (info->device_type & 0x01);
-    uint32_t tv_type = (info->tv_type & 0x03);
-    uint32_t reset_type = (info->reset_type & 0x01);
-    uint32_t cic_seed = (info->cic_seed & 0xFF);
-    uint32_t version = (info->version & 0x01);
-    void (*entry_point)(void) = (void (*)(void)) UNCACHED(&SP_MEM->DMEM[16]);
-    void *stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
+    register void (*entry_point)(void) asm ("t3");
+    register uint32_t boot_device asm ("s3");
+    register uint32_t tv_type asm ("s4");
+    register uint32_t reset_type asm ("s5");
+    register uint32_t cic_seed asm ("s6");
+    register uint32_t version asm ("s7");
+    void *stack_pointer;
 
-    __asm__ volatile (
-        ".set noat \n"
-        ".set noreorder \n"
-        "lw $t3, %[entry_point] \n"
-        "lw $s3, %[boot_device] \n"
-        "lw $s4, %[tv_type] \n"
-        "lw $s5, %[reset_type] \n"
-        "lw $s6, %[cic_seed] \n"
-        "lw $s7, %[version] \n"
-        "lw $sp, %[stack_pointer] \n"
-        "jr $t3 \n"
-        "nop \n"
-        :
-        : [entry_point] "R" (entry_point),
-          [boot_device] "R" (boot_device),
-          [tv_type] "R" (tv_type),
-          [reset_type] "R" (reset_type),
-          [cic_seed] "R" (cic_seed),
-          [version] "R" (version),
-          [stack_pointer] "R" (stack_pointer)
-        : "t3", "s3", "s4", "s5", "s6", "s7"
+    entry_point = (void (*)(void)) UNCACHED(&SP_MEM->DMEM[16]);
+    boot_device = (info->device_type & 0x01);
+    tv_type = (info->tv_type & 0x03);
+    reset_type = (info->reset_type & 0x01);
+    cic_seed = (info->cic_seed & 0xFF);
+    version = (info->version & 0x01);
+    stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
+
+    asm volatile (
+        "move $sp, %[stack_pointer] \n"
+        "jr %[entry_point] \n" ::
+        [entry_point] "r" (entry_point),
+        [boot_device] "r" (boot_device),
+        [tv_type] "r" (tv_type),
+        [reset_type] "r" (reset_type),
+        [cic_seed] "r" (cic_seed),
+        [version] "r" (version),
+        [stack_pointer] "r" (stack_pointer)
     );
 
     while (1);
