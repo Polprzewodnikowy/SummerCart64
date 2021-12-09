@@ -20,6 +20,7 @@ SRC_FILES = \
 	init.c \
 	main.c \
 	sc64.c \
+	storage.c \
 	sys.c \
 	syscalls.c \
 	fatfs/diskio.c \

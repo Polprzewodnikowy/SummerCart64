@@ -46,9 +46,10 @@ typedef struct {
 #define SC64_DEBUG_READ_ADDRESS     (0x13BD0000UL)
 #define SC64_DEBUG_MAX_SIZE         (32 * 1024)
 
-#define SC64_DEBUG_TYPE_TEXT        (0x01)
-#define SC64_DEBUG_TYPE_FSD_READ    (0xF1)
-#define SC64_DEBUG_TYPE_FSD_WRITE   (0xF2)
+#define SC64_DEBUG_ID_TEXT          (0x01)
+#define SC64_DEBUG_ID_FSD_READ      (0xF1)
+#define SC64_DEBUG_ID_FSD_WRITE     (0xF2)
+#define SC64_DEBUG_ID_FSD_SECTOR    (0xF3)
 
 
 typedef enum {
@@ -60,7 +61,7 @@ typedef enum {
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
     CFG_ID_SAVE_OFFEST,
-    CFG_ID_DD_OFFEST,
+    CFG_ID_DDIPL_OFFEST,
     CFG_ID_BOOT_MODE,
     CFG_ID_FLASH_SIZE,
     CFG_ID_FLASH_READ,
@@ -88,7 +89,7 @@ typedef enum {
 typedef enum {
     BOOT_MODE_MENU = 0,
     BOOT_MODE_ROM = 1,
-    BOOT_MODE_DD = 2,
+    BOOT_MODE_DDIPL = 2,
     BOOT_MODE_DIRECT = 3,
 } boot_mode_t;
 
@@ -97,29 +98,29 @@ typedef struct {
     save_type_t save_type;
     uint16_t cic_seed;
     tv_type_t tv_type;
-    io32_t *save_offset;
-    io32_t *dd_offset;
+    io32_t *save_location;
+    io32_t *ddipl_location;
     boot_mode_t boot_mode;
     char bootloader_version[32];
 } sc64_info_t;
 
 
-bool sc64_check_presence(void);
-void sc64_wait_cpu_ready(void);
-bool sc64_wait_cpu_busy(void);
-bool sc64_perform_cmd(uint8_t cmd, uint32_t *args, uint32_t *result);
-uint32_t sc64_get_config(cfg_id_t id);
-void sc64_set_config(cfg_id_t id, uint32_t value);
-void sc64_get_info(sc64_info_t *info);
-void sc64_wait_usb_rx_ready (uint32_t *type, uint32_t *length);
-void sc64_wait_usb_rx_busy (void);
-void sc64_usb_rx_data (io32_t *address, uint32_t length);
-void sc64_wait_usb_tx_ready(void);
-void sc64_usb_tx_data(io32_t *address, uint32_t length);
-void sc64_debug_write(uint8_t type, const void *data, uint32_t len);
-void sc64_debug_fsd_read(const void *data, uint32_t sector, uint32_t count);
-void sc64_debug_fsd_write(const void *data, uint32_t sector, uint32_t count);
-void sc64_init(void);
+bool sc64_check_presence (void);
+void sc64_wait_cpu_ready (void);
+bool sc64_wait_cpu_busy (void);
+bool sc64_perform_cmd (uint8_t cmd, uint32_t *args, uint32_t *result);
+uint32_t sc64_get_config (cfg_id_t id);
+void sc64_set_config (cfg_id_t id, uint32_t value);
+void sc64_get_info (sc64_info_t *info);
+void sc64_wait_usb_rx_ready  (uint32_t *type, uint32_t *length);
+void sc64_wait_usb_rx_busy  (void);
+void sc64_usb_rx_data  (io32_t *address, uint32_t length);
+void sc64_wait_usb_tx_ready (void);
+void sc64_usb_tx_data (io32_t *address, uint32_t length);
+void sc64_debug_write (uint8_t type, const void *data, uint32_t len);
+void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count);
+void sc64_debug_fsd_write (const void *data, uint32_t sector, uint32_t count);
+void sc64_init (void);
 
 
 #endif

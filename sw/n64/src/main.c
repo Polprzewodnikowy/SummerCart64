@@ -1,5 +1,6 @@
 #include "boot.h"
 #include "sc64.h"
+#include "storage.h"
 
 
 void main (void) {
@@ -12,22 +13,24 @@ void main (void) {
 
     switch (sc64_info.boot_mode) {
         case BOOT_MODE_MENU:
-            LOG_E("Menu boot mode not implemented!\r\n");
-            while (1);
+            LOG_I("Running menu from SD card\r\n");
+            storage_run_menu(STORAGE_BACKEND_SD, &boot_info, &sc64_info);
+            break;
 
         case BOOT_MODE_ROM:
             boot_info.device_type = BOOT_DEVICE_TYPE_ROM;
             LOG_I("Running ROM from SDRAM\r\n");
             break;
 
-        case BOOT_MODE_DD:
+        case BOOT_MODE_DDIPL:
             boot_info.device_type = BOOT_DEVICE_TYPE_DD;
             LOG_I("Running DDIPL from SDRAM\r\n");
             break;
 
         case BOOT_MODE_DIRECT:
-            LOG_I("Running bootloader from SDRAM - assuming FSD available\r\n");
-            while (1);
+            LOG_I("Running bootloader from SDRAM, running menu from FSD\r\n");
+            storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
+            break;
 
         default:
             LOG_E("Unknown boot mode! - %d\r\n", sc64_info.boot_mode);
@@ -62,7 +65,7 @@ void main (void) {
         }
     }
 
-    LOG_I("Booting IPL3\r\n");
+    LOG_I("Booting IPL3\r\n\r\n");
 
     boot(&boot_info);
 }

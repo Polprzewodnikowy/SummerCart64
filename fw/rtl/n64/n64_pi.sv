@@ -212,7 +212,7 @@ module n64_pi (
                 if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
                     n64_pi_address_valid <= 1'b1;
                     next_id <= sc64::ID_N64_SDRAM;
-                    next_offset <= cfg.dd_offset + 32'h0A00_0000;
+                    next_offset <= cfg.ddipl_offset + 32'h0A00_0000;
                 end
             end
             if (cfg.flashram_enabled) begin

@@ -15,7 +15,7 @@ interface if_config ();
     logic sram_banked;
     logic flashram_enabled;
     logic flashram_read_mode;
-    logic [25:0] dd_offset;
+    logic [25:0] ddipl_offset;
     logic [25:0] save_offset;
 
     modport pi (
@@ -26,7 +26,7 @@ interface if_config ();
         input sram_banked,
         input flashram_enabled,
         input flashram_read_mode,
-        input dd_offset,
+        input ddipl_offset,
         input save_offset
     );
 
@@ -60,7 +60,7 @@ interface if_config ();
         output sram_enabled,
         output sram_banked,
         output flashram_enabled,
-        output dd_offset,
+        output ddipl_offset,
         output save_offset
     );
 

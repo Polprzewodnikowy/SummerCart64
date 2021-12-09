@@ -124,7 +124,7 @@ typedef volatile struct dma_regs {
 
 typedef volatile struct cfg_regs {
     io32_t SCR;
-    io32_t DD_OFFSET;
+    io32_t DDIPL_OFFSET;
     io32_t SAVE_OFFSET;
     io8_t CMD;
     io8_t __padding[3];

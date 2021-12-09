@@ -49,13 +49,12 @@ uint32_t pi_busy (void) {
 }
 
 uint32_t pi_io_read (io32_t *address) {
-    while (pi_busy());
     return io_read(address);
 }
 
 void pi_io_write (io32_t *address, uint32_t value) {
-    while (pi_busy());
     io_write(address, value);
+    while (pi_busy());
 }
 
 uint32_t si_busy (void) {
@@ -63,11 +62,10 @@ uint32_t si_busy (void) {
 }
 
 uint32_t si_io_read (io32_t *address) {
-    while (si_busy());
     return io_read(address);
 }
 
 void si_io_write (io32_t *address, uint32_t value) {
-    while (si_busy());
     io_write(address, value);
+    while (si_busy());
 }

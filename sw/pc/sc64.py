@@ -26,7 +26,7 @@ class SC64:
     __CFG_ID_CIC_SEED = 5
     __CFG_ID_TV_TYPE = 6
     __CFG_ID_SAVE_OFFEST = 7
-    __CFG_ID_DD_OFFEST = 8
+    __CFG_ID_DDIPL_OFFEST = 8
     __CFG_ID_BOOT_MODE = 9
     __CFG_ID_FLASH_SIZE = 10
     __CFG_ID_FLASH_READ = 11
@@ -45,6 +45,7 @@ class SC64:
     __DEBUG_ID_TEXT = 0x01
     __DEBUG_ID_FSD_READ = 0xF1
     __DEBUG_ID_FSD_WRITE = 0xF2
+    __DEBUG_ID_FSD_SECTOR = 0xF3
 
 
     def __init__(self) -> None:
@@ -348,65 +349,82 @@ class SC64:
 
 
     def download_dd_ipl(self, file: str) -> None:
-        dd_ipl_offset = self.__query_config(self.__CFG_ID_DD_OFFEST)
+        dd_ipl_offset = self.__query_config(self.__CFG_ID_DDIPL_OFFEST)
         self.__read_file_from_sdram(file, dd_ipl_offset, length=self.__DDIPL_ROM_LENGTH)
 
 
     def upload_dd_ipl(self, file: str, offset: int = None) -> None:
         if (offset != None):
-            self.__change_config(self.__CFG_ID_DD_OFFEST, offset)
-        dd_ipl_offset = self.__query_config(self.__CFG_ID_DD_OFFEST)
+            self.__change_config(self.__CFG_ID_DDIPL_OFFEST, offset)
+        dd_ipl_offset = self.__query_config(self.__CFG_ID_DDIPL_OFFEST)
         self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
 
 
-    def __debug_process_fsd_read(self, file: str, id: int, data: bytes) -> None:
+    def __debug_process_fsd_set_sector(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder='big')
-        count = int.from_bytes(data[4:8], byteorder='big')
-        if (file):
-            if (self.__fsd_file == None):
-                self.__fsd_file = open(file, "rb")
+        if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
-            self.__debug_write(id, self.__fsd_file.read(count * 512))
+
+
+    def __debug_process_fsd_read(self, data: bytes) -> None:
+        length = int.from_bytes(data[0:4], byteorder='big')
+        if (self.__fsd_file):
+            self.__debug_write(self.__DEBUG_ID_FSD_READ, self.__fsd_file.read(length))
         else:
-            self.__debug_write(id, bytes(count * 512))
+            self.__debug_write(self.__DEBUG_ID_FSD_READ, bytes(length))
+
+
+    def __debug_process_fsd_write(self, data: bytes) -> None:
+        if (self.__fsd_file):
+            self.__fsd_file.write(data)
 
 
     def debug_loop(self, file: str = None) -> None:
-        print("\033[34m --- Debug server started --- \033[0m")
+        print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
         self.__serial.timeout = 0.01
         self.__serial.write_timeout = 1
 
-        while (True):
-            start_indicator = self.__read_long(4)
-            if (start_indicator == b"DMA@"):
-                header = self.__read_long(4)
-                id = int(header[0])
-                length = int.from_bytes(header[1:4], byteorder="big")
+        if (file):
+            self.__fsd_file = open(file, "rb+")
 
-                if (length > 0):
-                align = self.__align(length, 4) - length
+        start_indicator = bytearray()
+        dropped_bytes = 0
+
+        while (True):
+            while (start_indicator != b"DMA@"):
+                start_indicator.append(self.__read_long(1)[0])
+                if (len(start_indicator) > 4):
+                    dropped_bytes += 1
+                    start_indicator.pop(0)
+            start_indicator.clear()
+
+            if (dropped_bytes):
+                print(f"\033[35mWarning - dropped {dropped_bytes} bytes from stream\033[0m", file=sys.stderr)
+                dropped_bytes = 0
+
+            header = self.__read_long(4)
+            id = int(header[0])
+            length = int.from_bytes(header[1:4], byteorder="big")
+
+            if (length > 0):
                 data = self.__read_long(length)
 
-                    if (id == self.__DEBUG_ID_TEXT):
-                        print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
-                    elif (id == self.__DEBUG_ID_FSD_READ):
-                        pass
-                    elif (id == self.__DEBUG_ID_FSD_WRITE):
-                        pass
-                    else:
-                        print(f"Got unknown id: {id}, length: {length}")
+                if (id == self.__DEBUG_ID_TEXT):
+                    print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
+                elif (id == self.__DEBUG_ID_FSD_READ):
+                    self.__debug_process_fsd_read(data)
+                elif (id == self.__DEBUG_ID_FSD_WRITE):
+                    self.__debug_process_fsd_write(data)
+                elif (id == self.__DEBUG_ID_FSD_SECTOR):
+                    self.__debug_process_fsd_set_sector(data)
+                else:
+                    print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
-                    self.__read_long(align)
-                    end_indicator = self.__read_long(4)
-                    if (end_indicator != b"CMPH"):
-                        print(f"Got unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}")
-
-                    if (id == self.__DEBUG_ID_FSD_READ):
-                        self.__debug_process_fsd_read(file, id, data)
-
-            else:
-                print(f"Got unknown start indicator: {start_indicator.decode(encoding='ascii', errors='backslashreplace')}")
+            self.__read_long(self.__align(length, 4) - length)
+            end_indicator = self.__read_long(4)
+            if (end_indicator != b"CMPH"):
+                print(f"\033[35mGot unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}\033[0m", file=sys.stderr)
 
 
 

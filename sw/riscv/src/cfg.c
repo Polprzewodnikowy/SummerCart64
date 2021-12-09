@@ -13,7 +13,7 @@
 #define SAVE_OFFSET_PKST2       (0x01608000UL)
 
 #define DEFAULT_SAVE_OFFSET     (0x03FE0000UL)
-#define DEFAULT_DD_OFFSET       (0x03BE0000UL)
+#define DEFAULT_DDIPL_OFFSET    (0x03BE0000UL)
 
 
 enum cfg_id {
@@ -25,7 +25,7 @@ enum cfg_id {
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
     CFG_ID_SAVE_OFFEST,
-    CFG_ID_DD_OFFEST,
+    CFG_ID_DDIPL_OFFEST,
     CFG_ID_BOOT_MODE,
     CFG_ID_FLASH_SIZE,
     CFG_ID_FLASH_READ,
@@ -143,8 +143,8 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_SAVE_OFFEST:
             CFG->SAVE_OFFSET = args[1];
             break;
-        case CFG_ID_DD_OFFEST:
-            CFG->DD_OFFSET = args[1];
+        case CFG_ID_DDIPL_OFFEST:
+            CFG->DDIPL_OFFSET = args[1];
             break;
         case CFG_ID_BOOT_MODE:
             p.boot_mode = args[1];
@@ -193,8 +193,8 @@ void cfg_query (uint32_t *args) {
         case CFG_ID_SAVE_OFFEST:
             args[1] = CFG->SAVE_OFFSET;
             break;
-        case CFG_ID_DD_OFFEST:
-            args[1] = CFG->DD_OFFSET;
+        case CFG_ID_DDIPL_OFFEST:
+            args[1] = CFG->DDIPL_OFFSET;
             break;
         case CFG_ID_BOOT_MODE:
             args[1] = p.boot_mode;
@@ -212,7 +212,7 @@ void cfg_query (uint32_t *args) {
 void cfg_init (void) {
     set_save_type(SAVE_TYPE_NONE);
 
-    CFG->DD_OFFSET = DEFAULT_DD_OFFSET;
+    CFG->DDIPL_OFFSET = DEFAULT_DDIPL_OFFSET;
     CFG->SCR = CFG_SCR_CPU_READY | CFG_SCR_SDRAM_SWITCH;
 
     p.cic_seed = 0xFFFF;

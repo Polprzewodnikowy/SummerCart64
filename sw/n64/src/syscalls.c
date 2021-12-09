@@ -58,7 +58,7 @@ ssize_t _write_r (struct _reent *prt, int fd, const void *buf, size_t cnt) {
         errno = EBADF;
         return -1;
     } else if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
-        sc64_debug_write(SC64_DEBUG_TYPE_TEXT, buf, cnt);
+        sc64_debug_write(SC64_DEBUG_ID_TEXT, buf, cnt);
         return cnt;
     }
     errno = ENOSYS;

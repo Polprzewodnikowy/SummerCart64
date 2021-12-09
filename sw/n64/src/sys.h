@@ -243,23 +243,6 @@ typedef struct {
 #define SI_SR_CLEAR_INTERRUPT       (0)
 
 
-typedef struct {
-    uint32_t pi_config;
-    uint32_t clock_rate;
-    void (*entry_point)(void);
-    struct {
-        uint16_t __reserved_1;
-        uint8_t major;
-        char minor;
-    } sdk_version;
-    uint32_t crc[2];
-    uint32_t __reserved_1[2];
-    char name[20];
-    uint8_t __reserved_2[7];
-    char id[4];
-    uint8_t revision;
-} rom_header_t;
-
 #define ROM_DDIPL_BASE              (0x06000000UL)
 #define ROM_DDIPL                   ((io32_t *) ROM_DDIPL_BASE)
 #define ROM_CART_BASE               (0x10000000UL)
