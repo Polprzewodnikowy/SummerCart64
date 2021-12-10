@@ -76,7 +76,9 @@ typedef volatile struct i2c_regs {
 typedef volatile struct usb_regs {
     io32_t SCR;
     io8_t DR;
-    io8_t __padding[3];
+    io8_t __padding_1[3];
+    io8_t ESCAPE;
+    io8_t __padding_2[3];
 } usb_regs_t;
 
 #define USB_BASE                    (0x40000000UL)
@@ -88,6 +90,8 @@ typedef volatile struct usb_regs {
 #define USB_SCR_FLUSH_TX            (1 << 3)
 #define USB_SCR_ENABLED             (1 << 4)
 #define USB_SCR_PWREN               (1 << 5)
+#define USB_SCR_ESCAPE_PENDING      (1 << 6)
+#define USB_SCR_ESCAPE_ACK          (1 << 7)
 
 
 typedef volatile struct uart_regs {
@@ -120,7 +124,7 @@ typedef volatile struct dma_regs {
 
 typedef volatile struct cfg_regs {
     io32_t SCR;
-    io32_t DD_OFFSET;
+    io32_t DDIPL_OFFSET;
     io32_t SAVE_OFFSET;
     io8_t CMD;
     io8_t __padding[3];
@@ -183,6 +187,9 @@ typedef volatile struct joybus_regs {
 #define JOYBUS_SCR_RX_LENGTH_BIT    (8)
 #define JOYBUS_SCR_RX_LENGTH_MASK   (0x7F << JOYBUS_SCR_RX_LENGTH_BIT)
 #define JOYBUS_SCR_TX_LENGTH_BIT    (16)
+
+
+void reset_handler(void);
 
 
 #endif

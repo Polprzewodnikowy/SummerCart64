@@ -37,7 +37,7 @@ SECTIONS {
         . = ALIGN(4);
         _sbss = .;
         *(.sbss .sbss.* .gnu.linkonce.sb.*)
-        *(.scommon)
+        *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
         . = ALIGN(4);

@@ -9,7 +9,7 @@ module cpu_cfg (
 
     typedef enum bit [2:0] { 
         R_SCR,
-        R_DD_OFFSET,
+        R_DDIPL_OFFSET,
         R_SAVE_OFFSET,
         R_COMMAND,
         R_DATA_0,
@@ -45,7 +45,7 @@ module cpu_cfg (
                     cfg.sdram_writable,
                     cfg.sdram_switch
                 };
-                R_DD_OFFSET: bus.rdata = {6'd0, cfg.dd_offset};
+                R_DDIPL_OFFSET: bus.rdata = {6'd0, cfg.ddipl_offset};
                 R_SAVE_OFFSET: bus.rdata = {6'd0, cfg.save_offset};
                 R_COMMAND: bus.rdata = {24'd0, cfg.cmd};
                 R_DATA_0: bus.rdata = cfg.data[0];
@@ -77,7 +77,7 @@ module cpu_cfg (
             cfg.sram_enabled <= 1'b0;
             cfg.sram_banked <= 1'b0;
             cfg.flashram_enabled <= 1'b0;
-            cfg.dd_offset <= 26'h3BE_0000;
+            cfg.ddipl_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
             skip_bootloader <= 1'b0;
             trigger_reconfiguration <= 1'b0;
@@ -112,9 +112,9 @@ module cpu_cfg (
                         end
                     end
 
-                    R_DD_OFFSET: begin
+                    R_DDIPL_OFFSET: begin
                         if (&bus.wmask) begin
-                            cfg.dd_offset <= bus.wdata[25:0];
+                            cfg.ddipl_offset <= bus.wdata[25:0];
                         end
                     end
 

@@ -13,18 +13,19 @@ static bool rx_byte (uint8_t *data) {
     return true;
 }
 
+static uint8_t rx_word_current_byte = 0;
+static uint32_t rx_word_buffer = 0;
+
 static bool rx_word (uint32_t *data) {
-    static uint8_t current_byte = 0;
-    static uint32_t buffer = 0;
     uint8_t tmp;
 
     while (rx_byte(&tmp)) {
-        buffer = (buffer << 8) | tmp;
-        current_byte += 1;
-        if (current_byte == 4) {
-            current_byte = 0;
-            *data = buffer;
-            buffer = 0;
+        rx_word_buffer = (rx_word_buffer << 8) | tmp;
+        rx_word_current_byte += 1;
+        if (rx_word_current_byte == 4) {
+            rx_word_current_byte = 0;
+            *data = rx_word_buffer;
+            rx_word_buffer = 0;
 
             return true;
         }
@@ -43,12 +44,13 @@ static bool tx_byte (uint8_t data) {
     return true;
 }
 
+static uint8_t tx_word_current_byte = 0;
+
 static bool tx_word (uint32_t data) {
-    static uint8_t current_byte = 0;
-    while (tx_byte(data >> ((3 - current_byte) * 8))) {
-        current_byte += 1;
-        if (current_byte == 4) {
-            current_byte = 0;
+    while (tx_byte(data >> ((3 - tx_word_current_byte) * 8))) {
+        tx_word_current_byte += 1;
+        if (tx_word_current_byte == 4) {
+            tx_word_current_byte = 0;
 
             return true;
         }
@@ -152,31 +154,44 @@ void usb_debug_reset (void) {
     USB->SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
 }
 
+static uint8_t rx_cmd_current_byte = 0;
+static uint32_t rx_cmd_buffer = 0;
 
 static bool rx_cmd (uint32_t *data) {
-    static uint8_t current_byte = 0;
-    static uint32_t buffer = 0;
     uint8_t tmp;
 
     while (rx_byte(&tmp)) {
-        current_byte += 1;
-        if ((current_byte != 4) && (tmp != (USB_CMD_TOKEN >> (8 * (4 - current_byte)) & 0xFF))) {
-            current_byte = 0;
-            buffer = 0;
+        rx_cmd_current_byte += 1;
+        if ((rx_cmd_current_byte != 4) && (tmp != (USB_CMD_TOKEN >> (8 * (4 - rx_cmd_current_byte)) & 0xFF))) {
+            rx_cmd_current_byte = 0;
+            rx_cmd_buffer = 0;
 
             return false;
         }
-        buffer = (buffer << 8) | tmp;
-        if (current_byte == 4) {
-            current_byte = 0;
-            *data = buffer;
-            buffer = 0;
+        rx_cmd_buffer = (rx_cmd_buffer << 8) | tmp;
+        if (rx_cmd_current_byte == 4) {
+            rx_cmd_current_byte = 0;
+            *data = rx_cmd_buffer;
+            rx_cmd_buffer = 0;
 
             return true;
         }
     }
 
     return false;
+}
+
+static void handle_escape (void) {
+    if (USB->SCR & USB_SCR_ESCAPE_PENDING) {
+        if (USB->ESCAPE == 'R') {
+            if (p.dma_in_progress) {
+                dma_stop();
+                while (dma_busy());
+            }
+            usb_init();
+        }
+        USB->SCR |= USB_SCR_ESCAPE_ACK;
+    }
 }
 
 
@@ -186,10 +201,18 @@ void usb_init (void) {
     p.state = STATE_IDLE;
     p.debug_rx_busy = false;
     p.debug_tx_busy = false;
+
+    rx_word_current_byte = 0;
+    rx_word_buffer = 0;
+    tx_word_current_byte = 0;
+    rx_cmd_current_byte = 0;
+    rx_cmd_buffer = 0;
 }
 
 
 void process_usb (void) {
+    handle_escape();
+
     switch (p.state) {
         case STATE_IDLE:
             if (p.debug_tx_busy) {
@@ -222,6 +245,12 @@ void process_usb (void) {
 
         case STATE_DATA:
             switch (p.cmd) {
+                case 'V':
+                    if (tx_word(cfg_get_version())) {
+                        p.state = STATE_RESPONSE;
+                    }
+                    break;
+
                 case 'C':
                     cfg_update(p.args);
                     p.state = STATE_RESPONSE;

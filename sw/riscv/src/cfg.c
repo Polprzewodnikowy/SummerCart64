@@ -13,7 +13,7 @@
 #define SAVE_OFFSET_PKST2       (0x01608000UL)
 
 #define DEFAULT_SAVE_OFFSET     (0x03FE0000UL)
-#define DEFAULT_DD_OFFSET       (0x03BE0000UL)
+#define DEFAULT_DDIPL_OFFSET    (0x03BE0000UL)
 
 
 enum cfg_id {
@@ -25,9 +25,11 @@ enum cfg_id {
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
     CFG_ID_SAVE_OFFEST,
-    CFG_ID_DD_OFFEST,
-    CFG_ID_SKIP_BOOTLOADER,
-    CFG_ID_FLASH_OPERATION,
+    CFG_ID_DDIPL_OFFEST,
+    CFG_ID_BOOT_MODE,
+    CFG_ID_FLASH_SIZE,
+    CFG_ID_FLASH_READ,
+    CFG_ID_FLASH_PROGRAM,
     CFG_ID_RECONFIGURE,
 };
 
@@ -41,11 +43,19 @@ enum save_type {
     SAVE_TYPE_FLASHRAM_PKST2 = 6,
 };
 
+enum boot_mode {
+    BOOT_MODE_MENU = 0,
+    BOOT_MODE_ROM = 1,
+    BOOT_MODE_DD = 2,
+    BOOT_MODE_DIRECT = 3,
+};
+
 
 struct process {
     enum save_type save_type;
     uint16_t cic_seed;
     uint8_t tv_type;
+    enum boot_mode boot_mode;
 };
 
 static struct process p;
@@ -103,6 +113,10 @@ static void set_save_type (enum save_type save_type) {
 }
 
 
+uint32_t cfg_get_version (void) {
+    return CFG->VERSION;
+}
+
 void cfg_update (uint32_t *args) {
     switch (args[0]) {
         case CFG_ID_SCR:
@@ -129,13 +143,17 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_SAVE_OFFEST:
             CFG->SAVE_OFFSET = args[1];
             break;
-        case CFG_ID_DD_OFFEST:
-            CFG->DD_OFFSET = args[1];
+        case CFG_ID_DDIPL_OFFEST:
+            CFG->DDIPL_OFFSET = args[1];
             break;
-        case CFG_ID_SKIP_BOOTLOADER:
-            change_scr_bits(CFG_SCR_SKIP_BOOTLOADER, args[1]);
+        case CFG_ID_BOOT_MODE:
+            p.boot_mode = args[1];
+            change_scr_bits(CFG_SCR_SKIP_BOOTLOADER, args[1] == BOOT_MODE_DIRECT);
             break;
-        case CFG_ID_FLASH_OPERATION:
+        case CFG_ID_FLASH_READ:
+            flash_read(args[1]);
+            break;
+        case CFG_ID_FLASH_PROGRAM:
             flash_program(args[1]);
             break;
         case CFG_ID_RECONFIGURE:
@@ -175,14 +193,14 @@ void cfg_query (uint32_t *args) {
         case CFG_ID_SAVE_OFFEST:
             args[1] = CFG->SAVE_OFFSET;
             break;
-        case CFG_ID_DD_OFFEST:
-            args[1] = CFG->DD_OFFSET;
+        case CFG_ID_DDIPL_OFFEST:
+            args[1] = CFG->DDIPL_OFFSET;
             break;
-        case CFG_ID_SKIP_BOOTLOADER:
-            args[1] = CFG->SCR & CFG_SCR_SKIP_BOOTLOADER;
+        case CFG_ID_BOOT_MODE:
+            args[1] = p.boot_mode;
             break;
-        case CFG_ID_FLASH_OPERATION:
-            args[1] = flash_read(args[1]);
+        case CFG_ID_FLASH_SIZE:
+            args[1] = flash_size();
             break;
         case CFG_ID_RECONFIGURE:
             args[1] = CFG->RECONFIGURE;
@@ -194,11 +212,12 @@ void cfg_query (uint32_t *args) {
 void cfg_init (void) {
     set_save_type(SAVE_TYPE_NONE);
 
-    CFG->DD_OFFSET = DEFAULT_DD_OFFSET;
+    CFG->DDIPL_OFFSET = DEFAULT_DDIPL_OFFSET;
     CFG->SCR = CFG_SCR_CPU_READY | CFG_SCR_SDRAM_SWITCH;
 
     p.cic_seed = 0xFFFF;
     p.tv_type = 0x03;
+    p.boot_mode = BOOT_MODE_MENU;
 }
 
 

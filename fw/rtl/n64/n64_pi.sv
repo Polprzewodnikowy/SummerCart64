@@ -212,7 +212,7 @@ module n64_pi (
                 if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
                     n64_pi_address_valid <= 1'b1;
                     next_id <= sc64::ID_N64_SDRAM;
-                    next_offset <= cfg.dd_offset + 32'h0A00_0000;
+                    next_offset <= cfg.ddipl_offset + 32'h0A00_0000;
                 end
             end
             if (cfg.flashram_enabled) begin
@@ -297,7 +297,7 @@ module n64_pi (
                 first_write_op <= 1'b1;
                 load_starting_address <= 1'b1;
                 starting_id <= next_id;
-                starting_address <= {starting_address[31:16], n64_pi_ad_input[15:1], 1'b0} + next_offset;
+                starting_address <= {starting_address[31:16], n64_pi_ad_input[15:1], 1'b0};
             end
 
             if (write_op) begin
@@ -314,7 +314,10 @@ module n64_pi (
                     bus.write <= 1'b1;
                     if (load_starting_address) begin
                         bus.id <= starting_id;
-                        bus.address <= starting_address;
+                        bus.address <= starting_address + next_offset;
+                        if (starting_id == sc64::ID_N64_FLASHRAM) begin
+                            bus.address <= starting_address;
+                        end
                         load_starting_address <= 1'b0;
                     end
                     bus.wdata <= write_fifo_rdata;
@@ -324,18 +327,16 @@ module n64_pi (
                     bus.write <= 1'b0;
                     if (load_starting_address) begin
                         bus.id <= starting_id;
+                        bus.address <= starting_address + next_offset;
                         if (starting_id == sc64::ID_N64_FLASHRAM && cfg.flashram_read_mode) begin
                             bus.id <= sc64::ID_N64_SDRAM;
                         end
-                        bus.address <= starting_address;
                         load_starting_address <= 1'b0;
                     end
                 end
-            end else begin
-                if (bus.ack) begin
-                    bus.request <= 1'b0;
-                    bus.address <= bus.address + 2'd2;
-                end
+            end else if (bus.ack) begin
+                bus.request <= 1'b0;
+                bus.address <= bus.address + 2'd2;
             end
 
             if (end_op) begin

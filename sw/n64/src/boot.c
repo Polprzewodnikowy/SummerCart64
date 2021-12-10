@@ -1,53 +1,48 @@
 #include "boot.h"
 #include "crc32.h"
-#include "n64_regs.h"
-// #include "sc64.h"
+#include "sc64.h"
+#include "sys.h"
 
 
-static const struct crc32_to_cic_seed {
-    uint32_t ipl3_crc32;
-    uint16_t cic_seed;
-} crc32_to_cic_seed[] = {
-    { .ipl3_crc32 = 0x587BD543, .cic_seed = 0x00AC },   // CIC5101
-    { .ipl3_crc32 = 0x6170A4A1, .cic_seed = 0x013F },   // CIC6101
-    { .ipl3_crc32 = 0x009E9EA3, .cic_seed = 0x013F },   // CIC7102
-    { .ipl3_crc32 = 0x90BB6CB5, .cic_seed = 0x003F },   // CICx102
-    { .ipl3_crc32 = 0x0B050EE0, .cic_seed = 0x0078 },   // CICx103
-    { .ipl3_crc32 = 0x98BC2C86, .cic_seed = 0x0091 },   // CICx105
-    { .ipl3_crc32 = 0xACC8580A, .cic_seed = 0x0085 },   // CICx106
-    { .ipl3_crc32 = 0x10C68B18, .cic_seed = 0x00DD },   // JP 64DD dev
-    { .ipl3_crc32 = 0x0E018159, .cic_seed = 0x00DD },   // JP 64DD retail
-    { .ipl3_crc32 = 0x8FEBA21E, .cic_seed = 0x00DE },   // US 64DD retail
+extern uint32_t ipl2 __attribute__((section(".data")));
+
+
+typedef struct {
+    const uint32_t crc32;
+    const uint8_t seed;
+    const uint8_t version;
+} ipl3_crc32_t;
+
+static const ipl3_crc32_t ipl3_crc32[] = {
+    { .crc32 = 0x587BD543, .seed = 0xAC, .version = 0 },   // CIC5101
+    { .crc32 = 0x6170A4A1, .seed = 0x3F, .version = 1 },   // CIC6101
+    { .crc32 = 0x009E9EA3, .seed = 0x3F, .version = 1 },   // CIC7102
+    { .crc32 = 0x90BB6CB5, .seed = 0x3F, .version = 0 },   // CICx102
+    { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // CICx103
+    { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // CICx105
+    { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // CICx106
+    { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // NDXJ0
+    { .crc32 = 0xBC605D0A, .seed = 0xDD, .version = 0 },   // NDDJ0
+    { .crc32 = 0x502C4466, .seed = 0xDD, .version = 0 },   // NDDJ1
+    { .crc32 = 0x0C965795, .seed = 0xDD, .version = 0 },   // NDDJ2
+    { .crc32 = 0x8FEBA21E, .seed = 0xDE, .version = 0 },   // NDDE0
 };
 
 
-static cart_header_t global_cart_header __attribute__((aligned(16)));
-
-
-cart_header_t *boot_load_cart_header(void) {
-    cart_header_t *cart_header_pointer = &global_cart_header;
-
-    platform_pi_dma_read(cart_header_pointer, CART_BASE, sizeof(cart_header_t));
-    platform_cache_invalidate(cart_header_pointer, sizeof(cart_header_t));
-
-    return cart_header_pointer;
-}
-
-uint16_t boot_get_cic_seed(cart_header_t *cart_header) {
-    uint16_t cic_seed = crc32_to_cic_seed[7].cic_seed;
-    uint32_t ipl3_crc32 = crc32_calculate(cart_header->boot_code, sizeof(cart_header->boot_code));
-
-    for (size_t i = 0; i < ARRAY_ITEMS(crc32_to_cic_seed); i++) {
-        if (crc32_to_cic_seed[i].ipl3_crc32 == ipl3_crc32) {
-            cic_seed = crc32_to_cic_seed[i].cic_seed;
-        }
+static io32_t *boot_get_device_base (boot_info_t *info) {
+    io32_t *device_base_address = ROM_CART;
+    if (info->device_type == BOOT_DEVICE_TYPE_DD) {
+        device_base_address = ROM_DDIPL;
     }
-
-    return cic_seed;
+    return device_base_address;
 }
 
-tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
-    switch (cart_header->country_code) {
+bool boot_get_tv_type (boot_info_t *info) {
+    io32_t *base = boot_get_device_base(info);
+
+    char region = ((pi_io_read(&base[15]) >> 8) & 0xFF);
+
+    switch (region) {
         case 'D':
         case 'F':
         case 'H':
@@ -57,7 +52,9 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
         case 'W':
         case 'X':
         case 'Y':
-            return TV_PAL;
+            info->tv_type = BOOT_TV_TYPE_PAL;
+            break;
+
         case '7':
         case 'A':
         case 'C':
@@ -66,152 +63,119 @@ tv_type_t boot_get_tv_type(cart_header_t *cart_header) {
         case 'K':
         case 'N':
         case 'U':
-            return TV_NTSC;
+            info->tv_type = BOOT_TV_TYPE_NTSC;
+            break;
+
         case 'B':
-            return TV_MPAL;
+            info->tv_type = BOOT_TV_TYPE_MPAL;
+            break;
+
         default:
-            return -1;
+            LOG_E("Unknown region: [0x%02X]\r\n", region);
+            return false;
     }
+
+    return true;
 }
 
-void boot(cart_header_t *cart_header, uint16_t cic_seed, tv_type_t tv_type) {
-    uint32_t is_x105_boot = (cic_seed == crc32_to_cic_seed[5].cic_seed);
-    uint32_t is_ddipl_boot = (
-        (cic_seed == crc32_to_cic_seed[7].cic_seed) ||
-        (cic_seed == crc32_to_cic_seed[8].cic_seed) ||
-        (cic_seed == crc32_to_cic_seed[9].cic_seed)
-    );
-    tv_type_t os_tv_type = tv_type == -1 ? OS_BOOT_CONFIG->tv_type : tv_type;
+bool boot_get_cic_seed_version (boot_info_t *info) {
+    io32_t *base = boot_get_device_base(info);
 
-    volatile uint64_t gpr_regs[32];
+    uint32_t ipl3[1008];
 
-    MI->interrupt_mask = MI_INT_CLEAR_SP | MI_INT_CLEAR_SI | MI_INT_CLEAR_AI | MI_INT_CLEAR_VI | MI_INT_CLEAR_PI | MI_INT_CLEAR_DP;
+    io32_t *ipl3_src = &base[16];
+    uint32_t *ipl3_dst = ipl3;
 
-    while (!(SP->status & SP_STATUS_HALT));
-
-    SP->status = SP_STATUS_CLEAR_INTERRUPT | SP_STATUS_SET_HALT;
-
-    while (SP->dma_busy & SP_DMA_BUSY);
-
-    PI->status = PI_STATUS_CLEAR_INTERRUPT | PI_STATUS_RESET_CONTROLLER;
-    VI->v_intr = 0x3FF;
-    VI->h_limits = 0;
-    VI->current_line = 0;
-    AI->dram_addr = 0;
-    AI->len = 0;
-
-    PI->dom1_lat = cart_header->pi_conf & 0xFF;
-    PI->dom1_pwd = cart_header->pi_conf >> 8;
-    PI->dom1_pgs = cart_header->pi_conf >> 16;
-    PI->dom1_rls = cart_header->pi_conf >> 20;
-
-    if (DP_CMD->status & DP_CMD_STATUS_XBUS_DMEM_DMA) {
-        while (DP_CMD->status & DP_CMD_STATUS_PIPE_BUSY);
+    for (int i = 0; i < sizeof(ipl3); i += sizeof(uint32_t)) {
+        *ipl3_dst++ = pi_io_read(ipl3_src++);
     }
 
-    for (size_t i = 0; i < ARRAY_ITEMS(cart_header->boot_code); i++) {
-        SP_MEM->dmem[16 + i] = cart_header->boot_code[i];
+    uint32_t crc32 = crc32_calculate(ipl3, sizeof(ipl3));
+
+    for (int i = 0; i < sizeof(ipl3_crc32) / sizeof(ipl3_crc32_t); i++) {
+        if (ipl3_crc32[i].crc32 == crc32) {
+            info->cic_seed = ipl3_crc32[i].seed;
+            info->version = ipl3_crc32[i].version;
+            return true;
+        }
     }
 
-    // CIC X105 based games checks if start of IPL2 code exists in SP IMEM
+    LOG_E("Unknown IPL3 CRC32: [0x%08lX]\r\n", crc32);
 
-    SP_MEM->imem[0] = 0x3C0DBFC0;   // lui   t5, 0xBFC0
-    SP_MEM->imem[1] = 0x8DA807FC;   // lw    t0, 0x07FC(t5)
-    SP_MEM->imem[2] = 0x25AD07C0;   // addiu t5, t5, 0x07C0
-    SP_MEM->imem[3] = 0x31080080;   // andi  t0, t0, 0x0080
-    SP_MEM->imem[4] = 0x5500FFFC;   // bnel  t0, zero, &SP_MEM->imem[1]
-    SP_MEM->imem[5] = 0x3C0DBFC0;   // lui   t5, 0xBFC0
-    SP_MEM->imem[6] = 0x8DA80024;   // lw    t0, 0x0024(t5)
-    SP_MEM->imem[7] = 0x3C0BB000;   // lui   t3, 0xB000
+    return false;
+}
 
-    if (is_x105_boot) {
-        OS_BOOT_CONFIG->mem_size_6105 = OS_BOOT_CONFIG->mem_size;
+void boot (boot_info_t *info) {
+    c0_set_status(C0_SR_CU1 | C0_SR_CU0 | C0_SR_FR);
+
+    OS_INFO->mem_size_6105 = OS_INFO->mem_size;
+
+    while (!(io_read(&SP->SR) & SP_SR_HALT));
+
+    io_write(&SP->SR, SP_SR_CLR_INTR | SP_SR_SET_HALT);
+
+    while (io_read(&SP->DMA_BUSY));
+
+    io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
+    io_write(&VI->V_INTR, 0x3FF);
+    io_write(&VI->H_LIMITS, 0);
+    io_write(&VI->CURR_LINE, 0);
+    io_write(&AI->MADDR, 0);
+    io_write(&AI->LEN, 0);
+
+    io32_t *base = boot_get_device_base(info);
+
+    uint32_t pi_config = pi_io_read(base);
+
+    io_write(&PI->DOM[0].LAT, pi_config & 0xFF);
+    io_write(&PI->DOM[0].PWD, pi_config >> 8);
+    io_write(&PI->DOM[0].PGS, pi_config >> 16);
+    io_write(&PI->DOM[0].RLS, pi_config >> 20);
+
+    if (io_read(&DPC->SR) & DPC_SR_XBUS_DMEM_DMA) {
+        while (io_read(&DPC->SR) & DPC_SR_PIPE_BUSY);
     }
 
-    for (size_t i = 0; i < ARRAY_ITEMS(gpr_regs); i++) {
-        gpr_regs[i] = 0;
+    uint32_t *ipl2_src = &ipl2;
+    io32_t *ipl2_dst = SP_MEM->IMEM;
+
+    for (int i = 0; i < 8; i++) {
+        io_write(&ipl2_dst[i], ipl2_src[i]);
     }
 
-    gpr_regs[CPU_REG_T3] = CPU_ADDRESS_IN_REG(SP_MEM->dmem[16]);
-    gpr_regs[CPU_REG_S3] = is_ddipl_boot ? OS_BOOT_ROM_TYPE_DD : OS_BOOT_ROM_TYPE_GAME_PAK;
-    gpr_regs[CPU_REG_S4] = os_tv_type;
-    gpr_regs[CPU_REG_S5] = OS_BOOT_RESET_TYPE_COLD;
-    gpr_regs[CPU_REG_S6] = BOOT_SEED_IPL3(cic_seed);
-    gpr_regs[CPU_REG_S7] = BOOT_SEED_OS_VERSION(cic_seed);
-    gpr_regs[CPU_REG_SP] = CPU_ADDRESS_IN_REG(SP_MEM->imem[ARRAY_ITEMS(SP_MEM->imem) - 4]);
-    gpr_regs[CPU_REG_RA] = CPU_ADDRESS_IN_REG(SP_MEM->imem[(os_tv_type == TV_PAL) ? 341 : 340]);
+    io32_t *ipl3_src = base;
+    io32_t *ipl3_dst = SP_MEM->DMEM;
 
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_T3], (uint32_t) gpr_regs[CPU_REG_S3], (uint32_t) gpr_regs[CPU_REG_S4]);
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_S5], (uint32_t) gpr_regs[CPU_REG_S6], (uint32_t) gpr_regs[CPU_REG_S7]);
-    // sc64_print_debug((uint32_t) gpr_regs[CPU_REG_SP], (uint32_t) gpr_regs[CPU_REG_RA], 0);
+    for (int i = 16; i < 1024; i++) {
+        io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
+    }
 
-    __asm__ (
-        ".set noat \n\t"
-        ".set noreorder \n\t"
-        "li $t0, 0x34000000 \n\t"
-        "mtc0 $t0, $12 \n\t"
-        "nop \n\t"
-        "li $t0, 0x0006E463 \n\t"
-        "mtc0 $t0, $16 \n\t"
-        "nop \n\t"
-        "li $t0, 0x00005000 \n\t"
-        "mtc0 $t0, $9 \n\t"
-        "nop \n\t"
-        "li $t0, 0x0000005C \n\t"
-        "mtc0 $t0, $13 \n\t"
-        "nop \n\t"
-        "li $t0, 0x007FFFF0 \n\t"
-        "mtc0 $t0, $4 \n\t"
-        "nop \n\t"
-        "li $t0, 0xFFFFFFFF \n\t"
-        "mtc0 $t0, $14 \n\t"
-        "nop \n\t"
-        "mtc0 $t0, $30 \n\t"
-        "nop \n\t"
-        "lui $t0, 0x0000 \n\t"
-        "mthi $t0 \n\t"
-        "nop \n\t"
-        "mtlo $t0 \n\t"
-        "nop \n\t"
-        "ctc1 $t0, $31 \n\t"
-        "nop \n\t"
-        "add $ra, $zero, %[gpr_regs] \n\t"
-        "ld $at, 0x08($ra) \n\t"
-        "ld $v0, 0x10($ra) \n\t"
-        "ld $v1, 0x18($ra) \n\t"
-        "ld $a0, 0x20($ra) \n\t"
-        "ld $a1, 0x28($ra) \n\t"
-        "ld $a2, 0x30($ra) \n\t"
-        "ld $a3, 0x38($ra) \n\t"
-        "ld $t0, 0x40($ra) \n\t"
-        "ld $t1, 0x48($ra) \n\t"
-        "ld $t2, 0x50($ra) \n\t"
-        "ld $t3, 0x58($ra) \n\t"
-        "ld $t4, 0x60($ra) \n\t"
-        "ld $t5, 0x68($ra) \n\t"
-        "ld $t6, 0x70($ra) \n\t"
-        "ld $t7, 0x78($ra) \n\t"
-        "ld $s0, 0x80($ra) \n\t"
-        "ld $s1, 0x88($ra) \n\t"
-        "ld $s2, 0x90($ra) \n\t"
-        "ld $s3, 0x98($ra) \n\t"
-        "ld $s4, 0xA0($ra) \n\t"
-        "ld $s5, 0xA8($ra) \n\t"
-        "ld $s6, 0xB0($ra) \n\t"
-        "ld $s7, 0xB8($ra) \n\t"
-        "ld $t8, 0xC0($ra) \n\t"
-        "ld $t9, 0xC8($ra) \n\t"
-        "ld $k0, 0xD0($ra) \n\t"
-        "ld $k1, 0xD8($ra) \n\t"
-        "ld $gp, 0xE0($ra) \n\t"
-        "ld $sp, 0xE8($ra) \n\t"
-        "ld $fp, 0xF0($ra) \n\t"
-        "ld $ra, 0xF8($ra) \n\t"
-        "jr $t3 \n\t"
-        "nop"
-        :
-        : [gpr_regs] "r" (gpr_regs)
-        : "t0", "ra"
+    register void (*entry_point)(void) asm ("t3");
+    register uint32_t boot_device asm ("s3");
+    register uint32_t tv_type asm ("s4");
+    register uint32_t reset_type asm ("s5");
+    register uint32_t cic_seed asm ("s6");
+    register uint32_t version asm ("s7");
+    void *stack_pointer;
+
+    entry_point = (void (*)(void)) UNCACHED(&SP_MEM->DMEM[16]);
+    boot_device = (info->device_type & 0x01);
+    tv_type = (info->tv_type & 0x03);
+    reset_type = (info->reset_type & 0x01);
+    cic_seed = (info->cic_seed & 0xFF);
+    version = (info->version & 0x01);
+    stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
+
+    asm volatile (
+        "move $sp, %[stack_pointer] \n"
+        "jr %[entry_point] \n" ::
+        [entry_point] "r" (entry_point),
+        [boot_device] "r" (boot_device),
+        [tv_type] "r" (tv_type),
+        [reset_type] "r" (reset_type),
+        [cic_seed] "r" (cic_seed),
+        [version] "r" (version),
+        [stack_pointer] "r" (stack_pointer)
     );
 
     while (1);

@@ -1,5 +1,4 @@
 .section .text.reset_handler
-
 reset_handler:
     .global reset_handler
 

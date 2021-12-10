@@ -1,4 +1,6 @@
+/__pycache__
 /backup
+/roms
 /saves
 *.bak
 *.bin
@@ -6,6 +8,7 @@
 *.data
 *.eep
 *.fla
+*.img
 *.n64
 *.srm
 *.v64

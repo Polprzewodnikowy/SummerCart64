@@ -1,15 +1,17 @@
 #include "flash.h"
 
 
-uint32_t flash_read (uint32_t sdram_offset) {
+uint32_t flash_size (void) {
+    return FLASH_SIZE;
+}
+
+void flash_read (uint32_t sdram_offset) {
     io32_t *flash = (io32_t *) (FLASH_BASE);
     io32_t *sdram = (io32_t *) (SDRAM_BASE + sdram_offset);
 
     for (size_t i = 0; i < FLASH_SIZE; i += 4) {
         *sdram++ = *flash++;
     }
-
-    return FLASH_SIZE;
 }
 
 void flash_program (uint32_t sdram_offset) {

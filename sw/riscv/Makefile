@@ -1,11 +1,11 @@
 TOOLCHAIN = riscv32-unknown-elf-
 CC = $(TOOLCHAIN)gcc
-AS = $(TOOLCHAIN)as
+CXX = $(TOOLCHAIN)g++
 OBJCOPY = $(TOOLCHAIN)objcopy
 OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
-FLAGS = -mabi=ilp32 -march=rv32i
+FLAGS = -mabi=ilp32 -march=rv32i $(USER_FLAGS)
 CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 LDFLAGS = -nostartfiles -Wl,--gc-sections
 
@@ -22,27 +22,33 @@ VPATH = $(SRC_DIR)
 
 $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
 
-all: $(BUILD_DIR)/governor.hex
+$(BUILD_DIR)/%.S.o: %.S
+	$(CC) -x assembler-with-cpp $(FLAGS) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.c.o: %.c
-	$(CC) $(FLAGS) $(CFLAGS) $(USER_FLAGS) -c $< -o $@
+	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.S.o: %.S
-	$(AS) $(FLAGS) $(ASFLAGS) -c $< -o $@
+$(BUILD_DIR)/governor.elf: $(OBJS) SC64.ld
+	$(CXX) $(FLAGS) $(LDFLAGS) -TSC64.ld $(OBJS) -o $@
+	@$(OBJDUMP) -D $@ > $(BUILD_DIR)/governor.lst
 
-$(BUILD_DIR)/governor.hex: $(OBJS) SC64.ld
-	$(CC) $(FLAGS) $(LDFLAGS) -TSC64.ld $(OBJS) -o $(BUILD_DIR)/governor.elf
-	$(OBJDUMP) -D $(BUILD_DIR)/governor.elf > $(BUILD_DIR)/governor.map
-	$(OBJCOPY) -O binary $(BUILD_DIR)/governor.elf $(BUILD_DIR)/governor.bin
-	$(OBJCOPY) -I binary -O ihex $(BUILD_DIR)/governor.bin $@
+$(BUILD_DIR)/governor.bin: $(BUILD_DIR)/governor.elf
+	@$(OBJCOPY) -O binary $< $@
+
+$(BUILD_DIR)/governor.hex: $(BUILD_DIR)/governor.bin
+	@$(OBJCOPY) -I binary -O ihex $< $@
+
+print_size: $(BUILD_DIR)/governor.elf
 	@echo 'Size of modules:'
-	@$(SIZE) -B -t --common $(OBJS)
+	@$(SIZE) -B -d -t --common $(OBJS)
 	@echo 'Size of governor:'
-	@$(SIZE) -B $(BUILD_DIR)/governor.elf
+	@$(SIZE) -B -d $<
+
+all: $(BUILD_DIR)/governor.hex print_size
 
 clean:
-	rm -rf ./$(BUILD_DIR)/*
+	@rm -rf ./$(BUILD_DIR)/*
 
-.PHONY: all clean
+.PHONY: all clean print_size
 
 -include $(DEPS)

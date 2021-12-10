@@ -5,6 +5,7 @@
 #include "sys.h"
 
 
+uint32_t cfg_get_version (void);
 void cfg_update (uint32_t *args);
 void cfg_query (uint32_t *args);
 void cfg_init (void);
