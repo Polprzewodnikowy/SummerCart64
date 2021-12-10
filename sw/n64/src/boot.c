@@ -21,10 +21,11 @@ static const ipl3_crc32_t ipl3_crc32[] = {
     { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // CICx103
     { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // CICx105
     { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // CICx106
-    { .crc32 = 0x0C965795, .seed = 0xDD, .version = 0 },   // JP 64DD
-    { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // JP 64DD dev
-    { .crc32 = 0x0E018159, .seed = 0xDD, .version = 0 },   // JP 64DD retail
-    { .crc32 = 0x8FEBA21E, .seed = 0xDE, .version = 0 },   // US 64DD retail
+    { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // NDXJ0
+    { .crc32 = 0xBC605D0A, .seed = 0xDD, .version = 0 },   // NDDJ0
+    { .crc32 = 0x502C4466, .seed = 0xDD, .version = 0 },   // NDDJ1
+    { .crc32 = 0x0C965795, .seed = 0xDD, .version = 0 },   // NDDJ2
+    { .crc32 = 0x8FEBA21E, .seed = 0xDE, .version = 0 },   // NDDE0
 };
 
 

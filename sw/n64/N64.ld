@@ -1,5 +1,5 @@
 MEMORY {
-    rdram (rwx) : org = 0x80300000, len = 1M
+    rdram (rwx) : org = 0x80000400, len = 4M - 0x400
     flash (r)   : org = 0xB0000000, len = 90k
 }
 

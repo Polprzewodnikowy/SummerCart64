@@ -15,7 +15,7 @@ SECTIONS {
         . = ALIGN(4);
         _stext = .;
         *(.text .text.* .gnu.linkonce.t.*)
-        *(.rdata .rodata .rodata.* .gnu.linkonce.r.*)
+        *(.rodata .rodata.* .gnu.linkonce.r.*)
         . = ALIGN(4);
         _etext = .;
     } > ram AT > rom
