@@ -159,7 +159,7 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_RECONFIGURE:
             if (args[1] == CFG->RECONFIGURE) {
                 CFG->RECONFIGURE = args[1];
-                __asm__ volatile (
+                asm volatile (
                     "ebreak \n"
                 );
             }

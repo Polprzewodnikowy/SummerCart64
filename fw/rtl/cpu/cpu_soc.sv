@@ -6,6 +6,7 @@ module cpu_soc (
     if_flashram.cpu flashram,
     if_si.cpu si,
     if_flash.cpu flash,
+    if_dd.cpu dd,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -111,6 +112,12 @@ module cpu_soc (
         .sys(sys),
         .bus(bus.at[sc64::ID_CPU_SI].device),
         .si(si)
+    );
+
+    cpu_dd cpu_dd_inst (
+        .sys(sys),
+        .bus(bus.at[sc64::ID_CPU_DD].device),
+        .dd(dd)
     );
 
     assign sd_clk = 1'bZ;

@@ -190,6 +190,23 @@ module n64_pi (
         end
     end
 
+    always_comb begin
+        bus.read_op = read_op;
+        bus.write_op = write_op;
+    end
+
+    always_ff @(posedge sys.clk) begin
+        if (aleh_op) begin
+            bus.real_address[31:16] <= n64_pi_ad_input;           
+        end
+        if (alel_op) begin
+            bus.real_address[15:0] <= {n64_pi_ad_input[15:1], 1'b0};
+        end
+        if (read_op || write_op) begin
+            bus.real_address <= bus.real_address + 2'd2;
+        end
+    end
+
 
     // Address decoding
 
@@ -253,6 +270,11 @@ module n64_pi (
             end
         end
         if (alel_op) begin
+            if (next_id == sc64::ID_N64_DD) begin
+                if (|n64_pi_ad_input[15:11]) begin
+                    n64_pi_address_valid <= 1'b0;
+                end
+            end
             if (sram_selected) begin
                 if (n64_pi_ad_input[15]) begin
                     n64_pi_address_valid <= 1'b0;

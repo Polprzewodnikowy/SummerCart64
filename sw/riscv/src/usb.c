@@ -151,7 +151,7 @@ void usb_debug_reset (void) {
     p.debug_rx_busy = false;
     p.debug_tx_busy = false;
 
-    USB->SCR = USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
+    USB->SCR = USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
 }
 
 static uint8_t rx_cmd_current_byte = 0;

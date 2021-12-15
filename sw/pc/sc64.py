@@ -46,6 +46,7 @@ class SC64:
     __DEBUG_ID_FSD_READ = 0xF1
     __DEBUG_ID_FSD_WRITE = 0xF2
     __DEBUG_ID_FSD_SECTOR = 0xF3
+    __DEBUG_ID_DD_BLOCK = 0xF5
 
 
     def __init__(self) -> None:
@@ -54,6 +55,7 @@ class SC64:
         self.__progress_value = None
         self.__progress_finish = None
         self.__fsd_file = None
+        self.__disk_file = None
         self.__find_sc64()
 
 
@@ -379,7 +381,77 @@ class SC64:
             self.__fsd_file.write(data)
 
 
-    def debug_loop(self, file: str = None) -> None:
+    def __dd_track_offset(self, head_track: int) -> int:
+        head = (head_track & 0x1000) >> 9
+        track = head_track & 0xFFF
+        dd_zone = 0
+        tr_off = 0
+
+        if (track >= 0x425):
+            dd_zone = 7 + head
+            tr_off = track - 0x425
+        elif (track >= 0x390):
+            dd_zone = 6 + head
+            tr_off = track - 0x390
+        elif (track >= 0x2FB):
+            dd_zone = 5 + head
+            tr_off = track - 0x2FB
+        elif (track >= 0x266):
+            dd_zone = 4 + head
+            tr_off = track - 0x266
+        elif (track >= 0x1D1):
+            dd_zone = 3 + head
+            tr_off = track - 0x1D1
+        elif (track >= 0x13C):
+            dd_zone = 2 + head
+            tr_off = track - 0x13C
+        elif (track >= 0x9E):
+            dd_zone = 1 + head
+            tr_off = track - 0x9E
+        else:
+            dd_zone = 0 + head
+            tr_off = track
+
+        ddStartOffset = [0x0,0x5F15E0,0xB79D00,0x10801A0,0x1523720,0x1963D80,0x1D414C0,0x20BBCE0,
+		    0x23196E0,0x28A1E00,0x2DF5DC0,0x3299340,0x36D99A0,0x3AB70E0,0x3E31900,0x4149200]
+        ddZoneSecSize = [232,216,208,192,176,160,144,128,
+            216,208,192,176,160,144,128,112]
+
+        return (dd_zone, ddStartOffset[dd_zone] + tr_off * ddZoneSecSize[dd_zone] * 85 * 2)
+
+
+    # def __dd_zone_track_size(self, i) -> int:
+    #     # ddZoneTrackSize = [158,158,149,149,149,149,149,114,158,158,149,149,149,149,149,114]
+    #     ddZoneSecSize = [232,216,208,192,176,160,144,128,
+    #         216,208,192,176,160,144,128,112]
+    #     return ddZoneSecSize[i]
+
+
+    def __debug_process_dd_block(self, data: bytes) -> None:
+        # scr = int.from_bytes(data[0:4], byteorder='big')
+        current_sector = int.from_bytes(data[4:8], byteorder='little')
+        head_track = int.from_bytes(data[8:12], byteorder='little')
+        sector_num = int.from_bytes(data[12:16], byteorder='little')
+        sector_size = int.from_bytes(data[16:20], byteorder='little')
+        # sector_size_full = int.from_bytes(data[20:24], byteorder='little')
+        # sectors_in_block = int.from_bytes(data[24:28], byteorder='little')
+        # print(f"info: {hex(scr)}, {current_sector}, {head_track}, {sector_num}, {sector_size}, {sector_size_full}, {sectors_in_block}")
+        if (self.__disk_file):
+            (zone, track_offset) = self.__dd_track_offset(head_track)
+            sector = 0
+            sector += track_offset
+            sector += (int(sector_num / 90) * 85 * (sector_size + 1)) # self.__dd_zone_track_size(zone) 
+            sector += ((current_sector) * (sector_size + 1))
+            self.__disk_file.seek(sector)
+            data_dd = self.__disk_file.read(0x100 * 85)
+            if (current_sector == 0x00 or current_sector == 0x5A):
+                print(f"getting sect {hex(sector)}, {hex(int.from_bytes(data_dd[0:4], byteorder='big'))}")
+            self.__debug_write(self.__DEBUG_ID_DD_BLOCK, data_dd)
+        else:
+            self.__debug_write(self.__DEBUG_ID_DD_BLOCK, bytes(0x100))
+
+
+    def debug_loop(self, file: str = None, disk_file: str = None) -> None:
         print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
         self.__serial.timeout = 0.01
@@ -387,6 +459,9 @@ class SC64:
 
         if (file):
             self.__fsd_file = open(file, "rb+")
+
+        if (disk_file):
+            self.__disk_file = open(disk_file, "rb+")
 
         start_indicator = bytearray()
         dropped_bytes = 0
@@ -418,6 +493,8 @@ class SC64:
                     self.__debug_process_fsd_write(data)
                 elif (id == self.__DEBUG_ID_FSD_SECTOR):
                     self.__debug_process_fsd_set_sector(data)
+                elif (id == self.__DEBUG_ID_DD_BLOCK):
+                    self.__debug_process_dd_block(data)
                 else:
                     print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
@@ -499,6 +576,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", metavar="ddipl_path", default=None, required=False, help="path to DDIPL file")
     parser.add_argument("-q", default=None, action="store_true", required=False, help="start debug server")
     parser.add_argument("-f", metavar="sd_path", default=None, required=False, help="path to disk or file for fake SD card emulation")
+    parser.add_argument("-k", metavar="disk_path", default=None, required=False, help="path to 64DD disk file")
     parser.add_argument("rom", metavar="rom_path", default=None, help="path to ROM file", nargs="?")
 
     if (len(sys.argv) <= 1):
@@ -523,6 +601,7 @@ if __name__ == "__main__":
         rom_file = args.rom
         debug_server = args.q
         sd_file = args.f
+        disk_file = args.k
 
         firmware_backup_file = "sc64firmware.bin.bak"
 
@@ -582,7 +661,7 @@ if __name__ == "__main__":
                     sc64.upload_save(save_file)
 
             if (debug_server):
-                sc64.debug_loop(sd_file)
+                sc64.debug_loop(sd_file, disk_file)
 
     except SC64Exception as e:
         print(f"Error: {e}")

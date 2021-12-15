@@ -46,6 +46,8 @@ module SummerCart64 (
     logic [7:0] gpio_i;
     logic [7:0] gpio_oe;
 
+    logic dd_interrupt;
+
     if_system sys (
         .in_clk(i_clk),
         .n64_reset(i_n64_reset),
@@ -63,6 +65,10 @@ module SummerCart64 (
     if_si si ();
 
     if_flash flash ();
+
+    if_dd dd (
+        .dd_interrupt(dd_interrupt)
+    );
 
     system system_inst (
         .sys(sys)
@@ -82,6 +88,7 @@ module SummerCart64 (
         .flashram(flashram),
         .si(si),
         .flash(flash),
+        .dd(dd),
 
         .n64_pi_alel(i_n64_pi_alel),
         .n64_pi_aleh(i_n64_pi_aleh),
@@ -109,6 +116,7 @@ module SummerCart64 (
         .flashram(flashram),
         .si(si),
         .flash(flash),
+        .dd(dd),
 
         .gpio_o(gpio_o),
         .gpio_i(gpio_i),
@@ -132,8 +140,11 @@ module SummerCart64 (
     );
 
     always_comb begin
+        o_n64_irq = dd_interrupt ? 1'b0 : 1'bZ;
+    end
+
+    always_comb begin
         o_led = gpio_oe[0] ? gpio_o[0] : 1'bZ;
-        o_n64_irq = gpio_oe[1] ? gpio_o[1] : 1'bZ;
     end
 
     always_ff @(posedge sys.clk) begin

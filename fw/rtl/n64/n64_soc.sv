@@ -6,6 +6,7 @@ module n64_soc (
     if_flashram.flashram flashram,
     if_si.si si,
     if_flash.memory flash,
+    if_dd dd,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -77,7 +78,13 @@ module n64_soc (
 
     n64_dd n64_dd_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_N64_DD].device)
+        .bus(bus.at[sc64::ID_N64_DD].device),
+        .dd(dd)
+    );
+
+    n64_dd_sector_buffer n64_dd_sector_buffer_inst (
+        .sys(sys),
+        .dd(dd)
     );
 
     n64_cfg n64_cfg_inst (
