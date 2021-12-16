@@ -4,7 +4,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdbool.h>
+
+
+#define CPU_FREQ                    (100000000UL)
 
 
 typedef volatile uint8_t            io8_t;
@@ -201,9 +205,10 @@ typedef volatile struct dd_regs {
     io8_t SECTOR_SIZE;
     io8_t SECTOR_SIZE_FULL;
     io8_t SECTORS_IN_BLOCK;
-    io8_t DRIVE_ID;
-    io8_t __padding_3[3];
-    io32_t __padding_4[59];
+    io16_t DRIVE_ID;
+    io16_t __padding_3;
+    io32_t SEEK_TIMER;
+    io32_t __padding_4[58];
     io32_t SEC_BUF[64];
 } dd_regs_t;
 
@@ -229,7 +234,10 @@ typedef volatile struct dd_regs {
 #define DD_SCR_BM_MICRO_ERROR       (1 << 16)
 #define DD_SCR_BM_ACK               (1 << 17)
 #define DD_SCR_BM_ACK_CLEAR         (1 << 18)
+#define DD_SCR_BM_CLEAR             (1 << 19)
+#define DD_SCR_SEEK_TIMER_RESET     (1 << 20)
 
+#define DD_TRACK_MASK               (0x0FFF)
 #define DD_HEAD_TRACK_MASK          (0x1FFF)
 #define DD_HEAD_TRACK_INDEX_LOCK    (1 << 13)
 

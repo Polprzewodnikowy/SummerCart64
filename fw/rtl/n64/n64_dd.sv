@@ -47,17 +47,19 @@ interface if_dd (
     logic bm_transfer_c2;
     logic bm_transfer_data;
     logic bm_micro_error;
+    logic bm_clear;
     logic bm_ready;
     logic disk_inserted;
     logic disk_changed;
     logic index_lock;
     logic [12:0] head_track;
-    logic [2:0] drive_id;
+    logic [15:0] drive_id;
 
 
     always_comb begin
         dd_interrupt = cmd_interrupt || bm_interrupt;
     end
+
 
     modport dd (
         output hard_reset,
@@ -85,6 +87,7 @@ interface if_dd (
         input bm_transfer_c2,
         input bm_transfer_data,
         input bm_micro_error,
+        input bm_clear,
         input bm_ready,
         input disk_inserted,
         input disk_changed,
@@ -124,6 +127,7 @@ interface if_dd (
         output bm_transfer_data,
         output bm_micro_error,
         output bm_ready,
+        output bm_clear,
         output disk_inserted,
         output disk_changed,
         output index_lock,
@@ -229,7 +233,7 @@ module n64_dd (
                     };
                     R_TRK_CUR: bus.rdata = {1'd0, {2{dd.index_lock}}, dd.head_track};
                     R_BM_SCR: bus.rdata = {6'd0, dd.bm_micro_error, 9'd0};
-                    R_ID: bus.rdata = {13'd0, dd.drive_id};
+                    R_ID: bus.rdata = {dd.drive_id};
                     default: bus.rdata = 16'd0;
                 endcase
             end
@@ -254,8 +258,10 @@ module n64_dd (
         if (dd.bm_stop_clear) begin
             dd.bm_stop_pending <= 1'b0;
         end
-        if (dd.bm_ready) begin
+        if (dd.bm_clear) begin
             dd.bm_pending <= 1'b0;
+        end
+        if (dd.bm_ready) begin
             dd.bm_interrupt <= 1'b1;
         end
         if (bus.real_address == (M_C2_BUFFER + ({dd.sector_size[7:1], 1'b0} * 3'd4)) && bus.read_op) begin
@@ -269,7 +275,7 @@ module n64_dd (
             dd.bm_interrupt_ack <= 1'b1;
         end
 
-        if (sys.reset) begin
+        if (sys.reset || sys.n64_hard_reset) begin
             dd.hard_reset <= 1'b1;
             dd.cmd_pending <= 1'b0;
             dd.cmd_interrupt <= 1'b0;
