@@ -253,6 +253,7 @@ void process_dd (void) {
                     break;
 
                 case DD_CMD_READ_PROGRAM_VERSION:
+                    DD->DATA = 0;
                     break;
 
                 default:
