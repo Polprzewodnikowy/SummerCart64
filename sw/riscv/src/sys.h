@@ -8,9 +8,6 @@
 #include <stdbool.h>
 
 
-#define CPU_FREQ                    (100000000UL)
-
-
 typedef volatile uint8_t            io8_t;
 typedef volatile uint16_t           io16_t;
 typedef volatile uint32_t           io32_t;
@@ -209,7 +206,7 @@ typedef volatile struct dd_regs {
     io16_t __padding_3;
     io32_t SEEK_TIMER;
     io32_t __padding_4[58];
-    io32_t SEC_BUF[64];
+    io32_t SECTOR_BUFFER[64];
 } dd_regs_t;
 
 #define DD_BASE                     (0xB0000000UL)

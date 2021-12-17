@@ -48,6 +48,8 @@ class SC64:
     __DEBUG_ID_FSD_SECTOR = 0xF3
     __DEBUG_ID_DD_BLOCK = 0xF5
 
+    __DD_USER_SECTORS_IN_BLOCK = 85
+
 
     def __init__(self) -> None:
         self.__serial = None
@@ -381,7 +383,8 @@ class SC64:
             self.__fsd_file.write(data)
 
 
-    def __dd_track_offset(self, head_track: int) -> int:
+    def __dd_track_offset(self, head_track: int, sector_size: int) -> int:
+        # shamelessly stolen from MAME implementation, to be rewritten
         head = (head_track & 0x1000) >> 9
         track = head_track & 0xFFF
         dd_zone = 0
@@ -412,43 +415,52 @@ class SC64:
             dd_zone = 0 + head
             tr_off = track
 
-        ddStartOffset = [0x0,0x5F15E0,0xB79D00,0x10801A0,0x1523720,0x1963D80,0x1D414C0,0x20BBCE0,
-		    0x23196E0,0x28A1E00,0x2DF5DC0,0x3299340,0x36D99A0,0x3AB70E0,0x3E31900,0x4149200]
-        ddZoneSecSize = [232,216,208,192,176,160,144,128,
-            216,208,192,176,160,144,128,112]
+        ddStartOffset = [
+            0x0000000,
+            0x05F15E0,
+            0x0B79D00,
+            0x10801A0,
+            0x1523720,
+            0x1963D80,
+            0x1D414C0,
+            0x20BBCE0,
+		    0x23196E0,
+            0x28A1E00,
+            0x2DF5DC0,
+            0x3299340,
+            0x36D99A0,
+            0x3AB70E0,
+            0x3E31900,
+            0x4149200
+        ]
 
-        return (dd_zone, ddStartOffset[dd_zone] + tr_off * ddZoneSecSize[dd_zone] * 85 * 2)
+        return ddStartOffset[dd_zone] + tr_off * sector_size * self.__DD_USER_SECTORS_IN_BLOCK * 2
 
 
-    # def __dd_zone_track_size(self, i) -> int:
-    #     # ddZoneTrackSize = [158,158,149,149,149,149,149,114,158,158,149,149,149,149,149,114]
-    #     ddZoneSecSize = [232,216,208,192,176,160,144,128,
-    #         216,208,192,176,160,144,128,112]
-    #     return ddZoneSecSize[i]
+    def __dd_calculate_file_offset(self, head_track: int, starting_block: int, sector_size: int) -> int:
+        offset = self.__dd_track_offset(head_track, sector_size)
+        offset += starting_block * self.__DD_USER_SECTORS_IN_BLOCK * sector_size
+        return offset
 
 
     def __debug_process_dd_block(self, data: bytes) -> None:
-        # scr = int.from_bytes(data[0:4], byteorder='big')
-        current_sector = int.from_bytes(data[4:8], byteorder='little')
-        head_track = int.from_bytes(data[8:12], byteorder='little')
-        sector_num = int.from_bytes(data[12:16], byteorder='little')
-        sector_size = int.from_bytes(data[16:20], byteorder='little')
-        # sector_size_full = int.from_bytes(data[20:24], byteorder='little')
-        # sectors_in_block = int.from_bytes(data[24:28], byteorder='little')
-        # print(f"info: {hex(scr)}, {current_sector}, {head_track}, {sector_num}, {sector_size}, {sector_size_full}, {sectors_in_block}")
+        transfer_mode = int.from_bytes(data[0:4], byteorder='little')
+        head_track = int.from_bytes(data[4:6], byteorder='little')
+        starting_block = int.from_bytes(data[6:7], byteorder='little')
+        sector_size = int.from_bytes(data[7:8], byteorder='little')
+
         if (self.__disk_file):
-            (zone, track_offset) = self.__dd_track_offset(head_track)
-            sector = 0
-            sector += track_offset
-            sector += (int(sector_num / 90) * 85 * (sector_size + 1)) # self.__dd_zone_track_size(zone) 
-            sector += ((current_sector) * (sector_size + 1))
-            self.__disk_file.seek(sector)
-            data_dd = self.__disk_file.read(0x100 * 85)
-            if (current_sector == 0x00 or current_sector == 0x5A):
-                print(f"getting sect {hex(sector)}, {hex(int.from_bytes(data_dd[0:4], byteorder='big'))}")
-            self.__debug_write(self.__DEBUG_ID_DD_BLOCK, data_dd)
+            file_offset = self.__dd_calculate_file_offset(head_track, starting_block, sector_size)
+            self.__disk_file.seek(file_offset)
+            if (transfer_mode):
+                block_data = self.__disk_file.read(sector_size * self.__DD_USER_SECTORS_IN_BLOCK)
+                self.__debug_write(self.__DEBUG_ID_DD_BLOCK, block_data)
+            else:
+                block_data = self.__read_long(sector_size * self.__DD_USER_SECTORS_IN_BLOCK)
+                self.__disk_file.write(block_data)
         else:
-            self.__debug_write(self.__DEBUG_ID_DD_BLOCK, bytes(0x100))
+            if (transfer_mode):
+                self.__debug_write(self.__DEBUG_ID_DD_BLOCK, bytes(4))
 
 
     def debug_loop(self, file: str = None, disk_file: str = None) -> None:

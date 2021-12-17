@@ -29,7 +29,12 @@ module cpu_dd (
         bus.rdata = 32'd0;
         if (bus.ack) begin
             if (bus.address[8] == M_SECTOR_BUFFER[8]) begin
-                bus.rdata = dd.sector_rdata;
+                bus.rdata = {
+                    dd.sector_rdata[7:0],
+                    dd.sector_rdata[15:8],
+                    dd.sector_rdata[23:16],
+                    dd.sector_rdata[31:24]
+                };
             end else begin                
                 case (bus.address[5:2])
                     R_SCR: bus.rdata = {

@@ -1,5 +1,4 @@
 #include "dd.h"
-#include "uart.h"
 #include "rtc.h"
 #include "usb.h"
 
@@ -7,7 +6,10 @@
 #define DD_DRIVE_ID_RETAIL          (0x0003)
 #define DD_DRIVE_ID_DEVELOPMENT     (0x0004)
 #define DD_VERSION_RETAIL           (0x0114)
-#define DD_TRACK_SEEK_TIME_TICKS    (10000)
+#define DD_POWER_UP_DELAY_TICKS     (320000000UL)   // 3.2 s
+#define DD_TRACK_SEEK_TIME_TICKS    (10000)         // 0.1 ms
+#define DEFAULT_DD_BUFFER_OFFSET    (0x03BD8000UL)
+#define USB_DEBUG_ID_DD_BLOCK       (0xF5)
 
 typedef enum {
     DD_CMD_SEEK_READ                = 0x01,
@@ -44,6 +46,7 @@ struct process {
     enum state state;
     uint32_t track_seek_time;
     uint32_t next_seek_time;
+    bool power_up_delay;
     bool deffered_cmd_ready;
     bool bm_running;
     bool transfer_mode;
@@ -52,37 +55,32 @@ struct process {
     uint8_t current_sector;
     bool is_dev_disk;
     rtc_time_t time;
+    io32_t *buffer;
 };
 
 static struct process p;
+
 enum {
     READ_PHASE_IDLE,
     READ_PHASE_STARTED,
     READ_PHASE_WAIT,
 } read_phase = READ_PHASE_IDLE;
 
-io32_t *sdram = (io32_t *) (SDRAM_BASE + (32 * 1024 * 1024));
-
 static void dd_block_read (void) {
     read_phase = READ_PHASE_STARTED;
 
-    io32_t *dst = sdram;
+    io32_t *dst = p.buffer;
+
     const char *dma = "DMA@";
     const char *cmp = "CMPH";
 
-    if (usb_debug_tx_ready()) {
-        *dst++ = *((uint32_t *) (dma));
-        *dst++ = 0xF5 | (7 * 4) << 24;
-        *dst++ = (uint32_t) DD->SCR;
-        *dst++ = (uint32_t) p.current_sector;
-        *dst++ = (uint32_t) DD->HEAD_TRACK;
-        *dst++ = p.starting_block ? (DD->SECTORS_IN_BLOCK + 1) : 0;
-        *dst++ = (uint32_t) DD->SECTOR_SIZE;
-        *dst++ = (uint32_t) DD->SECTOR_SIZE_FULL;
-        *dst++ = (uint32_t) DD->SECTORS_IN_BLOCK;
-        *dst++ = *((uint32_t *) (cmp));
-        usb_debug_tx_data((uint32_t) (sdram), 10 * 4);
-    }
+    *dst++ = *((uint32_t *) (dma));
+    *dst++ = (((2 * 4) << 24) | USB_DEBUG_ID_DD_BLOCK);
+    *dst++ = p.transfer_mode;
+    *dst++ = (((DD->SECTOR_SIZE + 1) << 24) | (p.starting_block << 16) | DD->HEAD_TRACK);
+    *dst++ = *((uint32_t *) (cmp));
+
+    usb_debug_tx_data((uint32_t) (p.buffer), (5 * 4));
 }
 
 static bool dd_block_read_done (void) {
@@ -91,7 +89,7 @@ static bool dd_block_read_done (void) {
 
     if (read_phase == READ_PHASE_STARTED) {
         if (usb_debug_rx_ready(&type, &length)) {
-            usb_debug_rx_data((uint32_t) (sdram), length);
+            usb_debug_rx_data((uint32_t) (p.buffer), length);
             read_phase = READ_PHASE_WAIT;
         }
         return false;
@@ -107,39 +105,64 @@ static bool dd_block_read_done (void) {
 }
 
 static void dd_sector_read (void) {
-    io32_t *buf = DD->SEC_BUF;
-    io32_t *dst = sdram;
-    uint8_t sector_size = DD->SECTOR_SIZE + 1;
+    io32_t *src = p.buffer;
+    io32_t *dst = DD->SECTOR_BUFFER;
 
-    dst += ((sector_size * p.current_sector) / sizeof(io32_t));
-    for (int i = 0; i < 0x100; i += 4) {
-        *buf++ = *dst++;
+    uint8_t sector_size = ((DD->SECTOR_SIZE + 1) / sizeof(io32_t));
+
+    src += (sector_size * p.current_sector);
+
+    for (int i = 0; i < sector_size; i++) {
+        *dst++ = *src++;
+    }
+}
+
+static void dd_sector_write (void) {
+    io32_t *src = DD->SECTOR_BUFFER;
+    io32_t *dst = p.buffer + 4;
+
+    uint8_t sector_size = ((DD->SECTOR_SIZE + 1) / sizeof(io32_t));
+
+    dst += (sector_size * p.current_sector);
+
+    for (int i = 0; i < sector_size; i++) {
+        *dst++ = *src++;
     }
 }
 
 static void dd_block_write (void) {
-    uart_print("Requesting block write 0x");
-    uart_print_08hex(DD->HEAD_TRACK & DD_HEAD_TRACK_MASK);
-    uart_print("\r\n");
+    io32_t *dst = p.buffer;
+
+    const char *dma = "DMA@";
+    const char *cmp = "CMPH";
+
+    uint32_t block_length = ((DD->SECTOR_SIZE + 1) * 85);
+
+    *dst++ = *((uint32_t *) (dma));
+    *dst++ = (((2 * 4) << 24) | USB_DEBUG_ID_DD_BLOCK);
+    *dst++ = p.transfer_mode;
+    *dst++ = (((DD->SECTOR_SIZE + 1) << 24) | (p.starting_block << 16) | DD->HEAD_TRACK);
+    dst += block_length / 4;
+    *dst++ = *((uint32_t *) (cmp));
+    usb_debug_tx_data((uint32_t) (p.buffer), ((5 * 4) + block_length));
 }
 
 static bool dd_block_write_done (void) {
-    return true;
-}
-
-static void dd_sector_write (void) {
+    return usb_debug_tx_ready();
 }
 
 
 void dd_init (void) {
-    DD->SCR = 0;
+    DD->SCR = DD_SCR_DISK_INSERTED;
     DD->HEAD_TRACK = 0;
     DD->DRIVE_ID = DD_DRIVE_ID_RETAIL;
     p.state = STATE_IDLE;
     p.track_seek_time = DD_TRACK_SEEK_TIME_TICKS;
+    p.power_up_delay = true;
     p.deffered_cmd_ready = false;
     p.bm_running = false;
     p.is_dev_disk = false;
+    p.buffer = (io32_t *) (SDRAM_BASE + DEFAULT_DD_BUFFER_OFFSET);
 }
 
 
@@ -148,7 +171,9 @@ void process_dd (void) {
 
     if (scr & DD_SCR_HARD_RESET) {
         DD->SCR &= ~(DD_SCR_DISK_CHANGED);
+        DD->HEAD_TRACK = 0;
         p.state = STATE_IDLE;
+        p.power_up_delay = true;
         p.deffered_cmd_ready = false;
         p.bm_running = false;
     }
@@ -167,7 +192,12 @@ void process_dd (void) {
             }
         } else if ((cmd == DD_CMD_SEEK_READ) || (cmd == DD_CMD_SEEK_WRITE)) {
             int track_distance = abs((DD->HEAD_TRACK & DD_TRACK_MASK) - (data & DD_TRACK_MASK));
-            p.next_seek_time = track_distance * p.track_seek_time;
+            if (p.power_up_delay) {
+                p.power_up_delay = false;
+                p.next_seek_time += DD_POWER_UP_DELAY_TICKS;
+            } else {
+                p.next_seek_time = (track_distance * p.track_seek_time);
+            }
             p.deffered_cmd_ready = true;
             DD->HEAD_TRACK &= ~(DD_HEAD_TRACK_INDEX_LOCK);
             DD->SCR |= DD_SCR_SEEK_TIMER_RESET;
