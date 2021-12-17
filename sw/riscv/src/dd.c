@@ -194,7 +194,7 @@ void process_dd (void) {
             int track_distance = abs((DD->HEAD_TRACK & DD_TRACK_MASK) - (data & DD_TRACK_MASK));
             if (p.power_up_delay) {
                 p.power_up_delay = false;
-                p.next_seek_time += DD_POWER_UP_DELAY_TICKS;
+                p.next_seek_time = DD_POWER_UP_DELAY_TICKS;
             } else {
                 p.next_seek_time = (track_distance * p.track_seek_time);
             }
