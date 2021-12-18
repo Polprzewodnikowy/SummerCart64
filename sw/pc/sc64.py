@@ -32,6 +32,7 @@ class SC64:
     __CFG_ID_FLASH_READ = 11
     __CFG_ID_FLASH_PROGRAM = 12
     __CFG_ID_RECONFIGURE = 13
+    __CFG_ID_DD_SETTING = 14
 
     __SC64_VERSION_V2 = 0x53437632
 
@@ -50,6 +51,11 @@ class SC64:
 
     __DD_USER_SECTORS_IN_BLOCK = 85
 
+    __DD_SETTING_DISK_EJECTED = 0
+    __DD_SETTING_DISK_INSERTED = 1
+    __DD_SETTING_DISK_CHANGED = 2
+    __DD_SETTING_DRIVE_RETAIL = 3
+    __DD_SETTING_DRIVE_DEVELOPMENT = 4
 
     def __init__(self) -> None:
         self.__serial = None
@@ -364,6 +370,26 @@ class SC64:
         self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
 
 
+    def set_dd_disk_state(self, state: int) -> None:
+        if (state == "ejected"):
+            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_EJECTED)
+        elif (state == "inserted"):
+            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_INSERTED)
+        elif (state == "changed"):
+            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_CHANGED)
+        else:
+            raise SC64Exception("DD disk state outside of supported values")
+
+
+    def set_dd_drive_type(self, type: str) -> None:
+        if (type == "retail"):
+            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_RETAIL)
+        elif (type == "development"):
+            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_DEVELOPMENT)
+        else:
+            raise SC64Exception("DD drive type outside of supported values")
+
+
     def __debug_process_fsd_set_sector(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder='big')
         if (self.__fsd_file):
@@ -383,7 +409,7 @@ class SC64:
             self.__fsd_file.write(data)
 
 
-    def __dd_track_offset(self, head_track: int, sector_size: int) -> int:
+    def __dd_calculate_file_offset(self, head_track: int, starting_block: int) -> int:
         # shamelessly stolen from MAME implementation, to be rewritten
         head = (head_track & 0x1000) >> 9
         track = head_track & 0xFFF
@@ -434,12 +460,27 @@ class SC64:
             0x4149200
         ]
 
-        return ddStartOffset[dd_zone] + tr_off * sector_size * self.__DD_USER_SECTORS_IN_BLOCK * 2
+        ddZoneSecSize = [
+            232,
+            216,
+            208,
+            192,
+            176,
+            160,
+            144,
+            128,
+            216,
+            208,
+            192,
+            176,
+            160,
+            144,
+            128,
+            112
+        ]
 
-
-    def __dd_calculate_file_offset(self, head_track: int, starting_block: int, sector_size: int) -> int:
-        offset = self.__dd_track_offset(head_track, sector_size)
-        offset += starting_block * self.__DD_USER_SECTORS_IN_BLOCK * sector_size
+        offset = ddStartOffset[dd_zone] + tr_off * ddZoneSecSize[dd_zone] * self.__DD_USER_SECTORS_IN_BLOCK * 2
+        offset += starting_block * self.__DD_USER_SECTORS_IN_BLOCK * ddZoneSecSize[dd_zone]
         return offset
 
 
@@ -449,8 +490,10 @@ class SC64:
         starting_block = int.from_bytes(data[6:7], byteorder='little')
         sector_size = int.from_bytes(data[7:8], byteorder='little')
 
+        block_data = None
+
         if (self.__disk_file):
-            file_offset = self.__dd_calculate_file_offset(head_track, starting_block, sector_size)
+            file_offset = self.__dd_calculate_file_offset(head_track, starting_block)
             self.__disk_file.seek(file_offset)
             if (transfer_mode):
                 block_data = self.__disk_file.read(sector_size * self.__DD_USER_SECTORS_IN_BLOCK)
@@ -458,6 +501,7 @@ class SC64:
             else:
                 block_data = self.__read_long(sector_size * self.__DD_USER_SECTORS_IN_BLOCK)
                 self.__disk_file.write(block_data)
+            print(f"{'R'if transfer_mode else 'W'} - H: {1 if (head_track & 0x2000) else 0} | T: {head_track & 0x1FFF} | S: {starting_block} = [{hex(int.from_bytes(block_data[0:4], byteorder='big'))}]")
         else:
             if (transfer_mode):
                 self.__debug_write(self.__DEBUG_ID_DD_BLOCK, bytes(4))
@@ -589,6 +633,7 @@ if __name__ == "__main__":
     parser.add_argument("-q", default=None, action="store_true", required=False, help="start debug server")
     parser.add_argument("-f", metavar="sd_path", default=None, required=False, help="path to disk or file for fake SD card emulation")
     parser.add_argument("-k", metavar="disk_path", default=None, required=False, help="path to 64DD disk file")
+    parser.add_argument("-x", default=False, action="store_true", required=False, help="set 64DD drive type to development")
     parser.add_argument("rom", metavar="rom_path", default=None, help="path to ROM file", nargs="?")
 
     if (len(sys.argv) <= 1):
@@ -614,6 +659,7 @@ if __name__ == "__main__":
         debug_server = args.q
         sd_file = args.f
         disk_file = args.k
+        development_64dd = args.x
 
         firmware_backup_file = "sc64firmware.bin.bak"
 
@@ -651,6 +697,14 @@ if __name__ == "__main__":
                     print(f"Setting 64DD emulation to [{'Enabled' if dd_enable else 'Disabled'}]")
                 sc64.set_dd_enable(dd_enable)
 
+                if (development_64dd):
+                    print(f"Setting 64DD drive type to [Development]")
+                sc64.set_dd_drive_type("development" if development_64dd else "retail")
+
+                if (disk_file):
+                    print(f"Setting 64DD disk state to [Inserted]")
+                sc64.set_dd_disk_state("inserted" if disk_file else "ejected")
+
             if (rom_file):
                 if (is_read):            
                     if (rom_length > 0):
@@ -679,6 +733,7 @@ if __name__ == "__main__":
         print(f"Error: {e}")
         parser.exit(1)
     except KeyboardInterrupt:
-        pass
+        if (disk_file):
+            sc64.set_dd_disk_state("ejected")
     finally:
         sys.stdout.write("\033[0m")

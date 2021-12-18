@@ -152,8 +152,36 @@ static bool dd_block_write_done (void) {
 }
 
 
+void dd_set_disk_state (disk_state_t disk_state) {
+    uint32_t scr = (DD->SCR & (~(DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED)));
+
+    switch (disk_state) {
+        case DD_DISK_EJECTED:
+            break;
+        case DD_DISK_INSERTED:
+            scr |= DD_SCR_DISK_INSERTED;
+            break;
+        case DD_DISK_CHANGED:
+            scr |= (DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED);
+            break;
+    }
+
+    DD->SCR = scr;
+}
+
+void dd_set_drive_type_development (bool value) {
+    if (value) {
+        DD->DRIVE_ID = DD_DRIVE_ID_DEVELOPMENT;
+        p.is_dev_disk = true;
+    } else {
+        DD->DRIVE_ID = DD_DRIVE_ID_RETAIL;
+        p.is_dev_disk = false;
+    }
+}
+
+
 void dd_init (void) {
-    DD->SCR = DD_SCR_DISK_INSERTED;
+    DD->SCR = 0;
     DD->HEAD_TRACK = 0;
     DD->DRIVE_ID = DD_DRIVE_ID_RETAIL;
     p.state = STATE_IDLE;

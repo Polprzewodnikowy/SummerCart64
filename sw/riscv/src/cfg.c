@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include "dd.h"
 #include "flash.h"
 #include "joybus.h"
 #include "usb.h"
@@ -31,6 +32,7 @@ enum cfg_id {
     CFG_ID_FLASH_READ,
     CFG_ID_FLASH_PROGRAM,
     CFG_ID_RECONFIGURE,
+    CFG_ID_DD_SETTING,
 };
 
 enum save_type {
@@ -48,6 +50,14 @@ enum boot_mode {
     BOOT_MODE_ROM = 1,
     BOOT_MODE_DD = 2,
     BOOT_MODE_DIRECT = 3,
+};
+
+enum dd_setting {
+    DD_SETTING_DISK_EJECTED,
+    DD_SETTING_DISK_INSERTED,
+    DD_SETTING_DISK_CHANGED,
+    DD_SETTING_DRIVE_RETAIL,
+    DD_SETTING_DRIVE_DEVELOPMENT,
 };
 
 
@@ -112,6 +122,26 @@ static void set_save_type (enum save_type save_type) {
     CFG->SAVE_OFFSET = save_offset;
 }
 
+static void set_dd_setting (enum dd_setting setting) {
+    switch (setting) {
+        case DD_SETTING_DISK_EJECTED:
+            dd_set_disk_state(DD_DISK_EJECTED);
+            break;
+        case DD_SETTING_DISK_INSERTED:
+            dd_set_disk_state(DD_DISK_INSERTED);
+            break;
+        case DD_SETTING_DISK_CHANGED:
+            dd_set_disk_state(DD_DISK_CHANGED);
+            break;
+        case DD_SETTING_DRIVE_RETAIL:
+            dd_set_drive_type_development(false);
+            break;
+        case DD_SETTING_DRIVE_DEVELOPMENT:
+            dd_set_drive_type_development(true);
+            break;
+    }
+}
+
 
 uint32_t cfg_get_version (void) {
     return CFG->VERSION;
@@ -163,6 +193,9 @@ void cfg_update (uint32_t *args) {
                     "ebreak \n"
                 );
             }
+            break;
+        case CFG_ID_DD_SETTING:
+            set_dd_setting(args[1]);
             break;
     }
 }
