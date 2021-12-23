@@ -33,6 +33,7 @@ enum cfg_id {
     CFG_ID_FLASH_PROGRAM,
     CFG_ID_RECONFIGURE,
     CFG_ID_DD_SETTING,
+    CFG_ID_DD_THB_TABLE_OFFSET,
 };
 
 enum save_type {
@@ -53,11 +54,12 @@ enum boot_mode {
 };
 
 enum dd_setting {
-    DD_SETTING_DISK_EJECTED,
-    DD_SETTING_DISK_INSERTED,
-    DD_SETTING_DISK_CHANGED,
-    DD_SETTING_DRIVE_RETAIL,
-    DD_SETTING_DRIVE_DEVELOPMENT,
+    DD_SETTING_DISK_EJECTED = 0,
+    DD_SETTING_DISK_INSERTED = 1,
+    DD_SETTING_DISK_CHANGED = 2,
+    DD_SETTING_DRIVE_RETAIL = 3,
+    DD_SETTING_DRIVE_DEVELOPMENT = 4,
+    DD_SETTING_SET_BLOCK_READY = 5,
 };
 
 
@@ -138,6 +140,9 @@ static void set_dd_setting (enum dd_setting setting) {
             break;
         case DD_SETTING_DRIVE_DEVELOPMENT:
             dd_set_drive_type_development(true);
+            break;
+        case DD_SETTING_SET_BLOCK_READY:
+            dd_set_block_ready(true);
             break;
     }
 }
@@ -237,6 +242,9 @@ void cfg_query (uint32_t *args) {
             break;
         case CFG_ID_RECONFIGURE:
             args[1] = CFG->RECONFIGURE;
+            break;
+        case CFG_ID_DD_THB_TABLE_OFFSET:
+            args[1] = dd_get_thb_table_offset();
             break;
     }
 }

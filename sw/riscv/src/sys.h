@@ -8,6 +8,11 @@
 #include <stdbool.h>
 
 
+#define swap32(x)                   ((((x) & 0xFF000000UL) >> 24) | \
+                                    (((x) & 0x00FF0000UL) >> 8) | \
+                                    (((x) & 0x0000FF00UL) << 8) | \
+                                    (((x) & 0x000000FFUL) << 24))
+
 typedef volatile uint8_t            io8_t;
 typedef volatile uint16_t           io16_t;
 typedef volatile uint32_t           io32_t;
@@ -235,7 +240,8 @@ typedef volatile struct dd_regs {
 #define DD_SCR_SEEK_TIMER_RESET     (1 << 20)
 
 #define DD_TRACK_MASK               (0x0FFF)
-#define DD_HEAD_TRACK_MASK          (0x1FFF)
+#define DD_HEAD_MASK                (0x1000)
+#define DD_HEAD_TRACK_MASK          (DD_HEAD_MASK | DD_TRACK_MASK)
 #define DD_HEAD_TRACK_INDEX_LOCK    (1 << 13)
 
 

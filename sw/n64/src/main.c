@@ -65,7 +65,7 @@ void main (void) {
         }
     }
 
-    LOG_I("Booting IPL3\r\n\r\n");
+    LOG_I("Booting IPL3\033[0m\r\n\r\n");
 
     boot(&boot_info);
 }
