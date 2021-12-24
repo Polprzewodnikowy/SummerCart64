@@ -63,6 +63,7 @@ class SC64:
         self.__progress_finish = None
         self.__fsd_file = None
         self.__disk_file = None
+        self.__disk_lba_table = []
         self.__find_sc64()
 
 
@@ -380,40 +381,32 @@ class SC64:
             raise SC64Exception("DD disk state outside of supported values")
 
 
-    def set_dd_drive_type(self, type: str) -> None:
-        if (type == "retail"):
-            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_RETAIL)
-        elif (type == "development"):
-            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_DEVELOPMENT)
-        else:
-            raise SC64Exception("DD drive type outside of supported values")
-
-
-    def __dd_process_disk(self, handle: TextIOWrapper) -> tuple[str, bytes]:
-        DISK_TRACKS = 1175
+    def __dd_create_configuration(self, handle: TextIOWrapper) -> tuple[str, int, list[tuple[int, int]]]:
         DISK_HEADS = 2
+        DISK_TRACKS = 1175
         DISK_BLOCKS_PER_TRACK = 2
         DISK_SECTORS_PER_BLOCK = 85
+        DISK_BAD_TRACKS_PER_ZONE = 12
         DISK_SYSTEM_SECTOR_SIZE = 232
 
-        DISK_PZONES = [
-            (0, 0, 158, 232, 0,    0),
-            (1, 0, 158, 216, 158,  1),
-            (2, 0, 149, 208, 316,  2),
-            (3, 0, 149, 192, 465,  3),
-            (4, 0, 149, 176, 614,  4),
-            (5, 0, 149, 160, 763,  5),
-            (6, 0, 149, 144, 912,  6),
-            (7, 0, 114, 128, 1061, 7),
-            (1, 1, 158, 216, 157,  8),
-            (2, 1, 158, 208, 315,  9),
-            (3, 1, 149, 192, 464,  10),
-            (4, 1, 149, 176, 613,  11),
-            (5, 1, 149, 160, 762,  12),
-            (6, 1, 149, 144, 911,  13),
-            (7, 1, 149, 128, 1060, 14),
-            (8, 1, 114, 112, 1174, 15),
-        ] 
+        DISK_ZONES = [
+            (0, 232, 158, 0),
+            (0, 216, 158, 158),
+            (0, 208, 149, 316),
+            (0, 192, 149, 465),
+            (0, 176, 149, 614),
+            (0, 160, 149, 763),
+            (0, 144, 149, 912),
+            (0, 128, 114, 1061),
+            (1, 216, 158, 157),
+            (1, 208, 158, 315),
+            (1, 192, 149, 464),
+            (1, 176, 149, 613),
+            (1, 160, 149, 762),
+            (1, 144, 149, 911),
+            (1, 128, 149, 1060),
+            (1, 112, 114, 1174),
+        ]
 
         DISK_VZONE_TO_PZONE = [
             [0, 1, 2, 9, 8, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10],
@@ -425,113 +418,122 @@ class SC64:
             [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
         ]
 
-        DRIVE_TYPES = [{
-            "drive_type": "development",
-            "system_lbas": [11, 10, 3, 2],
-            "sector_size": 192,
-        }, {
-            "drive_type": "retail",
-            "system_lbas": [9, 8, 1, 0],
-            "sector_size": 232,
-        }]
+        DISK_DRIVE_TYPES = [(
+            "development",
+            192,
+            [11, 10, 3, 2],
+            [0, 1, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23],
+        ), (
+            "retail",
+            232,
+            [9, 8, 1, 0],
+            [2, 3, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23],
+        )]
 
-        block_valid = False
-        system_data = None
-        disk_type = None
-        drive_type = None
-
-        for drive in DRIVE_TYPES:
-            if (block_valid):
-                break
-
-            for system_lba in drive["system_lbas"]:
-                block_valid = True
-                sector_size = drive["sector_size"]
-
-                handle.seek(system_lba * DISK_SYSTEM_SECTOR_SIZE * DISK_SECTORS_PER_BLOCK)
-                block_data = handle.read(sector_size * DISK_SECTORS_PER_BLOCK)
-
-                system_data = block_data[:sector_size]
-
-                for sector in range(1, DISK_SECTORS_PER_BLOCK):
-                    sector_data = block_data[(sector * sector_size):][:sector_size]
-                    if (system_data != sector_data):
-                        block_valid = False
-
+        def __check_system_block(lba: int, sector_size: int, check_disk_type: bool) -> tuple[bool, bytes]:
+            handle.seek(lba * DISK_SYSTEM_SECTOR_SIZE * DISK_SECTORS_PER_BLOCK)
+            system_block_data = handle.read(sector_size * DISK_SECTORS_PER_BLOCK)
+            system_data = system_block_data[:sector_size]
+            for sector in range(1, DISK_SECTORS_PER_BLOCK):
+                sector_data = system_block_data[(sector * sector_size):][:sector_size]
+                if (system_data != sector_data):
+                    return (False, None)
+            if (check_disk_type):
                 if (system_data[4] != 0x10):
-                    block_valid = False
-
+                    return (False, None)
                 if ((system_data[5] & 0xF0) != 0x10):
-                    block_valid = False
+                    return (False, None)
+            return (True, system_data)
 
-                if (block_valid):
-                    disk_type = system_data[5] & 0x0F
-                    drive_type = drive["drive_type"]
+        disk_drive_type = None
+        disk_system_data = None
+        disk_id_data = None
+        disk_bad_lbas = []
 
-        if (not block_valid):
+        drive_index = 0
+        while (disk_system_data == None) and (drive_index < len(DISK_DRIVE_TYPES)):
+            (drive_type, system_sector_size, system_data_lbas, bad_lbas) = DISK_DRIVE_TYPES[drive_index]
+            disk_bad_lbas.clear()
+            disk_bad_lbas.extend(bad_lbas)
+            for system_lba in system_data_lbas:
+                (valid, system_data) = __check_system_block(system_lba, system_sector_size, check_disk_type=True)
+                if (valid):
+                    disk_drive_type = drive_type
+                    disk_system_data = system_data
+                else:
+                    disk_bad_lbas.append(system_lba)
+            drive_index += 1
+
+        for id_lba in [15, 14]:
+            (valid, id_data) = __check_system_block(id_lba, DISK_SYSTEM_SECTOR_SIZE, check_disk_type=False)
+            if (valid):
+                disk_id_data = id_data
+            else:
+                disk_bad_lbas.append(id_lba)
+
+        if not (disk_system_data and disk_id_data):
             raise SC64Exception("Provided 64DD disk file is not valid")
 
         disk_zone_bad_tracks = []
 
-        for pzone in range(16):
-            tracks = []
-            start = 0 if pzone == 0 else system_data[0x07 + pzone]
-            stop = system_data[0x07 + pzone + 1]
+        for zone in range(len(DISK_ZONES)):
+            zone_bad_tracks = []
+            start = 0 if zone == 0 else system_data[0x07 + zone]
+            stop = system_data[0x07 + zone + 1]
             for offset in range(start, stop):
-                tracks.append(system_data[0x20 + offset])
-            if (drive_type == "development"):
-                tracks.append(DISK_PZONES[pzone][2] - 2)
-                tracks.append(DISK_PZONES[pzone][2] - 1)
-            disk_zone_bad_tracks.append(tracks)
+                zone_bad_tracks.append(system_data[0x20 + offset])
+            for ignored_track in range(DISK_BAD_TRACKS_PER_ZONE - len(zone_bad_tracks)):
+                zone_bad_tracks.append(DISK_ZONES[zone][2] - ignored_track - 1)
+            disk_zone_bad_tracks.append(zone_bad_tracks)
 
-        zones = []
+        thb_lba_table = [(0xFFFFFFFF, -1)] * (DISK_HEADS * DISK_TRACKS * DISK_BLOCKS_PER_TRACK)
 
-        for vzone in range(16):
-            zones.append(DISK_PZONES[DISK_VZONE_TO_PZONE[disk_type][vzone]])
+        disk_type = disk_system_data[5] & 0x0F
 
-        thb_table = [0xFFFFFFFF] * (DISK_TRACKS * DISK_HEADS * DISK_BLOCKS_PER_TRACK)
-
+        current_lba = 0
         starting_block = 0
         disk_file_offset = 0
-        lba = 0
 
-        for (vzone, head, tracks, sector_size, track, pzone) in zones:
-            processed_tracks = 0
+        for zone in DISK_VZONE_TO_PZONE[disk_type]:
+            (head, sector_size, tracks, track) = DISK_ZONES[zone]
+
             for zone_track in range(tracks):
                 current_zone_track = ((tracks - 1) - zone_track) if head else zone_track
-                if (current_zone_track in disk_zone_bad_tracks[pzone]):
+
+                if (current_zone_track in disk_zone_bad_tracks[zone]):
                     track += (-1) if head else 1 
                     continue
 
-                if (processed_tracks >= (tracks - 12)):
-                    break
-
-                for block in range(2):
-                    if (not (drive_type == "retail" and lba == 12)):
-                        thb_table_entry = (track << 2) | (head << 1) | (starting_block ^ block)
-                        thb_table[thb_table_entry] = disk_file_offset
-                    disk_file_offset += sector_size * 85
-                    lba += 1
+                for block in range(DISK_BLOCKS_PER_TRACK):
+                    if (current_lba not in disk_bad_lbas):
+                        index = (track << 2) | (head << 1) | (starting_block ^ block)
+                        thb_lba_table[index] = (disk_file_offset, current_lba)
+                    disk_file_offset += sector_size * DISK_SECTORS_PER_BLOCK
+                    current_lba += 1
 
                 track += (-1) if head else 1
                 starting_block ^= 1
-                processed_tracks += 1
 
-        return (drive_type, thb_table)
+        return (disk_drive_type, thb_lba_table)
 
 
-    def set_dd_disk_info(self, file: str = None):
+    def set_dd_configuration_for_disk(self, file: str = None) -> None:
         if (file):
             with open(file, "rb+") as handle:
-                (drive_type, thb_table) = self.__dd_process_disk(handle)
+                (disk_drive_type, thb_lba_table) = self.__dd_create_configuration(handle)
                 thb_table_offset = self.__query_config(self.__CFG_ID_DD_THB_TABLE_OFFSET)            
                 data = bytearray()
-                for value in thb_table:
-                    data += struct.pack(">I", value)
+                self.__disk_lba_table = [0xFFFFFFFF] * len(thb_lba_table)
+                for (offset, lba) in thb_lba_table:
+                    data += struct.pack(">I", offset)
+                    self.__disk_lba_table[lba] = offset
                 self.__write_cmd("W", thb_table_offset, len(data))
                 self.__write(data)
                 self.__read_cmd_status("W")
-                self.set_dd_drive_type(drive_type)
+                if (disk_drive_type == "retail"):
+                    self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_RETAIL)
+                elif (disk_drive_type == "development"):
+                    self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_DEVELOPMENT)
         else:
             raise SC64Exception("No DD disk file provided for disk info creation")
 
@@ -560,6 +562,8 @@ class SC64:
         sdram_offset = int.from_bytes(data[4:8], byteorder='big')
         disk_file_offset = int.from_bytes(data[8:12], byteorder='big')
         block_length = int.from_bytes(data[12:16], byteorder='big')
+
+        print(f"64DD Block {'R' if transfer_mode else 'W'} - LBA: {self.__disk_lba_table.index(disk_file_offset):4}, Offset: 0x{disk_file_offset:08X}")
 
         if (self.__disk_file):
             self.__disk_file.seek(disk_file_offset)
@@ -784,7 +788,7 @@ if __name__ == "__main__":
                     print(f"Using fake SD emulation file [{sd_file}]")
                 if (disk_file):
                     print(f"Using 64DD disk image file [{disk_file}]")
-                    sc64.set_dd_disk_info(disk_file)
+                    sc64.set_dd_configuration_for_disk(disk_file)
                 if (disk_file):
                     print(f"Setting 64DD disk state to [Inserted]")
                 sc64.set_dd_disk_state("changed" if disk_file else "ejected")

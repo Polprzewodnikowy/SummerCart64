@@ -107,7 +107,7 @@ static bool dd_block_request (void) {
     *dst++ = swap32((USB_DEBUG_ID_DD_BLOCK << 24) | 16);
     *dst++ = swap32(p.transfer_mode);
     *dst++ = swap32((uint32_t) (p.block_buffer));
-    *dst++ = (offset);
+    *dst++ = offset;
     *dst++ = swap32(length);
     *dst++ = *((uint32_t *) (cmp));
 
