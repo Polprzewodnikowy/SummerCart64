@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include "dd.h"
 #include "flash.h"
 #include "joybus.h"
 #include "usb.h"
@@ -31,6 +32,8 @@ enum cfg_id {
     CFG_ID_FLASH_READ,
     CFG_ID_FLASH_PROGRAM,
     CFG_ID_RECONFIGURE,
+    CFG_ID_DD_SETTING,
+    CFG_ID_DD_THB_TABLE_OFFSET,
 };
 
 enum save_type {
@@ -48,6 +51,15 @@ enum boot_mode {
     BOOT_MODE_ROM = 1,
     BOOT_MODE_DD = 2,
     BOOT_MODE_DIRECT = 3,
+};
+
+enum dd_setting {
+    DD_SETTING_DISK_EJECTED = 0,
+    DD_SETTING_DISK_INSERTED = 1,
+    DD_SETTING_DISK_CHANGED = 2,
+    DD_SETTING_DRIVE_RETAIL = 3,
+    DD_SETTING_DRIVE_DEVELOPMENT = 4,
+    DD_SETTING_SET_BLOCK_READY = 5,
 };
 
 
@@ -112,6 +124,29 @@ static void set_save_type (enum save_type save_type) {
     CFG->SAVE_OFFSET = save_offset;
 }
 
+static void set_dd_setting (enum dd_setting setting) {
+    switch (setting) {
+        case DD_SETTING_DISK_EJECTED:
+            dd_set_disk_state(DD_DISK_EJECTED);
+            break;
+        case DD_SETTING_DISK_INSERTED:
+            dd_set_disk_state(DD_DISK_INSERTED);
+            break;
+        case DD_SETTING_DISK_CHANGED:
+            dd_set_disk_state(DD_DISK_CHANGED);
+            break;
+        case DD_SETTING_DRIVE_RETAIL:
+            dd_set_drive_type_development(false);
+            break;
+        case DD_SETTING_DRIVE_DEVELOPMENT:
+            dd_set_drive_type_development(true);
+            break;
+        case DD_SETTING_SET_BLOCK_READY:
+            dd_set_block_ready(true);
+            break;
+    }
+}
+
 
 uint32_t cfg_get_version (void) {
     return CFG->VERSION;
@@ -159,10 +194,13 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_RECONFIGURE:
             if (args[1] == CFG->RECONFIGURE) {
                 CFG->RECONFIGURE = args[1];
-                __asm__ volatile (
+                asm volatile (
                     "ebreak \n"
                 );
             }
+            break;
+        case CFG_ID_DD_SETTING:
+            set_dd_setting(args[1]);
             break;
     }
 }
@@ -204,6 +242,9 @@ void cfg_query (uint32_t *args) {
             break;
         case CFG_ID_RECONFIGURE:
             args[1] = CFG->RECONFIGURE;
+            break;
+        case CFG_ID_DD_THB_TABLE_OFFSET:
+            args[1] = dd_get_thb_table_offset();
             break;
     }
 }

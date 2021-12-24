@@ -9,6 +9,9 @@ interface if_n64_bus ();
     logic [31:0] address;
     logic [15:0] wdata;
     logic [15:0] rdata;
+    logic [31:0] real_address;
+    logic read_op;
+    logic write_op;
 
     logic device_ack [(NUM_DEVICES - 1):0];
     logic [15:0] device_rdata [(NUM_DEVICES - 1):0];
@@ -30,7 +33,11 @@ interface if_n64_bus ();
         output write,
         output address,
         output wdata,
-        input rdata
+        input rdata,
+
+        output real_address,
+        output read_op,
+        output write_op
     );
 
     genvar n;
@@ -48,7 +55,11 @@ interface if_n64_bus ();
                 input .write(write),
                 input .address(address),
                 input .wdata(wdata),
-                output .rdata(device_rdata[n])
+                output .rdata(device_rdata[n]),
+
+                input .real_address(real_address),
+                input .read_op(read_op),
+                input .write_op(write_op)
             );
         end
     endgenerate

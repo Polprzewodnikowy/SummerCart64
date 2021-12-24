@@ -6,6 +6,7 @@
 #include "rtc.h"
 #include "i2c.h"
 #include "flashram.h"
+#include "dd.h"
 #include "uart.h"
 
 
@@ -15,6 +16,7 @@ static const void (*process_table[])(void) = {
     process_rtc,
     process_i2c,
     process_flashram,
+    process_dd,
     process_uart,
     NULL,
 };
@@ -30,6 +32,7 @@ __attribute__((naked)) void process_loop (void) {
     rtc_init();
     i2c_init();
     flashram_init();
+    dd_init();
     uart_init();
 
     while (1) {

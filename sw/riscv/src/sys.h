@@ -4,10 +4,17 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 
+#define swap32(x)                   ((((x) & 0xFF000000UL) >> 24) | \
+                                    (((x) & 0x00FF0000UL) >> 8) | \
+                                    (((x) & 0x0000FF00UL) << 8) | \
+                                    (((x) & 0x000000FFUL) << 24))
+
 typedef volatile uint8_t            io8_t;
+typedef volatile uint16_t           io16_t;
 typedef volatile uint32_t           io32_t;
 
 
@@ -187,6 +194,55 @@ typedef volatile struct joybus_regs {
 #define JOYBUS_SCR_RX_LENGTH_BIT    (8)
 #define JOYBUS_SCR_RX_LENGTH_MASK   (0x7F << JOYBUS_SCR_RX_LENGTH_BIT)
 #define JOYBUS_SCR_TX_LENGTH_BIT    (16)
+
+
+typedef volatile struct dd_regs {
+    io32_t SCR;
+    io16_t DATA;
+    io8_t CMD;
+    io8_t __padding_1;
+    io16_t HEAD_TRACK;
+    io16_t __padding_2;
+    io8_t SECTOR_NUM;
+    io8_t SECTOR_SIZE;
+    io8_t SECTOR_SIZE_FULL;
+    io8_t SECTORS_IN_BLOCK;
+    io16_t DRIVE_ID;
+    io16_t __padding_3;
+    io32_t SEEK_TIMER;
+    io32_t __padding_4[58];
+    io32_t SECTOR_BUFFER[64];
+} dd_regs_t;
+
+#define DD_BASE                     (0xB0000000UL)
+#define DD                          ((dd_regs_t *) DD_BASE)
+
+#define DD_SCR_HARD_RESET           (1 << 0)
+#define DD_SCR_HARD_RESET_CLEAR     (1 << 1)
+#define DD_SCR_CMD_PENDING          (1 << 2)
+#define DD_SCR_CMD_READY            (1 << 3)
+#define DD_SCR_BM_PENDING           (1 << 4)
+#define DD_SCR_BM_READY             (1 << 5)
+#define DD_SCR_DISK_INSERTED        (1 << 6)
+#define DD_SCR_DISK_CHANGED         (1 << 7)
+#define DD_SCR_BM_START             (1 << 8)
+#define DD_SCR_BM_START_CLEAR       (1 << 9)
+#define DD_SCR_BM_STOP              (1 << 10)
+#define DD_SCR_BM_STOP_CLEAR        (1 << 11)
+#define DD_SCR_BM_TRANSFER_MODE     (1 << 12)
+#define DD_SCR_BM_TRANSFER_BLOCKS   (1 << 13)
+#define DD_SCR_BM_TRANSFER_DATA     (1 << 14)
+#define DD_SCR_BM_TRANSFER_C2       (1 << 15)
+#define DD_SCR_BM_MICRO_ERROR       (1 << 16)
+#define DD_SCR_BM_ACK               (1 << 17)
+#define DD_SCR_BM_ACK_CLEAR         (1 << 18)
+#define DD_SCR_BM_CLEAR             (1 << 19)
+#define DD_SCR_SEEK_TIMER_RESET     (1 << 20)
+
+#define DD_TRACK_MASK               (0x0FFF)
+#define DD_HEAD_MASK                (0x1000)
+#define DD_HEAD_TRACK_MASK          (DD_HEAD_MASK | DD_TRACK_MASK)
+#define DD_HEAD_TRACK_INDEX_LOCK    (1 << 13)
 
 
 void reset_handler(void);

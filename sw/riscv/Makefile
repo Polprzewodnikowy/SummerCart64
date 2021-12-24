@@ -12,7 +12,7 @@ LDFLAGS = -nostartfiles -Wl,--gc-sections
 SRC_DIR = src
 BUILD_DIR = build
 
-SRC_FILES = startup.S process.c usb.c cfg.c dma.c joybus.c rtc.c i2c.c flashram.c uart.c flash.c
+SRC_FILES = startup.S process.c usb.c cfg.c dma.c joybus.c rtc.c i2c.c flashram.c uart.c flash.c dd.c
 
 SRCS = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(patsubst %,%.o,$(SRCS))))

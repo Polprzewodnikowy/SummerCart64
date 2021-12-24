@@ -14,13 +14,13 @@ typedef struct {
 } ipl3_crc32_t;
 
 static const ipl3_crc32_t ipl3_crc32[] = {
-    { .crc32 = 0x587BD543, .seed = 0xAC, .version = 0 },   // CIC5101
-    { .crc32 = 0x6170A4A1, .seed = 0x3F, .version = 1 },   // CIC6101
-    { .crc32 = 0x009E9EA3, .seed = 0x3F, .version = 1 },   // CIC7102
-    { .crc32 = 0x90BB6CB5, .seed = 0x3F, .version = 0 },   // CICx102
-    { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // CICx103
-    { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // CICx105
-    { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // CICx106
+    { .crc32 = 0x587BD543, .seed = 0xAC, .version = 0 },   // 5101
+    { .crc32 = 0x6170A4A1, .seed = 0x3F, .version = 1 },   // 6101
+    { .crc32 = 0x009E9EA3, .seed = 0x3F, .version = 1 },   // 7102
+    { .crc32 = 0x90BB6CB5, .seed = 0x3F, .version = 0 },   // x102
+    { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // x103
+    { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // x105
+    { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // x106
     { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // NDXJ0
     { .crc32 = 0xBC605D0A, .seed = 0xDD, .version = 0 },   // NDDJ0
     { .crc32 = 0x502C4466, .seed = 0xDD, .version = 0 },   // NDDJ1
@@ -43,26 +43,13 @@ bool boot_get_tv_type (boot_info_t *info) {
     char region = ((pi_io_read(&base[15]) >> 8) & 0xFF);
 
     switch (region) {
-        case 'D':
-        case 'F':
-        case 'H':
-        case 'I':
         case 'P':
-        case 'S':
-        case 'W':
-        case 'X':
-        case 'Y':
+        case 'U':
             info->tv_type = BOOT_TV_TYPE_PAL;
             break;
 
-        case '7':
-        case 'A':
-        case 'C':
         case 'E':
         case 'J':
-        case 'K':
-        case 'N':
-        case 'U':
             info->tv_type = BOOT_TV_TYPE_NTSC;
             break;
 
