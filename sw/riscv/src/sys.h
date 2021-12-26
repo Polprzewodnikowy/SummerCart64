@@ -8,10 +8,13 @@
 #include <stdbool.h>
 
 
-#define swap32(x)                   ((((x) & 0xFF000000UL) >> 24) | \
+#define SWAP32(x)                   ((((x) & 0xFF000000UL) >> 24) | \
                                     (((x) & 0x00FF0000UL) >> 8) | \
                                     (((x) & 0x0000FF00UL) << 8) | \
                                     (((x) & 0x000000FFUL) << 24))
+
+#define	ALIGN(value, align)         (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
+
 
 typedef volatile uint8_t            io8_t;
 typedef volatile uint16_t           io16_t;

@@ -67,6 +67,10 @@ typedef enum {
     CFG_ID_FLASH_READ,
     CFG_ID_FLASH_PROGRAM,
     CFG_ID_RECONFIGURE,
+    CFG_ID_DD_DRIVE_ID,
+    CFG_ID_DD_DISK_STATE,
+    CFG_ID_DD_THB_TABLE_OFFSET,
+    CFG_ID_IS_VIEWER_ENABLE,
 } cfg_id_t;
 
 typedef enum {
@@ -95,6 +99,7 @@ typedef enum {
 
 typedef struct {
     bool dd_enabled;
+    bool is_viewer_enabled; // investigate why it breaks when put before bootloader_version
     save_type_t save_type;
     uint16_t cic_seed;
     tv_type_t tv_type;
@@ -120,6 +125,7 @@ void sc64_usb_tx_data (io32_t *address, uint32_t length);
 void sc64_debug_write (uint8_t type, const void *data, uint32_t len);
 void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count);
 void sc64_debug_fsd_write (const void *data, uint32_t sector, uint32_t count);
+void sc64_init_is_viewer (void);
 void sc64_init (void);
 
 

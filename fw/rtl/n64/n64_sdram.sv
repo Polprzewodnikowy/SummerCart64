@@ -41,15 +41,17 @@ module n64_sdram (
         end else begin
             case (state)
                 S_IDLE: begin
-                    if (bus.request || sdram.request || dma.request) begin
+                    if (bus.request) begin
                         state <= S_WAIT;
                         mem_request <= 1'b1;
-                        if (bus.request) begin
-                            mem_write <= bus.write;
-                            mem_address <= bus.address;
-                            mem_wdata <= bus.wdata;
-                            source_request <= T_BUS;
-                        end else if (sdram.request) begin
+                        mem_write <= bus.write;
+                        mem_address <= bus.address;
+                        mem_wdata <= bus.wdata;
+                        source_request <= T_BUS;
+                    end else if ((!bus.n64_active) && (sdram.request || dma.request)) begin
+                        state <= S_WAIT;
+                        mem_request <= 1'b1;
+                        if (sdram.request) begin
                             mem_write <= sdram.write;
                             mem_address <= sdram.address;
                             mem_wdata <= sdram.wdata;

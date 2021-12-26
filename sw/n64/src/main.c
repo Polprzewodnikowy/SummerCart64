@@ -65,6 +65,11 @@ void main (void) {
         }
     }
 
+    if (sc64_info.is_viewer_enabled) {
+        LOG_I("Initializing IS-Viewer 64\r\n");
+        sc64_init_is_viewer();
+    }
+
     LOG_I("Booting IPL3\033[0m\r\n\r\n");
 
     boot(&boot_info);

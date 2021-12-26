@@ -69,6 +69,7 @@ void sc64_get_info (sc64_info_t *info) {
     }
 
     info->dd_enabled = (bool) sc64_get_config(CFG_ID_DD_ENABLE);
+    info->is_viewer_enabled = (bool) sc64_get_config(CFG_ID_IS_VIEWER_ENABLE);
     info->save_type = (save_type_t) sc64_get_config(CFG_ID_SAVE_TYPE);
     info->cic_seed = (uint16_t) sc64_get_config(CFG_ID_CIC_SEED);
     info->tv_type = (tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
@@ -194,6 +195,11 @@ void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count) {
 void sc64_debug_fsd_write (const void *data, uint32_t sector, uint32_t count) {
     sc64_debug_write(SC64_DEBUG_ID_FSD_SECTOR, &sector, 4);
     sc64_debug_write(SC64_DEBUG_ID_FSD_WRITE, data, count * 512);
+}
+
+void sc64_init_is_viewer (void) {
+    sc64_set_config(CFG_ID_SDRAM_WRITABLE, true);
+    pi_io_write(&ISV->ID, 0);
 }
 
 void sc64_init (void) {

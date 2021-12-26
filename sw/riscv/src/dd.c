@@ -8,7 +8,7 @@
 #define DD_BUFFERS_OFFSET           (SDRAM_BASE + 0x03BD0000UL)
 #define DD_THB_TABLE_OFFSET         (DD_BUFFERS_OFFSET + 0x0000)
 #define DD_USB_BUFFER_OFFSET        (DD_BUFFERS_OFFSET + 0x5000)
-#define DD_BLOCK_BUFFER_OFFSET      (DD_BUFFERS_OFFSET + 0x6000)
+#define DD_BLOCK_BUFFER_OFFSET      (DD_USB_BUFFER_OFFSET + 0x10)
 
 #define USB_DEBUG_ID_DD_BLOCK       (0xF5)
 
@@ -62,10 +62,8 @@ struct process {
     bool full_track_transfer;
     bool starting_block;
     uint8_t current_sector;
-    bool is_dev_disk;
     rtc_time_t time;
     io32_t *thb_table;
-    io32_t *usb_buffer;
     io32_t *block_buffer;
     bool block_ready;
 };
@@ -87,7 +85,7 @@ static bool dd_block_valid (void) {
 }
 
 static bool dd_block_request (void) {
-    if (!usb_debug_tx_ready()) {
+    if (!usb_internal_debug_tx_ready()) {
         return false;
     }
 
@@ -95,23 +93,22 @@ static bool dd_block_request (void) {
         return true;
     }
 
-    const char *dma = "DMA@";
-    const char *cmp = "CMPH";
-
     io32_t offset = p.thb_table[dd_track_head_block()];
     uint32_t length = ((DD->SECTOR_SIZE + 1) * DD_USER_SECTORS_PER_BLOCK);
+    size_t transfer_length = 16;
 
-    io32_t *dst = p.usb_buffer;
+    io32_t *dst = (io32_t *) (DD_USB_BUFFER_OFFSET);
 
-    *dst++ = *((uint32_t *) (dma));
-    *dst++ = swap32((USB_DEBUG_ID_DD_BLOCK << 24) | 16);
-    *dst++ = swap32(p.transfer_mode);
-    *dst++ = swap32((uint32_t) (p.block_buffer));
+    *dst++ = SWAP32(p.transfer_mode);
+    *dst++ = SWAP32((uint32_t) (p.block_buffer));
     *dst++ = offset;
-    *dst++ = swap32(length);
-    *dst++ = *((uint32_t *) (cmp));
+    *dst++ = SWAP32(length);
 
-    usb_debug_tx_data((uint32_t) (p.usb_buffer), 28);
+    if (!p.transfer_mode) {
+        transfer_length += length;
+    }
+
+    usb_internal_debug_tx_data(INT_DBG_ID_DD_BLOCK, DD_USB_BUFFER_OFFSET, transfer_length);
 
     p.block_ready = false;
 
@@ -119,7 +116,15 @@ static bool dd_block_request (void) {
 }
 
 static bool dd_block_ready (void) {
-    return p.block_ready || (!(DD->SCR & DD_SCR_DISK_INSERTED));
+    if (!(DD->SCR & DD_SCR_DISK_INSERTED)) {
+        return true;
+    }
+
+    if (p.transfer_mode) {
+        return p.block_ready;
+    } else {
+        return usb_internal_debug_tx_ready();
+    }
 }
 
 static void dd_sector_read (void) {
@@ -166,18 +171,32 @@ void dd_set_disk_state (disk_state_t disk_state) {
     DD->SCR = scr;
 }
 
-void dd_set_drive_type_development (bool value) {
-    if (value) {
-        DD->DRIVE_ID = DD_DRIVE_ID_DEVELOPMENT;
-        p.is_dev_disk = true;
+disk_state_t dd_get_disk_state (void) {
+    uint32_t scr = (DD->SCR & (DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED));
+
+    if (scr == (DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED)) {
+        return DD_DISK_CHANGED;
+    } else if (scr == DD_SCR_DISK_INSERTED) {
+        return DD_DISK_INSERTED;
     } else {
-        DD->DRIVE_ID = DD_DRIVE_ID_RETAIL;
-        p.is_dev_disk = false;
+        return DD_DISK_EJECTED;
     }
+}
+
+void dd_set_drive_id (uint16_t id) {
+    DD->DRIVE_ID = id;
+}
+
+uint16_t dd_get_drive_id (void) {
+    return DD->DRIVE_ID;
 }
 
 void dd_set_block_ready (bool value) {
     p.block_ready = value;
+}
+
+void dd_set_thb_table_offset (uint32_t offset) {
+    p.thb_table = (io32_t *) (SDRAM_BASE + offset);
 }
 
 uint32_t dd_get_thb_table_offset (void) {
@@ -194,9 +213,7 @@ void dd_init (void) {
     p.power_up_delay = true;
     p.deffered_cmd_ready = false;
     p.bm_running = false;
-    p.is_dev_disk = false;
     p.thb_table = (io32_t *) (DD_THB_TABLE_OFFSET);
-    p.usb_buffer = (io32_t *) (DD_USB_BUFFER_OFFSET);
     p.block_buffer = (io32_t *) (DD_BLOCK_BUFFER_OFFSET);
 }
 

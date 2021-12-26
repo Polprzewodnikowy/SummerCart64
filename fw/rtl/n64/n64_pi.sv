@@ -191,6 +191,7 @@ module n64_pi (
     end
 
     always_comb begin
+        bus.n64_active = !pi_reset && pi_mode != PI_MODE_IDLE;
         bus.read_op = read_op;
         bus.write_op = write_op;
     end
@@ -218,6 +219,7 @@ module n64_pi (
     always_ff @(posedge sys.clk) begin
         if (aleh_op) begin
             n64_pi_address_valid <= 1'b0;
+            next_id <= sc64::__ID_N64_END;
             next_offset <= 32'd0;
             sram_selected <= 1'b0;
             cfg_selected <= 1'b0;

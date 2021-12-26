@@ -8,6 +8,7 @@
 #include "flashram.h"
 #include "dd.h"
 #include "uart.h"
+#include "isv.h"
 
 
 static const void (*process_table[])(void) = {
@@ -18,6 +19,7 @@ static const void (*process_table[])(void) = {
     process_flashram,
     process_dd,
     process_uart,
+    process_isv,
     NULL,
 };
 
@@ -34,6 +36,7 @@ __attribute__((naked)) void process_loop (void) {
     flashram_init();
     dd_init();
     uart_init();
+    isv_init();
 
     while (1) {
         process_joybus();

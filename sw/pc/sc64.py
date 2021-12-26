@@ -31,8 +31,10 @@ class SC64:
     __CFG_ID_FLASH_READ = 11
     __CFG_ID_FLASH_PROGRAM = 12
     __CFG_ID_RECONFIGURE = 13
-    __CFG_ID_DD_SETTING = 14
-    __CFG_ID_DD_THB_TABLE_OFFSET = 15
+    __CFG_ID_DD_DRIVE_ID = 14
+    __CFG_ID_DD_DISK_STATE = 15
+    __CFG_ID_DD_THB_TABLE_OFFSET = 16
+    __CFG_ID_IS_VIEWER_ENABLE = 17
 
     __SC64_VERSION_V2 = 0x53437632
 
@@ -47,14 +49,16 @@ class SC64:
     __DEBUG_ID_FSD_READ = 0xF1
     __DEBUG_ID_FSD_WRITE = 0xF2
     __DEBUG_ID_FSD_SECTOR = 0xF3
-    __DEBUG_ID_DD_BLOCK = 0xF5
+    __DEBUG_ID_INTERNAL = 0xFE
+    __INTERNAL_ID_IS_VIEWER = 0
+    __INTERNAL_ID_DD_BLOCK = 1
 
-    __DD_SETTING_DISK_EJECTED = 0
-    __DD_SETTING_DISK_INSERTED = 1
-    __DD_SETTING_DISK_CHANGED = 2
-    __DD_SETTING_DRIVE_RETAIL = 3
-    __DD_SETTING_DRIVE_DEVELOPMENT = 4
-    __DD_SETTING_SET_BLOCK_READY = 5
+    __DD_DRIVE_ID_RETAIL = 3
+    __DD_DRIVE_ID_DEVELOPMENT = 4
+    __DD_DISK_STATE_EJECTED = 0
+    __DD_DISK_STATE_INSERTED = 1
+    __DD_DISK_STATE_CHANGED = 2
+
 
     def __init__(self) -> None:
         self.__serial = None
@@ -64,6 +68,7 @@ class SC64:
         self.__fsd_file = None
         self.__disk_file = None
         self.__disk_lba_table = []
+        self.__isv_line_buffer = bytearray()
         self.__find_sc64()
 
 
@@ -370,13 +375,14 @@ class SC64:
         self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
 
 
-    def set_dd_disk_state(self, state: int) -> None:
-        if (state == "ejected"):
-            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_EJECTED)
-        elif (state == "inserted"):
-            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_INSERTED)
-        elif (state == "changed"):
-            self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DISK_CHANGED)
+    def set_dd_disk_state(self, state: str) -> None:
+        state_mapping = {
+            "ejected": self.__DD_DISK_STATE_EJECTED,
+            "inserted": self.__DD_DISK_STATE_INSERTED,
+            "changed": self.__DD_DISK_STATE_CHANGED,
+        }
+        if (state in state_mapping):
+            self.__change_config(self.__CFG_ID_DD_DISK_STATE, state_mapping[state])
         else:
             raise SC64Exception("DD disk state outside of supported values")
 
@@ -530,10 +536,14 @@ class SC64:
                 self.__write_cmd("W", thb_table_offset, len(data))
                 self.__write(data)
                 self.__read_cmd_status("W")
-                if (disk_drive_type == "retail"):
-                    self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_RETAIL)
-                elif (disk_drive_type == "development"):
-                    self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_DRIVE_DEVELOPMENT)
+                id_mapping = {
+                    "retail": self.__DD_DRIVE_ID_RETAIL,
+                    "development": self.__DD_DRIVE_ID_DEVELOPMENT,
+                }
+                if (disk_drive_type in id_mapping):
+                    self.__change_config(self.__CFG_ID_DD_DRIVE_ID, id_mapping[disk_drive_type])
+                else:
+                    raise SC64Exception("DD drive type outside of supported values")
         else:
             raise SC64Exception("No DD disk file provided for disk info creation")
 
@@ -557,6 +567,18 @@ class SC64:
             self.__fsd_file.write(data)
 
 
+    def __debug_process_is_viewer(self, data: bytes) -> None:
+        self.__isv_line_buffer.extend(data)
+        try:
+            while (len(self.__isv_line_buffer) > 0):
+                line_end = self.__isv_line_buffer.index(b'\n')
+                line = self.__isv_line_buffer[:line_end]
+                self.__isv_line_buffer = self.__isv_line_buffer[line_end + 1:]
+                print(line.decode("EUC-JP", errors="backslashreplace"))
+        except ValueError:
+            pass
+
+
     def __debug_process_dd_block(self, data: bytes) -> None:
         transfer_mode = int.from_bytes(data[0:4], byteorder='big')
         sdram_offset = int.from_bytes(data[4:8], byteorder='big')
@@ -568,25 +590,38 @@ class SC64:
         if (self.__disk_file):
             self.__disk_file.seek(disk_file_offset)
             if (transfer_mode):
-                self.__write_cmd("W", sdram_offset, block_length)
+                time.sleep(0.01)    # Fixes weird bug in Mario Artist Paint Studio minigame
+                self.__write_cmd("S", sdram_offset, block_length)
                 self.__write(self.__disk_file.read(block_length))
-                self.__read_cmd_status("W")
             else:
-                self.__write_cmd("R", sdram_offset, block_length)
-                self.__disk_file.write(self.__read_long(block_length))
-                self.__read_cmd_status("R")
-
-        self.__change_config(self.__CFG_ID_DD_SETTING, self.__DD_SETTING_SET_BLOCK_READY)
+                write_data = data[16:]
+                self.__disk_file.write(write_data)
 
 
-    def debug_loop(self, fsd_file: str = None, disk_file: str = None) -> None:
-        print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
+    def __debug_process_internal(self, internal_data: bytes) -> None:
+        id = internal_data[0]
+        start_alignmnet = internal_data[1]
+        length = int.from_bytes(internal_data[2:4], byteorder="big")
+        data = internal_data[(4 + start_alignmnet):][:length]
 
+        if (id == self.__INTERNAL_ID_IS_VIEWER):
+            self.__debug_process_is_viewer(data)
+        elif (id == self.__INTERNAL_ID_DD_BLOCK):
+            self.__debug_process_dd_block(data)
+
+
+    def debug_init(self, fsd_file: str = None, disk_file: str = None, is_viewer_enabled: bool = False) -> None:
         if (fsd_file):
             self.__fsd_file = open(fsd_file, "rb+")
 
         if (disk_file):
             self.__disk_file = open(disk_file, "rb+")
+
+        self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
+
+
+    def debug_loop(self) -> None:
+        print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
         start_indicator = bytearray()
         dropped_bytes = 0
@@ -621,8 +656,8 @@ class SC64:
                     self.__debug_process_fsd_write(data)
                 elif (id == self.__DEBUG_ID_FSD_SECTOR):
                     self.__debug_process_fsd_set_sector(data)
-                elif (id == self.__DEBUG_ID_DD_BLOCK):
-                    self.__debug_process_dd_block(data)
+                elif (id == self.__DEBUG_ID_INTERNAL):
+                    self.__debug_process_internal(data)
                 else:
                     print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
@@ -698,6 +733,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", metavar="save_path", default=None, required=False, help="path to save file")
     parser.add_argument("-i", metavar="ddipl_path", default=None, required=False, help="path to DDIPL file")
     parser.add_argument("-q", default=None, action="store_true", required=False, help="start debug server")
+    parser.add_argument("-v", default=False, action="store_true", required=False, help="enable IS-Viewer64 support")
     parser.add_argument("-f", metavar="sd_path", default=None, required=False, help="path to disk or file for fake SD card emulation")
     parser.add_argument("-k", metavar="disk_path", default=None, required=False, help="path to 64DD disk file")
     parser.add_argument("rom", metavar="rom_path", default=None, help="path to ROM file", nargs="?")
@@ -723,6 +759,7 @@ if __name__ == "__main__":
         dd_ipl_file = args.i
         rom_file = args.rom
         debug_server = args.q
+        is_viewer_enabled = args.v
         sd_file = args.f
         disk_file = args.k
 
@@ -789,10 +826,12 @@ if __name__ == "__main__":
                 if (disk_file):
                     print(f"Using 64DD disk image file [{disk_file}]")
                     sc64.set_dd_configuration_for_disk(disk_file)
-                if (disk_file):
                     print(f"Setting 64DD disk state to [Changed]")
                 sc64.set_dd_disk_state("changed" if disk_file else "ejected")
-                sc64.debug_loop(sd_file, disk_file)
+                if (is_viewer_enabled):
+                    print(f"Setting IS-Viewer64 emulation to [Enabled]")
+                sc64.debug_init(sd_file, disk_file, is_viewer_enabled)
+                sc64.debug_loop(is_viewer_enabled)
 
     except SC64Exception as e:
         print(f"Error: {e}")

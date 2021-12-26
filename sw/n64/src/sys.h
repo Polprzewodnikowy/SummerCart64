@@ -249,6 +249,18 @@ typedef struct {
 #define ROM_CART                    ((io32_t *) ROM_CART_BASE)
 
 
+typedef struct {
+    io32_t ID;
+    io32_t __padding_1[4];
+    io32_t RD_PTR;
+    io32_t __padding_2[2];
+    io8_t BUFFER[(64 * 1024) - 0x20];
+} is_viewer_t;
+
+#define ISV_BASE                    (0x13FF0000UL)
+#define ISV                         ((is_viewer_t *) ISV_BASE)
+
+
 #define PIFRAM_BASE                 (0x1FC007C0UL)
 #define PIFRAM                      ((io8_t *) PIFRAM_BASE)
 

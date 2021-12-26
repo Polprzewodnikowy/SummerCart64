@@ -1,6 +1,7 @@
 #include "usb.h"
 #include "dma.h"
 #include "cfg.h"
+#include "dd.h"
 
 
 static bool rx_byte (uint8_t *data) {
@@ -60,9 +61,12 @@ static bool tx_word (uint32_t data) {
 }
 
 
-#define USB_CMD_TOKEN   (0x434D4400)
-#define USB_CMP_TOKEN   (0x434D5000)
-#define USB_ERR_TOKEN   (0x45525200)
+#define USB_CMD_TOKEN       (0x434D4400)
+#define USB_CMP_TOKEN       (0x434D5000)
+#define USB_DMA_TOKEN       (0x444D4100)
+#define USB_ERR_TOKEN       (0x45525200)
+
+#define DEBUG_ID_INTERNAL   (0xFE)
 
 enum state {
     STATE_IDLE,
@@ -70,6 +74,9 @@ enum state {
     STATE_DATA,
     STATE_RESPONSE,
     STATE_DEBUG_TX,
+    STATE_INTERNAL_DEBUG_TX_START,
+    STATE_INTERNAL_DEBUG_TX_DATA,
+    STATE_INTERNAL_DEBUG_TX_END,
 };
 
 struct process {
@@ -88,6 +95,13 @@ struct process {
     bool debug_tx_busy;
     uint32_t debug_tx_address;
     size_t debug_tx_length;
+
+    bool internal_debug_tx_busy;
+    uint8_t internal_debug_tx_step;
+    uint32_t internal_debug_tx_address;
+    size_t internal_debug_tx_length;
+    uint32_t internal_debug_tx_id_length;
+    uint32_t internal_debug_tx_info;
 };
 
 static struct process p;
@@ -154,6 +168,30 @@ void usb_debug_reset (void) {
     USB->SCR = USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
 }
 
+bool usb_internal_debug_tx_ready (void) {
+    return !p.internal_debug_tx_busy;
+}
+
+bool usb_internal_debug_tx_data (internal_debug_id_t id, uint32_t address, size_t length) {
+    if (p.internal_debug_tx_busy) {
+        return false;
+    }
+
+    uint32_t start_address = address & 0xFFFFFFFC;
+    uint32_t end_address = ALIGN((address + length), 4);
+    size_t dma_length = end_address - start_address;
+    uint8_t start_alignment = address & 0x03;
+
+    p.internal_debug_tx_busy = true;
+    p.internal_debug_tx_address = start_address;
+    p.internal_debug_tx_length = dma_length;
+    p.internal_debug_tx_id_length = ((DEBUG_ID_INTERNAL << 24) | (dma_length + 4));
+    p.internal_debug_tx_info = ((id << 24) | (start_alignment << 16) | (length & 0xFFFF));
+
+    return true;
+}
+
+
 static uint8_t rx_cmd_current_byte = 0;
 static uint32_t rx_cmd_buffer = 0;
 
@@ -201,6 +239,7 @@ void usb_init (void) {
     p.state = STATE_IDLE;
     p.debug_rx_busy = false;
     p.debug_tx_busy = false;
+    p.internal_debug_tx_busy = false;
 
     rx_word_current_byte = 0;
     rx_word_buffer = 0;
@@ -215,10 +254,7 @@ void process_usb (void) {
 
     switch (p.state) {
         case STATE_IDLE:
-            if (p.debug_tx_busy) {
-                p.state = STATE_DEBUG_TX;
-                p.dma_in_progress = false;
-            } else if (rx_cmd(&p.args[0])) {
+            if (rx_cmd(&p.args[0])) {
                 if ((p.args[0] & 0xFFFFFF00) == USB_CMD_TOKEN) {
                     p.cmd = p.args[0] & 0xFF;
                     p.counter = 0;
@@ -231,6 +267,13 @@ void process_usb (void) {
                     p.error = true;
                     p.state = STATE_RESPONSE;
                 }
+            } else if (p.debug_tx_busy) {
+                p.state = STATE_DEBUG_TX;
+                p.dma_in_progress = false;
+            } else if (p.internal_debug_tx_busy) {
+                p.state = STATE_INTERNAL_DEBUG_TX_START;
+                p.dma_in_progress = false;
+                p.internal_debug_tx_step = 0;
             }
             break;
 
@@ -268,13 +311,20 @@ void process_usb (void) {
 
                 case 'R':
                 case 'W':
+                case 'S':
                     if (!dma_busy()) {
                         if (!p.dma_in_progress) {
-                            enum dma_dir dir = p.cmd == 'W' ? DMA_DIR_TO_SDRAM : DMA_DIR_FROM_SDRAM;
+                            bool is_write = (p.cmd == 'W') || (p.cmd == 'S');
+                            enum dma_dir dir = is_write ? DMA_DIR_TO_SDRAM : DMA_DIR_FROM_SDRAM;
                             dma_start(p.args[0], p.args[1], DMA_ID_USB, dir);
                             p.dma_in_progress = true;
                         } else {
-                            p.state = STATE_RESPONSE;
+                            if (p.cmd == 'S') {
+                                dd_set_block_ready(true);
+                                p.state = STATE_IDLE;
+                            } else {
+                                p.state = STATE_RESPONSE;
+                            }
                         }
                     }
                     break;
@@ -318,6 +368,40 @@ void process_usb (void) {
                     p.state = STATE_IDLE;
                 }
             }
+            break;
+
+        case STATE_INTERNAL_DEBUG_TX_START:
+            uint32_t header_data[] = {
+                (USB_DMA_TOKEN | '@'),
+                p.internal_debug_tx_id_length,
+                p.internal_debug_tx_info,
+            };
+
+            if (tx_word(header_data[p.internal_debug_tx_step])) {
+                p.internal_debug_tx_step += 1;
+                if (p.internal_debug_tx_step >= 3) {
+                    p.state = STATE_INTERNAL_DEBUG_TX_DATA;
+                }
+            }
+            break;
+
+        case STATE_INTERNAL_DEBUG_TX_DATA:
+            if (!dma_busy()) {
+                if (!p.dma_in_progress) {
+                    dma_start(p.internal_debug_tx_address, p.internal_debug_tx_length, DMA_ID_USB, DMA_DIR_FROM_SDRAM);
+                    p.dma_in_progress = true;
+                } else {
+                    p.internal_debug_tx_busy = false;
+                    p.state = STATE_INTERNAL_DEBUG_TX_END;
+                }
+            }
+            break;
+
+        case STATE_INTERNAL_DEBUG_TX_END:
+            if (tx_word(USB_CMP_TOKEN | 'H')) {
+                p.state = STATE_IDLE;
+            }
+            p.state = STATE_IDLE;
             break;
     }
 }
