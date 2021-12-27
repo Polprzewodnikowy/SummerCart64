@@ -42,8 +42,8 @@ typedef struct {
 
 #define SC64_VERSION_2              (0x53437632)
 
-#define SC64_DEBUG_WRITE_ADDRESS    (0x13BD8000UL)
-#define SC64_DEBUG_READ_ADDRESS     (0x13BD0000UL)
+#define SC64_DEBUG_WRITE_ADDRESS    (0x13FF8000UL)
+#define SC64_DEBUG_READ_ADDRESS     (0x13FF0000UL)
 #define SC64_DEBUG_MAX_SIZE         (32 * 1024)
 
 #define SC64_DEBUG_ID_TEXT          (0x01)
