@@ -12,10 +12,12 @@
 #define SAVE_SIZE_FLASHRAM      (128 * 1024)
 #define SAVE_SIZE_SRAM_BANKED   (3 * 32 * 1024)
 
+#define ISV_SIZE                (64 * 1024)
+
 #define SAVE_OFFSET_PKST2       (0x01608000UL)
 
-#define DEFAULT_SAVE_OFFSET     (0x03FE0000UL)
-#define DEFAULT_DDIPL_OFFSET    (0x03BE0000UL)
+#define DEFAULT_SAVE_OFFSET     (0x03FD0000UL)
+#define DEFAULT_DDIPL_OFFSET    (0x03BD0000UL)
 
 
 enum cfg_id {
@@ -85,23 +87,23 @@ static void set_save_type (enum save_type save_type) {
         case SAVE_TYPE_NONE:
             break;
         case SAVE_TYPE_EEPROM_4K:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_4K;
+            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_4K - ISV_SIZE;
             joybus_set_eeprom(EEPROM_4K);
             break;
         case SAVE_TYPE_EEPROM_16K:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_16K;
+            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_16K - ISV_SIZE;
             joybus_set_eeprom(EEPROM_16K);
             break;
         case SAVE_TYPE_SRAM:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM;
+            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM - ISV_SIZE;
             change_scr_bits(CFG_SCR_SRAM_EN, true);
             break;
         case SAVE_TYPE_FLASHRAM:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_FLASHRAM;
+            save_offset = SDRAM_SIZE - SAVE_SIZE_FLASHRAM - ISV_SIZE;
             change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         case SAVE_TYPE_SRAM_BANKED:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM_BANKED;
+            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM_BANKED - ISV_SIZE;
             change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN, true);
             break;
         case SAVE_TYPE_FLASHRAM_PKST2:

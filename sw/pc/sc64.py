@@ -829,9 +829,9 @@ if __name__ == "__main__":
                     print(f"Setting 64DD disk state to [Changed]")
                 sc64.set_dd_disk_state("changed" if disk_file else "ejected")
                 if (is_viewer_enabled):
-                    print(f"Setting IS-Viewer64 emulation to [Enabled]")
+                    print(f"Setting IS-Viewer 64 emulation to [Enabled]")
                 sc64.debug_init(sd_file, disk_file, is_viewer_enabled)
-                sc64.debug_loop(is_viewer_enabled)
+                sc64.debug_loop()
 
     except SC64Exception as e:
         print(f"Error: {e}")
