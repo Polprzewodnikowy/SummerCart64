@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "./docker_build.sh update -s -c -d",
+            "windows":{
+                "command": "wsl -- ./docker_build.sh update -s -c -d"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "build_full",
+            "type": "shell",
+            "command": "./docker_build.sh release -c -d",
+            "windows": {
+                "command": "wsl -- ./docker_build.sh update -c -d"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_n64_bootloader",
+            "type": "shell",
+            "command": "./docker_build.sh n64 -d",
+            "windows": {
+                "command": "wsl -- ./docker_build.sh n64 -d"
+            },
+            "group": "build"
+        }
+    ]
+}

@@ -1,0 +1,58 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Build SW and Update",
+            "type": "python",
+            "request": "launch",
+            "program": "sw/pc/sc64.py",
+            "preLaunchTask": "build",
+            "args": [
+                "-u", "fw/output_files/SC64_update.bin",
+            ]
+        },
+        {
+            "name": "Build FW & SW and Update",
+            "type": "python",
+            "request": "launch",
+            "program": "sw/pc/sc64.py",
+            "preLaunchTask": "build_full",
+            "args": [
+                "-u", "fw/output_files/SC64_update.bin",
+            ]
+        },
+        {
+            "name": "Run menu from SD with debug output",
+            "type": "python",
+            "request": "launch",
+            "program": "sw/pc/sc64.py",
+            "args": [
+                "-b", "0",
+                "-q",
+            ]
+        },
+        {
+            "name": "Run menu from USB with debug output",
+            "type": "python",
+            "request": "launch",
+            "program": "sw/pc/sc64.py",
+            "console": "integratedTerminal",
+            "linux": {
+                "args": [
+                    "-f", "/dev/ttyUSB0",
+                    "-b", "3",
+                    "-q",
+                    "sw/n64/build/n64boot.bin",
+                ]
+            },
+            "windows": {
+                "args": [
+                    "-f", "\\\\.\\D:",
+                    "-b", "3",
+                    "-q",
+                    "sw/n64/build/n64boot.bin",
+                ]
+            }
+        },
+    ]
+}

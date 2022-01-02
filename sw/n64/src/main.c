@@ -30,7 +30,7 @@ void main (void) {
             break;
 
         case BOOT_MODE_DIRECT:
-            LOG_I("Running bootloader from SDRAM - running menu from FSD\r\n");
+            LOG_I("Running menu from USB\r\n");
             storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
             break;
 

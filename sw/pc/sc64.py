@@ -590,7 +590,7 @@ class SC64:
         if (self.__disk_file):
             self.__disk_file.seek(disk_file_offset)
             if (transfer_mode):
-                time.sleep(0.01)    # Fixes weird bug in Mario Artist Paint Studio minigame
+                time.sleep(0.016)    # Fixes weird bug in Mario Artist Paint Studio minigame
                 self.__write_cmd("S", sdram_offset, block_length)
                 self.__write(self.__disk_file.read(block_length))
             else:
@@ -821,6 +821,9 @@ if __name__ == "__main__":
                     sc64.upload_save(save_file)
 
             if (debug_server):
+                sc64.debug_init(sd_file, disk_file, is_viewer_enabled)
+                if (is_viewer_enabled):
+                    print(f"Setting IS-Viewer 64 emulation to [Enabled]")
                 if (sd_file):
                     print(f"Using fake SD emulation file [{sd_file}]")
                 if (disk_file):
@@ -828,9 +831,6 @@ if __name__ == "__main__":
                     sc64.set_dd_configuration_for_disk(disk_file)
                     print(f"Setting 64DD disk state to [Changed]")
                 sc64.set_dd_disk_state("changed" if disk_file else "ejected")
-                if (is_viewer_enabled):
-                    print(f"Setting IS-Viewer 64 emulation to [Enabled]")
-                sc64.debug_init(sd_file, disk_file, is_viewer_enabled)
                 sc64.debug_loop()
 
     except SC64Exception as e:
