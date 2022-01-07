@@ -6,7 +6,7 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
 FLAGS = -march=vr4300 -mtune=vr4300 -falign-functions=32 $(USER_FLAGS)
-CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
+CFLAGS = -O2 -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 ASFLAGS = -Wa,-I$(N64_INST)/mips64-elf/lib
 LDFLAGS = -lc -nostartfiles -Wl,--gc-sections
 
@@ -15,8 +15,10 @@ BUILD_DIR = build
 
 SRC_FILES = \
 	startup.S \
+	exception.S \
 	boot.c \
 	crc32.c \
+	exception.c \
 	init.c \
 	main.c \
 	sc64.c \

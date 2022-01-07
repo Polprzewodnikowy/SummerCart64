@@ -10,11 +10,13 @@
 
 #ifdef DEBUG
 #include <assert.h>
-#define LOG_I(args...)              {iprintf("\033[32m" args);}
-#define LOG_E(args...)              {iprintf("\033[31m" args);}
+#define LOG_I(args...)              {iprintf("\033[32m"); iprintf(args); iprintf("\033[0m");}
+#define LOG_E(args...)              {iprintf("\033[31m"); iprintf(args); iprintf("\033[0m");}
+#define LOG_FLUSH()                 {fflush(stdout);}
 #else
 #define LOG_I(args...)
 #define LOG_E(args...)
+#define LOG_FLUSH()
 #define assert(expr)
 #endif
 
@@ -99,13 +101,13 @@ typedef enum {
 
 typedef struct {
     bool dd_enabled;
-    bool is_viewer_enabled; // investigate why it breaks when put before bootloader_version
     save_type_t save_type;
     uint16_t cic_seed;
     tv_type_t tv_type;
     io32_t *save_location;
     io32_t *ddipl_location;
     boot_mode_t boot_mode;
+    bool is_viewer_enabled;
     char bootloader_version[32];
 } sc64_info_t;
 
@@ -117,9 +119,9 @@ bool sc64_perform_cmd (uint8_t cmd, uint32_t *args, uint32_t *result);
 uint32_t sc64_get_config (cfg_id_t id);
 void sc64_set_config (cfg_id_t id, uint32_t value);
 void sc64_get_info (sc64_info_t *info);
-void sc64_wait_usb_rx_ready  (uint32_t *type, uint32_t *length);
-void sc64_wait_usb_rx_busy  (void);
-void sc64_usb_rx_data  (io32_t *address, uint32_t length);
+void sc64_wait_usb_rx_ready (uint32_t *type, uint32_t *length);
+void sc64_wait_usb_rx_busy (void);
+void sc64_usb_rx_data (io32_t *address, uint32_t length);
 void sc64_wait_usb_tx_ready (void);
 void sc64_usb_tx_data (io32_t *address, uint32_t length);
 void sc64_debug_write (uint8_t type, const void *data, uint32_t len);

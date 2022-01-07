@@ -51,9 +51,10 @@ void sc64_set_config (cfg_id_t id, uint32_t value) {
 }
 
 void sc64_get_info (sc64_info_t *info) {
+    uint32_t tmp;
     io32_t *src = (io32_t *) UNCACHED(&header_text_info);
-    uint32_t *dst = (uint32_t *) info->bootloader_version;
-    
+    char *dst = info->bootloader_version;
+
     bool sdram_switched = sc64_get_config(CFG_ID_SDRAM_SWITCH);
 
     if (sdram_switched) {
@@ -61,7 +62,11 @@ void sc64_get_info (sc64_info_t *info) {
     }
 
     for (int i = 0; i < sizeof(info->bootloader_version); i += sizeof(uint32_t)) {
-        *dst++ = pi_io_read(src++);
+        tmp = pi_io_read(src++);
+        *dst++ = (tmp >> 24);
+        *dst++ = (tmp >> 16);
+        *dst++ = (tmp >> 8);
+        *dst++ = (tmp & 0xFF);
     }
 
     if (sdram_switched) {
@@ -117,7 +122,8 @@ void sc64_debug_write (uint8_t type, const void *data, uint32_t len) {
 
     io32_t *sdram = (io32_t *) (SC64_DEBUG_WRITE_ADDRESS);
 
-    uint32_t *src = (uint32_t *) (data);
+    uint8_t *src = (uint8_t *) (data);
+    uint32_t tmp;
     io32_t *dst = sdram;
 
     uint32_t copy_length = ALIGN(len, 4);
@@ -137,8 +143,12 @@ void sc64_debug_write (uint8_t type, const void *data, uint32_t len) {
     pi_io_write(dst++, *((uint32_t *) (dma)));
     pi_io_write(dst++, (type << 24) | len);
 
-    while (src < ((uint32_t *) (data + copy_length))) {
-        pi_io_write(dst++, *src++);
+    while (src < ((uint8_t *) (data + copy_length))) {
+        tmp = ((*src++) << 24);
+        tmp |= ((*src++) << 16);
+        tmp |= ((*src++) << 8);
+        tmp |= ((*src++) << 0);
+        pi_io_write(dst++, tmp);
         if (dst >= (io32_t *) ((void *) (sdram) + SC64_DEBUG_MAX_SIZE)) {
             sc64_usb_tx_data(sdram, (dst - sdram) * sizeof(uint32_t));
             sc64_wait_usb_tx_ready();
@@ -165,7 +175,8 @@ void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count) {
     io32_t *sdram = (io32_t *) (SC64_DEBUG_READ_ADDRESS);
 
     io32_t *src = sdram;
-    uint32_t *dst = (uint32_t *) (data);
+    uint32_t tmp;
+    uint8_t *dst = (uint8_t *) (data);
 
     uint32_t read_length = count * 512;
 
@@ -184,7 +195,11 @@ void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count) {
     }
 
     for (int i = 0; i < copy_length; i += 4) {
-        *dst++ = pi_io_read(src++);
+        tmp = pi_io_read(src++);
+        *dst++ = (tmp >> 24);
+        *dst++ = (tmp >> 16);
+        *dst++ = (tmp >> 8);
+        *dst++ = (tmp & 0xFF);
     }
 
     if (!sdram_switched) {

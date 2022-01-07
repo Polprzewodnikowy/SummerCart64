@@ -39,7 +39,9 @@ entry_handler:
     la $gp, _gp
     la $sp, _sp
 
-run:
+    la $t0, exception_install
+    jalr $t0
+
     la $t0, init
     jalr $t0
 

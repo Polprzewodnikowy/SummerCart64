@@ -1,10 +1,11 @@
 MEMORY {
-    rdram (rwx) : org = 0x80000400, len = 4M - 0x400
+    rdram (rwx) : org = 0x80300000, len = 1M
     flash (r)   : org = 0xB0000000, len = 90k
 }
 
 ENTRY(entry_handler)
 
+__exception_stack_size = 8k;
 __stack_size = 64k;
 
 SECTIONS {
@@ -22,7 +23,7 @@ SECTIONS {
         _gp = . + 0x8000;
         *(.sdata .sdata.* .gnu.linkonce.s.*)
         *(.lit8 .lit4)
-        . = ALIGN(4);
+        . = ALIGN(8);
     } > rdram AT > flash
 
     .bss : {
@@ -30,12 +31,15 @@ SECTIONS {
         *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
-        . = ALIGN(4);
+        . = ALIGN(8);
     } > rdram
 
     _sheap = .;
-    . = ORIGIN(rdram) + LENGTH(rdram) - __stack_size;
+    . = ORIGIN(rdram) + LENGTH(rdram) - __exception_stack_size - __stack_size;
     _eheap = .;
+
+    . += __exception_stack_size;
+    _esp = .;
 
     . += __stack_size;
     _sp = .;

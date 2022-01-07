@@ -5,6 +5,10 @@
             "label": "build",
             "type": "shell",
             "command": "./docker_build.sh update -s -c -d",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
             "windows":{
                 "command": "wsl -- ./docker_build.sh update -s -c -d"
             },
@@ -17,6 +21,10 @@
             "label": "build_full",
             "type": "shell",
             "command": "./docker_build.sh release -c -d",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
             "windows": {
                 "command": "wsl -- ./docker_build.sh update -c -d"
             },
@@ -26,6 +34,10 @@
             "label": "build_n64_bootloader",
             "type": "shell",
             "command": "./docker_build.sh n64 -d",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
             "windows": {
                 "command": "wsl -- ./docker_build.sh n64 -d"
             },

@@ -70,7 +70,8 @@ void main (void) {
         sc64_init_is_viewer();
     }
 
-    LOG_I("Booting IPL3\033[0m\r\n\r\n");
+    LOG_I("Booting IPL3\r\n\r\n");
+    LOG_FLUSH();
 
     boot(&boot_info);
 }

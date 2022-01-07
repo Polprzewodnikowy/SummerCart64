@@ -3,6 +3,7 @@
 #include "fatfs/ff.h"
 
 
+#ifdef DEBUG
 static const char *fatfs_error_codes[] = {
 	"(0) Succeeded",
 	"(1) A hard error occurred in the low level disk I/O layer",
@@ -25,6 +26,7 @@ static const char *fatfs_error_codes[] = {
 	"(18) Number of open files > FF_FS_LOCK",
 	"(19) Given parameter is invalid",
 };
+#endif
 
 
 #define FF_CHECK(x) { \
