@@ -93,8 +93,6 @@ bool boot_get_cic_seed_version (boot_info_t *info) {
 }
 
 void boot (boot_info_t *info) {
-    c0_set_status(C0_SR_CU1 | C0_SR_CU0 | C0_SR_FR);
-
     OS_INFO->mem_size_6105 = OS_INFO->mem_size;
 
     while (!(io_read(&SP->SR) & SP_SR_HALT));
@@ -154,8 +152,10 @@ void boot (boot_info_t *info) {
     stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
 
     asm volatile (
+        "mtc0 %[status], $12 \n"
         "move $sp, %[stack_pointer] \n"
         "jr %[entry_point] \n" ::
+        [status] "r" (C0_SR_CU1 | C0_SR_CU0 | C0_SR_FR),
         [entry_point] "r" (entry_point),
         [boot_device] "r" (boot_device),
         [tv_type] "r" (tv_type),

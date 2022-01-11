@@ -1,29 +1,15 @@
 #include "sys.h"
 
 
-void c0_set_status (uint32_t status) {
-    asm volatile (
-        ".set noat \n"
-        ".set noreorder \n"
-        "mtc0 %[status], $12 \n"
-        "nop \n" ::
-        [status] "r" (status)
-    );
-}
-
 uint32_t io_read (io32_t *address) {
     io32_t *uncached = UNCACHED(address);
-    asm volatile ("" ::: "memory");
     uint32_t value = *uncached;
-    asm volatile ("" ::: "memory");
     return value;
 }
 
 void io_write (io32_t *address, uint32_t value) {
     io32_t *uncached = UNCACHED(address);
-    asm volatile ("" ::: "memory");
     *uncached = value;
-    asm volatile ("" ::: "memory");
 }
 
 uint32_t pi_busy (void) {

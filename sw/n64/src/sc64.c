@@ -51,28 +51,6 @@ void sc64_set_config (cfg_id_t id, uint32_t value) {
 }
 
 void sc64_get_info (sc64_info_t *info) {
-    uint32_t tmp;
-    io32_t *src = (io32_t *) UNCACHED(&header_text_info);
-    char *dst = info->bootloader_version;
-
-    bool sdram_switched = sc64_get_config(CFG_ID_SDRAM_SWITCH);
-
-    if (sdram_switched) {
-        sc64_set_config(CFG_ID_SDRAM_SWITCH, false);
-    }
-
-    for (int i = 0; i < sizeof(info->bootloader_version); i += sizeof(uint32_t)) {
-        tmp = pi_io_read(src++);
-        *dst++ = (tmp >> 24);
-        *dst++ = (tmp >> 16);
-        *dst++ = (tmp >> 8);
-        *dst++ = (tmp & 0xFF);
-    }
-
-    if (sdram_switched) {
-        sc64_set_config(CFG_ID_SDRAM_SWITCH, true);
-    }
-
     info->dd_enabled = (bool) sc64_get_config(CFG_ID_DD_ENABLE);
     info->is_viewer_enabled = (bool) sc64_get_config(CFG_ID_IS_VIEWER_ENABLE);
     info->save_type = (save_type_t) sc64_get_config(CFG_ID_SAVE_TYPE);

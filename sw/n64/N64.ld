@@ -12,7 +12,6 @@ SECTIONS {
     .flash : {
         KEEP(*(.text.rom_header));
         KEEP(*(.text.ipl3));
-        __ipl3_font = LOADADDR(.flash) + 0xB70;
     } > flash
 
     .text : {

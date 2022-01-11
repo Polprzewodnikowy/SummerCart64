@@ -21,19 +21,6 @@
 #endif
 
 
-typedef struct {
-    io32_t SR_CMD;
-    io32_t DATA[2];
-    io32_t VERSION;
-} sc64_regs_t;
-
-#define SC64_BASE                   (0x1FFF0000)
-#define SC64                        ((sc64_regs_t *) SC64_BASE)
-
-#define SC64_SR_CMD_ERROR           (1 << 28)
-#define SC64_SR_CPU_BUSY            (1 << 30)
-#define SC64_SR_CPU_READY           (1 << 31)
-
 #define SC64_CMD_CONFIG             ('C')
 #define SC64_CMD_QUERY              ('Q')
 #define SC64_CMD_DEBUG_RX_DATA      ('E')
@@ -101,14 +88,13 @@ typedef enum {
 
 typedef struct {
     bool dd_enabled;
+    bool is_viewer_enabled;
     save_type_t save_type;
     uint16_t cic_seed;
     tv_type_t tv_type;
     io32_t *save_location;
     io32_t *ddipl_location;
     boot_mode_t boot_mode;
-    bool is_viewer_enabled;
-    char bootloader_version[32];
 } sc64_info_t;
 
 

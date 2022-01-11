@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "exception.h"
 #include "sc64.h"
 
 
@@ -21,7 +22,7 @@ int _fstat_r (struct _reent *prt, int fd, struct stat *pstat) {
 }
 
 int _isatty_r (struct _reent *prt, int fd) {
-    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO){
+    if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO) {
         return 1;
     }
     errno = EBADF;
@@ -66,6 +67,6 @@ ssize_t _write_r (struct _reent *prt, int fd, const void *buf, size_t cnt) {
 }
 
 void __assert_func (const char *file, int line, const char *func, const char *failedexpr) {
-    LOG_E("\r\nassertion \"%s\" failed: file \"%s\", line %d%s%s\r\n", failedexpr, file, line, func ? ", function: " : "", func ? func : "");
+    EXCEPTION_TRIGGER(TRIGGER_CODE_ASSERT);
     while (1);
 }

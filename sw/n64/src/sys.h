@@ -46,6 +46,15 @@ typedef volatile uint32_t io32_t;
 #define C0_SR_CU2                   (1 << 30)
 #define C0_SR_CU3                   (1 << 31)
 
+#define C0_CR_IP0                   (1 << 8)
+#define C0_CR_IP1                   (1 << 9)
+#define C0_CR_IP2                   (1 << 9)
+#define C0_CR_IP3                   (1 << 9)
+#define C0_CR_IP4                   (1 << 9)
+#define C0_CR_IP5                   (1 << 9)
+#define C0_CR_IP6                   (1 << 9)
+#define C0_CR_IP7                   (1 << 9)
+#define C0_CR_BD                    (1 << 31)
 
 typedef struct {
     io32_t DMEM[1024];
@@ -243,6 +252,8 @@ typedef struct {
 
 #define ROM_DDIPL_BASE              (0x06000000UL)
 #define ROM_DDIPL                   ((io32_t *) ROM_DDIPL_BASE)
+
+
 #define ROM_CART_BASE               (0x10000000UL)
 #define ROM_CART                    ((io32_t *) ROM_CART_BASE)
 
@@ -263,9 +274,37 @@ typedef struct {
 #define PIFRAM                      ((io8_t *) PIFRAM_BASE)
 
 
-void c0_set_status (uint32_t status);
-uint32_t c0_get_count (void);
-void wait_ms (uint32_t ms);
+typedef struct {
+    io32_t SR_CMD;
+    io32_t DATA[2];
+    io32_t VERSION;
+} sc64_regs_t;
+
+#define SC64_BASE                   (0x1FFF0000)
+#define SC64                        ((sc64_regs_t *) SC64_BASE)
+
+#define SC64_SR_CMD_ERROR           (1 << 28)
+#define SC64_SR_CPU_BUSY            (1 << 30)
+#define SC64_SR_CPU_READY           (1 << 31)
+
+
+typedef struct {
+    uint32_t tv_type;
+    uint32_t device_type;
+    uint32_t device_base;
+    uint32_t reset_type;
+    uint32_t cic_id;
+    uint32_t version;
+    uint32_t mem_size;
+    uint8_t app_nmi_buffer[64];
+    uint32_t __reserved_1[37];
+    uint32_t mem_size_6105;
+} os_info_t;
+
+#define OS_INFO_BASE                (0x80000300UL)
+#define OS_INFO                     ((os_info_t *) OS_INFO_BASE)
+
+
 uint32_t io_read (io32_t *address);
 void io_write (io32_t *address, uint32_t value);
 uint32_t pi_busy (void);

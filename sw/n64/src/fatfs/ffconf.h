@@ -15,7 +15,7 @@
 /  and optional writing functions as well. */
 
 
-#define FF_FS_MINIMIZE	1
+#define FF_FS_MINIMIZE	2
 /* This option defines minimization level to remove some basic API functions.
 /
 /   0: Basic functions are fully enabled.
@@ -34,7 +34,7 @@
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
-#define FF_USE_FASTSEEK	1
+#define FF_USE_FASTSEEK	0
 /* This option switches fast seek function. (0:Disable or 1:Enable) */
 
 
@@ -113,7 +113,7 @@
 */
 
 
-#define FF_USE_LFN		2
+#define FF_USE_LFN		1
 #define FF_MAX_LFN		255
 /* The FF_USE_LFN switches the support for LFN (long file name).
 /
@@ -153,7 +153,7 @@
 /  on character encoding. When LFN is not enabled, these options have no effect. */
 
 
-#define FF_FS_RPATH		2
+#define FF_FS_RPATH		1
 /* This option configures support for relative path.
 /
 /   0: Disable relative path and remove related functions.

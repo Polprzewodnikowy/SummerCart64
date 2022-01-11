@@ -7,6 +7,4 @@ void init (void) {
     si_io_write((io32_t *) (&PIFRAM[0x3C]), pifram | 0x08);
 
     sc64_init();
-
-    LOG_I("Initialized\r\n");
 }
