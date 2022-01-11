@@ -1,6 +1,5 @@
 #include "boot.h"
 #include "crc32.h"
-#include "sc64.h"
 #include "sys.h"
 
 
@@ -58,7 +57,6 @@ bool boot_get_tv_type (boot_info_t *info) {
             break;
 
         default:
-            LOG_E("Unknown region: [0x%02X]\r\n", region);
             return false;
     }
 
@@ -86,8 +84,6 @@ bool boot_get_cic_seed_version (boot_info_t *info) {
             return true;
         }
     }
-
-    LOG_E("Unknown IPL3 CRC32: [0x%08lX]\r\n", crc32);
 
     return false;
 }

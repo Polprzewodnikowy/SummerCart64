@@ -5,11 +5,50 @@
 #include "sys.h"
 
 
+typedef union {
+    uint64_t u64;
+    struct {
+        uint32_t u32_h;
+        uint32_t u32;
+    };
+} uint64_32_t;
+
 typedef struct {
-    uint64_t gpr[32];
+    uint64_32_t zr;
+    uint64_32_t at;
+    uint64_32_t v0;
+    uint64_32_t v1;
+    uint64_32_t a0;
+    uint64_32_t a1;
+    uint64_32_t a2;
+    uint64_32_t a3;
+    uint64_32_t t0;
+    uint64_32_t t1;
+    uint64_32_t t2;
+    uint64_32_t t3;
+    uint64_32_t t4;
+    uint64_32_t t5;
+    uint64_32_t t6;
+    uint64_32_t t7;
+    uint64_32_t s0;
+    uint64_32_t s1;
+    uint64_32_t s2;
+    uint64_32_t s3;
+    uint64_32_t s4;
+    uint64_32_t s5;
+    uint64_32_t s6;
+    uint64_32_t s7;
+    uint64_32_t t8;
+    uint64_32_t t9;
+    uint64_32_t k0;
+    uint64_32_t k1;
+    uint64_32_t gp;
+    uint64_32_t sp;
+    uint64_32_t fp;
+    uint64_32_t ra;
     uint32_t sr;
     uint32_t cr;
-    uint64_t epc;
+    uint64_32_t epc;
 } exception_t;
 
 
@@ -18,11 +57,13 @@ typedef struct {
 
 #define INTERRUPT_MASK_TIMER    (1 << 7)
 
-#define SYSCALL_CODE_MASK       (0x03FF0000UL)
-#define SYSCALL_CODE_BIT        (16)
+#define SYSCALL_CODE_MASK       (0x03FFFFC0UL)
+#define SYSCALL_CODE_BIT        (6)
 
 #define SCREEN_WIDTH            (640)
 #define SCREEN_HEIGHT           (240)
+#define BORDER_WIDTH            (32)
+#define BORDER_HEIGHT           (8)
 
 #define BACKGROUND_COLOR        (0x000000FFUL)
 #define FOREGROUND_COLOR        (0xFFFFFFFFUL)
@@ -95,7 +136,7 @@ static void exception_draw_character (int x, int y, char c) {
         int c_x = x + (i % FONT_WIDTH);
         int c_y = y + (i / FONT_WIDTH);
 
-        if ((c_x >= SCREEN_WIDTH) || (c_y >= SCREEN_HEIGHT)) {
+        if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (SCREEN_HEIGHT - BORDER_HEIGHT))) {
             break;
         }
 
@@ -114,7 +155,7 @@ static void exception_print_string (int x, int y, const char *s) {
 }
 
 static void exception_print (int *x, int *y, const char* fmt, ...) {
-    char line[128];
+    char line[80];
     va_list args;
 
     va_start(args, fmt);
@@ -152,32 +193,28 @@ static const char *exception_get_description (uint8_t exception_code) {
 
 void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, exception_t *e) {
     uint32_t sc64_version = pi_io_read(&SC64->VERSION);
-    uint32_t *instruction_address = (uint32_t *) ((uint32_t) (e->epc));
-    uint32_t gpr32[32];
-    int x = 12;
-    int y = 8;
-
-    if (e->cr & C0_CR_BD) {
-        instruction_address += 1;
-    }
-
-    for (int i = 0; i < 32; i++) {
-        gpr32[i] = (uint32_t) (e->gpr[i]);
-    }
+    uint32_t *instruction_address = (((uint32_t *) (e->epc.u32)) + ((e->cr & C0_CR_BD) ? 1 : 0));
+    int x = BORDER_WIDTH;
+    int y = BORDER_HEIGHT;
 
     exception_init_screen();
 
-    exception_print(&x, &y, "SC64 VERSION: 0x%08lX (%4s)", sc64_version, (char *) (&sc64_version));
-    exception_print(&x, &y, "%s at pc: 0x%08lX", exception_get_description(exception_code), (uint32_t) (e->epc));
+    exception_print(&x, &y, "%s at pc: 0x%08lX", exception_get_description(exception_code), e->epc.u32);
+    exception_print(&x, &y, "");
     exception_print(&x, &y, "sr: 0x%08lX, cr: 0x%08lX", e->sr, e->cr);
-    exception_print(&x, &y, "zr: 0x%08lX, at: 0x%08lX, v0: 0x%08lX, v1: 0x%08lX", gpr32[0], gpr32[1], gpr32[2], gpr32[3]);
-    exception_print(&x, &y, "a0: 0x%08lX, a1: 0x%08lX, a2: 0x%08lX, a3: 0x%08lX", gpr32[4], gpr32[5], gpr32[6], gpr32[7]);
-    exception_print(&x, &y, "t0: 0x%08lX, t1: 0x%08lX, t2: 0x%08lX, t3: 0x%08lX", gpr32[8], gpr32[9], gpr32[10], gpr32[11]);
-    exception_print(&x, &y, "t4: 0x%08lX, t5: 0x%08lX, t6: 0x%08lX, t7: 0x%08lX", gpr32[12], gpr32[13], gpr32[14], gpr32[15]);
-    exception_print(&x, &y, "s0: 0x%08lX, s1: 0x%08lX, s2: 0x%08lX, s3: 0x%08lX", gpr32[16], gpr32[17], gpr32[18], gpr32[19]);
-    exception_print(&x, &y, "s4: 0x%08lX, s5: 0x%08lX, s6: 0x%08lX, s7: 0x%08lX", gpr32[20], gpr32[21], gpr32[22], gpr32[23]);
-    exception_print(&x, &y, "t8: 0x%08lX, t9: 0x%08lX, k0: 0x%08lX, k1: 0x%08lX", gpr32[24], gpr32[25], gpr32[26], gpr32[27]);
-    exception_print(&x, &y, "gp: 0x%08lX, sp: 0x%08lX, fp: 0x%08lX, ra: 0x%08lX", gpr32[28], gpr32[29], gpr32[30], gpr32[31]);
+    exception_print(&x, &y, "zr: 0x%08lX, at: 0x%08lX, v0: 0x%08lX, v1: 0x%08lX", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
+    exception_print(&x, &y, "a0: 0x%08lX, a1: 0x%08lX, a2: 0x%08lX, a3: 0x%08lX", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
+    exception_print(&x, &y, "t0: 0x%08lX, t1: 0x%08lX, t2: 0x%08lX, t3: 0x%08lX", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
+    exception_print(&x, &y, "t4: 0x%08lX, t5: 0x%08lX, t6: 0x%08lX, t7: 0x%08lX", e->t4.u32, e->t5.u32, e->t6.u32, e->t7.u32);
+    exception_print(&x, &y, "s0: 0x%08lX, s1: 0x%08lX, s2: 0x%08lX, s3: 0x%08lX", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
+    exception_print(&x, &y, "s4: 0x%08lX, s5: 0x%08lX, s6: 0x%08lX, s7: 0x%08lX", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
+    exception_print(&x, &y, "t8: 0x%08lX, t9: 0x%08lX, k0: 0x%08lX, k1: 0x%08lX", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
+    exception_print(&x, &y, "gp: 0x%08lX, sp: 0x%08lX, fp: 0x%08lX, ra: 0x%08lX", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
+    exception_print(&x, &y, "");
+    exception_print(&x, &y, "0x%08lX: 0x%08lX = [%4s]", (uint32_t) (&SC64->VERSION), sc64_version, (char *) (&sc64_version));
+    exception_print(&x, &y, "");
+    exception_print(&x, &y, "------------------------------------------------------------------------");
+    exception_print(&x, &y, "");
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {
@@ -187,16 +224,16 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
         uint32_t code = (((*instruction_address) & SYSCALL_CODE_MASK) >> SYSCALL_CODE_BIT);
 
         if (code == TRIGGER_CODE_ERROR) {
-            const char *message = (const char *) (gpr32[4]);
+            const char *message = (const char *) (e->a0.u32);
             exception_print(&x, &y, "%s", message);
         } else if (code == TRIGGER_CODE_ASSERT) {
-            const char *file = (const char *) (gpr32[4]);
-            int line = (int) (gpr32[5]);
-            const char *func = (const char *) (gpr32[6]);
-            const char *failedexpr = (const char *) (gpr32[7]);
+            const char *file = (const char *) (e->a0.u32);
+            int line = (int) (e->a1.u32);
+            const char *func = (const char *) (e->a2.u32);
+            const char *failedexpr = (const char *) (e->a3.u32);
 
-            exception_print(&x, &y, "assertion \"%s\" failed:", failedexpr);
-            exception_print(&x, &y, "  file \"%s\", line %d, %s%s", file, line, func ? "function: " : "", func);
+            exception_print(&x, &y, "Assertion \"%s\" failed:", failedexpr);
+            exception_print(&x, &y, " file \"%s\", line %d, %s%s", file, line, func ? "function: " : "", func);
         }
     }
 

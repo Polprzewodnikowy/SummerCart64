@@ -8,19 +8,6 @@
 #include "sys.h"
 
 
-#ifdef DEBUG
-#include <assert.h>
-#define LOG_I(args...)              {iprintf("\033[32m"); iprintf(args); iprintf("\033[0m");}
-#define LOG_E(args...)              {iprintf("\033[31m"); iprintf(args); iprintf("\033[0m");}
-#define LOG_FLUSH()                 {fflush(stdout);}
-#else
-#define LOG_I(args...)
-#define LOG_E(args...)
-#define LOG_FLUSH()
-#define assert(expr)
-#endif
-
-
 #define SC64_CMD_CONFIG             ('C')
 #define SC64_CMD_QUERY              ('Q')
 #define SC64_CMD_DEBUG_RX_DATA      ('E')
