@@ -71,6 +71,7 @@ typedef enum {
     BOOT_MODE_ROM = 1,
     BOOT_MODE_DDIPL = 2,
     BOOT_MODE_DIRECT = 3,
+    BOOT_MODE_MENU_USB = 4,
 } boot_mode_t;
 
 typedef struct {

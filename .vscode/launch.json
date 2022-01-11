@@ -40,17 +40,15 @@
             "linux": {
                 "args": [
                     "-f", "/dev/ttyUSB0",
-                    "-b", "3",
+                    "-b", "4",
                     "-q",
-                    "sw/n64/build/n64boot.bin",
                 ]
             },
             "windows": {
                 "args": [
                     "-f", "\\\\.\\D:",
-                    "-b", "3",
+                    "-b", "4",
                     "-q",
-                    "sw/n64/build/n64boot.bin",
                 ]
             }
         },

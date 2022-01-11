@@ -25,12 +25,12 @@ void main (void) {
             boot_info.device_type = BOOT_DEVICE_TYPE_DD;
             break;
 
-        case BOOT_MODE_DIRECT:
+        case BOOT_MODE_MENU_USB:
             storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
             break;
 
         default:
-            error_display("Unknown boot mode selected");
+            error_display("Unknown boot mode selected [%d]", sc64_info.boot_mode);
             break;
     }
 

@@ -264,20 +264,21 @@ class SC64:
 
 
     def set_boot_mode(self, mode: int) -> None:
-        if (mode >= 0 and mode <= 3):
+        if (mode >= 0 and mode <= 4):
             self.__change_config(self.__CFG_ID_BOOT_MODE, mode)
         else:
             raise SC64Exception("Boot mode outside of supported values")
 
 
     def get_boot_mode_label(self, mode: int) -> None:
-        if (mode < 0 or mode > 3):
+        if (mode < 0 or mode > 4):
             return "Unknown"
         return {
             0: "Load menu from SD card",
             1: "Load ROM from SDRAM through bootloader",
             2: "Load DDIPL from SDRAM",
-            3: "Load ROM from SDRAM directly without bootloader"
+            3: "Load ROM from SDRAM directly without bootloader",
+            4: "Load menu from USB",
         }[mode]
 
 
