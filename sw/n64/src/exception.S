@@ -116,11 +116,11 @@ exception_fatal:
     sw $t0, C0_STATUS_OFFSET($k0)
     dmfc0 $t0, C0_EPC
     sd $t0, C0_EPC_OFFSET($k0)
-    addiu $t0, 4
-    dmtc0 $t0, C0_EPC
     move $a2, $k0
     la $t1, exception_fatal_handler
     jalr $t1
+    ld $t0, C0_EPC_OFFSET($k0)
+    dmtc0 $t0, C0_EPC
     j exception_restore
 
 exception_interrupt:
@@ -194,8 +194,8 @@ exception_install:
     bne $t4, $t5, 2b
     addiu $t1, VECTOR_SIZE
     bne $t1, $t2, 1b
-    li $t7, (WATCHDOG_TIMEOUT * TICKS_PER_SECOND)
     mtc0 $zero, C0_COUNT
+    li $t7, (WATCHDOG_TIMEOUT * TICKS_PER_SECOND)
     mtc0 $t7, C0_COMPARE
     mfc0 $t7, C0_STATUS
     ori $t7, (INTERRUPT_MASK_TIMER | INTERRUPT_ENABLE)
