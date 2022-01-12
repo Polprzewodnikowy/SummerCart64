@@ -13,8 +13,12 @@ void main (void) {
     sc64_get_info(&sc64_info);
 
     switch (sc64_info.boot_mode) {
-        case BOOT_MODE_MENU:
+        case BOOT_MODE_MENU_SD:
             storage_run_menu(STORAGE_BACKEND_SD, &boot_info, &sc64_info);
+            break;
+
+        case BOOT_MODE_MENU_USB:
+            storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
             break;
 
         case BOOT_MODE_ROM:
@@ -23,10 +27,6 @@ void main (void) {
 
         case BOOT_MODE_DDIPL:
             boot_info.device_type = BOOT_DEVICE_TYPE_DD;
-            break;
-
-        case BOOT_MODE_MENU_USB:
-            storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
             break;
 
         default:

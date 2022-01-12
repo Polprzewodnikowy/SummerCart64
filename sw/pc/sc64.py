@@ -275,10 +275,10 @@ class SC64:
             return "Unknown"
         return {
             0: "Load menu from SD card",
-            1: "Load ROM from SDRAM through bootloader",
-            2: "Load DDIPL from SDRAM",
-            3: "Load ROM from SDRAM directly without bootloader",
-            4: "Load menu from USB",
+            1: "Load menu from USB",
+            2: "Load ROM from SDRAM",
+            3: "Load DDIPL from SDRAM",
+            4: "Load ROM from SDRAM directly without bootloader",
         }[mode]
 
 
@@ -723,7 +723,7 @@ class SC64ProgressBar:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SummerCart64 one stop control center")
-    parser.add_argument("-b", metavar="boot_mode", default="1", required=False, help="set boot mode (0 - 3)")
+    parser.add_argument("-b", metavar="boot_mode", default="2", required=False, help="set boot mode (0 - 4)")
     parser.add_argument("-t", metavar="tv_type", default="3", required=False, help="set TV type (0 - 2)")
     parser.add_argument("-c", metavar="cic_seed", default="0xFFFF", required=False, help="set CIC seed")
     parser.add_argument("-s", metavar="save_type", default="0", required=False, help="set save type (0 - 6)")
@@ -780,7 +780,7 @@ if __name__ == "__main__":
                     os.remove(firmware_backup_file)
 
             if (not is_read):
-                if (boot_mode != 1):
+                if (boot_mode != 2):
                     print(f"Setting boot mode to [{sc64.get_boot_mode_label(boot_mode)}]")
                 sc64.set_boot_mode(boot_mode)
 

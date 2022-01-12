@@ -1,62 +1,47 @@
-#define VECTOR_LOCATION         (0xA0000000UL)
-#define VECTOR_SIZE             (0x80)
-#define VECTOR_NUM              (4)
+#include "regs.h"
 
-#define HIT_INVALIDATE_I        ((4 << 2) | 0)
 
-#define TICKS_PER_SECOND        (93750000UL / 2)
-#define WATCHDOG_TIMEOUT        (10)
+#define WATCHDOG_TIMEOUT            (10 * (93750000UL / 2))
 
-#define C0_COUNT                $9
-#define C0_COMPARE              $11
-#define C0_STATUS               $12
-#define C0_CAUSE                $13
-#define C0_EPC                  $14
+#define VECTOR_LOCATION             (0xA0000000UL)
+#define VECTOR_SIZE                 (0x80)
+#define VECTOR_NUM                  (4)
 
-#define INTERRUPT_ENABLE        (1 << 0)
-#define INTERRUPT_MASK_TIMER    (1 << 15)
-
-#define EXCEPTION_CODE_MASK     (0x007C)
-#define EXCEPTION_CODE_BIT      (2)
-#define INTERRUPT_PENDING_MASK  (0xFF00)
-#define INTERRUPT_PENDING_BIT   (8)
-#define INTERRUPT_PENDING_TIMER (1 << 7)
-
-#define AT_OFFSET               (8)
-#define V0_OFFSET               (16)
-#define V1_OFFSET               (24)
-#define A0_OFFSET               (32)
-#define A1_OFFSET               (40)
-#define A2_OFFSET               (48)
-#define A3_OFFSET               (56)
-#define T0_OFFSET               (64)
-#define T1_OFFSET               (72)
-#define T2_OFFSET               (80)
-#define T3_OFFSET               (88)
-#define T4_OFFSET               (96)
-#define T5_OFFSET               (104)
-#define T6_OFFSET               (112)
-#define T7_OFFSET               (120)
-#define S0_OFFSET               (128)
-#define S1_OFFSET               (136)
-#define S2_OFFSET               (144)
-#define S3_OFFSET               (152)
-#define S4_OFFSET               (160)
-#define S5_OFFSET               (168)
-#define S6_OFFSET               (176)
-#define S7_OFFSET               (184)
-#define T8_OFFSET               (192)
-#define T9_OFFSET               (200)
-#define K0_OFFSET               (208)
-#define K1_OFFSET               (216)
-#define GP_OFFSET               (224)
-#define SP_OFFSET               (232)
-#define FP_OFFSET               (240)
-#define RA_OFFSET               (248)
-#define C0_STATUS_OFFSET        (256)
-#define C0_CAUSE_OFFSET         (260)
-#define C0_EPC_OFFSET           (264)
-#define SAVE_REGISTERS_SIZE     (272)
+#define AT_OFFSET                   (8)
+#define V0_OFFSET                   (16)
+#define V1_OFFSET                   (24)
+#define A0_OFFSET                   (32)
+#define A1_OFFSET                   (40)
+#define A2_OFFSET                   (48)
+#define A3_OFFSET                   (56)
+#define T0_OFFSET                   (64)
+#define T1_OFFSET                   (72)
+#define T2_OFFSET                   (80)
+#define T3_OFFSET                   (88)
+#define T4_OFFSET                   (96)
+#define T5_OFFSET                   (104)
+#define T6_OFFSET                   (112)
+#define T7_OFFSET                   (120)
+#define S0_OFFSET                   (128)
+#define S1_OFFSET                   (136)
+#define S2_OFFSET                   (144)
+#define S3_OFFSET                   (152)
+#define S4_OFFSET                   (160)
+#define S5_OFFSET                   (168)
+#define S6_OFFSET                   (176)
+#define S7_OFFSET                   (184)
+#define T8_OFFSET                   (192)
+#define T9_OFFSET                   (200)
+#define K0_OFFSET                   (208)
+#define K1_OFFSET                   (216)
+#define GP_OFFSET                   (224)
+#define SP_OFFSET                   (232)
+#define FP_OFFSET                   (240)
+#define RA_OFFSET                   (248)
+#define C0_STATUS_OFFSET            (256)
+#define C0_CAUSE_OFFSET             (260)
+#define C0_EPC_OFFSET               (264)
+#define SAVE_REGISTERS_SIZE         (272)
 
 
 .section .text.exception_handler
@@ -96,17 +81,17 @@ exception_handler:
 
     move $sp, $k0
 
-exception_is_fatal:
+exception_check_type:
     mfc0 $a0, C0_CAUSE
     sw $a0, C0_CAUSE_OFFSET($k0)
     move $a1, $a0
-    andi $a0, EXCEPTION_CODE_MASK
-    srl $a0, $a0, EXCEPTION_CODE_BIT
-    andi $a1, INTERRUPT_PENDING_MASK
-    srl $a1, $a1, INTERRUPT_PENDING_BIT
-    move $t0, $a1
-    andi $t0, INTERRUPT_PENDING_TIMER
-    bne $t0, $zero, exception_fatal
+    move $t0, $a0
+    andi $t0, C0_CR_IP7
+    andi $a0, C0_CR_EC_MASK
+    srl $a0, $a0, C0_CR_EC_BIT
+    andi $a1, C0_CR_IP_MASK
+    srl $a1, $a1, C0_CR_IP_BIT
+    # bne $t0, $zero, exception_fatal
     beq $a0, $zero, exception_interrupt
 
 exception_fatal:
@@ -194,10 +179,47 @@ exception_install:
     bne $t4, $t5, 2b
     addiu $t1, VECTOR_SIZE
     bne $t1, $t2, 1b
+    jr $ra
+
+
+.section .text.exception_disable_interrupts
+exception_disable_interrupts:
+    .global exception_disable_interrupts
+    mfc0 $t0, C0_STATUS
+    li $t1, ~(C0_SR_IE)
+    and $t0, $t0, $t1
+    mtc0 $t0, C0_STATUS
+    jr $ra
+
+
+.section .text.exception_enable_interrupts
+exception_enable_interrupts:
+    .global exception_enable_interrupts
+    mfc0 $t0, C0_STATUS
+    li $t1, C0_SR_IE
+    or $t0, $t0, $t1
+    mtc0 $t0, C0_STATUS
+    jr $ra
+
+
+.section .text.exception_enable_watchdog
+exception_enable_watchdog:
+    .global exception_enable_watchdog
     mtc0 $zero, C0_COUNT
-    li $t7, (WATCHDOG_TIMEOUT * TICKS_PER_SECOND)
-    mtc0 $t7, C0_COMPARE
-    mfc0 $t7, C0_STATUS
-    ori $t7, (INTERRUPT_MASK_TIMER | INTERRUPT_ENABLE)
-    mtc0 $t7, C0_STATUS
+    li $t1, WATCHDOG_TIMEOUT
+    mtc0 $t1, C0_COMPARE
+    mfc0 $t0, C0_STATUS
+    li $t1, C0_SR_IM7
+    or $t0, $t0, $t1
+    mtc0 $t0, C0_STATUS
+    jr $ra
+
+
+.section .text.exception_disable_watchdog
+exception_disable_watchdog:
+    .global exception_disable_watchdog
+    mfc0 $t0, C0_STATUS
+    li $t1, ~(C0_SR_IM7)
+    and $t0, $t0, $t1
+    mtc0 $t0, C0_STATUS
     jr $ra

@@ -2,7 +2,12 @@
 #include <stdio.h>
 #include "exception.h"
 #include "font.h"
-#include "sys.h"
+#include "io.h"
+#include "regs.h"
+
+
+#define STR(x)      #x
+#define XSTR(s)     STR(s)
 
 
 typedef union {
@@ -217,8 +222,8 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_print(&x, &y, "s4: 0x%08lX, s5: 0x%08lX, s6: 0x%08lX, s7: 0x%08lX", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
     exception_print(&x, &y, "t8: 0x%08lX, t9: 0x%08lX, k0: 0x%08lX, k1: 0x%08lX", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
     exception_print(&x, &y, "gp: 0x%08lX, sp: 0x%08lX, fp: 0x%08lX, ra: 0x%08lX\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
-    exception_print(&x, &y, "0x%08lX: 0x%08lX = [%4s]\n", (uint32_t) (&SC64->VERSION), sc64_version, (char *) (&sc64_version));
-    exception_print(&x, &y, "------------------------------------------------------------------------\n");
+    exception_print(&x, &y, "0x%08lX: 0x%08lX = [%4s]", (uint32_t) (&SC64->VERSION), sc64_version, (char *) (&sc64_version));
+    exception_print(&x, &y, "%s\n", XSTR(__SC64_VERSION));
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {

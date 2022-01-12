@@ -1,13 +1,14 @@
 #!/bin/bash
 
-GIT_SHA=$(git rev-parse --short HEAD)
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+GIT_SHA=$(git rev-parse HEAD)
 GIT_TAG=$(git describe --tags --exact-match 2> /dev/null)
 
-if [ ! -z $GIT_TAG ]; then
-    __SC64_VERSION=$(printf "%.7q\ %.7q" $GIT_SHA $GIT_TAG)
-else
-    __SC64_VERSION=$(printf "%.7q\ develop" $GIT_SHA)
+if [ -z $GIT_TAG ]; then
+    GIT_TAG="develop"
 fi
+
+__SC64_VERSION=$(printf "[ %q | %q | %q ]" $GIT_BRANCH $GIT_TAG $GIT_SHA)
 
 docker run \
     --rm \

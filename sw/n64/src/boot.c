@@ -1,6 +1,7 @@
 #include "boot.h"
 #include "crc32.h"
-#include "sys.h"
+#include "init.h"
+#include "io.h"
 
 
 extern uint32_t ipl2 __attribute__((section(".data")));
@@ -131,6 +132,8 @@ void boot (boot_info_t *info) {
         io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
     }
 
+    deinit();
+
     register void (*entry_point)(void) asm ("t3");
     register uint32_t boot_device asm ("s3");
     register uint32_t tv_type asm ("s4");
@@ -148,10 +151,8 @@ void boot (boot_info_t *info) {
     stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
 
     asm volatile (
-        "mtc0 %[status], $12 \n"
         "move $sp, %[stack_pointer] \n"
         "jr %[entry_point] \n" ::
-        [status] "r" (C0_SR_CU1 | C0_SR_CU0 | C0_SR_FR),
         [entry_point] "r" (entry_point),
         [boot_device] "r" (boot_device),
         [tv_type] "r" (tv_type),

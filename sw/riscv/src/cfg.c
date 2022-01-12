@@ -52,10 +52,11 @@ enum save_type {
 };
 
 enum boot_mode {
-    BOOT_MODE_MENU = 0,
-    BOOT_MODE_ROM = 1,
-    BOOT_MODE_DD = 2,
-    BOOT_MODE_DIRECT = 3,
+    BOOT_MODE_MENU_SD = 0,
+    BOOT_MODE_MENU_USB = 1,
+    BOOT_MODE_ROM = 2,
+    BOOT_MODE_DD = 3,
+    BOOT_MODE_DIRECT = 4,
 };
 
 
@@ -249,7 +250,7 @@ void cfg_init (void) {
 
     p.cic_seed = 0xFFFF;
     p.tv_type = 0x03;
-    p.boot_mode = BOOT_MODE_MENU;
+    p.boot_mode = BOOT_MODE_MENU_SD;
 }
 
 

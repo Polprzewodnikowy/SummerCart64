@@ -15,6 +15,7 @@ BUILD_DIR = build
 
 SRC_FILES = \
 	startup.S \
+	ipl2.S \
 	exception.S \
 	boot.c \
 	crc32.c \
@@ -23,10 +24,10 @@ SRC_FILES = \
 	font.c \
 	init.c \
 	interrupt.c \
+	io.c \
 	main.c \
 	sc64.c \
 	storage.c \
-	sys.c \
 	syscalls.c \
 	fatfs/diskio.c \
 	fatfs/ff.c \

@@ -1,8 +1,3 @@
-#define STR(x)  #x
-#define XSTR(s) STR(s)
-#define VERSION XSTR(__SC64_VERSION)
-
-
 .section .text.rom_header
 header_pi_config:
     .word 0x80371240
@@ -22,8 +17,7 @@ header_crc:
     .org 0x20, 0x00
 header_text_info:
     .global header_text_info
-    .ascii "SummerLoader64 "
-    .ascii VERSION
+    .ascii "n64boot SummerCart64"
     .org 0x40, 0x00
 
 
@@ -39,9 +33,6 @@ entry_handler:
     la $gp, _gp
     la $sp, _sp
 
-    la $t0, exception_install
-    jalr $t0
-
     la $t0, init
     jalr $t0
 
@@ -50,19 +41,3 @@ entry_handler:
 
 loop:
     j loop
-
-
-.section .text.ipl2
-ipl2:
-    .global ipl2
-    .set noat
-    .set noreorder
-    lui $t5, 0xBFC0
-1:
-    lw $t0, 0x7FC($t5)
-    addiu $t5, $t5, 0x7C0
-    andi $t0, $t0, 0x80
-    bnel $t0, $zero, 1b
-    lui $t5, 0xBFC0
-    lw $t0, 0x24($t5)
-    lui $t3, 0xB000

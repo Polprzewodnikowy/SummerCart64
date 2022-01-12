@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "sys.h"
+#include "io.h"
 
 
 #define SC64_CMD_CONFIG             ('C')
@@ -67,11 +67,11 @@ typedef enum {
 } tv_type_t;
 
 typedef enum {
-    BOOT_MODE_MENU = 0,
-    BOOT_MODE_ROM = 1,
-    BOOT_MODE_DDIPL = 2,
-    BOOT_MODE_DIRECT = 3,
-    BOOT_MODE_MENU_USB = 4,
+    BOOT_MODE_MENU_SD = 0,
+    BOOT_MODE_MENU_USB = 1,
+    BOOT_MODE_ROM = 2,
+    BOOT_MODE_DDIPL = 3,
+    BOOT_MODE_DIRECT = 4,
 } boot_mode_t;
 
 typedef struct {
