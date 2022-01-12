@@ -6,10 +6,6 @@
 #include "regs.h"
 
 
-#define STR(x)      #x
-#define XSTR(s)     STR(s)
-
-
 typedef union {
     uint64_t u64;
     struct {
@@ -57,6 +53,9 @@ typedef struct {
 } exception_t;
 
 
+#define STR(x)                  #x
+#define XSTR(s)                 STR(s)
+
 #define EXCEPTION_INTERRUPT     (0)
 #define EXCEPTION_SYSCALL       (8)
 
@@ -68,10 +67,10 @@ typedef struct {
 #define SCREEN_WIDTH            (640)
 #define SCREEN_HEIGHT           (240)
 #define BORDER_WIDTH            (32)
-#define BORDER_HEIGHT           (8)
+#define BORDER_HEIGHT           (16)
 
-#define BACKGROUND_COLOR        (0x000000FFUL)
-#define FOREGROUND_COLOR        (0xFFFFFFFFUL)
+#define BACKGROUND_COLOR        (0xFFFFFFFFUL)
+#define FOREGROUND_COLOR        (0x000000FFUL)
 
 #define LINE_HEIGHT             (12)
 
@@ -213,16 +212,16 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_init_screen();
 
     exception_print(&x, &y, "%s at pc: 0x%08lX\n", exception_get_description(exception_code), e->epc.u32);
-    exception_print(&x, &y, "sr: 0x%08lX, cr: 0x%08lX", e->sr, e->cr);
-    exception_print(&x, &y, "zr: 0x%08lX, at: 0x%08lX, v0: 0x%08lX, v1: 0x%08lX", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
-    exception_print(&x, &y, "a0: 0x%08lX, a1: 0x%08lX, a2: 0x%08lX, a3: 0x%08lX", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
-    exception_print(&x, &y, "t0: 0x%08lX, t1: 0x%08lX, t2: 0x%08lX, t3: 0x%08lX", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
-    exception_print(&x, &y, "t4: 0x%08lX, t5: 0x%08lX, t6: 0x%08lX, t7: 0x%08lX", e->t4.u32, e->t5.u32, e->t6.u32, e->t7.u32);
-    exception_print(&x, &y, "s0: 0x%08lX, s1: 0x%08lX, s2: 0x%08lX, s3: 0x%08lX", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
-    exception_print(&x, &y, "s4: 0x%08lX, s5: 0x%08lX, s6: 0x%08lX, s7: 0x%08lX", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
-    exception_print(&x, &y, "t8: 0x%08lX, t9: 0x%08lX, k0: 0x%08lX, k1: 0x%08lX", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
-    exception_print(&x, &y, "gp: 0x%08lX, sp: 0x%08lX, fp: 0x%08lX, ra: 0x%08lX\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
-    exception_print(&x, &y, "0x%08lX: 0x%08lX = [%4s]", (uint32_t) (&SC64->VERSION), sc64_version, (char *) (&sc64_version));
+    exception_print(&x, &y, "sr: 0x%08lX   cr: 0x%08lX", e->sr, e->cr);
+    exception_print(&x, &y, "zr: 0x%08lX   at: 0x%08lX   v0: 0x%08lX   v1: 0x%08lX", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
+    exception_print(&x, &y, "a0: 0x%08lX   a1: 0x%08lX   a2: 0x%08lX   a3: 0x%08lX", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
+    exception_print(&x, &y, "t0: 0x%08lX   t1: 0x%08lX   t2: 0x%08lX   t3: 0x%08lX", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
+    exception_print(&x, &y, "t4: 0x%08lX   t5: 0x%08lX   t6: 0x%08lX   t7: 0x%08lX", e->t4.u32, e->t5.u32, e->t6.u32, e->t7.u32);
+    exception_print(&x, &y, "s0: 0x%08lX   s1: 0x%08lX   s2: 0x%08lX   s3: 0x%08lX", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
+    exception_print(&x, &y, "s4: 0x%08lX   s5: 0x%08lX   s6: 0x%08lX   s7: 0x%08lX", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
+    exception_print(&x, &y, "t8: 0x%08lX   t9: 0x%08lX   k0: 0x%08lX   k1: 0x%08lX", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
+    exception_print(&x, &y, "gp: 0x%08lX   sp: 0x%08lX   fp: 0x%08lX   ra: 0x%08lX\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
+    exception_print(&x, &y, "vr: 0x%08lX = [%4s]", sc64_version, (char *) (&sc64_version));
     exception_print(&x, &y, "%s\n", XSTR(__SC64_VERSION));
 
     if (exception_code == EXCEPTION_INTERRUPT) {
