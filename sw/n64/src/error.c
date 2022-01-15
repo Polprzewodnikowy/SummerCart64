@@ -11,7 +11,3 @@ void error_display (const char *fmt, ...) {
 
     while (1);
 }
-
-void __assert_func (const char *file, int line, const char *func, const char *failedexpr) {
-    while (1);
-}
