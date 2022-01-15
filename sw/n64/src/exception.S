@@ -182,22 +182,22 @@ exception_install:
     jr $ra
 
 
-.section .text.exception_disable_interrupts
-exception_disable_interrupts:
-    .global exception_disable_interrupts
-    mfc0 $t0, C0_STATUS
-    li $t1, ~(C0_SR_IE)
-    and $t0, $t0, $t1
-    mtc0 $t0, C0_STATUS
-    jr $ra
-
-
 .section .text.exception_enable_interrupts
 exception_enable_interrupts:
     .global exception_enable_interrupts
     mfc0 $t0, C0_STATUS
     li $t1, C0_SR_IE
     or $t0, $t0, $t1
+    mtc0 $t0, C0_STATUS
+    jr $ra
+
+
+.section .text.exception_disable_interrupts
+exception_disable_interrupts:
+    .global exception_disable_interrupts
+    mfc0 $t0, C0_STATUS
+    li $t1, ~(C0_SR_IE)
+    and $t0, $t0, $t1
     mtc0 $t0, C0_STATUS
     jr $ra
 

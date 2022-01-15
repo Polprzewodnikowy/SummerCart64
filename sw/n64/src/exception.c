@@ -72,6 +72,7 @@ typedef struct {
 
 #define BACKGROUND_COLOR        (0xFFFFFFFFUL)
 #define FOREGROUND_COLOR        (0x000000FFUL)
+#define BORDER_COLOR            (0x2F2F2FFFUL)
 
 #define LINE_HEIGHT             (12)
 
@@ -112,8 +113,21 @@ static io32_t *exception_framebuffer = (io32_t *) (0x0026A000UL);
 static void exception_init_screen (void) {
     const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
 
-    for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
-        io_write(&exception_framebuffer[i], BACKGROUND_COLOR);
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            uint32_t color;
+            if (
+                (x < (BORDER_WIDTH - FONT_WIDTH)) ||
+                (x > (SCREEN_WIDTH - BORDER_WIDTH + FONT_WIDTH)) ||
+                (y < (BORDER_HEIGHT - FONT_HEIGHT)) ||
+                (y > (SCREEN_HEIGHT - BORDER_HEIGHT + FONT_HEIGHT))
+            ) {
+                color = BORDER_COLOR;
+            } else {
+                color = BACKGROUND_COLOR;
+            }
+            io_write(&exception_framebuffer[x + (y * SCREEN_WIDTH)], color);
+        }
     }
 
     io_write(&VI->MADDR, (uint32_t) (exception_framebuffer));
@@ -235,14 +249,9 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
         uint32_t code = (((*instruction_address) & SYSCALL_CODE_MASK) >> SYSCALL_CODE_BIT);
 
         if (code == TRIGGER_CODE_ERROR) {
-            exception_vprint((const char *) (e->a0.u32), (va_list) (e->sp.u32 + 8));
-        } else if (code == TRIGGER_CODE_ASSERT) {
-            const char *file = (const char *) (e->a0.u32);
-            int line = (int) (e->a1.u32);
-            const char *func = (const char *) (e->a2.u32);
-            const char *failedexpr = (const char *) (e->a3.u32);
-            exception_print("Assertion \"%s\" failed:\n", failedexpr);
-            exception_print(" file \"%s\", line %d, %s%s\n", file, line, func ? "function: " : "", func);
+            const char *fmt = (const char *) (e->a0.u32);
+            va_list args = *((va_list *) (e->sp.u32));
+            exception_vprint(fmt, args);
         }
     }
 
