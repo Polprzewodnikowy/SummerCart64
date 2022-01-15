@@ -2,6 +2,7 @@
 #include "diskio.h"
 #include "../sc64.h"
 
+
 DSTATUS disk_status (BYTE pdrv) {
     return 0;
 }
@@ -11,26 +12,22 @@ DSTATUS disk_initialize (BYTE pdrv) {
 }
 
 DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
-    if (pdrv == 0) {
-        return RES_NOTRDY;
-    } else if (pdrv == 1) {
-        sc64_debug_fsd_read(buff, sector, count);
-        return RES_OK;
-    }
-    return RES_PARERR;
-}
+    sc64_storage_type_t storage_type;
 
-#if FF_FS_READONLY == 0
-DRESULT disk_write (BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
     if (pdrv == 0) {
-        return RES_NOTRDY;
+        storage_type = SC64_STORAGE_TYPE_SD;
     } else if (pdrv == 1) {
-        sc64_debug_fsd_write(buff, sector, count);
-        return RES_OK;
+        storage_type = SC64_STORAGE_TYPE_USB;
+    } else {
+        return RES_PARERR;
     }
-    return RES_PARERR;
+
+    if (sc64_storage_read(storage_type, buff, sector, count) != SC64_STORAGE_OK) {
+        return RES_ERROR;
+    }
+
+    return RES_OK;
 }
-#endif
 
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void *buff) {
     return RES_PARERR;

@@ -1,5 +1,6 @@
 #include "boot.h"
 #include "error.h"
+#include "init.h"
 #include "sc64.h"
 #include "storage.h"
 
@@ -8,17 +9,15 @@ void main (void) {
     boot_info_t boot_info;
     sc64_info_t sc64_info;
 
-    boot_info.reset_type = OS_INFO->reset_type;
-
     sc64_get_info(&sc64_info);
 
     switch (sc64_info.boot_mode) {
         case BOOT_MODE_MENU_SD:
-            storage_run_menu(STORAGE_BACKEND_SD, &boot_info, &sc64_info);
+            storage_run_menu(STORAGE_BACKEND_SD);
             break;
 
         case BOOT_MODE_MENU_USB:
-            storage_run_menu(STORAGE_BACKEND_USB, &boot_info, &sc64_info);
+            storage_run_menu(STORAGE_BACKEND_USB);
             break;
 
         case BOOT_MODE_ROM:
@@ -30,9 +29,11 @@ void main (void) {
             break;
 
         default:
-            error_display("Unknown boot mode selected [%d]", sc64_info.boot_mode);
+            error_display("Unknown boot mode selected [%d]\n", sc64_info.boot_mode);
             break;
     }
+
+    boot_info.reset_type = OS_INFO->reset_type;
 
     if (sc64_info.tv_type != TV_TYPE_UNKNOWN) {
         boot_info.tv_type = sc64_info.tv_type;
@@ -42,7 +43,7 @@ void main (void) {
         }
     }
 
-    if (sc64_info.cic_seed != 0xFFFF) {
+    if (sc64_info.cic_seed != CIC_SEED_UNKNOWN) {
         boot_info.cic_seed = sc64_info.cic_seed & 0xFF;
         boot_info.version = (sc64_info.cic_seed >> 8) & 0x01;
     } else {
@@ -51,6 +52,8 @@ void main (void) {
             boot_info.version = 0;
         }
     }
+
+    deinit();
 
     boot(&boot_info);
 }

@@ -8,11 +8,17 @@ static const char hex_char_map[16] = {
 };
 #endif
 
+void uart_put (char c) {
+#ifdef DEBUG
+    while (!(UART->SCR & UART_SCR_TXE));
+    UART->DR = c;
+#endif
+}
+
 void uart_print (const char *text) {
 #ifdef DEBUG
     while (*text != '\0') {
-        while (!(UART->SCR & UART_SCR_TXE));
-        UART->DR = *text++;
+        uart_put(*text++);
     }
 #endif
 }

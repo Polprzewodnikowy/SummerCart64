@@ -3,7 +3,8 @@
 #include "exception.h"
 #include "font.h"
 #include "io.h"
-#include "regs.h"
+#include "sc64.h"
+#include "vr4300.h"
 
 
 typedef union {
@@ -105,7 +106,7 @@ static const vi_regs_t vi_config[] = {{
     .V_SCALE = ((0x100 * SCREEN_HEIGHT) / 60),
 }};
 
-static io32_t *exception_framebuffer = (io32_t *) (0x00200000UL);
+static io32_t *exception_framebuffer = (io32_t *) (0x0026A000UL);
 
 
 static void exception_init_screen (void) {
@@ -151,31 +152,35 @@ static void exception_draw_character (int x, int y, char c) {
     }
 }
 
-static void exception_print_string (int *x, int *y, const char *s) {
-    int line_x = *x;
+static void exception_print_string (const char *s) {
+    static int x = BORDER_WIDTH;
+    static int y = BORDER_HEIGHT;
 
     while (*s != '\0') {
         if (*s == '\n') {
-            line_x = BORDER_WIDTH;
-            *y += LINE_HEIGHT;
+            x = BORDER_WIDTH;
+            y += LINE_HEIGHT;
             s++;
         } else {
-            exception_draw_character(line_x, *y, *s++);
-            line_x += FONT_WIDTH;
+            exception_draw_character(x, y, *s++);
+            x += FONT_WIDTH;
         }
     }
 }
 
-static void exception_print (int *x, int *y, const char* fmt, ...) {
+static void exception_vprint (const char *fmt, va_list args) {
     char line[256];
+
+    vsniprintf(line, sizeof(line), fmt, args);
+    exception_print_string(line);
+    sc64_uart_print_string(line);
+}
+
+static void exception_print (const char* fmt, ...) {
     va_list args;
 
     va_start(args, fmt);
-
-    vsniprintf(line, sizeof(line), fmt, args);
-    exception_print_string(x, y, line);
-    *y += LINE_HEIGHT;
-
+    exception_vprint(fmt, args);
     va_end(args);
 }
 
@@ -206,40 +211,38 @@ static const char *exception_get_description (uint8_t exception_code) {
 void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, exception_t *e) {
     uint32_t sc64_version = pi_io_read(&SC64->VERSION);
     uint32_t *instruction_address = (((uint32_t *) (e->epc.u32)) + ((e->cr & C0_CR_BD) ? 1 : 0));
-    int x = BORDER_WIDTH;
-    int y = BORDER_HEIGHT;
 
     exception_init_screen();
 
-    exception_print(&x, &y, "%s at pc: 0x%08lX\n", exception_get_description(exception_code), e->epc.u32);
-    exception_print(&x, &y, "sr: 0x%08lX   cr: 0x%08lX", e->sr, e->cr);
-    exception_print(&x, &y, "zr: 0x%08lX   at: 0x%08lX   v0: 0x%08lX   v1: 0x%08lX", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
-    exception_print(&x, &y, "a0: 0x%08lX   a1: 0x%08lX   a2: 0x%08lX   a3: 0x%08lX", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
-    exception_print(&x, &y, "t0: 0x%08lX   t1: 0x%08lX   t2: 0x%08lX   t3: 0x%08lX", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
-    exception_print(&x, &y, "t4: 0x%08lX   t5: 0x%08lX   t6: 0x%08lX   t7: 0x%08lX", e->t4.u32, e->t5.u32, e->t6.u32, e->t7.u32);
-    exception_print(&x, &y, "s0: 0x%08lX   s1: 0x%08lX   s2: 0x%08lX   s3: 0x%08lX", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
-    exception_print(&x, &y, "s4: 0x%08lX   s5: 0x%08lX   s6: 0x%08lX   s7: 0x%08lX", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
-    exception_print(&x, &y, "t8: 0x%08lX   t9: 0x%08lX   k0: 0x%08lX   k1: 0x%08lX", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
-    exception_print(&x, &y, "gp: 0x%08lX   sp: 0x%08lX   fp: 0x%08lX   ra: 0x%08lX\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
-    exception_print(&x, &y, "vr: 0x%08lX = [%4s]", sc64_version, (char *) (&sc64_version));
-    exception_print(&x, &y, "%s\n", XSTR(__SC64_VERSION));
+    exception_print("%s at pc: 0x%08lX\n\n", exception_get_description(exception_code), e->epc.u32);
+    exception_print("sr: 0x%08lX  cr: 0x%08lX\n", e->sr, e->cr);
+    exception_print("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
+    exception_print("a0: 0x%08lX  a1: 0x%08lX  a2: 0x%08lX  a3: 0x%08lX\n", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
+    exception_print("t0: 0x%08lX  t1: 0x%08lX  t2: 0x%08lX  t3: 0x%08lX\n", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
+    exception_print("t4: 0x%08lX  t5: 0x%08lX  t6: 0x%08lX  t7: 0x%08lX\n", e->t4.u32, e->t5.u32, e->t6.u32, e->t7.u32);
+    exception_print("s0: 0x%08lX  s1: 0x%08lX  s2: 0x%08lX  s3: 0x%08lX\n", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
+    exception_print("s4: 0x%08lX  s5: 0x%08lX  s6: 0x%08lX  s7: 0x%08lX\n", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
+    exception_print("t8: 0x%08lX  t9: 0x%08lX  k0: 0x%08lX  k1: 0x%08lX\n", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
+    exception_print("gp: 0x%08lX  sp: 0x%08lX  fp: 0x%08lX  ra: 0x%08lX\n\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
+    exception_print("vr: 0x%08lX = [%4s]\n", sc64_version, (char *) (&sc64_version));
+    exception_print("%s\n\n", XSTR(__SC64_VERSION));
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {
-            exception_print(&x, &y, "Bootloader did not finish within 10 seconds limit");
+            exception_print("Bootloader did not finish within 1 second limit\n");
         }
     } else if (exception_code == EXCEPTION_SYSCALL) {
         uint32_t code = (((*instruction_address) & SYSCALL_CODE_MASK) >> SYSCALL_CODE_BIT);
 
         if (code == TRIGGER_CODE_ERROR) {
-            exception_print(&x, &y, (const char *) (e->a0.u32), e->a1.u32, e->a2.u32, e->a3.u32);
+            exception_vprint((const char *) (e->a0.u32), (va_list) (e->sp.u32 + 8));
         } else if (code == TRIGGER_CODE_ASSERT) {
             const char *file = (const char *) (e->a0.u32);
             int line = (int) (e->a1.u32);
             const char *func = (const char *) (e->a2.u32);
             const char *failedexpr = (const char *) (e->a3.u32);
-            exception_print(&x, &y, "Assertion \"%s\" failed:", failedexpr);
-            exception_print(&x, &y, " file \"%s\", line %d, %s%s", file, line, func ? "function: " : "", func);
+            exception_print("Assertion \"%s\" failed:\n", failedexpr);
+            exception_print(" file \"%s\", line %d, %s%s\n", file, line, func ? "function: " : "", func);
         }
     }
 

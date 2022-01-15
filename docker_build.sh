@@ -10,8 +10,12 @@ fi
 
 __SC64_VERSION=$(printf "[ %q | %q | %q ]" $GIT_BRANCH $GIT_TAG $GIT_SHA)
 
+if [ -t 1 ]; then
+    DOCKER_OPTIONS="-it"
+fi
+
 docker run \
-    --rm \
+    --rm $DOCKER_OPTIONS \
     --user $(id -u):$(id -g) \
     --mount type=bind,src="$(pwd)",target="/workdir" \
     -e __SC64_VERSION="$__SC64_VERSION" \

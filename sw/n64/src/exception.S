@@ -1,7 +1,7 @@
-#include "regs.h"
+#include "vr4300.h"
 
 
-#define WATCHDOG_TIMEOUT            (10 * (93750000UL / 2))
+#define WATCHDOG_TIMEOUT            (1 * (93750000UL / 2))
 
 #define VECTOR_LOCATION             (0xA0000000UL)
 #define VECTOR_SIZE                 (0x80)
@@ -91,7 +91,7 @@ exception_check_type:
     srl $a0, $a0, C0_CR_EC_BIT
     andi $a1, C0_CR_IP_MASK
     srl $a1, $a1, C0_CR_IP_BIT
-    # bne $t0, $zero, exception_fatal
+    bne $t0, $zero, exception_fatal
     beq $a0, $zero, exception_interrupt
 
 exception_fatal:

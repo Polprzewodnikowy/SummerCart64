@@ -132,8 +132,6 @@ void boot (boot_info_t *info) {
         io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
     }
 
-    deinit();
-
     register void (*entry_point)(void) asm ("t3");
     register uint32_t boot_device asm ("s3");
     register uint32_t tv_type asm ("s4");

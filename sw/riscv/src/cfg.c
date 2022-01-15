@@ -4,6 +4,7 @@
 #include "isv.h"
 #include "joybus.h"
 #include "usb.h"
+#include "uart.h"
 
 
 #define SAVE_SIZE_EEPROM_4K     (512)
@@ -301,6 +302,10 @@ void process_cfg (void) {
 
             case 'B':
                 usb_debug_reset();
+                break;
+
+            case 'Z':
+                uart_put((char) (args[0] & 0xFF));
                 break;
 
             default:

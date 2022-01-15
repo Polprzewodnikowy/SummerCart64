@@ -840,8 +840,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
-        sc64.reset_link()
-        if (disk_file):
-            print(f"Setting 64DD disk state to [Ejected]")
-            sc64.set_dd_disk_state("ejected")
+        if (sc64):
+            sc64.reset_link()
+            if (disk_file):
+                print(f"Setting 64DD disk state to [Ejected]")
+                sc64.set_dd_disk_state("ejected")
         sys.stdout.write("\033[0m")

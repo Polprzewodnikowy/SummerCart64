@@ -16,7 +16,6 @@ header_crc:
 
     .org 0x20, 0x00
 header_text_info:
-    .global header_text_info
     .ascii "n64boot SummerCart64"
     .org 0x40, 0x00
 

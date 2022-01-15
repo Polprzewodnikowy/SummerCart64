@@ -5,6 +5,7 @@
 #include "sys.h"
 
 
+void uart_put (char c);
 void uart_print (const char *text);
 void uart_print_02hex (uint8_t number);
 void uart_print_08hex (uint32_t number);

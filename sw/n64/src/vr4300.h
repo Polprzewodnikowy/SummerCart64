@@ -1,5 +1,5 @@
-#ifndef REGS_H__
-#define REGS_H__
+#ifndef VR4300_H__
+#define VR4300_H__
 
 
 #define HIT_INVALIDATE_I            ((4 << 2) | 0)

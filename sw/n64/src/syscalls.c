@@ -1,6 +1,5 @@
 #include <errno.h>
 #include <sys/types.h>
-#include "exception.h"
 
 
 extern char _sheap __attribute__((section(".data")));
@@ -20,10 +19,4 @@ caddr_t _sbrk_r (struct _reent *prt, ptrdiff_t incr) {
     }
 
     return (caddr_t) prev_heap_end;
-}
-
-
-void __assert_func (const char *file, int line, const char *func, const char *failedexpr) {
-    EXCEPTION_TRIGGER(TRIGGER_CODE_ASSERT);
-    while (1);
 }
