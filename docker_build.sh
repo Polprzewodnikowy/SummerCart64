@@ -16,7 +16,7 @@ fi
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 GIT_TAG=$(git describe --tags 2> /dev/null)
 GIT_SHA=$(git rev-parse HEAD)
-GIT_MESSAGE=$(git log -1 --pretty=format:%B)
+GIT_MESSAGE=$(git log -1 --pretty=format:%s)
 
 if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"

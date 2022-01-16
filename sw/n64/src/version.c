@@ -1,8 +1,8 @@
 #include "version.h"
 
 
-#define STR(x)  #x
-#define XSTR(s) STR(s)
+#define STR(x...)   #x
+#define XSTR(s)     STR(s)
 
 
 version_t version = {

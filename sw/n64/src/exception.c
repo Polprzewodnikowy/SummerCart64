@@ -175,6 +175,10 @@ static void exception_print_string (const char *s) {
             y += LINE_HEIGHT;
             s++;
         } else {
+            if (x + FONT_WIDTH > (SCREEN_WIDTH - BORDER_WIDTH)) {
+                x = BORDER_WIDTH;
+                y += LINE_HEIGHT;
+            }
             exception_draw_character(x, y, *s++);
             x += FONT_WIDTH;
         }
@@ -229,11 +233,10 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_init_screen();
 
     exception_print("-----  SummerCart64 n64boot  -----\n");
-    exception_print("branch: %s\n", version->git_branch);
-    exception_print("tag: %s\n", version->git_tag);
+    exception_print("branch: %s | tag: %s\n", version->git_branch, version->git_tag);
     exception_print("sha: %s\n", version->git_sha);
     exception_print("msg: %s\n\n", version->git_message);
-    exception_print("%s at pc: 0x%08lX\n\n", exception_get_description(exception_code), e->epc.u32);
+    exception_print("%s at pc: 0x%08lX\n", exception_get_description(exception_code), e->epc.u32);
     exception_print("sr: 0x%08lX  cr: 0x%08lX  hw: 0x%08lX  [%4s]\n", e->sr, e->cr, sc64_version, (char *) (&sc64_version));
     exception_print("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
     exception_print("a0: 0x%08lX  a1: 0x%08lX  a2: 0x%08lX  a3: 0x%08lX\n", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
