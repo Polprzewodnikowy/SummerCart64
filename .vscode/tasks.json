@@ -31,7 +31,7 @@
             "group": "build"
         },
         {
-            "label": "build_n64_bootloader",
+            "label": "build_n64",
             "type": "shell",
             "command": "./docker_build.sh n64 -d",
             "presentation": {

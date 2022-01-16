@@ -4,6 +4,7 @@
 #include "font.h"
 #include "io.h"
 #include "sc64.h"
+#include "version.h"
 #include "vr4300.h"
 
 
@@ -54,9 +55,6 @@ typedef struct {
 } exception_t;
 
 
-#define STR(x)                  #x
-#define XSTR(s)                 STR(s)
-
 #define EXCEPTION_INTERRUPT     (0)
 #define EXCEPTION_SYSCALL       (8)
 
@@ -74,7 +72,8 @@ typedef struct {
 #define FOREGROUND_COLOR        (0x000000FFUL)
 #define BORDER_COLOR            (0x2F2F2FFFUL)
 
-#define LINE_HEIGHT             (12)
+#define LINE_HEIGHT             (10)
+#define START_X_OFFSET          (19)
 
 
 static const vi_regs_t vi_config[] = {{
@@ -167,7 +166,7 @@ static void exception_draw_character (int x, int y, char c) {
 }
 
 static void exception_print_string (const char *s) {
-    static int x = BORDER_WIDTH;
+    static int x = BORDER_WIDTH + (START_X_OFFSET * FONT_WIDTH);
     static int y = BORDER_HEIGHT;
 
     while (*s != '\0') {
@@ -223,13 +222,19 @@ static const char *exception_get_description (uint8_t exception_code) {
 
 
 void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, exception_t *e) {
+    version_t *version = version_get();
     uint32_t sc64_version = pi_io_read(&SC64->VERSION);
     uint32_t *instruction_address = (((uint32_t *) (e->epc.u32)) + ((e->cr & C0_CR_BD) ? 1 : 0));
 
     exception_init_screen();
 
+    exception_print("-----  SummerCart64 n64boot  -----\n");
+    exception_print("branch: %s\n", version->git_branch);
+    exception_print("tag: %s\n", version->git_tag);
+    exception_print("sha: %s\n", version->git_sha);
+    exception_print("msg: %s\n\n", version->git_message);
     exception_print("%s at pc: 0x%08lX\n\n", exception_get_description(exception_code), e->epc.u32);
-    exception_print("sr: 0x%08lX  cr: 0x%08lX\n", e->sr, e->cr);
+    exception_print("sr: 0x%08lX  cr: 0x%08lX  hw: 0x%08lX  [%4s]\n", e->sr, e->cr, sc64_version, (char *) (&sc64_version));
     exception_print("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
     exception_print("a0: 0x%08lX  a1: 0x%08lX  a2: 0x%08lX  a3: 0x%08lX\n", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
     exception_print("t0: 0x%08lX  t1: 0x%08lX  t2: 0x%08lX  t3: 0x%08lX\n", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
@@ -238,12 +243,10 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_print("s4: 0x%08lX  s5: 0x%08lX  s6: 0x%08lX  s7: 0x%08lX\n", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
     exception_print("t8: 0x%08lX  t9: 0x%08lX  k0: 0x%08lX  k1: 0x%08lX\n", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
     exception_print("gp: 0x%08lX  sp: 0x%08lX  fp: 0x%08lX  ra: 0x%08lX\n\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
-    exception_print("vr: 0x%08lX = [%4s]\n", sc64_version, (char *) (&sc64_version));
-    exception_print("%s\n\n", XSTR(__SC64_VERSION));
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {
-            exception_print("Bootloader did not finish within 1 second limit\n");
+            exception_print("Bootloader did not finish within 1 second limit\n\n");
         }
     } else if (exception_code == EXCEPTION_SYSCALL) {
         uint32_t code = (((*instruction_address) & SYSCALL_CODE_MASK) >> SYSCALL_CODE_BIT);
@@ -252,6 +255,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
             const char *fmt = (const char *) (e->a0.u32);
             va_list args = *((va_list *) (e->sp.u32));
             exception_vprint(fmt, args);
+            exception_print("\n");
         }
     }
 

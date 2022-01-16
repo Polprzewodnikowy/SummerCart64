@@ -1,2 +1,2 @@
 progressbar2==3.55.0
-pyserial==3.5
+pyft232==0.12

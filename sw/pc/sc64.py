@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
+from ft232 import Ft232, Ft232Exception
 from io import TextIOWrapper
-from serial import Serial, SerialException
-from serial.tools import list_ports
 import argparse
 import filecmp
 import os
@@ -61,7 +60,7 @@ class SC64:
 
 
     def __init__(self) -> None:
-        self.__serial = None
+        self.__usb = None
         self.__progress_init = None
         self.__progress_value = None
         self.__progress_finish = None
@@ -73,8 +72,8 @@ class SC64:
 
 
     def __del__(self) -> None:
-        if (self.__serial):
-            self.__serial.close()
+        if (self.__usb):
+            self.__usb.close()
         if (self.__fsd_file):
             self.__fsd_file.close()
 
@@ -103,18 +102,17 @@ class SC64:
 
 
     def reset_link(self) -> None:
-        self.__serial.write(b"\x1BR")
-        while (self.__serial.in_waiting):
-            self.__serial.read_all()
-            time.sleep(0.1)
+        self.__usb.write(b"\x1BR")
+        time.sleep(0.1)
+        self.__usb.flushInput()
 
 
     def __read(self, bytes: int) -> bytes:
-        return self.__serial.read(bytes)
+        return self.__usb.read(bytes)
 
 
     def __write(self, data: bytes) -> None:
-        self.__serial.write(self.__escape(data))
+        self.__usb.write(self.__escape(data))
 
 
     def __read_long(self, length: int) -> bytes:
@@ -147,29 +145,25 @@ class SC64:
         self.__write_int(arg2)
 
 
+    def reset_n64(self) -> None:
+        self.__usb.cbus_setup(mask=1, init=0)
+        time.sleep(0.1)
+        self.__usb.cbus_setup(mask=0)
+
+
     def __find_sc64(self) -> None:
-        ports = list_ports.comports()
-        device_found = False
+        if (self.__usb != None and not self.__usb.closed):
+            self.__usb.close()
 
-        if (self.__serial != None and self.__serial.isOpen()):
-            self.__serial.close()
-
-        for p in ports:
-            if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC64")):
-                try:
-                    self.__serial = Serial(p.device, timeout=1.0, write_timeout=1.0)
-                    self.__serial.flushOutput()
-                    self.reset_link()
-                    self.__probe_device()
-                except (SerialException, SC64Exception):
-                    if (self.__serial):
-                        self.__serial.close()
-                    continue
-                device_found = True
-                break
-
-        if (not device_found):
-            raise SC64Exception("No SummerCart64 device was found")
+        try:
+            self.__usb = Ft232(description="SummerCart64")
+            self.__usb.flushOutput()
+            self.reset_link()
+            self.__probe_device()
+        except Ft232Exception as e:
+            if (self.__usb):
+                self.__usb.close()
+            raise SC64Exception(f"No SummerCart64 device was found: {e}")
 
 
     def __probe_device(self) -> None:
@@ -255,10 +249,10 @@ class SC64:
 
     def update_firmware(self, file: str) -> None:
         self.__write_file_to_sdram(file, self.__UPDATE_OFFSET)
-        saved_timeout = self.__serial.timeout
-        self.__serial.timeout = 20.0
+        saved_timeout = self.__usb.timeout
+        self.__usb.timeout = 20.0
         self.__change_config(self.__CFG_ID_FLASH_PROGRAM, self.__UPDATE_OFFSET)
-        self.__serial.timeout = saved_timeout
+        self.__usb.timeout = saved_timeout
         self.__reconfigure()
         self.__find_sc64()
 
@@ -820,6 +814,8 @@ if __name__ == "__main__":
                     sc64.download_save(save_file)
                 else:
                     sc64.upload_save(save_file)
+   
+            sc64.reset_n64()
 
             if (debug_server):
                 sc64.debug_init(sd_file, disk_file, is_viewer_enabled)

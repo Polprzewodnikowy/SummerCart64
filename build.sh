@@ -22,7 +22,6 @@ BUILT_RELEASE=false
 FORCE_CLEAN=false
 SKIP_FPGA_REBUILD=false
 DEBUG_ENABLED=false
-USER_FLAGS+=" -D__SC64_VERSION=\"$__SC64_VERSION\""
 
 build_cic () {
     if [ "$BUILT_CIC" = true ]; then return; fi
@@ -41,7 +40,7 @@ build_n64 () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all -j USER_FLAGS="$USER_FLAGS"
+    make all -j USER_FLAGS="$USER_FLAGS -DGIT_BRANCH='$GIT_BRANCH' -DGIT_TAG='$GIT_TAG' -DGIT_SHA='$GIT_SHA' -DGIT_MESSAGE='$GIT_MESSAGE'"
     popd > /dev/null
 
     BUILT_N64=true

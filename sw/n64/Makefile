@@ -29,6 +29,7 @@ SRC_FILES = \
 	sc64.c \
 	storage.c \
 	syscalls.c \
+	version.c \
 	fatfs/diskio.c \
 	fatfs/ff.c \
 	fatfs/ffsystem.c \
@@ -71,6 +72,10 @@ all: $(BUILD_DIR)/n64boot.hex print_size
 clean:
 	@rm -rf ./$(BUILD_DIR)/*
 
-.PHONY: all clean print_size
+$(BUILD_DIR)/version.c.o: .FORCE
+
+.FORCE:
+
+.PHONY: .FORCE all clean print_size
 
 -include $(DEPS)
