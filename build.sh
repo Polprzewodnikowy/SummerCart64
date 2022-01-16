@@ -40,7 +40,12 @@ build_n64 () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all -j USER_FLAGS="$USER_FLAGS -DGIT_BRANCH='$GIT_BRANCH' -DGIT_TAG='$GIT_TAG' -DGIT_SHA='$GIT_SHA' -DGIT_MESSAGE='$GIT_MESSAGE'"
+    N64_FLAGS="$USER_FLAGS"
+    if [ ! -z "${GIT_BRANCH+x}" ]; then N64_FLAGS+=" -DGIT_BRANCH='\"$GIT_BRANCH\"'"; fi
+    if [ ! -z "${GIT_TAG+x}" ]; then N64_FLAGS+=" -DGIT_TAG='\"$GIT_TAG\"'"; fi
+    if [ ! -z "${GIT_SHA+x}" ]; then N64_FLAGS+=" -DGIT_SHA='\"$GIT_SHA\"'"; fi
+    if [ ! -z "${GIT_MESSAGE+x}" ]; then N64_FLAGS+=" -DGIT_MESSAGE='\"$GIT_MESSAGE\"'"; fi
+    make all -j USER_FLAGS="$N64_FLAGS"
     popd > /dev/null
 
     BUILT_N64=true

@@ -145,9 +145,23 @@ static void exception_init_screen (void) {
     io_write(&VI->CR, cfg->CR);
 }
 
-static void exception_draw_character (int x, int y, char c) {
+static void exception_draw_character (char c) {
+    static int x = BORDER_WIDTH + (START_X_OFFSET * FONT_WIDTH);
+    static int y = BORDER_HEIGHT;
+
+    if (c == '\n') {
+        x = BORDER_WIDTH;
+        y += LINE_HEIGHT;
+        return;
+    }
+
+    if ((x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
+        x = BORDER_WIDTH;
+        y += LINE_HEIGHT;
+    }
+
     if ((c < ' ') || (c > '~')) {
-        c = 127;
+        c = '\x7F';
     }
 
     for (int i = 0; i < (FONT_WIDTH * FONT_HEIGHT); i++) {
@@ -163,25 +177,13 @@ static void exception_draw_character (int x, int y, char c) {
             io_write(&exception_framebuffer[screen_offset], FOREGROUND_COLOR);
         }
     }
+
+    x += FONT_WIDTH;
 }
 
 static void exception_print_string (const char *s) {
-    static int x = BORDER_WIDTH + (START_X_OFFSET * FONT_WIDTH);
-    static int y = BORDER_HEIGHT;
-
     while (*s != '\0') {
-        if (*s == '\n') {
-            x = BORDER_WIDTH;
-            y += LINE_HEIGHT;
-            s++;
-        } else {
-            if (x + FONT_WIDTH > (SCREEN_WIDTH - BORDER_WIDTH)) {
-                x = BORDER_WIDTH;
-                y += LINE_HEIGHT;
-            }
-            exception_draw_character(x, y, *s++);
-            x += FONT_WIDTH;
-        }
+        exception_draw_character(*s++);
     }
 }
 
@@ -233,7 +235,8 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_init_screen();
 
     exception_print("-----  SummerCart64 n64boot  -----\n");
-    exception_print("branch: %s | tag: %s\n", version->git_branch, version->git_tag);
+    exception_print("branch: %s\n", version->git_branch);
+    exception_print("tag: %s\n", version->git_tag);
     exception_print("sha: %s\n", version->git_sha);
     exception_print("msg: %s\n\n", version->git_message);
     exception_print("%s at pc: 0x%08lX\n", exception_get_description(exception_code), e->epc.u32);

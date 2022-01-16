@@ -1,15 +1,27 @@
 #include "version.h"
 
 
-#define STR(x...)   #x
-#define XSTR(s)     STR(s)
-
-
 version_t version = {
-    .git_branch = XSTR(GIT_BRANCH),
-    .git_tag = XSTR(GIT_TAG),
-    .git_sha = XSTR(GIT_SHA),
-    .git_message = XSTR(GIT_MESSAGE),
+#ifdef GIT_BRANCH
+    .git_branch = GIT_BRANCH,
+#else
+#warning "No GIT_BRANCH provided"
+#endif
+#ifdef GIT_TAG
+    .git_tag = GIT_TAG,
+#else
+#warning "No GIT_TAG provided"
+#endif
+#ifdef GIT_SHA
+    .git_sha = GIT_SHA,
+#else
+#warning "No GIT_SHA provided"
+#endif
+#ifdef GIT_MESSAGE
+    .git_message = GIT_MESSAGE,
+#else
+#warning "No GIT_MESSAGE provided"
+#endif
 };
 
 
