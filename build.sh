@@ -15,6 +15,7 @@ FILES=(
 BUILT_CIC=false
 BUILT_N64=false
 BUILT_RISCV=false
+BUILT_SW=false
 BUILT_FPGA=false
 BUILT_UPDATE=false
 BUILT_RELEASE=false
@@ -44,7 +45,6 @@ build_n64 () {
     if [ ! -z "${GIT_BRANCH+x}" ]; then N64_FLAGS+=" -DGIT_BRANCH='\"$GIT_BRANCH\"'"; fi
     if [ ! -z "${GIT_TAG+x}" ]; then N64_FLAGS+=" -DGIT_TAG='\"$GIT_TAG\"'"; fi
     if [ ! -z "${GIT_SHA+x}" ]; then N64_FLAGS+=" -DGIT_SHA='\"$GIT_SHA\"'"; fi
-    if [ ! -z "${GIT_MESSAGE+x}" ]; then N64_FLAGS+=" -DGIT_MESSAGE='\"$GIT_MESSAGE\"'"; fi
     make all -j USER_FLAGS="$N64_FLAGS"
     popd > /dev/null
 
@@ -64,15 +64,29 @@ build_riscv () {
     BUILT_RISCV=true
 }
 
-build_fpga () {
-    if [ "$BUILT_FPGA" = true ]; then return; fi
+build_sw () {
+    if [ "$BUILT_SW" = true ]; then return; fi
 
     build_n64
     build_riscv
 
     pushd fw > /dev/null
+    mkdir -p output_files > /dev/null
+    cat ../sw/n64/build/n64boot.bin ../sw/riscv/build/governor.bin > output_files/SC64_software.bin
+    objcopy -I binary -O ihex output_files/SC64_software.bin output_files/SC64_software.hex
+    popd
+
+    BUILT_SW=true
+}
+
+build_fpga () {
+    if [ "$BUILT_FPGA" = true ]; then return; fi
+
+    build_sw
+
+    pushd fw > /dev/null
     if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
-        quartus_cpf -c SummerCart64.cof
+        echo Skipping FPGA build
     else
         if [ "$DEBUG_ENABLED" = true ]; then
             quartus_sh --set VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
@@ -91,9 +105,8 @@ build_update () {
     build_fpga
 
     pushd fw/output_files > /dev/null
-    cat sc64_firmware_ufm_auto.rpd sc64_firmware_cfm0_auto.rpd > SC64_update_tmp.bin
-    objcopy -I binary -O binary --reverse-bytes=4 SC64_update_tmp.bin SC64_update.bin
-    rm SC64_update_tmp.bin
+    objcopy -I binary -O binary --reverse-bytes=4 sc64_firmware_cfm0_auto.rpd SC64_firmware.bin
+    cat SC64_software.bin SC64_firmware.bin > SC64_update.bin
     popd > /dev/null
 
     BUILT_UPDATE=true
@@ -120,7 +133,8 @@ print_usage () {
     echo "  cic       - assemble UltraCIC-III software"
     echo "  n64       - compile N64 bootloader software"
     echo "  riscv     - compile cart governor software"
-    echo "  fpga      - compile FPGA design (triggers 'n64' and 'riscv' build)"
+    echo "  sw        - compile all software (triggers 'n64' and 'riscv' build)"
+    echo "  fpga      - compile FPGA design (triggers 'sw' build)"
     echo "  update    - convert programming .pof file to raw binary for self-upgrade (triggers 'fpga' build)"
     echo "  release   - collect and zip files for release (triggers 'cic' and 'update' build)"
     echo "  -c | --force-clean"
@@ -142,6 +156,7 @@ fi
 TRIGGER_CIC=false
 TRIGGER_N64=false
 TRIGGER_RISCV=false
+TRIGGER_SW=false
 TRIGGER_FPGA=false
 TRIGGER_UPDATE=false
 TRIGGER_RELEASE=false
@@ -156,6 +171,9 @@ while test $# -gt 0; do
             ;;
         riscv)
             TRIGGER_RISCV=true
+            ;;
+        sw)
+            TRIGGER_SW=true
             ;;
         fpga)
             TRIGGER_FPGA=true
@@ -193,6 +211,7 @@ if [ "$DEBUG_ENABLED" = true ]; then USER_FLAGS+=" -DDEBUG"; fi
 if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_N64" = true ]; then build_n64; fi
 if [ "$TRIGGER_RISCV" = true ]; then build_riscv; fi
+if [ "$TRIGGER_SW" = true ]; then build_sw; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi

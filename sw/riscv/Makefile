@@ -46,7 +46,7 @@ $(BUILD_DIR)/governor.elf: $(OBJS) SC64.ld
 	@$(OBJDUMP) -D $@ > $(BUILD_DIR)/governor.lst
 
 $(BUILD_DIR)/governor.bin: $(BUILD_DIR)/governor.elf
-	@$(OBJCOPY) -O binary $< $@
+	@$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to 0x10016800 $< $@
 
 $(BUILD_DIR)/governor.hex: $(BUILD_DIR)/governor.bin
 	@$(OBJCOPY) -I binary -O ihex $< $@

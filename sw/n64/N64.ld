@@ -1,12 +1,12 @@
 MEMORY {
-    rdram (rwx) : org = 0x80300000, len = 1M
-    flash (r)   : org = 0xB0000000, len = 90k
+    rdram (rwx) : org = 0x803E0000, len = 128k
+    flash (r)   : org = 0xB0000000, len = 64k
 }
 
 ENTRY(entry_handler)
 
 __exception_stack_size = 8k;
-__stack_size = 64k;
+__stack_size = 16k;
 
 SECTIONS {
     .flash : {

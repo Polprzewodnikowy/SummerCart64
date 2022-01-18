@@ -1,7 +1,7 @@
 #include "version.h"
 
 
-version_t version = {
+static version_t version = {
 #ifdef GIT_BRANCH
     .git_branch = GIT_BRANCH,
 #else
@@ -16,11 +16,6 @@ version_t version = {
     .git_sha = GIT_SHA,
 #else
 #warning "No GIT_SHA provided"
-#endif
-#ifdef GIT_MESSAGE
-    .git_message = GIT_MESSAGE,
-#else
-#warning "No GIT_MESSAGE provided"
 #endif
 };
 

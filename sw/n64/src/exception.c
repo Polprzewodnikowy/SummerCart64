@@ -76,6 +76,8 @@ typedef struct {
 #define START_X_OFFSET          (19)
 
 
+extern const io32_t entry_handler __attribute__((section(".data")));
+
 static const vi_regs_t vi_config[] = {{
     .CR = VI_CR_TYPE_32,
     .H_WIDTH = SCREEN_WIDTH,
@@ -106,11 +108,13 @@ static const vi_regs_t vi_config[] = {{
     .V_SCALE = ((0x100 * SCREEN_HEIGHT) / 60),
 }};
 
-static io32_t *exception_framebuffer = (io32_t *) (0x0026A000UL);
+static io32_t *exception_framebuffer;
 
 
 static void exception_init_screen (void) {
     const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
+
+    exception_framebuffer = (io32_t *) (((io32_t) (&entry_handler)) - (SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(io32_t)));
 
     for (int y = 0; y < SCREEN_HEIGHT; y++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -237,8 +241,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_print("-----  SummerCart64 n64boot  -----\n");
     exception_print("branch: %s\n", version->git_branch);
     exception_print("tag: %s\n", version->git_tag);
-    exception_print("sha: %s\n", version->git_sha);
-    exception_print("msg: %s\n\n", version->git_message);
+    exception_print("sha: %s\n\n", version->git_sha);
     exception_print("%s at pc: 0x%08lX\n", exception_get_description(exception_code), e->epc.u32);
     exception_print("sr: 0x%08lX  cr: 0x%08lX  hw: 0x%08lX  [%4s]\n", e->sr, e->cr, sc64_version, (char *) (&sc64_version));
     exception_print("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);

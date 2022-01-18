@@ -15,16 +15,16 @@ BUILD_DIR = build
 
 SRC_FILES = \
 	startup.S \
-	ipl2.S \
-	exception.S \
 	boot.c \
 	crc32.c \
 	error.c \
 	exception.c \
+	exception.S \
 	font.c \
 	init.c \
 	interrupt.c \
 	io.c \
+	ipl2.S \
 	main.c \
 	sc64.c \
 	storage.c \
@@ -56,7 +56,7 @@ $(BUILD_DIR)/n64boot.elf: $(OBJS) N64.ld
 $(BUILD_DIR)/n64boot.bin: $(BUILD_DIR)/n64boot.elf
 	@$(OBJCOPY) -O binary $< $@
 	@chksum64 $@ > /dev/null
-	@truncate --size=90k $@
+	@truncate --size=64k $@
 
 $(BUILD_DIR)/n64boot.hex: $(BUILD_DIR)/n64boot.bin
 	@$(OBJCOPY) -I binary -O ihex $< $@

@@ -33,7 +33,7 @@ package sc64;
 
     parameter bit [31:0] SC64_VER           = 32'h53437632;
     parameter int CLOCK_FREQUENCY           = 32'd100_000_000;
-    parameter bit [31:0] CPU_RESET_VECTOR   = {4'(ID_CPU_FLASH), 28'h0035800};
+    parameter bit [31:0] CPU_RESET_VECTOR   = {4'(ID_CPU_FLASH), 28'h0010000};
     parameter int UART_BAUD_RATE            = 32'd1_000_000;
 
 `ifdef DEBUG
