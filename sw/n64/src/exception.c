@@ -64,13 +64,14 @@ typedef struct {
 #define SYSCALL_CODE_BIT        (6)
 
 #define SCREEN_WIDTH            (640)
-#define SCREEN_HEIGHT           (240)
+#define SCREEN_HEIGHT_NTSC      (240)
+#define SCREEN_HEIGHT_PAL       (288)
 #define BORDER_WIDTH            (32)
 #define BORDER_HEIGHT           (16)
 
 #define BACKGROUND_COLOR        (0xFFFFFFFFUL)
 #define FOREGROUND_COLOR        (0x000000FFUL)
-#define BORDER_COLOR            (0x2F2F2FFFUL)
+#define BORDER_COLOR            (0x080808FFUL)
 
 #define LINE_HEIGHT             (10)
 #define START_X_OFFSET          (19)
@@ -79,51 +80,71 @@ typedef struct {
 extern const io32_t entry_handler __attribute__((section(".data")));
 
 static const vi_regs_t vi_config[] = {{
-    .CR = VI_CR_TYPE_32,
+    .CR = (
+        VI_CR_PIXEL_ADVANCE_1 |
+        VI_CR_PIXEL_ADVANCE_0 |
+        VI_CR_ANTIALIAS_1 |
+        VI_CR_ANTIALIAS_0 |
+        VI_CR_GAMMA_ON |
+        VI_CR_TYPE_32
+    ),
     .H_WIDTH = SCREEN_WIDTH,
-    .V_INTR = 512,
-    .CURR_LINE = 0,
+    .V_INTR = 0x000003FF,
+    .CURR_LINE = 0x00000000,
     .TIMING = 0x0404233A,
-    .V_SYNC = 625,
+    .V_SYNC = 0x00000271,
     .H_SYNC = 0x00150C69,
     .H_SYNC_LEAP = 0x0C6F0C6E,
     .H_LIMITS = 0x00800300,
-    .V_LIMITS = 0x005F0239,
+    .V_LIMITS = 0x002D026D,
     .COLOR_BURST = 0x00090268,
-    .H_SCALE = ((0x100 * SCREEN_WIDTH) / 160),
-    .V_SCALE = ((0x100 * SCREEN_HEIGHT) / 60),
+    .H_SCALE = 0x00000400,
+    .V_SCALE = 0x00000400,
 }, {
-    .CR = VI_CR_TYPE_32,
+    .CR = (
+        VI_CR_PIXEL_ADVANCE_1 |
+        VI_CR_PIXEL_ADVANCE_0 |
+        VI_CR_ANTIALIAS_1 |
+        VI_CR_ANTIALIAS_0 |
+        VI_CR_GAMMA_ON |
+        VI_CR_TYPE_32
+    ),
     .H_WIDTH = SCREEN_WIDTH,
-    .V_INTR = 512,
-    .CURR_LINE = 0,
+    .V_INTR = 0x000003FF,
+    .CURR_LINE = 0x00000000,
     .TIMING = 0x03E52239,
-    .V_SYNC = 525,
+    .V_SYNC = 0x0000020D,
     .H_SYNC = 0x00000C15,
     .H_SYNC_LEAP = 0x0C150C15,
     .H_LIMITS = 0x006C02EC,
-    .V_LIMITS = 0x002501FF,
+    .V_LIMITS = 0x00230203,
     .COLOR_BURST = 0x000E0204,
-    .H_SCALE = ((0x100 * SCREEN_WIDTH) / 160),
-    .V_SCALE = ((0x100 * SCREEN_HEIGHT) / 60),
+    .H_SCALE = 0x00000400,
+    .V_SCALE = 0x00000400,
 }};
 
+static const int screen_heights[] = {
+    SCREEN_HEIGHT_PAL,
+    SCREEN_HEIGHT_NTSC,
+};
+
+static int screen_heigth;
 static io32_t *exception_framebuffer;
 
 
 static void exception_init_screen (void) {
     const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
+    screen_heigth = screen_heights[OS_INFO->tv_type];
+    exception_framebuffer = (io32_t *) (((io32_t) (&entry_handler)) - (SCREEN_WIDTH * screen_heigth * sizeof(io32_t)));
 
-    exception_framebuffer = (io32_t *) (((io32_t) (&entry_handler)) - (SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(io32_t)));
-
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+    for (int y = 0; y < screen_heigth; y++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
             uint32_t color;
             if (
                 (x < (BORDER_WIDTH - FONT_WIDTH)) ||
-                (x > (SCREEN_WIDTH - BORDER_WIDTH + FONT_WIDTH)) ||
+                (x > (SCREEN_WIDTH - (BORDER_WIDTH - FONT_WIDTH))) ||
                 (y < (BORDER_HEIGHT - FONT_HEIGHT)) ||
-                (y > (SCREEN_HEIGHT - BORDER_HEIGHT + FONT_HEIGHT))
+                (y > (screen_heigth - (BORDER_HEIGHT - FONT_HEIGHT)))
             ) {
                 color = BORDER_COLOR;
             } else {
@@ -172,7 +193,7 @@ static void exception_draw_character (char c) {
         int c_x = x + (i % FONT_WIDTH);
         int c_y = y + (i / FONT_WIDTH);
 
-        if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (SCREEN_HEIGHT - BORDER_HEIGHT))) {
+        if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (screen_heigth - BORDER_HEIGHT))) {
             break;
         }
 

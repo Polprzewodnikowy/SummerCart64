@@ -145,6 +145,10 @@ typedef struct {
 #define VI_CR_SERRATE_ON            (1 << 6)
 #define VI_CR_ANTIALIAS_0           (1 << 8)
 #define VI_CR_ANTIALIAS_1           (1 << 9)
+#define VI_CR_PIXEL_ADVANCE_0       (1 << 12)
+#define VI_CR_PIXEL_ADVANCE_1       (1 << 13)
+#define VI_CR_PIXEL_ADVANCE_2       (1 << 14)
+#define VI_CR_PIXEL_ADVANCE_3       (1 << 15)
 #define VI_CR_DITHER_FILTER_ON      (1 << 16)
 
 
