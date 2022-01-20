@@ -9,7 +9,10 @@
 
 #define SC64_CMD_QUERY              ('Q')
 #define SC64_CMD_CONFIG             ('C')
-#define SC64_CMD_UART_PUT           ('Z')
+#define SC64_CMD_DRIVE_BUSY         (0xF0)
+#define SC64_CMD_DRIVE_READ         (0xF1)
+#define SC64_CMD_DRIVE_WRITE        (0xF2)
+#define SC64_CMD_UART_PUT           (0xFF)
 
 #define SC64_VERSION_2              (0x53437632)
 
@@ -72,15 +75,13 @@ typedef struct {
 
 
 bool sc64_check_presence (void);
-void sc64_wait_cpu_ready (void);
-bool sc64_wait_cpu_busy (void);
-bool sc64_perform_cmd (uint8_t cmd, uint32_t *args, uint32_t *result);
 uint32_t sc64_query_config (cfg_id_t id);
 void sc64_change_config (cfg_id_t id, uint32_t value);
 void sc64_get_info (sc64_info_t *info);
-void sc64_uart_put_char (char c);
 void sc64_uart_print_string (const char *text);
 void sc64_init (void);
+bool sc64_storage_read (uint8_t drive, void *buffer, uint32_t sector, uint32_t count);
+bool sc64_storage_write (uint8_t drive, void *buffer, uint32_t sector, uint32_t count);
 
 
 #endif
