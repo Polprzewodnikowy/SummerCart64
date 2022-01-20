@@ -229,6 +229,9 @@ typedef struct {
     io32_t SR_CMD;
     io32_t DATA[2];
     io32_t VERSION;
+    io32_t __padding[4092];
+    io32_t CPU_RAM[3840];
+    io32_t BUFFER[256];
 } sc64_regs_t;
 
 #define SC64_BASE                   (0x1FFF0000UL)

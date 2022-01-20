@@ -1,7 +1,8 @@
 module n64_cfg (
     if_system sys,
     if_n64_bus bus,
-    if_config.n64 cfg
+    if_config.n64 cfg,
+    if_cpu_ram.external cpu_ram
 );
 
     typedef enum bit [3:0] { 
@@ -23,24 +24,32 @@ module n64_cfg (
     e_state state;
 
     always_comb begin
+        cpu_ram.write = bus.request && bus.write && bus.address[14];
+        cpu_ram.address = bus.address[13:1];
+        cpu_ram.wdata = {bus.wdata[7:0], bus.wdata[15:8]};
+
         bus.rdata = 16'd0;
         if (bus.ack) begin
-            case (bus.address[3:1])
-                R_SR: bus.rdata = {
-                    cfg.cpu_ready,
-                    cfg.cpu_busy,
-                    1'b0,
-                    cfg.cmd_error,
-                    12'd0
-                };
-                R_COMMAND: bus.rdata = {8'd0, cfg.cmd};
-                R_DATA_0_H: bus.rdata = cfg.data[0][31:16];
-                R_DATA_0_L: bus.rdata = cfg.data[0][15:0];
-                R_DATA_1_H: bus.rdata = cfg.data[1][31:16];
-                R_DATA_1_L: bus.rdata = cfg.data[1][15:0];
-                R_VERSION_H: bus.rdata = sc64::SC64_VER[31:16];
-                R_VERSION_L: bus.rdata = sc64::SC64_VER[15:0];
-            endcase
+            if (bus.address[14]) begin
+                bus.rdata = {cpu_ram.rdata[7:0], cpu_ram.rdata[15:8]};
+            end else if (!(&bus.address[13:4])) begin
+                case (bus.address[3:1])
+                    R_SR: bus.rdata = {
+                        cfg.cpu_ready,
+                        cfg.cpu_busy,
+                        1'b0,
+                        cfg.cmd_error,
+                        12'd0
+                    };
+                    R_COMMAND: bus.rdata = {8'd0, cfg.cmd};
+                    R_DATA_0_H: bus.rdata = cfg.data[0][31:16];
+                    R_DATA_0_L: bus.rdata = cfg.data[0][15:0];
+                    R_DATA_1_H: bus.rdata = cfg.data[1][31:16];
+                    R_DATA_1_L: bus.rdata = cfg.data[1][15:0];
+                    R_VERSION_H: bus.rdata = sc64::SC64_VER[31:16];
+                    R_VERSION_L: bus.rdata = sc64::SC64_VER[15:0];
+                endcase
+            end
         end
     end
 
@@ -59,7 +68,7 @@ module n64_cfg (
                     if (bus.request) begin
                         state <= S_WAIT;
                         bus.ack <= 1'b1;
-                        if (bus.write) begin
+                        if (bus.write && (!(&bus.address[14:4]))) begin
                             case (bus.address[3:1])
                                 R_COMMAND: begin
                                     cfg.cmd <= bus.wdata[7:0];

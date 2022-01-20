@@ -247,7 +247,7 @@ void cfg_init (void) {
     set_save_type(SAVE_TYPE_NONE);
 
     CFG->DDIPL_OFFSET = DEFAULT_DDIPL_OFFSET;
-    CFG->SCR = CFG_SCR_CPU_READY | CFG_SCR_SDRAM_SWITCH;
+    CFG->SCR = CFG_SCR_CPU_READY;
 
     p.cic_seed = 0xFFFF;
     p.tv_type = 0x03;

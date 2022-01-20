@@ -70,6 +70,8 @@ module SummerCart64 (
         .dd_interrupt(dd_interrupt)
     );
 
+    if_cpu_ram cpu_ram ();
+
     system system_inst (
         .sys(sys)
     );
@@ -89,6 +91,7 @@ module SummerCart64 (
         .si(si),
         .flash(flash),
         .dd(dd),
+        .cpu_ram(cpu_ram),
 
         .n64_pi_alel(i_n64_pi_alel),
         .n64_pi_aleh(i_n64_pi_aleh),
@@ -117,6 +120,7 @@ module SummerCart64 (
         .si(si),
         .flash(flash),
         .dd(dd),
+        .cpu_ram(cpu_ram),
 
         .gpio_o(gpio_o),
         .gpio_i(gpio_i),

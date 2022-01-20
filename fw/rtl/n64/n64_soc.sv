@@ -7,6 +7,7 @@ module n64_soc (
     if_si.si si,
     if_flash.memory flash,
     if_dd dd,
+    if_cpu_ram.external cpu_ram,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -90,7 +91,8 @@ module n64_soc (
     n64_cfg n64_cfg_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_CFG].device),
-        .cfg(cfg)
+        .cfg(cfg),
+        .cpu_ram(cpu_ram)
     );
 
 endmodule

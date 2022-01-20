@@ -7,6 +7,7 @@ module cpu_soc (
     if_si.cpu si,
     if_flash.cpu flash,
     if_dd.cpu dd,
+    if_cpu_ram.cpu cpu_ram,
 
     input [7:0] gpio_i,
     output [7:0] gpio_o,
@@ -38,7 +39,8 @@ module cpu_soc (
 
     cpu_ram cpu_ram_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_RAM].device)
+        .bus(bus.at[sc64::ID_CPU_RAM].device),
+        .cpu_ram(cpu_ram)
     );
 
     cpu_flash cpu_flash_inst (

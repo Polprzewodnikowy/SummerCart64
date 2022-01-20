@@ -90,9 +90,10 @@ build_fpga () {
     else
         if [ "$DEBUG_ENABLED" = true ]; then
             quartus_sh --set VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
+        else
+            quartus_sh --set -remove VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
         fi
         quartus_sh --flow compile ./SummerCart64.qpf
-        quartus_sh --set -remove VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
     fi
     popd > /dev/null
 

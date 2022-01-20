@@ -35,179 +35,40 @@ bool sc64_perform_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
     return error;
 }
 
-uint32_t sc64_get_config (cfg_id_t id) {
+uint32_t sc64_query_config (cfg_id_t id) {
     uint32_t args[2] = { id, 0 };
     uint32_t result[2];
     sc64_perform_cmd(SC64_CMD_QUERY, args, result);
     return result[1];
 }
 
-void sc64_set_config (cfg_id_t id, uint32_t value) {
+void sc64_change_config (cfg_id_t id, uint32_t value) {
     uint32_t args[2] = { id, value };
     sc64_perform_cmd(SC64_CMD_CONFIG, args, NULL);
 }
 
 void sc64_get_info (sc64_info_t *info) {
-    // info->dd_enabled = (bool) sc64_get_config(CFG_ID_DD_ENABLE);
-    // info->is_viewer_enabled = (bool) sc64_get_config(CFG_ID_IS_VIEWER_ENABLE);
-    // info->save_type = (save_type_t) sc64_get_config(CFG_ID_SAVE_TYPE);
-    info->cic_seed = (uint16_t) sc64_get_config(CFG_ID_CIC_SEED);
-    info->tv_type = (tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
-    // info->save_location = (io32_t *) (0x10000000 | sc64_get_config(CFG_ID_SAVE_OFFEST));
-    // info->ddipl_location = (io32_t *) (0x10000000 | sc64_get_config(CFG_ID_DDIPL_OFFEST));
-    info->boot_mode = (boot_mode_t) sc64_get_config(CFG_ID_BOOT_MODE);
+    info->cic_seed = (uint16_t) sc64_query_config(CFG_ID_CIC_SEED);
+    info->tv_type = (tv_type_t) sc64_query_config(CFG_ID_TV_TYPE);
+    info->boot_mode = (boot_mode_t) sc64_query_config(CFG_ID_BOOT_MODE);
 }
 
-// void sc64_wait_usb_rx_ready (uint32_t *type, uint32_t *length) {
-//     uint32_t result[2];
-//     do {
-//         sc64_perform_cmd(SC64_CMD_DEBUG_RX_READY, NULL, result);
-//     } while (result[0] == 0 && result[1] == 0);
-//     *type = result[0];
-//     *length = result[1];
-// }
-
-// void sc64_wait_usb_rx_busy (void) {
-//     uint32_t result[2];
-//     do {
-//         sc64_perform_cmd(SC64_CMD_DEBUG_RX_BUSY, NULL, result);
-//     } while (result[0]);
-// }
-
-// void sc64_usb_rx_data (io32_t *address, uint32_t length) {
-//     uint32_t args[2] = { (uint32_t) (address), ALIGN(length, 2) };
-//     sc64_perform_cmd(SC64_CMD_DEBUG_RX_DATA, args, NULL);
-// }
-
-// void sc64_wait_usb_tx_ready (void) {
-//     uint32_t result[2];
-//     do {
-//         sc64_perform_cmd(SC64_CMD_DEBUG_TX_READY, NULL, result);
-//     } while (!result[0]);
-// }
-
-// void sc64_usb_tx_data (io32_t *address, uint32_t length) {
-//     uint32_t args[2] = { (uint32_t) (address), ALIGN(length, 2) };
-//     sc64_perform_cmd(SC64_CMD_DEBUG_TX_DATA, args, NULL);
-// }
-
-// void sc64_debug_write (uint8_t type, const void *data, uint32_t len) {
-//     char *dma = "DMA@";
-//     char *cmp = "CMPH";
-
-//     io32_t *sdram = (io32_t *) (SC64_DEBUG_WRITE_ADDRESS);
-
-//     uint8_t *src = (uint8_t *) (data);
-//     uint32_t tmp;
-//     io32_t *dst = sdram;
-
-//     uint32_t copy_length = ALIGN(len, 4);
-
-//     sc64_wait_usb_tx_ready();
-
-//     bool writable = sc64_get_config(CFG_ID_SDRAM_WRITABLE);
-//     bool sdram_switched = sc64_get_config(CFG_ID_SDRAM_SWITCH);
-
-//     if (!writable) {
-//         sc64_set_config(CFG_ID_SDRAM_WRITABLE, true);
-//     }
-//     if (!sdram_switched) {
-//         sc64_set_config(CFG_ID_SDRAM_SWITCH, true);
-//     }
-
-//     pi_io_write(dst++, *((uint32_t *) (dma)));
-//     pi_io_write(dst++, (type << 24) | len);
-
-//     while (src < ((uint8_t *) (data + copy_length))) {
-//         tmp = ((*src++) << 24);
-//         tmp |= ((*src++) << 16);
-//         tmp |= ((*src++) << 8);
-//         tmp |= ((*src++) << 0);
-//         pi_io_write(dst++, tmp);
-//         if (dst >= (io32_t *) ((void *) (sdram) + SC64_DEBUG_MAX_SIZE)) {
-//             sc64_usb_tx_data(sdram, (dst - sdram) * sizeof(uint32_t));
-//             sc64_wait_usb_tx_ready();
-//             dst = sdram;
-//         }
-//     }
-
-//     pi_io_write(dst++, *((uint32_t *) (cmp)));
-
-//     if (!writable) {
-//         sc64_set_config(CFG_ID_SDRAM_WRITABLE, false);
-//     }
-//     if (!sdram_switched) {
-//         sc64_set_config(CFG_ID_SDRAM_SWITCH, false);
-//     }
-
-//     sc64_usb_tx_data(sdram, (dst - sdram) * sizeof(uint32_t));
-// }
-
-// void sc64_debug_fsd_read (const void *data, uint32_t sector, uint32_t count) {
-//     uint32_t type;
-//     uint32_t length;
-
-//     io32_t *sdram = (io32_t *) (SC64_DEBUG_READ_ADDRESS);
-
-//     io32_t *src = sdram;
-//     uint32_t tmp;
-//     uint8_t *dst = (uint8_t *) (data);
-
-//     uint32_t read_length = count * 512;
-
-//     sc64_debug_write(SC64_DEBUG_ID_FSD_SECTOR, &sector, 4);
-//     sc64_debug_write(SC64_DEBUG_ID_FSD_READ, &read_length, 4);
-//     sc64_wait_usb_rx_ready(&type, &length);
-//     sc64_usb_rx_data(sdram, length);
-//     sc64_wait_usb_rx_busy();
-
-//     uint32_t copy_length = ALIGN(length, 4);
-
-//     bool sdram_switched = sc64_get_config(CFG_ID_SDRAM_SWITCH);
-
-//     if (!sdram_switched) {
-//         sc64_set_config(CFG_ID_SDRAM_SWITCH, true);
-//     }
-
-//     for (int i = 0; i < copy_length; i += 4) {
-//         tmp = pi_io_read(src++);
-//         *dst++ = (tmp >> 24);
-//         *dst++ = (tmp >> 16);
-//         *dst++ = (tmp >> 8);
-//         *dst++ = (tmp & 0xFF);
-//     }
-
-//     if (!sdram_switched) {
-//         sc64_set_config(CFG_ID_SDRAM_SWITCH, false);
-//     }
-// }
-
-// void sc64_debug_fsd_write (const void *data, uint32_t sector, uint32_t count) {
-//     sc64_debug_write(SC64_DEBUG_ID_FSD_SECTOR, &sector, 4);
-//     sc64_debug_write(SC64_DEBUG_ID_FSD_WRITE, data, count * 512);
-// }
-
-// void sc64_init_is_viewer (void) {
-//     sc64_set_config(CFG_ID_SDRAM_WRITABLE, true);
-//     pi_io_write(&ISV->ID, 0);
-// }
-
-sc64_storage_error_t sc64_storage_read(sc64_storage_type_t storage_type, const void *buff, uint32_t sector, uint32_t count) {
-    return SC64_STORAGE_ERROR;
+void sc64_uart_put_char (char c) {
+#ifdef DEBUG
+    uint32_t args[2] = { (uint32_t) (c), 0 };
+    sc64_perform_cmd(SC64_CMD_UART_PUT, args, NULL);
+#endif
 }
 
 void sc64_uart_print_string (const char *text) {
-#ifdef DEBUG
-    uint32_t args[2] = { 0, 0 };
     while (*text != '\0') {
-        args[0] = (uint32_t) (*text++);
-        sc64_perform_cmd(SC64_CMD_UART_PUT, args, NULL);
+        sc64_uart_put_char (*text++);
     }
-#endif
 }
 
 void sc64_init (void) {
     while (!sc64_check_presence());
     sc64_wait_cpu_ready();
-    sc64_set_config(CFG_ID_SDRAM_SWITCH, true);
+    sc64_change_config(CFG_ID_SDRAM_SWITCH, true);
+    sc64_uart_print_string("\033c");
 }

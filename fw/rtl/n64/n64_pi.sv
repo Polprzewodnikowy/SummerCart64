@@ -282,11 +282,6 @@ module n64_pi (
                     n64_pi_address_valid <= 1'b0;
                 end
             end
-            if (cfg_selected) begin
-                if (|n64_pi_ad_input[15:4]) begin
-                    n64_pi_address_valid <= 1'b0;
-                end
-            end
         end
     end
 
