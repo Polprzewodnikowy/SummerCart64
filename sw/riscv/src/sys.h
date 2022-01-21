@@ -23,7 +23,10 @@ typedef volatile uint32_t           io32_t;
 
 #define RAM_BASE                    (0x00000000UL)
 #define RAM                         (*((io32_t *) RAM_BASE))
-#define RAM_SIZE                    (16 * 1024)
+#define RAM_SIZE                    (15 * 1024)
+#define RAMBUFFER_BASE              (0x00003C00UL)
+#define RAMBUFFER                   (*((io8_t *) RAMBUFFER_BASE))
+#define RAMBUFFER_SIZE              (1 * 1024)
 
 
 #define FLASH_BASE                  (0x10000000UL)

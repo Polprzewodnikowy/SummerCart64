@@ -66,127 +66,51 @@ static bool tx_word (uint32_t data) {
 #define USB_DMA_TOKEN       (0x444D4100)
 #define USB_ERR_TOKEN       (0x45525200)
 
-#define DEBUG_ID_INTERNAL   (0xFE)
+#define DEBUG_ID_EVENT      (0xFE)
+
 
 enum state {
     STATE_IDLE,
     STATE_ARGS,
     STATE_DATA,
     STATE_RESPONSE,
-    STATE_DEBUG_TX,
-    STATE_INTERNAL_DEBUG_TX_START,
-    STATE_INTERNAL_DEBUG_TX_DATA,
-    STATE_INTERNAL_DEBUG_TX_END,
+    STATE_EVENT,
 };
 
 struct process {
     enum state state;
-    uint8_t counter;
+    uint32_t counter;
     uint8_t cmd;
     uint32_t args[2];
     bool error;
     bool dma_in_progress;
     bool queried;
 
-    bool debug_rx_busy;
-    uint32_t debug_rx_address;
-    size_t debug_rx_length;
-
-    bool debug_tx_busy;
-    uint32_t debug_tx_address;
-    size_t debug_tx_length;
-
-    bool internal_debug_tx_busy;
-    uint8_t internal_debug_tx_step;
-    uint32_t internal_debug_tx_address;
-    size_t internal_debug_tx_length;
-    uint32_t internal_debug_tx_id_length;
-    uint32_t internal_debug_tx_info;
+    bool event_pending;
+    bool event_callback_pending;
+    usb_event_t event;
+    uint8_t event_data[16];
+    uint32_t event_data_length;
 };
 
 static struct process p;
 
 
-bool usb_debug_rx_ready (uint32_t *type, size_t *length) {
-    if (p.state != STATE_DATA || p.cmd != 'D' || p.debug_rx_busy) {
+bool usb_put_event (usb_event_t *event, void *data, uint32_t length) {
+    if (p.event_pending || p.event_callback_pending) {
         return false;
     }
 
-    *type = p.args[0];
-    *length = (size_t) p.args[1];
+    uint8_t *src = (uint8_t *) (data);
+    uint8_t *dst = p.event_data;
 
-    return true;
-}
-
-bool usb_debug_rx_busy (void) {
-    return p.debug_rx_busy;
-}
-
-bool usb_debug_rx_data (uint32_t address, size_t length) {
-    if (p.debug_rx_busy) {
-        return false;
+    p.event_pending = true;
+    p.event_callback_pending = false;
+    p.event = *event;
+    p.event_data_length = length <= sizeof(p.event_data) ? length : sizeof(p.event_data);
+    for (int i = 0; i < p.event_data_length; i++) {
+        *dst++ = *src++;
     }
-
-    p.debug_rx_busy = true;
-    p.debug_rx_address = address;
-    p.debug_rx_length = length;
-
-    return true;
-}
-
-bool usb_debug_tx_ready (void) {
-    return !p.debug_tx_busy;
-}
-
-bool usb_debug_tx_data (uint32_t address, size_t length) {
-    if (p.debug_tx_busy) {
-        return false;
-    }
-
-    p.debug_tx_busy = true;
-    p.debug_tx_address = address;
-    p.debug_tx_length = length;
-
-    return true;
-}
-
-void usb_debug_reset (void) {
-    uint8_t tmp;
-
-    if (p.state == STATE_DATA && p.cmd == 'D') {
-        for (size_t i = 0; i < p.args[1]; i++) {
-            rx_byte(&tmp);
-        }
-        p.args[1] = 0;    
-    }
-    if (p.state == STATE_DEBUG_TX) {
-        p.state = STATE_IDLE;
-    }
-    p.debug_rx_busy = false;
-    p.debug_tx_busy = false;
-
-    USB->SCR = USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
-}
-
-bool usb_internal_debug_tx_ready (void) {
-    return !p.internal_debug_tx_busy;
-}
-
-bool usb_internal_debug_tx_data (internal_debug_id_t id, uint32_t address, size_t length) {
-    if (p.internal_debug_tx_busy) {
-        return false;
-    }
-
-    uint32_t start_address = address & 0xFFFFFFFC;
-    uint32_t end_address = ALIGN((address + length), 4);
-    size_t dma_length = end_address - start_address;
-    uint8_t start_alignment = address & 0x03;
-
-    p.internal_debug_tx_busy = true;
-    p.internal_debug_tx_address = start_address;
-    p.internal_debug_tx_length = dma_length;
-    p.internal_debug_tx_id_length = ((DEBUG_ID_INTERNAL << 24) | (dma_length + 4));
-    p.internal_debug_tx_info = ((id << 24) | (start_alignment << 16) | (length & 0xFFFF));
 
     return true;
 }
@@ -234,12 +158,11 @@ static void handle_escape (void) {
 
 
 void usb_init (void) {
-    USB->SCR = USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX;
+    USB->SCR = (USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX);
 
     p.state = STATE_IDLE;
-    p.debug_rx_busy = false;
-    p.debug_tx_busy = false;
-    p.internal_debug_tx_busy = false;
+    p.event_pending = false;
+    p.event_callback_pending = false;
 
     rx_word_current_byte = 0;
     rx_word_buffer = 0;
@@ -267,13 +190,9 @@ void process_usb (void) {
                     p.error = true;
                     p.state = STATE_RESPONSE;
                 }
-            } else if (p.debug_tx_busy) {
-                p.state = STATE_DEBUG_TX;
-                p.dma_in_progress = false;
-            } else if (p.internal_debug_tx_busy) {
-                p.state = STATE_INTERNAL_DEBUG_TX_START;
-                p.dma_in_progress = false;
-                p.internal_debug_tx_step = 0;
+            } else if (p.event_pending && (!p.event_callback_pending)) {
+                p.state = STATE_EVENT;
+                p.counter = 0;
             }
             break;
 
@@ -281,6 +200,7 @@ void process_usb (void) {
             if (rx_word(&p.args[p.counter])) {
                 p.counter += 1;
                 if (p.counter == 2) {
+                    p.counter = 0;
                     p.state = STATE_DATA;
                 }
             }
@@ -311,6 +231,7 @@ void process_usb (void) {
 
                 case 'R':
                 case 'W':
+                case 'L':
                 case 'S':
                     if (!dma_busy()) {
                         if (!p.dma_in_progress) {
@@ -319,8 +240,17 @@ void process_usb (void) {
                             dma_start(p.args[0], p.args[1], DMA_ID_USB, dir);
                             p.dma_in_progress = true;
                         } else {
-                            if (p.cmd == 'S') {
-                                dd_set_block_ready(true);
+                            if (p.cmd == 'L' || p.cmd == 'S') {
+                                if (p.event_callback_pending) {
+                                    if (p.cmd == 'L' && p.event.trigger == CALLBACK_SDRAM_READ) {
+                                        p.event_callback_pending = false;
+                                        p.event.callback();
+                                    }
+                                    if (p.cmd == 'S' && p.event.trigger == CALLBACK_SDRAM_WRITE) {
+                                        p.event_callback_pending = false;
+                                        p.event.callback();
+                                    }
+                                }
                                 p.state = STATE_IDLE;
                             } else {
                                 p.state = STATE_RESPONSE;
@@ -329,18 +259,36 @@ void process_usb (void) {
                     }
                     break;
 
-                case 'D':
-                    if (!dma_busy() && p.debug_rx_busy && p.args[1] > 0) {
-                        if (!p.dma_in_progress) {
-                            dma_start(p.debug_rx_address, p.debug_rx_length, DMA_ID_USB, DMA_DIR_TO_SDRAM);
-                            p.dma_in_progress = true;
-                        } else {
-                            p.args[1] -= p.debug_rx_length > p.args[1] ? p.args[1] : p.debug_rx_length;
-                            p.dma_in_progress = false;
-                            p.debug_rx_busy = false;
+                case 'F':
+                case 'T':
+                    while ((p.args[0] + p.counter) != (p.args[0] + p.args[1])) {
+                        uint8_t *buffer = (uint8_t *) (RAMBUFFER_BASE + p.args[0] + p.counter);
+                        if (p.cmd == 'F') {
+                            if (tx_byte(*buffer)) {
+                                p.counter += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (p.cmd == 'T') {
+                            if (rx_byte(buffer)) {
+                                p.counter += 1;
+                            } else {
+                                break;
+                            }
                         }
                     }
-                    if (p.args[1] == 0) {
+                    if ((p.args[0] + p.counter) == (p.args[0] + p.args[1])) {
+                        if (p.event_callback_pending) {
+                            if (p.cmd == 'F' && p.event.trigger == CALLBACK_BUFFER_READ) {
+                                p.event_callback_pending = false;
+                                p.event.callback();
+                            }
+                            if (p.cmd == 'T' && p.event.trigger == CALLBACK_BUFFER_WRITE) {
+                                p.event_callback_pending = false;
+                                p.event.callback();
+                            }
+                        }
                         p.state = STATE_IDLE;
                     }
                     break;
@@ -358,50 +306,28 @@ void process_usb (void) {
             }
             break;
 
-        case STATE_DEBUG_TX:
-            if (!dma_busy()) {
-                if (!p.dma_in_progress) {
-                    dma_start(p.debug_tx_address, p.debug_tx_length, DMA_ID_USB, DMA_DIR_FROM_SDRAM);
-                    p.dma_in_progress = true;
-                } else {
-                    p.debug_tx_busy = false;
-                    p.state = STATE_IDLE;
+        case STATE_EVENT:
+            if ((p.counter == 0) && tx_word(USB_DMA_TOKEN | '@')) {
+                p.counter += 1;
+            }
+            if ((p.counter == 1) && tx_word((DEBUG_ID_EVENT << 24) | (sizeof(p.event.id) + p.event_data_length))) {
+                p.counter += 1;
+            }
+            if ((p.counter == 2) && tx_word(p.event.id)) {
+                p.counter += 1;
+            }
+            if (p.counter >= 3) {
+                while (((p.counter - 3) < p.event_data_length) && tx_byte(p.event_data[p.counter - 3])) {
+                    p.counter += 1;
                 }
             }
-            break;
-
-        case STATE_INTERNAL_DEBUG_TX_START:
-            uint32_t header_data[] = {
-                (USB_DMA_TOKEN | '@'),
-                p.internal_debug_tx_id_length,
-                p.internal_debug_tx_info,
-            };
-
-            if (tx_word(header_data[p.internal_debug_tx_step])) {
-                p.internal_debug_tx_step += 1;
-                if (p.internal_debug_tx_step >= 3) {
-                    p.state = STATE_INTERNAL_DEBUG_TX_DATA;
+            if ((p.counter == (p.event_data_length + 3)) && tx_word(USB_CMP_TOKEN | 'H')) {
+                if (p.event.callback != NULL) {
+                    p.event_callback_pending = true;
                 }
-            }
-            break;
-
-        case STATE_INTERNAL_DEBUG_TX_DATA:
-            if (!dma_busy()) {
-                if (!p.dma_in_progress) {
-                    dma_start(p.internal_debug_tx_address, p.internal_debug_tx_length, DMA_ID_USB, DMA_DIR_FROM_SDRAM);
-                    p.dma_in_progress = true;
-                } else {
-                    p.internal_debug_tx_busy = false;
-                    p.state = STATE_INTERNAL_DEBUG_TX_END;
-                }
-            }
-            break;
-
-        case STATE_INTERNAL_DEBUG_TX_END:
-            if (tx_word(USB_CMP_TOKEN | 'H')) {
+                p.event_pending = false;
                 p.state = STATE_IDLE;
             }
-            p.state = STATE_IDLE;
             break;
     }
 }

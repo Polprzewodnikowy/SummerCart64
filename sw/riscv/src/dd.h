@@ -18,7 +18,6 @@ void dd_set_drive_id (uint16_t id);
 uint16_t dd_get_drive_id (void);
 void dd_set_thb_table_offset (uint32_t offset);
 uint32_t dd_get_thb_table_offset (void);
-void dd_set_block_ready (bool value);
 void dd_init (void);
 void process_dd (void);
 

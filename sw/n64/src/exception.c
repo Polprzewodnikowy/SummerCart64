@@ -217,7 +217,6 @@ static void exception_vprint (const char *fmt, va_list args) {
 
     vsniprintf(line, sizeof(line), fmt, args);
     exception_print_string(line);
-    sc64_uart_print_string(line);
 }
 
 static void exception_print (const char* fmt, ...) {
@@ -276,7 +275,9 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {
-            exception_print("Bootloader did not finish within 1 second limit\n\n");
+            exception_disable_watchdog();
+            exception_print("Still loading after 1 second limit...\n\n");
+            return;
         }
     } else if (exception_code == EXCEPTION_SYSCALL) {
         uint32_t code = (((*instruction_address) & SYSCALL_CODE_MASK) >> SYSCALL_CODE_BIT);

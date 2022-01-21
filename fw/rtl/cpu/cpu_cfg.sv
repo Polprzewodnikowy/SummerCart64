@@ -84,7 +84,6 @@ module cpu_cfg (
         end else begin
             if (sys.n64_soft_reset) begin
                 cfg.sdram_switch <= skip_bootloader;
-                cfg.sdram_writable <= 1'b0;
             end
             if (cfg.cmd_request) begin
                 cfg.cpu_busy <= 1'b1;

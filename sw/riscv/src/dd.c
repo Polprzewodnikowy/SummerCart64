@@ -84,35 +84,36 @@ static bool dd_block_valid (void) {
     return (p.thb_table[dd_track_head_block()] != 0xFFFFFFFF);
 }
 
-static bool dd_block_request (void) {
-    if (!usb_internal_debug_tx_ready()) {
-        return false;
-    }
+static void dd_set_block_ready (void) {
+    p.block_ready = true;
+}
 
-    if (!(DD->SCR & DD_SCR_DISK_INSERTED)) {
+static bool dd_block_request (void) {
+if (!(DD->SCR & DD_SCR_DISK_INSERTED)) {
         return true;
     }
 
     io32_t offset = p.thb_table[dd_track_head_block()];
     uint32_t length = ((DD->SECTOR_SIZE + 1) * DD_USER_SECTORS_PER_BLOCK);
-    size_t transfer_length = 16;
 
-    io32_t *dst = (io32_t *) (DD_USB_BUFFER_OFFSET);
+    uint32_t data[4] = {
+        p.transfer_mode,
+        (uint32_t) (p.block_buffer),
+        offset,
+        length,
+    };
 
-    *dst++ = SWAP32(p.transfer_mode);
-    *dst++ = SWAP32((uint32_t) (p.block_buffer));
-    *dst++ = offset;
-    *dst++ = SWAP32(length);
+    usb_event_t event;
+    event.id = EVENT_ID_DD_BLOCK;
+    event.trigger = p.transfer_mode ? CALLBACK_SDRAM_WRITE : CALLBACK_SDRAM_READ;
+    event.callback = dd_set_block_ready;
 
-    if (!p.transfer_mode) {
-        transfer_length += length;
+    if (usb_put_event(&event, data, sizeof(data))) {
+        p.block_ready = false;
+        return true;
     }
 
-    usb_internal_debug_tx_data(INT_DBG_ID_DD_BLOCK, DD_USB_BUFFER_OFFSET, transfer_length);
-
-    p.block_ready = false;
-
-    return true;
+    return false;
 }
 
 static bool dd_block_ready (void) {
@@ -120,11 +121,7 @@ static bool dd_block_ready (void) {
         return true;
     }
 
-    if (p.transfer_mode) {
-        return p.block_ready;
-    } else {
-        return usb_internal_debug_tx_ready();
-    }
+    return p.block_ready;
 }
 
 static void dd_sector_read (void) {
@@ -189,10 +186,6 @@ void dd_set_drive_id (uint16_t id) {
 
 uint16_t dd_get_drive_id (void) {
     return DD->DRIVE_ID;
-}
-
-void dd_set_block_ready (bool value) {
-    p.block_ready = value;
 }
 
 void dd_set_thb_table_offset (uint32_t offset) {

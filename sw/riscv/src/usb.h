@@ -8,17 +8,33 @@
 typedef enum {
     INT_DBG_ID_IS_VIEWER = 0,
     INT_DBG_ID_DD_BLOCK = 1,
+    INT_DBG_ID_FSD_READ = 2,
+    INT_DBG_ID_FSD_WRITE = 3,
 } internal_debug_id_t;
 
+typedef enum {
+    EVENT_ID_FSD_READ = 0,
+    EVENT_ID_FSD_WRITE = 1,
+    EVENT_ID_DD_BLOCK = 2,
+    EVENT_ID_IS_VIEWER = 3,
+} usb_event_id_t;
 
-bool usb_debug_rx_ready (uint32_t *type, size_t *length);
-bool usb_debug_rx_busy (void);
-bool usb_debug_rx_data (uint32_t address, size_t length);
-bool usb_debug_tx_ready (void);
-bool usb_debug_tx_data (uint32_t address, size_t length);
-void usb_debug_reset (void);
-bool usb_internal_debug_tx_ready (void);
-bool usb_internal_debug_tx_data (internal_debug_id_t id, uint32_t address, size_t length);
+typedef enum {
+    CALLBACK_NONE = 0,
+    CALLBACK_SDRAM_WRITE = 1,
+    CALLBACK_SDRAM_READ = 2,
+    CALLBACK_BUFFER_WRITE = 3,
+    CALLBACK_BUFFER_READ = 4,
+} usb_event_callback_t;
+
+typedef struct {
+    usb_event_id_t id;
+    usb_event_callback_t trigger;
+    void (*callback)(void);
+} usb_event_t;
+
+
+bool usb_put_event (usb_event_t *event, void *data, uint32_t length);
 void usb_init (void);
 void process_usb (void);
 

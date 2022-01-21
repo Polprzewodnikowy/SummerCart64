@@ -222,4 +222,5 @@ exception_disable_watchdog:
     li $t1, ~(C0_SR_IM7)
     and $t0, $t0, $t1
     mtc0 $t0, C0_STATUS
+    mtc0 $zero, C0_COMPARE
     jr $ra

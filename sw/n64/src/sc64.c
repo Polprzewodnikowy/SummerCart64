@@ -56,6 +56,99 @@ void sc64_get_info (sc64_info_t *info) {
     info->boot_mode = (boot_mode_t) sc64_query_config(CFG_ID_BOOT_MODE);
 }
 
+void sc64_init (void) {
+    while (!sc64_check_presence());
+    sc64_wait_cpu_ready();
+    sc64_change_config(CFG_ID_SDRAM_SWITCH, true);
+}
+
+static uint32_t sc64_wait_drive_ready (drive_id_t drive) {
+    uint32_t args[2] = { drive, 0 };
+    uint32_t result[2];
+    do {
+        sc64_perform_cmd(SC64_CMD_DRIVE_BUSY, args, result);
+    } while (result[0]);
+    return result[1];
+}
+
+bool sc64_storage_init (drive_id_t drive) {
+    uint32_t args[2] = { drive, 0 };
+    if (sc64_perform_cmd(SC64_CMD_DRIVE_INIT, args, NULL)) {
+        return true;
+    }
+    if (sc64_wait_drive_ready(drive) != 0) {
+        return true;
+    }
+    return false;
+}
+
+static bool sc64_drive_start_read_and_wait (drive_id_t drive, uint32_t sector) {
+    uint32_t args[2] = { drive, sector };
+    if (sc64_perform_cmd(SC64_CMD_DRIVE_READ, args, NULL)) {
+        return true;
+    }
+    if (sc64_wait_drive_ready(drive) != 0) {
+        return true;
+    }
+    return false;
+}
+
+static bool sc64_drive_start_write_and_wait (drive_id_t drive, uint32_t sector) {
+    uint32_t args[2] = { drive, sector };
+    if (sc64_perform_cmd(SC64_CMD_DRIVE_WRITE, args, NULL)) {
+        return true;
+    }
+    if (sc64_wait_drive_ready(drive) != 0) {
+        return true;
+    }
+    return false;
+}
+
+bool sc64_storage_read (drive_id_t drive, void *buffer, uint32_t sector, uint32_t count) {
+    io32_t *src = SC64->BUFFER;
+    uint8_t *dst = (uint8_t *) (buffer);
+
+    while (count > 0) {
+        if (sc64_drive_start_read_and_wait(drive, sector)) {
+            return true;
+        }
+        for (int i = 0; i < (SECTOR_SIZE / sizeof(uint32_t)); i++) {
+            uint32_t data = pi_io_read(src + i);
+            *dst++ = ((data >> 24) & 0xFF);
+            *dst++ = ((data >> 16) & 0xFF);
+            *dst++ = ((data >> 8) & 0xFF);
+            *dst++ = ((data >> 0) & 0xFF);
+        }
+        sector += 1;
+        count -= 1;
+    }
+
+    return false;
+}
+
+bool sc64_storage_write (drive_id_t drive, const void *buffer, uint32_t sector, uint32_t count) {
+    uint8_t *src = (uint8_t *) (buffer);
+    io32_t *dst = SC64->BUFFER;
+
+    while (count > 0) {
+        for (int i = 0; i < (SECTOR_SIZE / sizeof(uint32_t)); i++) {
+            uint32_t data = 0;
+            data |= ((*src++) << 24);
+            data |= ((*src++) << 16);
+            data |= ((*src++) << 8);
+            data |= ((*src++) << 0);
+            pi_io_write((dst + i), data);
+        }
+        if (sc64_drive_start_write_and_wait(drive, sector)) {
+            return true;
+        }
+        sector += 1;
+        count -= 1;
+    }
+
+    return false;
+}
+
 static void sc64_uart_put_char (char c) {
 #ifdef DEBUG
     uint32_t args[2] = { (uint32_t) (c), 0 };
@@ -67,85 +160,4 @@ void sc64_uart_print_string (const char *text) {
     while (*text != '\0') {
         sc64_uart_put_char (*text++);
     }
-}
-
-void sc64_init (void) {
-    while (!sc64_check_presence());
-    sc64_wait_cpu_ready();
-    sc64_change_config(CFG_ID_SDRAM_SWITCH, true);
-    sc64_uart_print_string("\033c");
-}
-
-static bool sc64_wait_drive_ready (uint8_t drive) {
-    bool error;
-    uint32_t args[2] = { drive, 0 };
-    uint32_t result[2];
-    do {
-        error = sc64_perform_cmd(SC64_CMD_DRIVE_BUSY, args, result);
-    } while (!result[0]);
-    return error;
-}
-
-static bool sc64_drive_read_sector (uint8_t drive, void *buffer, uint32_t sector) {
-    io32_t *src = SC64->BUFFER;
-    uint8_t *dst = (uint8_t *) (buffer);
-    uint32_t args[2] = { drive, sector };
-    if (sc64_perform_cmd(SC64_CMD_DRIVE_READ, args, NULL)) {
-        return true;
-    }
-    if (sc64_wait_drive_ready(drive)) {
-        return true;
-    }
-    for (int i = 0; i < SECTOR_SIZE; i += sizeof(uint32_t)) {
-        uint32_t data = pi_io_read(src++);
-        *dst++ = ((data >> 24) & 0xFF);
-        *dst++ = ((data >> 16) & 0xFF);
-        *dst++ = ((data >> 8) & 0xFF);
-        *dst++ = ((data >> 0) & 0xFF);
-    }
-    return false;
-}
-
-bool sc64_storage_read (uint8_t drive, void *buffer, uint32_t sector, uint32_t count) {
-    if (sc64_wait_drive_ready(drive)) {
-        return true;
-    }
-    for (int i = 0; i < count; i++) {
-        if (sc64_drive_read_sector(drive, buffer, (sector + i))) {
-            return true;
-        }
-        buffer += SECTOR_SIZE;
-    }
-    return false;
-}
-
-static bool sc64_drive_write_sector (uint8_t drive, void *buffer, uint32_t sector) {
-    uint8_t *src = (uint8_t *) (buffer);
-    io32_t *dst = SC64->BUFFER;
-    uint32_t args[2] = { drive, sector };
-    uint32_t data;
-    if (sc64_wait_drive_ready(drive)) {
-        return true;
-    }
-    for (int i = 0; i < SECTOR_SIZE; i += sizeof(uint32_t)) {
-        data = ((*src++) << 24);
-        data |= ((*src++) << 16);
-        data |= ((*src++) << 8);
-        data |= ((*src++) << 0);
-        pi_io_write(dst++, data);
-    }
-    if (sc64_perform_cmd(SC64_CMD_DRIVE_WRITE, args, NULL)) {
-        return true;
-    }
-    return false;
-}
-
-bool sc64_storage_write (uint8_t drive, void *buffer, uint32_t sector, uint32_t count) {
-    for (int i = 0; i < count; i++) {
-        if (sc64_drive_write_sector(drive, buffer, (sector + i))) {
-            return true;
-        }
-        buffer += SECTOR_SIZE;
-    }
-    return false;
 }

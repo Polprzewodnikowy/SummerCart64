@@ -66,6 +66,7 @@ struct process {
     uint16_t cic_seed;
     uint8_t tv_type;
     enum boot_mode boot_mode;
+    bool usb_drive_busy;
 };
 
 static struct process p;
@@ -77,6 +78,10 @@ static void change_scr_bits (uint32_t mask, bool value) {
     } else {
         CFG->SCR &= ~(mask);
     }
+}
+
+static void set_usb_drive_not_busy (void) {
+    p.usb_drive_busy = false;
 }
 
 static void set_save_type (enum save_type save_type) {
@@ -252,6 +257,7 @@ void cfg_init (void) {
     p.cic_seed = 0xFFFF;
     p.tv_type = 0x03;
     p.boot_mode = BOOT_MODE_MENU_SD;
+    p.usb_drive_busy = false;
 }
 
 
@@ -273,38 +279,66 @@ void process_cfg (void) {
                 cfg_query(args);
                 break;
 
-            case 'S':
-                args[0] = usb_debug_tx_ready();
-                break;
-
-            case 'D':
-                if (!usb_debug_tx_data(args[0], (size_t) args[1])) {
+            case 0xF0:
+                if (args[0] == 0) {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                } else if (args[0] == 1) {
+                    p.usb_drive_busy = false;
+                } else {
                     change_scr_bits(CFG_SCR_CMD_ERROR, true);
                 }
                 break;
 
-            case 'A':
-                if (!usb_debug_rx_ready(&args[0], (size_t *) (&args[1]))) {
+            case 0xF1:
+                if (args[0] == 0) {
                     args[0] = 0;
-                    args[1] = 0;
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                } else if (args[0] == 1) {
+                    args[0] = p.usb_drive_busy;
+                } else {
+                    args[0] = 0;
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
                 }
+                args[1] = 0;
                 break;
 
-            case 'F':
-                args[0] = usb_debug_rx_busy();
-                break;
-            
-            case 'E':
-                if (!usb_debug_rx_data(args[0], (size_t) args[1])) {
+            case 0xF2:
+                if ((args[0] & 0xFF) == 0) {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                } else if ((args[0] & 0xFF) == 1 && (!p.usb_drive_busy)) {
+                    usb_event_t event;
+                    event.id = EVENT_ID_FSD_READ;
+                    event.trigger = CALLBACK_BUFFER_WRITE;
+                    event.callback = set_usb_drive_not_busy;
+                    if (usb_put_event(&event, &args[1], sizeof(args[1]))) {
+                        p.usb_drive_busy = true;
+                    } else {
+                        return;
+                    }
+                } else {
                     change_scr_bits(CFG_SCR_CMD_ERROR, true);
                 }
                 break;
 
-            case 'B':
-                usb_debug_reset();
+            case 0xF3:
+                if ((args[0] & 0xFF) == 0) {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                } else if ((args[0] & 0xFF) == 1 && (!p.usb_drive_busy)) {
+                    usb_event_t event;
+                    event.id = EVENT_ID_FSD_WRITE;
+                    event.trigger = CALLBACK_BUFFER_READ;
+                    event.callback = set_usb_drive_not_busy;
+                    if (usb_put_event(&event, &args[1], sizeof(args[1]))) {
+                        p.usb_drive_busy = true;
+                    } else {
+                        return;
+                    }
+                } else {
+                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
+                }
                 break;
 
-            case 'Z':
+            case 0xFF:
                 uart_put((char) (args[0] & 0xFF));
                 break;
 

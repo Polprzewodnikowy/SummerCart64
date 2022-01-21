@@ -17,6 +17,7 @@ typedef struct {
 
 struct process {
     bool enabled;
+    bool ready;
     uint32_t current_read_pointer;
     is_viewer_t *ISV;
 };
@@ -26,6 +27,7 @@ struct process p;
 
 void isv_set_enabled (bool enabled) {
     p.enabled = enabled;
+    p.ready = true;
 }
 
 bool isv_get_enabled (void) {
@@ -35,8 +37,13 @@ bool isv_get_enabled (void) {
 
 void isv_init (void) {
     p.enabled = false;
+    p.ready = true;
     p.current_read_pointer = 0;
     p.ISV = (is_viewer_t *) (IS64_OFFSET);
+}
+
+void isv_set_ready (void) {
+    p.ready = true;
 }
 
 void process_isv (void) {
@@ -48,12 +55,19 @@ void process_isv (void) {
 
     uint32_t read_pointer = SWAP32(p.ISV->RD_PTR);
 
-    if ((read_pointer != p.current_read_pointer) && usb_internal_debug_tx_ready()) {
+    if (p.ready && (read_pointer != p.current_read_pointer)) {
         bool wrap = read_pointer < p.current_read_pointer;
-        size_t length = ((wrap ? sizeof(p.ISV->BUFFER) : read_pointer) - p.current_read_pointer);
-        uint32_t address = (uint32_t) (&p.ISV->BUFFER[p.current_read_pointer]);
+        uint32_t data[2] = {
+            ((wrap ? sizeof(p.ISV->BUFFER) : read_pointer) - p.current_read_pointer),
+            (uint32_t) (&p.ISV->BUFFER[p.current_read_pointer]),
+        };
 
-        if (usb_internal_debug_tx_data(INT_DBG_ID_IS_VIEWER, address, length)) {
+        usb_event_t event;
+        event.id = EVENT_ID_IS_VIEWER;
+        event.trigger = CALLBACK_SDRAM_READ;
+        event.callback = isv_set_ready;
+        if (usb_put_event(&event, data, sizeof(data))) {
+            p.ready = false;
             p.current_read_pointer = wrap ? 0 : read_pointer;
         }
     }

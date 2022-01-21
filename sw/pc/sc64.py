@@ -19,6 +19,7 @@ class SC64Exception(Exception):
 
 
 class SC64:
+    __CFG_ID_SDRAM_WRITABLE = 2
     __CFG_ID_DD_ENABLE = 3
     __CFG_ID_SAVE_TYPE = 4
     __CFG_ID_CIC_SEED = 5
@@ -45,12 +46,12 @@ class SC64:
     __DDIPL_ROM_LENGTH = 0x400000
 
     __DEBUG_ID_TEXT = 0x01
-    __DEBUG_ID_FSD_READ = 0xF1
-    __DEBUG_ID_FSD_WRITE = 0xF2
-    __DEBUG_ID_FSD_SECTOR = 0xF3
-    __DEBUG_ID_INTERNAL = 0xFE
-    __INTERNAL_ID_IS_VIEWER = 0
-    __INTERNAL_ID_DD_BLOCK = 1
+    __DEBUG_ID_EVENT = 0xFE
+
+    __EVENT_ID_FSD_READ = 0
+    __EVENT_ID_FSD_WRITE = 1
+    __EVENT_ID_DD_BLOCK = 2
+    __EVENT_ID_IS_VIEWER = 3
 
     __DD_DRIVE_ID_RETAIL = 3
     __DD_DRIVE_ID_DEVELOPMENT = 4
@@ -67,6 +68,7 @@ class SC64:
         self.__fsd_file = None
         self.__disk_file = None
         self.__disk_lba_table = []
+        self.__dd_turbo = False
         self.__isv_line_buffer = bytearray()
         self.__find_sc64()
 
@@ -185,11 +187,6 @@ class SC64:
         self.__write_cmd("C", id, arg)
         if (not ignore_response):
             self.__read_cmd_status("C")
-
-
-    def __debug_write(self, type: int, data: bytes) -> None:
-        self.__write_cmd("D", type, len(data))
-        self.__write(data)
 
 
     def __read_file_from_sdram(self, file: str, offset: int, length: int, align: int = 2) -> None:
@@ -543,27 +540,53 @@ class SC64:
             raise SC64Exception("No DD disk file provided for disk info creation")
 
 
-    def __debug_process_fsd_set_sector(self, data: bytes) -> None:
-        sector = int.from_bytes(data[0:4], byteorder='big')
+    def __debug_process_fsd_read(self, data: bytes) -> None:
+        sector = int.from_bytes(data[0:4], byteorder='little')
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
-
-
-    def __debug_process_fsd_read(self, data: bytes) -> None:
-        length = int.from_bytes(data[0:4], byteorder='big')
-        if (self.__fsd_file):
-            self.__debug_write(self.__DEBUG_ID_FSD_READ, self.__fsd_file.read(length))
+            self.__write_cmd("T", 0, 512)
+            self.__write(self.__fsd_file.read(512))
         else:
-            self.__debug_write(self.__DEBUG_ID_FSD_READ, bytes(length))
+            self.__write_cmd("T", 0, 0)
 
 
     def __debug_process_fsd_write(self, data: bytes) -> None:
+        sector = int.from_bytes(data[0:4], byteorder='little')
         if (self.__fsd_file):
-            self.__fsd_file.write(data)
+            self.__fsd_file.seek(sector * 512)
+            self.__write_cmd("F", 0, 512)
+            self.__fsd_file.write(self.__read(512))
+        else:
+            self.__write_cmd("F", 0, 0)
+
+
+    def __debug_process_dd_block(self, data: bytes) -> None:
+        transfer_mode = int.from_bytes(data[0:4], byteorder='little')
+        sdram_offset = int.from_bytes(data[4:8], byteorder='little')
+        disk_file_offset = int.from_bytes(data[8:12], byteorder='big')
+        block_length = int.from_bytes(data[12:16], byteorder='little')
+
+        if (self.__disk_file):
+            self.__disk_file.seek(disk_file_offset)
+            if (transfer_mode):
+                if (not self.__dd_turbo):
+                    # Fixes weird bug in Mario Artist Paint Studio prototype minigame
+                    time.sleep(0.016)
+                self.__write_cmd("S", sdram_offset, block_length)
+                self.__write(self.__disk_file.read(block_length))
+            else:
+                self.__write_cmd("L", sdram_offset, block_length)
+                self.__disk_file.write(self.__read(block_length))
 
 
     def __debug_process_is_viewer(self, data: bytes) -> None:
-        self.__isv_line_buffer.extend(data)
+        length = int.from_bytes(data[0:4], byteorder='little')
+        address = int.from_bytes(data[4:8], byteorder='little')
+        offset = (address & 0x01)
+        transfer_length = self.__align(length + offset, 2)
+        self.__write_cmd("L", (address & 0xFFFFFFFE), transfer_length)
+        text = self.__read(transfer_length)[offset:][:length]
+        self.__isv_line_buffer.extend(text)
         try:
             while (len(self.__isv_line_buffer) > 0):
                 line_end = self.__isv_line_buffer.index(b'\n')
@@ -574,48 +597,32 @@ class SC64:
             pass
 
 
-    def __debug_process_dd_block(self, data: bytes) -> None:
-        transfer_mode = int.from_bytes(data[0:4], byteorder='big')
-        sdram_offset = int.from_bytes(data[4:8], byteorder='big')
-        disk_file_offset = int.from_bytes(data[8:12], byteorder='big')
-        block_length = int.from_bytes(data[12:16], byteorder='big')
+    def __debug_process_event(self, event_data: bytes) -> None:
+        id = int.from_bytes(event_data[0:4], byteorder="big")
+        data = event_data[4:]
 
-        print(f"64DD Block {'R' if transfer_mode else 'W'} - LBA: {self.__disk_lba_table.index(disk_file_offset):4}, Offset: 0x{disk_file_offset:08X}")
-
-        if (self.__disk_file):
-            self.__disk_file.seek(disk_file_offset)
-            if (transfer_mode):
-                time.sleep(0.016)    # Fixes weird bug in Mario Artist Paint Studio minigame
-                self.__write_cmd("S", sdram_offset, block_length)
-                self.__write(self.__disk_file.read(block_length))
-            else:
-                write_data = data[16:]
-                self.__disk_file.write(write_data)
-
-
-    def __debug_process_internal(self, internal_data: bytes) -> None:
-        id = internal_data[0]
-        start_alignmnet = internal_data[1]
-        length = int.from_bytes(internal_data[2:4], byteorder="big")
-        data = internal_data[(4 + start_alignmnet):][:length]
-
-        if (id == self.__INTERNAL_ID_IS_VIEWER):
-            self.__debug_process_is_viewer(data)
-        elif (id == self.__INTERNAL_ID_DD_BLOCK):
+        if (id == self.__EVENT_ID_FSD_READ):
+            self.__debug_process_fsd_read(data)
+        elif (id == self.__EVENT_ID_FSD_WRITE):
+            self.__debug_process_fsd_write(data)
+        elif (id == self.__EVENT_ID_DD_BLOCK):
             self.__debug_process_dd_block(data)
+        elif (id == self.__EVENT_ID_IS_VIEWER):
+            self.__debug_process_is_viewer(data)
 
 
-    def debug_init(self, fsd_file: str = None, disk_file: str = None, is_viewer_enabled: bool = False) -> None:
+    def debug_init(self, fsd_file: str = None, disk_file: str = None, dd_turbo: bool = False) -> None:
         if (fsd_file):
             self.__fsd_file = open(fsd_file, "rb+")
-
         if (disk_file):
             self.__disk_file = open(disk_file, "rb+")
+        self.__dd_turbo = dd_turbo
 
+
+    def debug_loop(self, is_viewer_enabled: bool = False) -> None:
+        self.__change_config(self.__CFG_ID_SDRAM_WRITABLE, is_viewer_enabled)
         self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
 
-
-    def debug_loop(self) -> None:
         print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
         start_indicator = bytearray()
@@ -645,14 +652,8 @@ class SC64:
             else:
                 if (id == self.__DEBUG_ID_TEXT):
                     print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
-                elif (id == self.__DEBUG_ID_FSD_READ):
-                    self.__debug_process_fsd_read(data)
-                elif (id == self.__DEBUG_ID_FSD_WRITE):
-                    self.__debug_process_fsd_write(data)
-                elif (id == self.__DEBUG_ID_FSD_SECTOR):
-                    self.__debug_process_fsd_set_sector(data)
-                elif (id == self.__DEBUG_ID_INTERNAL):
-                    self.__debug_process_internal(data)
+                elif (id == self.__DEBUG_ID_EVENT):
+                    self.__debug_process_event(data)
                 else:
                     print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
@@ -722,6 +723,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", metavar="cic_seed", default="0xFFFF", required=False, help="set CIC seed")
     parser.add_argument("-s", metavar="save_type", default="0", required=False, help="set save type (0 - 6)")
     parser.add_argument("-d", default=False, action="store_true", required=False, help="enable 64DD emulation")
+    parser.add_argument("-df", default=False, action="store_true", required=False, help="set 64DD emulation to turbo mode")
     parser.add_argument("-r", default=False, action="store_true", required=False, help="perform reading operation instead of writing")
     parser.add_argument("-l", metavar="length", default="0x101000", required=False, help="specify ROM length to read")
     parser.add_argument("-u", metavar="update_path", default=None, required=False, help="path to update file")
@@ -747,6 +749,7 @@ if __name__ == "__main__":
         tv_type = int(args.t)
         cic_seed = int(args.c, 0)
         dd_enable = args.d
+        dd_turbo = args.df
         is_read = args.r
         rom_length = int(args.l, 0)
         update_file = args.u
@@ -818,7 +821,7 @@ if __name__ == "__main__":
             sc64.reset_n64()
 
             if (debug_server):
-                sc64.debug_init(sd_file, disk_file, is_viewer_enabled)
+                sc64.debug_init(sd_file, disk_file, dd_turbo)
                 if (is_viewer_enabled):
                     print(f"Setting IS-Viewer 64 emulation to [Enabled]")
                 if (sd_file):
@@ -828,7 +831,7 @@ if __name__ == "__main__":
                     sc64.set_dd_configuration_for_disk(disk_file)
                     print(f"Setting 64DD disk state to [Changed]")
                 sc64.set_dd_disk_state("changed" if disk_file else "ejected")
-                sc64.debug_loop()
+                sc64.debug_loop(is_viewer_enabled)
 
     except SC64Exception as e:
         print(f"Error: {e}")
