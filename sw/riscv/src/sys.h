@@ -105,6 +105,7 @@ typedef volatile struct usb_regs {
 #define USB_SCR_PWREN               (1 << 5)
 #define USB_SCR_ESCAPE_PENDING      (1 << 6)
 #define USB_SCR_ESCAPE_ACK          (1 << 7)
+#define USB_SCR_FORCE_TX            (1 << 8)
 
 
 typedef volatile struct uart_regs {

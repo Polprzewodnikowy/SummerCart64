@@ -252,6 +252,9 @@ void process_usb (void) {
                                     }
                                 }
                                 p.state = STATE_IDLE;
+                                if (p.cmd == 'L') {
+                                    USB->SCR |= USB_SCR_FORCE_TX;
+                                }
                             } else {
                                 p.state = STATE_RESPONSE;
                             }
@@ -303,6 +306,7 @@ void process_usb (void) {
         case STATE_RESPONSE:
             if (tx_word((p.error ? USB_ERR_TOKEN : USB_CMP_TOKEN) | p.cmd)) {
                 p.state = STATE_IDLE;
+                USB->SCR |= USB_SCR_FORCE_TX;
             }
             break;
 
@@ -327,6 +331,7 @@ void process_usb (void) {
                 }
                 p.event_pending = false;
                 p.state = STATE_IDLE;
+                USB->SCR |= USB_SCR_FORCE_TX;
             }
             break;
     }

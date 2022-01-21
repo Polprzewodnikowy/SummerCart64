@@ -2,6 +2,7 @@ module usb_ft1248 (
     if_system.sys sys,
 
     input usb_enabled,
+    input tx_force,
 
     output usb_clk,
     output usb_cs,
@@ -111,7 +112,8 @@ module usb_ft1248 (
 
     typedef enum bit [7:0] {
         C_WRITE = 8'h00,
-        C_READ = 8'h04
+        C_READ = 8'h04,
+        C_FORCE = 8'h80
     } e_command;
 
     typedef enum bit [1:0] {
@@ -134,7 +136,9 @@ module usb_ft1248 (
     logic usb_miosi_output_enable_data;
     logic usb_miso_input;
 
+    logic tx_force_pending;
     logic is_cmd_write;
+    logic is_cmd_tx_force;
     logic [1:0] nibble_counter;
     logic [7:0] tx_buffer;
 
@@ -168,7 +172,9 @@ module usb_ft1248 (
             S_COMMAND: begin
                 usb_clk_output = clock_phase[P_PRE_FALLING] || clock_phase[P_FALLING];
                 usb_cs_output = 1'b0;
-                if (is_cmd_write) begin
+                if (is_cmd_tx_force) begin
+                    usb_miosi_output_data = nibble_counter[0] ? C_FORCE[3:0] : C_FORCE[7:4];
+                end else if (is_cmd_write) begin
                     usb_miosi_output_data = nibble_counter[0] ? C_WRITE[3:0] : C_WRITE[7:4];
                 end else begin
                     usb_miosi_output_data = nibble_counter[0] ? C_READ[3:0] : C_READ[7:4];
@@ -202,12 +208,18 @@ module usb_ft1248 (
 
         if (sys.reset || !usb_enabled) begin
             state <= S_TRY_RX;
+            tx_force_pending <= 1'b0;
         end else begin
+            if (tx_force) begin
+                tx_force_pending <= 1'b1;
+            end
+
             case (state)
                 S_TRY_RX: begin
                     if (!rx_full && !rx_escape_valid) begin
                         state <= S_COMMAND;
                         is_cmd_write <= 1'b0;
+                        is_cmd_tx_force <= 1'b0;
                         nibble_counter <= 2'b11;
                     end else begin
                         state <= S_TRY_TX;
@@ -218,6 +230,13 @@ module usb_ft1248 (
                     if (!tx_empty) begin
                         state <= S_COMMAND;
                         is_cmd_write <= 1'b1;
+                        is_cmd_tx_force <= 1'b0;
+                        nibble_counter <= 2'b11;
+                    end else if (tx_force_pending) begin
+                        state <= S_COMMAND;
+                        tx_force_pending <= 1'b0;
+                        is_cmd_write <= 1'b1;
+                        is_cmd_tx_force <= 1'b1;
                         nibble_counter <= 2'b11;
                     end else begin
                         state <= S_TRY_RX;
@@ -227,7 +246,7 @@ module usb_ft1248 (
                 S_COMMAND: begin
                     if (clock_phase[P_RISING]) begin
                         if (nibble_counter == 2'd2) begin
-                            if (usb_miso_input) begin
+                            if (usb_miso_input || is_cmd_tx_force) begin
                                 state <= is_cmd_write ? S_TRY_RX : S_TRY_TX;
                             end else begin
                                 state <= S_DATA;

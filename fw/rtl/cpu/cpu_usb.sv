@@ -28,6 +28,7 @@ module cpu_usb (
     logic cpu_tx_write;
 
     logic usb_enabled;
+    logic tx_force;
 
     always_comb begin
         dma.rx_empty = rx_empty;
@@ -66,6 +67,7 @@ module cpu_usb (
         cpu_tx_write <= 1'b0;
 
         rx_escape_ack <= 1'b0;
+        tx_force <= 1'b0;
 
         if (sys.reset) begin
             usb_enabled <= 1'b0;
@@ -73,6 +75,9 @@ module cpu_usb (
             if (bus.request) begin
                 case (bus.address[2:2])
                     2'd0: begin
+                        if (bus.wmask[1]) begin
+                            tx_force <= bus.wdata[8];
+                        end
                         if (bus.wmask[0]) begin
                             rx_escape_ack <= bus.wdata[7];
                             {usb_enabled, tx_flush, rx_flush} <= bus.wdata[4:2];
@@ -95,6 +100,7 @@ module cpu_usb (
         .sys(sys),
 
         .usb_enabled(usb_enabled),
+        .tx_force(tx_force),
 
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
