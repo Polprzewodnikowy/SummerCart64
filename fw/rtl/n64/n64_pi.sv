@@ -211,27 +211,31 @@ module n64_pi (
 
     // Address decoding
 
+    logic load_next;
     sc64::e_n64_id next_id;
     logic [31:0] next_offset;
     logic sram_selected;
-    logic cfg_selected;
+    logic isv_selected;
 
     always_ff @(posedge sys.clk) begin
+        load_next <= 1'b0;
+
         if (aleh_op) begin
             n64_pi_address_valid <= 1'b0;
             next_id <= sc64::__ID_N64_END;
             next_offset <= 32'd0;
             sram_selected <= 1'b0;
-            cfg_selected <= 1'b0;
+            isv_selected <= 1'b0;
             if (cfg.dd_enabled) begin
                 if (n64_pi_ad_input == 16'h0500) begin
                     n64_pi_address_valid <= 1'b1;
                     next_id <= sc64::ID_N64_DD;
+                    next_offset <= cfg.ddipl_offset - 32'h0500_0000;
                 end
                 if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
                     n64_pi_address_valid <= 1'b1;
                     next_id <= sc64::ID_N64_SDRAM;
-                    next_offset <= cfg.ddipl_offset + 32'h0A00_0000;
+                    next_offset <= cfg.ddipl_offset - 32'h0600_0000;
                 end
             end
             if (cfg.flashram_enabled) begin
@@ -239,7 +243,7 @@ module n64_pi (
                     n64_pi_address_valid <= 1'b1;
                     next_id <= sc64::ID_N64_FLASHRAM;
                     if (cfg.flashram_read_mode) begin
-                        next_offset <= cfg.save_offset + 32'h0800_0000;
+                        next_offset <= cfg.save_offset - 32'h0800_0000;
                     end
                 end
             end else if (cfg.sram_enabled) begin
@@ -248,7 +252,7 @@ module n64_pi (
                         if (n64_pi_ad_input[3:2] != 2'b11 && n64_pi_ad_input[1:0] == 2'b00) begin
                             n64_pi_address_valid <= 1'b1;
                             next_id <= sc64::ID_N64_SDRAM;
-                            next_offset <= cfg.save_offset - {n64_pi_ad_input[3:2], 18'd0} + {n64_pi_ad_input[3:2], 15'd0} + 32'h0800_0000;
+                            next_offset <= cfg.save_offset - {n64_pi_ad_input[3:2], 18'd0} + {n64_pi_ad_input[3:2], 15'd0} - 32'h0800_0000;
                             sram_selected <= 1'b1;
                         end
                     end
@@ -256,7 +260,7 @@ module n64_pi (
                     if (n64_pi_ad_input == 16'h0800) begin
                         n64_pi_address_valid <= 1'b1;
                         next_id <= sc64::ID_N64_SDRAM;
-                        next_offset <= cfg.save_offset + 32'h0800_0000;
+                        next_offset <= cfg.save_offset - 32'h0800_0000;
                         sram_selected <= 1'b1;
                     end
                 end
@@ -264,11 +268,18 @@ module n64_pi (
             if (n64_pi_ad_input >= 16'h1000 && n64_pi_ad_input < 16'h1400) begin
                 n64_pi_address_valid <= 1'b1;
                 next_id <= cfg.sdram_switch ? sc64::ID_N64_SDRAM : sc64::ID_N64_BOOTLOADER;
+                next_offset <= (-32'h1000_0000);
+                if (cfg.isv_enabled) begin
+                    if (n64_pi_ad_input == 16'h13FF) begin
+                        next_id <= sc64::ID_N64_SDRAM;
+                        next_offset <= cfg.isv_offset - 32'h13FF_0000;
+                        isv_selected <= 1'b1;
+                    end
+                end
             end
             if (n64_pi_ad_input == 16'h1FFF) begin
                 n64_pi_address_valid <= 1'b1;
                 next_id <= sc64::ID_N64_CFG;
-                cfg_selected <= 1'b1;
             end
         end
         if (alel_op) begin
@@ -282,6 +293,13 @@ module n64_pi (
                     n64_pi_address_valid <= 1'b0;
                 end
             end
+            if (isv_selected) begin
+                if (n64_pi_ad_input < 16'h0020) begin
+                    next_offset <= (-32'h13FF_0000) + 32'h0000_C000;
+                    next_id <= sc64::ID_N64_CFG;
+                end
+            end
+            load_next <= 1'b1;
         end
     end
 
@@ -304,13 +322,13 @@ module n64_pi (
             read_fifo_flush <= 1'b1;
             write_fifo_flush <= 1'b1;
         end else begin
-            write_fifo_flush <= starting_id == sc64::ID_N64_SDRAM && !cfg.sdram_writable && !sram_selected;
+            write_fifo_flush <= starting_id == sc64::ID_N64_SDRAM && !cfg.sdram_writable && !sram_selected && !isv_selected;
 
             if (aleh_op) begin
                 starting_address[31:16] <= n64_pi_ad_input;
             end
 
-            if (alel_op) begin
+            if (load_next) begin
                 read_fifo_flush <= 1'b1;
                 can_read <= 1'b1;
                 first_write_op <= 1'b1;

@@ -6,8 +6,9 @@ module cpu_cfg (
 
     logic skip_bootloader;
     logic trigger_reconfiguration;
+    logic [15:0] isv_current_rd_ptr;
 
-    typedef enum bit [2:0] { 
+    typedef enum bit [3:0] { 
         R_SCR,
         R_DDIPL_OFFSET,
         R_SAVE_OFFSET,
@@ -15,7 +16,9 @@ module cpu_cfg (
         R_DATA_0,
         R_DATA_1,
         R_VERSION,
-        R_RECONFIGURE
+        R_RECONFIGURE,
+        R_ISV_OFFSET,
+        R_ISV_RD_PTR
     } e_reg_id;
 
     const logic [31:0] RECONFIGURE_MAGIC = 32'h52535446;
@@ -30,13 +33,14 @@ module cpu_cfg (
     always_comb begin
         bus.rdata = 32'd0;
         if (bus.ack) begin
-            case (bus.address[4:2])
+            case (bus.address[5:2])
                 R_SCR: bus.rdata = {
                     cfg.cpu_ready,
                     cfg.cpu_busy,
                     1'b0,
                     cfg.cmd_error,
-                    21'd0,
+                    20'd0,
+                    cfg.isv_enabled,
                     skip_bootloader,
                     cfg.flashram_enabled,
                     cfg.sram_banked,
@@ -52,6 +56,8 @@ module cpu_cfg (
                 R_DATA_1: bus.rdata = cfg.data[1];
                 R_VERSION: bus.rdata = sc64::SC64_VER;
                 R_RECONFIGURE: bus.rdata = RECONFIGURE_MAGIC;
+                R_ISV_OFFSET: bus.rdata = {6'd0, cfg.isv_offset};
+                R_ISV_RD_PTR: bus.rdata = {isv_current_rd_ptr, cfg.isv_rd_ptr};
                 default: bus.rdata = 32'd0;
             endcase
         end
@@ -77,19 +83,23 @@ module cpu_cfg (
             cfg.sram_enabled <= 1'b0;
             cfg.sram_banked <= 1'b0;
             cfg.flashram_enabled <= 1'b0;
+            cfg.isv_enabled <= 1'b0;
             cfg.ddipl_offset <= 26'h3BE_0000;
             cfg.save_offset <= 26'h3FE_0000;
+            cfg.isv_offset <= 26'h3FF_0000;
             skip_bootloader <= 1'b0;
             trigger_reconfiguration <= 1'b0;
         end else begin
             if (sys.n64_soft_reset) begin
                 cfg.sdram_switch <= skip_bootloader;
+                cfg.sdram_writable <= 1'b0;
+                isv_current_rd_ptr <= 16'd0;
             end
             if (cfg.cmd_request) begin
                 cfg.cpu_busy <= 1'b1;
             end
             if (bus.request) begin
-                case (bus.address[4:2])
+                case (bus.address[5:2])
                     R_SCR: begin
                         if (bus.wmask[3]) begin
                             {
@@ -100,6 +110,7 @@ module cpu_cfg (
                         end
                         if (bus.wmask[0]) begin
                             {
+                                cfg.isv_enabled,
                                 skip_bootloader,
                                 cfg.flashram_enabled,
                                 cfg.sram_banked,
@@ -107,7 +118,7 @@ module cpu_cfg (
                                 cfg.dd_enabled,
                                 cfg.sdram_writable,
                                 cfg.sdram_switch
-                            } <= bus.wdata[6:0];
+                            } <= bus.wdata[7:0];
                         end
                     end
 
@@ -126,6 +137,18 @@ module cpu_cfg (
                     R_RECONFIGURE: begin
                         if (&bus.wmask && bus.wdata == RECONFIGURE_MAGIC) begin
                             trigger_reconfiguration <= 1'b1;
+                        end
+                    end
+
+                    R_ISV_OFFSET: begin
+                        if (&bus.wmask) begin
+                            cfg.isv_offset <= bus.wdata[25:0];
+                        end
+                    end
+
+                    R_ISV_RD_PTR: begin
+                        if (&bus.wmask[3:2]) begin
+                            isv_current_rd_ptr <= bus.wdata[31:16];
                         end
                     end
                 endcase

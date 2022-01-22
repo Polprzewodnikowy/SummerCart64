@@ -89,7 +89,7 @@ module n64_bootloader (
 
         bus.ack = source_request == T_N64 && data_ack;
         bus.rdata = 16'd0;
-        if (bus.ack && bus.address >= 32'h10000000 && bus.address < 32'h10010000) begin
+        if (bus.ack && bus.address < 32'h00010000) begin
             if (bus.address[1]) bus.rdata = {data_rdata[23:16], data_rdata[31:24]};
             else bus.rdata = {data_rdata[7:0], data_rdata[15:8]};
         end

@@ -15,8 +15,11 @@ interface if_config ();
     logic sram_banked;
     logic flashram_enabled;
     logic flashram_read_mode;
+    logic isv_enabled;
     logic [25:0] ddipl_offset;
     logic [25:0] save_offset;
+    logic [25:0] isv_offset;
+    logic [15:0] isv_rd_ptr;
 
     modport pi (
         input sdram_switch,
@@ -26,8 +29,10 @@ interface if_config ();
         input sram_banked,
         input flashram_enabled,
         input flashram_read_mode,
+        input isv_enabled,
         input ddipl_offset,
-        input save_offset
+        input save_offset,
+        input isv_offset
     );
 
     modport flashram (
@@ -42,7 +47,8 @@ interface if_config ();
         output cmd,
         output data,
         input data_write,
-        input wdata
+        input wdata,
+        output isv_rd_ptr
     );
 
     modport cpu (
@@ -60,8 +66,11 @@ interface if_config ();
         output sram_enabled,
         output sram_banked,
         output flashram_enabled,
+        output isv_enabled,
         output ddipl_offset,
-        output save_offset
+        output save_offset,
+        output isv_offset,
+        input isv_rd_ptr
     );
 
 endinterface

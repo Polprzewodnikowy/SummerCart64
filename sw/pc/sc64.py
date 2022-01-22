@@ -19,7 +19,6 @@ class SC64Exception(Exception):
 
 
 class SC64:
-    __CFG_ID_SDRAM_WRITABLE = 2
     __CFG_ID_DD_ENABLE = 3
     __CFG_ID_SAVE_TYPE = 4
     __CFG_ID_CIC_SEED = 5
@@ -608,7 +607,6 @@ class SC64:
 
 
     def debug_loop(self, is_viewer_enabled: bool = False) -> None:
-        self.__change_config(self.__CFG_ID_SDRAM_WRITABLE, is_viewer_enabled)
         self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
 
         print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")

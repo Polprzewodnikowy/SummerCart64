@@ -145,6 +145,9 @@ typedef volatile struct cfg_regs {
     io32_t DATA[2];
     io32_t VERSION;
     io32_t RECONFIGURE;
+    io32_t ISV_OFFSET;
+    io16_t ISV_RD_PTR;
+    io16_t ISV_CURRENT_RD_PTR;
 } cfg_regs_t;
 
 #define CFG_BASE                    (0x70000000UL)
@@ -157,8 +160,8 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_SRAM_BANKED         (1 << 4)
 #define CFG_SCR_FLASHRAM_EN         (1 << 5)
 #define CFG_SCR_SKIP_BOOTLOADER     (1 << 6)
+#define CFG_SCR_ISV_EN              (1 << 7)
 #define CFG_SCR_CMD_ERROR           (1 << 28)
-#define CFG_SCR_USB_WAITING         (1 << 29)
 #define CFG_SCR_CPU_BUSY            (1 << 30)
 #define CFG_SCR_CPU_READY           (1 << 31)
 
