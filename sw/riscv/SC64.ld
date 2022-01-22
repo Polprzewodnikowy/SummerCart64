@@ -1,6 +1,6 @@
 MEMORY {
-    ram (rwx)   : org = 0x00000000, len = 16k - 512
-    buffer (rw) : org = 0x00003E00, len = 512
+    ram (rwx)   : org = 0x00000000, len = 15k
+    buffer (rw) : org = 0x00003C00, len = 1k
     rom (rx)    : org = 0x10010000, len = 26k
 }
 

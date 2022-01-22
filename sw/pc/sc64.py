@@ -542,22 +542,24 @@ class SC64:
 
     def __debug_process_fsd_read(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder='little')
+        offset = int.from_bytes(data[4:8], byteorder='little')
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
-            self.__write_cmd("T", 0, 512)
+            self.__write_cmd("T", offset, 512)
             self.__write(self.__fsd_file.read(512))
         else:
-            self.__write_cmd("T", 0, 0)
+            self.__write_cmd("T", offset, 0)
 
 
     def __debug_process_fsd_write(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder='little')
+        offset = int.from_bytes(data[4:8], byteorder='little')
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
-            self.__write_cmd("F", 0, 512)
+            self.__write_cmd("F", offset, 512)
             self.__fsd_file.write(self.__read(512))
         else:
-            self.__write_cmd("F", 0, 0)
+            self.__write_cmd("F", offset, 0)
 
 
     def __debug_process_dd_block(self, data: bytes) -> None:

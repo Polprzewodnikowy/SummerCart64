@@ -310,7 +310,8 @@ void process_cfg (void) {
                     event.id = EVENT_ID_FSD_READ;
                     event.trigger = CALLBACK_BUFFER_WRITE;
                     event.callback = set_usb_drive_not_busy;
-                    if (usb_put_event(&event, &args[1], sizeof(args[1]))) {
+                    uint32_t data[2] = { args[1], (args[0] >> 8) };
+                    if (usb_put_event(&event, data, sizeof(data))) {
                         p.usb_drive_busy = true;
                     } else {
                         return;
@@ -328,7 +329,8 @@ void process_cfg (void) {
                     event.id = EVENT_ID_FSD_WRITE;
                     event.trigger = CALLBACK_BUFFER_READ;
                     event.callback = set_usb_drive_not_busy;
-                    if (usb_put_event(&event, &args[1], sizeof(args[1]))) {
+                    uint32_t data[2] = { args[1], (args[0] >> 8) };
+                    if (usb_put_event(&event, data, sizeof(data))) {
                         p.usb_drive_busy = true;
                     } else {
                         return;
