@@ -66,8 +66,6 @@ static bool tx_word (uint32_t data) {
 #define USB_DMA_TOKEN       (0x444D4100)
 #define USB_ERR_TOKEN       (0x45525200)
 
-#define DEBUG_ID_EVENT      (0xFE)
-
 
 enum state {
     STATE_IDLE,
@@ -84,7 +82,6 @@ struct process {
     uint32_t args[2];
     bool error;
     bool dma_in_progress;
-    bool queried;
 
     bool event_pending;
     bool event_callback_pending;
@@ -183,7 +180,6 @@ void process_usb (void) {
                     p.counter = 0;
                     p.error = false;
                     p.dma_in_progress = false;
-                    p.queried = false;
                     p.state = STATE_ARGS;
                 } else {
                     p.cmd = '!';
@@ -220,9 +216,9 @@ void process_usb (void) {
                     break;
 
                 case 'Q':
-                    if (!p.queried) {
+                    if (p.counter == 0) {
                         cfg_query(p.args);
-                        p.queried = true;
+                        p.counter += 1;
                     }
                     if (tx_word(p.args[1])) {
                         p.state = STATE_RESPONSE;
@@ -317,18 +313,15 @@ void process_usb (void) {
             if ((p.counter == 0) && tx_word(USB_DMA_TOKEN | '@')) {
                 p.counter += 1;
             }
-            if ((p.counter == 1) && tx_word((DEBUG_ID_EVENT << 24) | (sizeof(p.event.id) + p.event_data_length))) {
+            if ((p.counter == 1) && tx_word(((p.event.id & 0xFF) << 24) | p.event_data_length)) {
                 p.counter += 1;
             }
-            if ((p.counter == 2) && tx_word(p.event.id)) {
-                p.counter += 1;
-            }
-            if (p.counter >= 3) {
-                while (((p.counter - 3) < p.event_data_length) && tx_byte(p.event_data[p.counter - 3])) {
+            if (p.counter >= 2) {
+                while (((p.counter - 2) < p.event_data_length) && tx_byte(p.event_data[p.counter - 2])) {
                     p.counter += 1;
                 }
             }
-            if ((p.counter == (p.event_data_length + 3)) && tx_word(USB_CMP_TOKEN | 'H')) {
+            if ((p.counter == (p.event_data_length + 2)) && tx_word(USB_CMP_TOKEN | 'H')) {
                 if (p.event.callback != NULL) {
                     p.event_callback_pending = true;
                 }

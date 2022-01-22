@@ -6,17 +6,12 @@
 
 
 typedef enum {
-    INT_DBG_ID_IS_VIEWER = 0,
-    INT_DBG_ID_DD_BLOCK = 1,
-    INT_DBG_ID_FSD_READ = 2,
-    INT_DBG_ID_FSD_WRITE = 3,
-} internal_debug_id_t;
-
-typedef enum {
-    EVENT_ID_FSD_READ = 0,
-    EVENT_ID_FSD_WRITE = 1,
-    EVENT_ID_DD_BLOCK = 2,
-    EVENT_ID_IS_VIEWER = 3,
+    EVENT_ID_FSD_READ = 0xF0,
+    EVENT_ID_FSD_WRITE = 0xF1,
+    EVENT_ID_FSD_LOAD = 0xF2,
+    EVENT_ID_FSD_STORE = 0xF3,
+    EVENT_ID_DD_BLOCK = 0xF4,
+    EVENT_ID_IS_VIEWER = 0xF5,
 } usb_event_id_t;
 
 typedef enum {

@@ -46,12 +46,12 @@ class SC64:
     __DDIPL_ROM_LENGTH = 0x400000
 
     __DEBUG_ID_TEXT = 0x01
-    __DEBUG_ID_EVENT = 0xFE
-
-    __EVENT_ID_FSD_READ = 0
-    __EVENT_ID_FSD_WRITE = 1
-    __EVENT_ID_DD_BLOCK = 2
-    __EVENT_ID_IS_VIEWER = 3
+    __EVENT_ID_FSD_READ = 0xF0
+    __EVENT_ID_FSD_WRITE = 0xF1
+    __EVENT_ID_FSD_LOAD = 0xF2
+    __EVENT_ID_FSD_STORE = 0xF3
+    __EVENT_ID_DD_BLOCK = 0xF4
+    __EVENT_ID_IS_VIEWER = 0xF5
 
     __DD_DRIVE_ID_RETAIL = 3
     __DD_DRIVE_ID_DEVELOPMENT = 4
@@ -599,20 +599,6 @@ class SC64:
             pass
 
 
-    def __debug_process_event(self, event_data: bytes) -> None:
-        id = int.from_bytes(event_data[0:4], byteorder="big")
-        data = event_data[4:]
-
-        if (id == self.__EVENT_ID_FSD_READ):
-            self.__debug_process_fsd_read(data)
-        elif (id == self.__EVENT_ID_FSD_WRITE):
-            self.__debug_process_fsd_write(data)
-        elif (id == self.__EVENT_ID_DD_BLOCK):
-            self.__debug_process_dd_block(data)
-        elif (id == self.__EVENT_ID_IS_VIEWER):
-            self.__debug_process_is_viewer(data)
-
-
     def debug_init(self, fsd_file: str = None, disk_file: str = None, dd_turbo: bool = False) -> None:
         if (fsd_file):
             self.__fsd_file = open(fsd_file, "rb+")
@@ -654,8 +640,14 @@ class SC64:
             else:
                 if (id == self.__DEBUG_ID_TEXT):
                     print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
-                elif (id == self.__DEBUG_ID_EVENT):
-                    self.__debug_process_event(data)
+                elif (id == self.__EVENT_ID_FSD_READ):
+                    self.__debug_process_fsd_read(data)
+                elif (id == self.__EVENT_ID_FSD_WRITE):
+                    self.__debug_process_fsd_write(data)
+                elif (id == self.__EVENT_ID_DD_BLOCK):
+                    self.__debug_process_dd_block(data)
+                elif (id == self.__EVENT_ID_IS_VIEWER):
+                    self.__debug_process_is_viewer(data)
                 else:
                     print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
