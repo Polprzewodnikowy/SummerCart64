@@ -258,7 +258,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
 
     exception_init_screen();
 
-    exception_print("-----  SummerCart64 n64boot  -----\n");
+    exception_print("-----  n64boot SummerCart64  -----\n");
     exception_print("branch: %s\n", version->git_branch);
     exception_print("tag: %s\n", version->git_tag);
     exception_print("sha: %s\n\n", version->git_sha);

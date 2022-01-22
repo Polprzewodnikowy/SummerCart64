@@ -251,10 +251,10 @@ void process_usb (void) {
                                         p.event.callback();
                                     }
                                 }
-                                p.state = STATE_IDLE;
                                 if (p.cmd == 'L') {
                                     USB->SCR |= USB_SCR_FORCE_TX;
                                 }
+                                p.state = STATE_IDLE;
                             } else {
                                 p.state = STATE_RESPONSE;
                             }
@@ -291,6 +291,9 @@ void process_usb (void) {
                                 p.event_callback_pending = false;
                                 p.event.callback();
                             }
+                        }
+                        if (p.cmd == 'F') {
+                            USB->SCR |= USB_SCR_FORCE_TX;
                         }
                         p.state = STATE_IDLE;
                     }
@@ -329,9 +332,9 @@ void process_usb (void) {
                 if (p.event.callback != NULL) {
                     p.event_callback_pending = true;
                 }
+                USB->SCR |= USB_SCR_FORCE_TX;
                 p.event_pending = false;
                 p.state = STATE_IDLE;
-                USB->SCR |= USB_SCR_FORCE_TX;
             }
             break;
     }
