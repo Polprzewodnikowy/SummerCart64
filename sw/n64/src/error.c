@@ -8,6 +8,4 @@ void error_display (const char *fmt, ...) {
     va_start(args, fmt);
     EXCEPTION_TRIGGER(TRIGGER_CODE_ERROR);
     va_end(args);
-
-    while (1);
 }

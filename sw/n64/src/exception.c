@@ -1,58 +1,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "exception.h"
+#include "exception_regs.h"
 #include "font.h"
 #include "io.h"
 #include "sc64.h"
 #include "version.h"
 #include "vr4300.h"
-
-
-typedef union {
-    uint64_t u64;
-    struct {
-        uint32_t u32_h;
-        uint32_t u32;
-    };
-} uint64_32_t;
-
-typedef struct {
-    uint64_32_t zr;
-    uint64_32_t at;
-    uint64_32_t v0;
-    uint64_32_t v1;
-    uint64_32_t a0;
-    uint64_32_t a1;
-    uint64_32_t a2;
-    uint64_32_t a3;
-    uint64_32_t t0;
-    uint64_32_t t1;
-    uint64_32_t t2;
-    uint64_32_t t3;
-    uint64_32_t t4;
-    uint64_32_t t5;
-    uint64_32_t t6;
-    uint64_32_t t7;
-    uint64_32_t s0;
-    uint64_32_t s1;
-    uint64_32_t s2;
-    uint64_32_t s3;
-    uint64_32_t s4;
-    uint64_32_t s5;
-    uint64_32_t s6;
-    uint64_32_t s7;
-    uint64_32_t t8;
-    uint64_32_t t9;
-    uint64_32_t k0;
-    uint64_32_t k1;
-    uint64_32_t gp;
-    uint64_32_t sp;
-    uint64_32_t fp;
-    uint64_32_t ra;
-    uint32_t sr;
-    uint32_t cr;
-    uint64_32_t epc;
-} exception_t;
 
 
 #define EXCEPTION_INTERRUPT     (0)
@@ -271,7 +225,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     exception_print("s0: 0x%08lX  s1: 0x%08lX  s2: 0x%08lX  s3: 0x%08lX\n", e->s0.u32, e->s1.u32, e->s2.u32, e->s3.u32);
     exception_print("s4: 0x%08lX  s5: 0x%08lX  s6: 0x%08lX  s7: 0x%08lX\n", e->s4.u32, e->s5.u32, e->s6.u32, e->s7.u32);
     exception_print("t8: 0x%08lX  t9: 0x%08lX  k0: 0x%08lX  k1: 0x%08lX\n", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
-    exception_print("gp: 0x%08lX  sp: 0x%08lX  fp: 0x%08lX  ra: 0x%08lX\n\n", e->gp.u32, e->sp.u32, e->fp.u32, e->ra.u32);
+    exception_print("gp: 0x%08lX  sp: 0x%08lX  s8: 0x%08lX  ra: 0x%08lX\n\n", e->gp.u32, e->sp.u32, e->s8.u32, e->ra.u32);
 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {

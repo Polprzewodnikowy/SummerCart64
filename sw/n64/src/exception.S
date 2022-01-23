@@ -36,7 +36,7 @@
 #define K1_OFFSET                   (216)
 #define GP_OFFSET                   (224)
 #define SP_OFFSET                   (232)
-#define FP_OFFSET                   (240)
+#define S8_OFFSET                   (240)
 #define RA_OFFSET                   (248)
 #define C0_STATUS_OFFSET            (256)
 #define C0_CAUSE_OFFSET             (260)
@@ -75,7 +75,7 @@ exception_handler:
     sd $t9, T9_OFFSET($k0)
     sd $gp, GP_OFFSET($k0)
     sd $sp, SP_OFFSET($k0)
-    sd $fp, FP_OFFSET($k0)
+    sd $s8, S8_OFFSET($k0)
     sd $ra, RA_OFFSET($k0)
     .set at
 
@@ -141,7 +141,7 @@ exception_restore:
     ld $t9, T9_OFFSET($k0)
     ld $gp, GP_OFFSET($k0)
     ld $sp, SP_OFFSET($k0)
-    ld $fp, FP_OFFSET($k0)
+    ld $s8, S8_OFFSET($k0)
     ld $ra, RA_OFFSET($k0)
     .set at
 
