@@ -3,8 +3,9 @@
 #include "flash.h"
 #include "isv.h"
 #include "joybus.h"
-#include "usb.h"
+#include "rtc.h"
 #include "uart.h"
+#include "usb.h"
 
 
 #define SAVE_SIZE_EEPROM_4K     (512)
@@ -132,6 +133,59 @@ uint32_t cfg_get_version (void) {
     return CFG->VERSION;
 }
 
+void cfg_query (uint32_t *args) {
+    switch (args[0]) {
+        case CFG_ID_SCR:
+            args[1] = CFG->SCR;
+            break;
+        case CFG_ID_SDRAM_SWITCH:
+            args[1] = CFG->SCR & CFG_SCR_SDRAM_SWITCH;
+            break;
+        case CFG_ID_SDRAM_WRITABLE:
+            args[1] = CFG->SCR & CFG_SCR_SDRAM_WRITABLE;
+            break;
+        case CFG_ID_DD_ENABLE:
+            args[1] = CFG->SCR & CFG_SCR_DD_EN;
+            break;
+        case CFG_ID_SAVE_TYPE:
+            args[1] = (uint32_t) (p.save_type);
+            break;
+        case CFG_ID_CIC_SEED:
+            args[1] = (uint32_t) (p.cic_seed);
+            break;
+        case CFG_ID_TV_TYPE:
+            args[1] = (uint32_t) (p.tv_type);
+            break;
+        case CFG_ID_SAVE_OFFEST:
+            args[1] = CFG->SAVE_OFFSET;
+            break;
+        case CFG_ID_DDIPL_OFFEST:
+            args[1] = CFG->DDIPL_OFFSET;
+            break;
+        case CFG_ID_BOOT_MODE:
+            args[1] = p.boot_mode;
+            break;
+        case CFG_ID_FLASH_SIZE:
+            args[1] = flash_size();
+            break;
+        case CFG_ID_RECONFIGURE:
+            args[1] = CFG->RECONFIGURE;
+            break;
+        case CFG_ID_DD_DISK_STATE:
+            args[1] = dd_get_disk_state();
+            break;
+        case CFG_ID_DD_DRIVE_ID:
+            args[1] = dd_get_drive_id();
+            break;
+        case CFG_ID_DD_THB_TABLE_OFFSET:
+            args[1] = dd_get_thb_table_offset();
+            break;
+        case CFG_ID_IS_VIEWER_ENABLE:
+            args[1] = isv_get_enabled();
+            break;
+    }
+}
+
 void cfg_update (uint32_t *args) {
     switch (args[0]) {
         case CFG_ID_SCR:
@@ -194,57 +248,22 @@ void cfg_update (uint32_t *args) {
     }
 }
 
-void cfg_query (uint32_t *args) {
-    switch (args[0]) {
-        case CFG_ID_SCR:
-            args[1] = CFG->SCR;
-            break;
-        case CFG_ID_SDRAM_SWITCH:
-            args[1] = CFG->SCR & CFG_SCR_SDRAM_SWITCH;
-            break;
-        case CFG_ID_SDRAM_WRITABLE:
-            args[1] = CFG->SCR & CFG_SCR_SDRAM_WRITABLE;
-            break;
-        case CFG_ID_DD_ENABLE:
-            args[1] = CFG->SCR & CFG_SCR_DD_EN;
-            break;
-        case CFG_ID_SAVE_TYPE:
-            args[1] = (uint32_t) (p.save_type);
-            break;
-        case CFG_ID_CIC_SEED:
-            args[1] = (uint32_t) (p.cic_seed);
-            break;
-        case CFG_ID_TV_TYPE:
-            args[1] = (uint32_t) (p.tv_type);
-            break;
-        case CFG_ID_SAVE_OFFEST:
-            args[1] = CFG->SAVE_OFFSET;
-            break;
-        case CFG_ID_DDIPL_OFFEST:
-            args[1] = CFG->DDIPL_OFFSET;
-            break;
-        case CFG_ID_BOOT_MODE:
-            args[1] = p.boot_mode;
-            break;
-        case CFG_ID_FLASH_SIZE:
-            args[1] = flash_size();
-            break;
-        case CFG_ID_RECONFIGURE:
-            args[1] = CFG->RECONFIGURE;
-            break;
-        case CFG_ID_DD_DISK_STATE:
-            args[1] = dd_get_disk_state();
-            break;
-        case CFG_ID_DD_DRIVE_ID:
-            args[1] = dd_get_drive_id();
-            break;
-        case CFG_ID_DD_THB_TABLE_OFFSET:
-            args[1] = dd_get_thb_table_offset();
-            break;
-        case CFG_ID_IS_VIEWER_ENABLE:
-            args[1] = isv_get_enabled();
-            break;
-    }
+void cfg_get_time (uint32_t *args) {
+    rtc_time_t *t = rtc_get_time();
+    args[0] = ((t->hour << 16) | (t->minute << 8) | t->second);
+    args[1] = ((t->weekday << 24) | (t->year << 16) | (t->month << 8) | t->day);
+}
+
+void cfg_set_time (uint32_t *args) {
+    rtc_time_t t;
+    t.second = (args[0] & 0xFF);
+    t.minute = ((args[0] >> 8) & 0xFF);
+    t.hour = ((args[0] >> 16) & 0xFF);
+    t.weekday = ((args[1] >> 24) & 0xFF);
+    t.day = (args[1] & 0xFF);
+    t.month = ((args[1] >> 8) & 0xFF);
+    t.year = ((args[1] >> 16) & 0xFF);
+    rtc_set_time(&t);
 }
 
 
@@ -271,12 +290,24 @@ void process_cfg (void) {
         args[1] = CFG->DATA[1];
 
         switch (CFG->CMD) {
-            case 'C':
-                cfg_update(args);
+            case 'V':
+                args[0] = cfg_get_version();
                 break;
 
             case 'Q':
                 cfg_query(args);
+                break;
+
+            case 'C':
+                cfg_update(args);
+                break;
+
+            case 0xEE:
+                cfg_get_time(args);
+                break;
+
+            case 0xEF:
+                cfg_set_time(args);
                 break;
 
             case 0xF0:

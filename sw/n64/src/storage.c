@@ -70,6 +70,7 @@ void storage_run_menu (storage_backend_t storage_backend) {
     FF_CHECK(f_read(&fil, menu, size, &br), "Couldn't read menu file");
     FF_CHECK(br != size, "Read size is different than expected");
     FF_CHECK(f_close(&fil), "Couldn't close menu file");
+    FF_CHECK(f_unmount(path), "Couldn't unmount drive");
 
     deinit();
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
 from ft232 import Ft232, Ft232Exception
 from io import TextIOWrapper
+from typing import Union
 import argparse
 import filecmp
+import helpers
 import os
 import progressbar
 import re
@@ -73,6 +76,7 @@ class SC64:
 
     def __del__(self) -> None:
         if (self.__usb):
+            self.__reset_n64("release")
             self.__usb.close()
         if (self.__fsd_file):
             self.__fsd_file.close()
@@ -134,21 +138,26 @@ class SC64:
         self.__write(value.to_bytes(4, byteorder="big"))
 
 
-    def __read_cmd_status(self, cmd: str) -> None:
-        if (self.__read(4) != f"CMP{cmd[0]}".encode(encoding="ascii")):
+    def __read_cmd_status(self, cmd: Union[str, int]) -> None:
+        token = b"CMP" + (cmd.encode() if isinstance(cmd, str) else int.to_bytes(cmd, 1, byteorder="big"))
+        if (self.__read(4) != token):
             raise SC64Exception("Wrong command response")
 
 
-    def __write_cmd(self, cmd: str, arg1: int, arg2: int) -> None:
-        self.__write(f"CMD{cmd[0]}".encode())
+    def __write_cmd(self, cmd: Union[str, int], arg1: int, arg2: int) -> None:
+        token = b"CMD" + (cmd.encode() if isinstance(cmd, str) else int.to_bytes(cmd, 1, byteorder="big"))
+        self.__write(token)
         self.__write_int(arg1)
         self.__write_int(arg2)
 
 
-    def reset_n64(self) -> None:
-        self.__usb.cbus_setup(mask=1, init=0)
-        time.sleep(0.1)
-        self.__usb.cbus_setup(mask=0)
+    def __reset_n64(self, type: str) -> None:
+        if (self.__usb):
+            if (type == "hold"):
+                self.__usb.cbus_setup(mask=1, init=0)
+                time.sleep(0.6)
+            elif (type == "release"):
+                self.__usb.cbus_setup(mask=0)
 
 
     def __find_sc64(self) -> None:
@@ -157,6 +166,7 @@ class SC64:
 
         try:
             self.__usb = Ft232(description="SummerCart64")
+            self.__reset_n64("hold")
             self.__usb.flushOutput()
             self.reset_link()
             self.__probe_device()
@@ -250,6 +260,16 @@ class SC64:
         self.__usb.timeout = saved_timeout
         self.__reconfigure()
         self.__find_sc64()
+
+
+    def set_rtc(self, t: datetime) -> None:
+        to_bcd = lambda v : ((int((v / 10) % 10) << 4) | int(int(v) % 10))
+        args = [
+            (to_bcd(t.weekday() + 1) << 24) | (to_bcd(t.hour) << 16) | (to_bcd(t.minute) << 8) | to_bcd(t.second),
+            (to_bcd(t.year) << 16) | (to_bcd(t.month) << 8) | to_bcd(t.day),
+        ]
+        self.__write_cmd(0xEF, args[0], args[1])
+        self.__read_cmd_status(0xEF)
 
 
     def set_boot_mode(self, mode: int) -> None:
@@ -555,9 +575,10 @@ class SC64:
         offset = int.from_bytes(data[4:8], byteorder="little")
 
         if (self.__fsd_file):
-            self.__fsd_file.seek(sector * 512)
-            self.__write_cmd("F", offset, 512)
-            self.__fsd_file.write(self.__read(512))
+            with helpers.lock_volume(self.__fsd_file):
+                self.__fsd_file.seek(sector * 512)
+                self.__write_cmd("F", offset, 512)
+                self.__fsd_file.write(self.__read(512))
         else:
             self.__write_cmd("F", offset, 0)
 
@@ -608,6 +629,8 @@ class SC64:
 
         start_indicator = bytearray()
         dropped_bytes = 0
+
+        self.__reset_n64("release")
 
         while (True):
             while (start_indicator != b"DMA@"):
@@ -705,6 +728,7 @@ class SC64ProgressBar:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SummerCart64 one stop control center")
+    parser.add_argument("-rtc", default=False, action="store_true", required=False, help="update RTC to system time")
     parser.add_argument("-b", metavar="boot_mode", default="2", required=False, help="set boot mode (0 - 4)")
     parser.add_argument("-t", metavar="tv_type", default="3", required=False, help="set TV type (0 - 2)")
     parser.add_argument("-c", metavar="cic_seed", default="0xFFFF", required=False, help="set CIC seed")
@@ -731,6 +755,7 @@ if __name__ == "__main__":
     try:
         sc64 = SC64()
 
+        rtc = args.rtc
         boot_mode = int(args.b)
         save_type = int(args.s)
         tv_type = int(args.t)
@@ -751,6 +776,11 @@ if __name__ == "__main__":
         firmware_backup_file = "sc64firmware.bin.bak"
 
         with SC64ProgressBar(sc64):
+            if (rtc):
+                now = datetime.now()
+                print(f"Setting RTC to [{now}]")
+                sc64.set_rtc(now)
+
             if (update_file):
                 if (is_read):
                     sc64.backup_firmware(update_file)
@@ -804,8 +834,6 @@ if __name__ == "__main__":
                     sc64.download_save(save_file)
                 else:
                     sc64.upload_save(save_file)
-   
-            sc64.reset_n64()
 
             if (debug_server):
                 sc64.debug_init(sd_file, disk_file, dd_turbo)

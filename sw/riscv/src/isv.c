@@ -21,6 +21,7 @@ static void isv_set_ready (void) {
 void isv_set_enabled (bool enabled) {
     if (enabled) {
         CFG->SCR |= CFG_SCR_ISV_EN;
+        CFG->ISV_CURRENT_RD_PTR = CFG->ISV_RD_PTR;
         p.ready = true;
     } else {
         CFG->SCR &= ~(CFG_SCR_ISV_EN);

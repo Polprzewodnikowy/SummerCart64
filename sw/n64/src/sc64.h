@@ -9,10 +9,14 @@
 
 #define SC64_CMD_QUERY              ('Q')
 #define SC64_CMD_CONFIG             ('C')
+#define SC64_CMD_GET_TIME           (0xEE)
+#define SC64_CMD_SET_TIME           (0xEF)
 #define SC64_CMD_DRIVE_INIT         (0xF0)
 #define SC64_CMD_DRIVE_BUSY         (0xF1)
 #define SC64_CMD_DRIVE_READ         (0xF2)
 #define SC64_CMD_DRIVE_WRITE        (0xF3)
+#define SC64_CMD_DRIVE_LOAD         (0xF4)
+#define SC64_CMD_DRIVE_STORE        (0xF5)
 #define SC64_CMD_UART_PUT           (0xFF)
 
 #define SC64_VERSION_2              (0x53437632)
@@ -64,6 +68,16 @@ typedef struct {
     tv_type_t tv_type;
 } sc64_info_t;
 
+typedef struct {
+    uint8_t second;
+    uint8_t minute;
+    uint8_t hour;
+    uint8_t weekday;
+    uint8_t day;
+    uint8_t month;
+    uint8_t year;
+} rtc_time_t;
+
 typedef enum {
     DRIVE_SD = 0,
     DRIVE_USB = 1,
@@ -76,6 +90,8 @@ uint32_t sc64_query_config (cfg_id_t id);
 void sc64_change_config (cfg_id_t id, uint32_t value);
 void sc64_get_info (sc64_info_t *info);
 void sc64_init (void);
+void sc64_get_time (rtc_time_t *t);
+void sc64_set_time (rtc_time_t *t);
 bool sc64_storage_init (drive_id_t drive);
 bool sc64_storage_read (drive_id_t drive, void *buffer, uint32_t sector, uint32_t count);
 bool sc64_storage_write (drive_id_t drive, const void *buffer, uint32_t sector, uint32_t count);

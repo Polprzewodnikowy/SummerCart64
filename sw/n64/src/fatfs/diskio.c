@@ -46,5 +46,25 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
 #endif
 
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void *buff) {
+    if (cmd == CTRL_SYNC) {
+        return RES_OK;
+    }
     return RES_PARERR;
+}
+
+static uint8_t from_bcd (uint8_t bcd) {
+    return ((((bcd >> 4) & 0x0F) * 10) + (bcd & 0x0F));
+}
+
+DWORD get_fattime(void) {
+    rtc_time_t t;
+    sc64_get_time(&t);
+    return (
+        ((from_bcd(t.year) + 20) << 25) |
+        (from_bcd(t.month) << 21) |
+        (from_bcd(t.day) << 16) |
+        (from_bcd(t.hour) << 11) |
+        (from_bcd(t.minute) << 5) |
+        (from_bcd(t.second) >> 1)
+    );
 }

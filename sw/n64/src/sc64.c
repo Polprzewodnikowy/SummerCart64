@@ -62,6 +62,26 @@ void sc64_init (void) {
     sc64_change_config(CFG_ID_SDRAM_SWITCH, true);
 }
 
+void sc64_get_time (rtc_time_t *t) {
+    uint32_t result[2];
+    sc64_perform_cmd(SC64_CMD_GET_TIME, NULL, result);
+    t->second = (result[0] & 0xFF);
+    t->minute = ((result[0] >> 8) & 0xFF);
+    t->hour = ((result[0] >> 16) & 0xFF);
+    t->weekday = ((result[1] >> 24) & 0xFF);
+    t->day = (result[1] & 0xFF);
+    t->month = ((result[1] >> 8) & 0xFF);
+    t->year = ((result[1] >> 16) & 0xFF);
+}
+
+void sc64_set_time (rtc_time_t *t) {
+    uint32_t args[2] = {
+        ((t->hour << 16) | (t->minute << 8) | t->second),
+        ((t->weekday << 24) | (t->year << 16) | (t->month << 8) | t->day),
+    };
+    sc64_perform_cmd(SC64_CMD_SET_TIME, args, NULL);
+}
+
 static uint32_t sc64_wait_drive_ready (drive_id_t drive) {
     uint32_t args[2] = { (drive & 0xFF), 0 };
     uint32_t result[2];

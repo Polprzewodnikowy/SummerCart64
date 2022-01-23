@@ -210,11 +210,6 @@ void process_usb (void) {
                     }
                     break;
 
-                case 'C':
-                    cfg_update(p.args);
-                    p.state = STATE_RESPONSE;
-                    break;
-
                 case 'Q':
                     if (p.counter == 0) {
                         cfg_query(p.args);
@@ -223,6 +218,29 @@ void process_usb (void) {
                     if (tx_word(p.args[1])) {
                         p.state = STATE_RESPONSE;
                     }
+                    break;
+
+                case 'C':
+                    cfg_update(p.args);
+                    p.state = STATE_RESPONSE;
+                    break;
+
+                case 0xEE:
+                    if (p.counter == 0) {
+                        cfg_get_time(p.args);
+                        p.counter += 1;
+                    }
+                    if ((p.counter == 1) && tx_word(p.args[0])) {
+                        p.counter += 1;
+                    }
+                    if ((p.counter == 2) && tx_word(p.args[1])) {
+                        p.state = STATE_RESPONSE;
+                    }
+                    break;
+
+                case 0xEF:
+                    cfg_set_time(p.args);
+                    p.state = STATE_RESPONSE;
                     break;
 
                 case 'R':
