@@ -776,11 +776,6 @@ if __name__ == "__main__":
         firmware_backup_file = "sc64firmware.bin.bak"
 
         with SC64ProgressBar(sc64):
-            if (rtc):
-                now = datetime.now()
-                print(f"Setting RTC to [{now}]")
-                sc64.set_rtc(now)
-
             if (update_file):
                 if (is_read):
                     sc64.backup_firmware(update_file)
@@ -792,6 +787,11 @@ if __name__ == "__main__":
                     else:
                         print("SummerCart64 is already updated to latest version")
                     os.remove(firmware_backup_file)
+
+            if (rtc):
+                now = datetime.now()
+                print(f"Setting RTC to [{now}]")
+                sc64.set_rtc(now)
 
             if (not is_read):
                 if (boot_mode != 2):
