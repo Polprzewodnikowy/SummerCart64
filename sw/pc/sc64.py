@@ -68,7 +68,6 @@ class SC64:
         self.__disk_file = None
         self.__disk_lba_table = []
         self.__dd_turbo = False
-        self.__isv_line_buffer = bytearray()
         self.__find_sc64()
 
 
@@ -540,8 +539,8 @@ class SC64:
 
 
     def __debug_process_fsd_read(self, data: bytes) -> None:
-        sector = int.from_bytes(data[0:4], byteorder='little')
-        offset = int.from_bytes(data[4:8], byteorder='little')
+        sector = int.from_bytes(data[0:4], byteorder="little")
+        offset = int.from_bytes(data[4:8], byteorder="little")
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
             self.__write_cmd("T", offset, 512)
@@ -551,8 +550,8 @@ class SC64:
 
 
     def __debug_process_fsd_write(self, data: bytes) -> None:
-        sector = int.from_bytes(data[0:4], byteorder='little')
-        offset = int.from_bytes(data[4:8], byteorder='little')
+        sector = int.from_bytes(data[0:4], byteorder="little")
+        offset = int.from_bytes(data[4:8], byteorder="little")
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
             self.__write_cmd("F", offset, 512)
@@ -562,10 +561,10 @@ class SC64:
 
 
     def __debug_process_dd_block(self, data: bytes) -> None:
-        transfer_mode = int.from_bytes(data[0:4], byteorder='little')
-        sdram_offset = int.from_bytes(data[4:8], byteorder='little')
-        disk_file_offset = int.from_bytes(data[8:12], byteorder='big')
-        block_length = int.from_bytes(data[12:16], byteorder='little')
+        transfer_mode = int.from_bytes(data[0:4], byteorder="little")
+        sdram_offset = int.from_bytes(data[4:8], byteorder="little")
+        disk_file_offset = int.from_bytes(data[8:12], byteorder="big")
+        block_length = int.from_bytes(data[12:16], byteorder="little")
 
         if (self.__disk_file):
             self.__disk_file.seek(disk_file_offset)
@@ -581,21 +580,13 @@ class SC64:
 
 
     def __debug_process_is_viewer(self, data: bytes) -> None:
-        length = int.from_bytes(data[0:4], byteorder='little')
-        address = int.from_bytes(data[4:8], byteorder='little')
+        length = int.from_bytes(data[0:4], byteorder="little")
+        address = int.from_bytes(data[4:8], byteorder="little")
         offset = (address & 0x01)
         transfer_length = self.__align(length + offset, 2)
         self.__write_cmd("L", (address & 0xFFFFFFFE), transfer_length)
         text = self.__read(transfer_length)[offset:][:length]
-        self.__isv_line_buffer.extend(text)
-        try:
-            while (len(self.__isv_line_buffer) > 0):
-                line_end = self.__isv_line_buffer.index(b'\n')
-                line = self.__isv_line_buffer[:line_end]
-                self.__isv_line_buffer = self.__isv_line_buffer[line_end + 1:]
-                print(line.decode("EUC-JP", errors="backslashreplace"))
-        except ValueError:
-            pass
+        print(text.decode("EUC-JP", errors="backslashreplace"), end="")
 
 
     def debug_init(self, fsd_file: str = None, disk_file: str = None, dd_turbo: bool = False) -> None:
@@ -610,6 +601,8 @@ class SC64:
         self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
 
         print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
+
+        self.__usb.setTimeout(0.1)
 
         start_indicator = bytearray()
         dropped_bytes = 0

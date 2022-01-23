@@ -2,10 +2,13 @@
 /backup
 /roms
 /saves
+*.a
 *.bak
 *.bin
 *.dat
 *.data
+*.dll
+*.dylib
 *.eep
 *.fla
 *.img
