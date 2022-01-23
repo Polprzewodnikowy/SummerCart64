@@ -541,6 +541,7 @@ class SC64:
     def __debug_process_fsd_read(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder="little")
         offset = int.from_bytes(data[4:8], byteorder="little")
+
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
             self.__write_cmd("T", offset, 512)
@@ -552,6 +553,7 @@ class SC64:
     def __debug_process_fsd_write(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder="little")
         offset = int.from_bytes(data[4:8], byteorder="little")
+
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
             self.__write_cmd("F", offset, 512)
