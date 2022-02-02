@@ -1,17 +1,12 @@
 module cpu_soc (
     if_system.sys sys,
     if_config.cpu cfg,
-    if_dma dma,
+    if_memory_dma usb_dma,
     if_sdram.cpu sdram,
     if_flashram.cpu flashram,
     if_si.cpu si,
-    if_flash.cpu flash,
+    if_flash flash,
     if_dd.cpu dd,
-    if_cpu_ram.cpu cpu_ram,
-
-    input [7:0] gpio_i,
-    output [7:0] gpio_o,
-    output [7:0] gpio_oe,
 
     output i2c_scl,
     inout i2c_sda,
@@ -19,8 +14,7 @@ module cpu_soc (
     output usb_clk,
     output usb_cs,
     input usb_miso,
-    inout [3:0] usb_miosi,
-    input usb_pwren,
+    inout [7:0] usb_miosi,
 
     input uart_rxd,
     output uart_txd,
@@ -30,96 +24,96 @@ module cpu_soc (
     inout [3:0] sd_dat
 );
 
-    if_cpu_bus bus ();
+    typedef enum bit [3:0] {
+        DEV_FLASH,
+        DEV_RAM,
+        DEV_CFG,
+        DEV_I2C,
+        DEV_USB,
+        DEV_UART,
+        DEV_DD,
+        DEV_SDRAM,
+        DEV_FLASHRAM,
+        DEV_SI,
+        __NUM_DEVICES
+    } e_bus_id;
+
+    if_cpu_bus #(
+        .NUM_DEVICES(__NUM_DEVICES)
+    ) bus ();
 
     cpu_wrapper cpu_wrapper_inst (
         .sys(sys),
         .bus(bus)
     );
 
-    cpu_ram cpu_ram_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_RAM].device),
-        .cpu_ram(cpu_ram)
-    );
-
     cpu_flash cpu_flash_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_FLASH].device),
+        .bus(bus.at[DEV_FLASH].device),
         .flash(flash)
     );
 
-    cpu_gpio cpu_gpio_inst (
+    cpu_ram cpu_ram_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_GPIO].device),
-        .gpio_i(gpio_i),
-        .gpio_o(gpio_o),
-        .gpio_oe(gpio_oe)
+        .bus(bus.at[DEV_RAM].device)
+    );
+
+    cpu_cfg cpu_cfg_inst (
+        .sys(sys),
+        .bus(bus.at[DEV_CFG].device),
+        .cfg(cfg)
     );
 
     cpu_i2c cpu_i2c_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_I2C].device),
+        .bus(bus.at[DEV_I2C].device),
         .i2c_scl(i2c_scl),
         .i2c_sda(i2c_sda)
     );
 
     cpu_usb cpu_usb_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_USB].device),
-        .dma(dma.at[sc64::ID_DMA_USB].device),
+        .bus(bus.at[DEV_USB].device),
+        .dma(usb_dma),
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
-        .usb_miosi(usb_miosi),
-        .usb_pwren(usb_pwren)
+        .usb_miosi(usb_miosi)
     );
 
     generate
         if (sc64::CPU_HAS_UART) begin
             cpu_uart cpu_uart_inst (
                 .sys(sys),
-                .bus(bus.at[sc64::ID_CPU_UART].device),
+                .bus(bus.at[DEV_UART].device),
                 .uart_rxd(uart_rxd),
                 .uart_txd(uart_txd)
             );
         end
     endgenerate
 
-    cpu_dma cpu_dma_inst (
+    cpu_dd cpu_dd_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_DMA].device),
-        .dma(dma)
-    );
-
-    cpu_cfg cpu_cfg_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_CFG].device),
-        .cfg(cfg)
+        .bus(bus.at[DEV_DD].device),
+        .dd(dd)
     );
 
     cpu_sdram cpu_sdram_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_SDRAM].device),
+        .bus(bus.at[DEV_SDRAM].device),
         .sdram(sdram)
     );
 
     cpu_flashram cpu_flashram_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_FLASHRAM].device),
+        .bus(bus.at[DEV_FLASHRAM].device),
         .flashram(flashram)
     );
 
     cpu_si cpu_si_inst (
         .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_SI].device),
+        .bus(bus.at[DEV_SI].device),
         .si(si)
-    );
-
-    cpu_dd cpu_dd_inst (
-        .sys(sys),
-        .bus(bus.at[sc64::ID_CPU_DD].device),
-        .dd(dd)
     );
 
     assign sd_clk = 1'bZ;

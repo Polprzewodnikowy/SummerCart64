@@ -86,7 +86,7 @@ build_fpga () {
 
     pushd fw > /dev/null
     if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
-        echo Skipping FPGA build
+        quartus_cpf -c SummerCart64.cof
     else
         if [ "$DEBUG_ENABLED" = true ]; then
             quartus_sh --set VERILOG_MACRO="DEBUG" ./SummerCart64.qpf

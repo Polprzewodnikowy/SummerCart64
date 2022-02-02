@@ -1,44 +1,27 @@
 module cpu_usb (
     if_system sys,
     if_cpu_bus bus,
-    if_dma dma,
+    if_memory_dma dma,
 
     output usb_clk,
     output usb_cs,
     input usb_miso,
-    inout [3:0] usb_miosi,
-    input usb_pwren
+    inout [7:0] usb_miosi
 );
 
     logic rx_flush;
-    logic rx_empty;
-    logic rx_read;
-    logic [7:0] rx_rdata;
-
     logic tx_flush;
-    logic tx_full;
-    logic tx_write;
-    logic [7:0] tx_wdata;
+    logic usb_enable;
+    logic reset_pending;
+    logic reset_ack;
+    logic write_buffer_flush;
 
-    logic rx_escape_valid;
-    logic rx_escape_ack;
-    logic [7:0] rx_escape;
-
-    logic cpu_rx_read;
-    logic cpu_tx_write;
-
-    logic usb_enabled;
-    logic tx_force;
-
-    always_comb begin
-        dma.rx_empty = rx_empty;
-        rx_read = cpu_rx_read || dma.rx_read;
-        dma.rx_rdata = rx_rdata;
-
-        dma.tx_full = tx_full;
-        tx_write = cpu_tx_write || dma.tx_write;
-        tx_wdata = dma.tx_write ? dma.tx_wdata : bus.wdata[7:0];
-    end
+    typedef enum bit [1:0] {
+        R_SCR,
+        R_DATA,
+        R_ADDR,
+        R_LEN
+    } e_reg_id;
 
     always_ff @(posedge sys.clk) begin
         bus.ack <= 1'b0;
@@ -51,75 +34,93 @@ module cpu_usb (
         bus.rdata = 32'd0;
         if (bus.ack) begin
             case (bus.address[3:2])
-                0: bus.rdata = {25'd0, rx_escape_valid, usb_pwren, usb_enabled, 2'b00, ~tx_full, ~rx_empty};
-                1: bus.rdata = {24'd0, rx_rdata};
-                2: bus.rdata = {24'd0, rx_escape};
+                R_SCR: bus.rdata = {
+                    23'd0,
+                    dma.busy,
+                    1'b0,
+                    reset_pending,
+                    1'b0,
+                    usb_enable,
+                    2'b00,
+                    ~dma.tx_full,
+                    ~dma.rx_empty
+                };
+                R_DATA: bus.rdata = {24'd0, dma.rx_rdata};
                 default: bus.rdata = 32'd0;
             endcase
         end
     end
 
     always_ff @(posedge sys.clk) begin
+        dma.start <= 1'b0;
+        dma.stop <= 1'b0;
+        dma.cpu_rx_read <= 1'b0;
+        dma.cpu_tx_write <= 1'b0;
         rx_flush <= 1'b0;
-        cpu_rx_read <= 1'b0;
-
         tx_flush <= 1'b0;
-        cpu_tx_write <= 1'b0;
-
-        rx_escape_ack <= 1'b0;
-        tx_force <= 1'b0;
+        reset_ack <= 1'b0;
+        write_buffer_flush <= 1'b0;
 
         if (sys.reset) begin
-            usb_enabled <= 1'b0;
+            usb_enable <= 1'b0;
         end else begin
             if (bus.request) begin
-                case (bus.address[2:2])
-                    2'd0: begin
-                        if (bus.wmask[1]) begin
-                            tx_force <= bus.wdata[8];
-                        end
-                        if (bus.wmask[0]) begin
-                            rx_escape_ack <= bus.wdata[7];
-                            {usb_enabled, tx_flush, rx_flush} <= bus.wdata[4:2];
-                        end
+                case (bus.address[3:2])
+                    R_SCR: if (&bus.wmask) begin
+                        {dma.direction, dma.stop, dma.start} <= bus.wdata[11:9];
+                        reset_ack <= bus.wdata[7];
+                        {write_buffer_flush, usb_enable, tx_flush, rx_flush} <= bus.wdata[5:2];
                     end
 
-                    2'd1: begin
-                        if (bus.wmask[0]) begin
-                            cpu_tx_write <= 1'b1;
-                        end else begin
-                            cpu_rx_read <= 1'b1;
-                        end
+                    R_DATA: if (bus.wmask == 4'b0000) begin
+                        dma.cpu_rx_read <= 1'b1;
+                    end else if (bus.wmask == 4'b0001) begin
+                        dma.cpu_tx_write <= 1'b1;
+                        dma.cpu_tx_wdata <= bus.wdata[7:0];
+                    end
+
+                    R_ADDR: if (&bus.wmask) begin
+                        dma.starting_address <= bus.wdata;
+                    end
+
+                    R_LEN: if (&bus.wmask) begin
+                        dma.transfer_length <= bus.wdata;
                     end
                 endcase
             end
         end
     end
 
-    usb_ft1248 usb_ft1248_inst (
-        .sys(sys),
+    memory_dma usb_memory_dma_inst (
+        .clk(sys.clk),
+        .reset(~usb_enable),
+        .dma(dma)
+    );
 
-        .usb_enabled(usb_enabled),
-        .tx_force(tx_force),
+    usb_ft1248 usb_ft1248_inst (
+        .clk(sys.clk),
+        .reset(~usb_enable),
 
         .usb_clk(usb_clk),
         .usb_cs(usb_cs),
         .usb_miso(usb_miso),
         .usb_miosi(usb_miosi),
 
+        .reset_pending(reset_pending),
+        .reset_ack(reset_ack),
+        .write_buffer_flush(write_buffer_flush),
+
         .rx_flush(rx_flush),
-        .rx_empty(rx_empty),
-        .rx_read(rx_read),
-        .rx_rdata(rx_rdata),
+        .rx_empty(dma.rx_empty),
+        .rx_almost_empty(dma.rx_almost_empty),
+        .rx_read(dma.rx_read),
+        .rx_rdata(dma.rx_rdata),
 
         .tx_flush(tx_flush),
-        .tx_full(tx_full),
-        .tx_write(tx_write),
-        .tx_wdata(tx_wdata),
-
-        .rx_escape_valid(rx_escape_valid),
-        .rx_escape_ack(rx_escape_ack),
-        .rx_escape(rx_escape)
+        .tx_full(dma.tx_full),
+        .tx_almost_full(dma.tx_almost_full),
+        .tx_write(dma.tx_write),
+        .tx_wdata(dma.tx_wdata)
     );
 
 endmodule

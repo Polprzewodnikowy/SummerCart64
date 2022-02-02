@@ -29,8 +29,7 @@ module SummerCart64 (
     output o_usb_clk,
     output o_usb_cs,
     input i_usb_miso,
-    inout [3:0] io_usb_miosi,
-    input i_usb_pwren,
+    inout [7:0] io_usb_miosi,
 
     input i_uart_rxd,
     output o_uart_txd,
@@ -42,10 +41,6 @@ module SummerCart64 (
     output o_led
 );
 
-    logic [7:0] gpio_o;
-    logic [7:0] gpio_i;
-    logic [7:0] gpio_oe;
-
     logic dd_interrupt;
 
     if_system sys (
@@ -56,7 +51,7 @@ module SummerCart64 (
 
     if_config cfg ();
 
-    if_dma dma ();
+    if_memory_dma usb_dma ();
 
     if_sdram sdram ();
 
@@ -70,7 +65,6 @@ module SummerCart64 (
         .dd_interrupt(dd_interrupt)
     );
 
-    if_cpu_ram cpu_ram ();
 
     system system_inst (
         .sys(sys)
@@ -85,13 +79,12 @@ module SummerCart64 (
     n64_soc n64_soc_inst (
         .sys(sys),
         .cfg(cfg),
-        .dma(dma),
+        .usb_dma(usb_dma),
         .sdram(sdram),
         .flashram(flashram),
         .si(si),
         .flash(flash),
         .dd(dd),
-        .cpu_ram(cpu_ram),
 
         .n64_pi_alel(i_n64_pi_alel),
         .n64_pi_aleh(i_n64_pi_aleh),
@@ -114,18 +107,13 @@ module SummerCart64 (
     cpu_soc cpu_soc_inst (
         .sys(sys),
         .cfg(cfg),
-        .dma(dma),
+        .usb_dma(usb_dma),
         .sdram(sdram),
         .flashram(flashram),
         .si(si),
         .flash(flash),
         .dd(dd),
-        .cpu_ram(cpu_ram),
 
-        .gpio_o(gpio_o),
-        .gpio_i(gpio_i),
-        .gpio_oe(gpio_oe),
-        
         .i2c_scl(o_rtc_scl),
         .i2c_sda(io_rtc_sda),
 
@@ -133,7 +121,6 @@ module SummerCart64 (
         .usb_cs(o_usb_cs),
         .usb_miso(i_usb_miso),
         .usb_miosi(io_usb_miosi),
-        .usb_pwren(i_usb_pwren),
 
         .uart_rxd(i_uart_rxd),
         .uart_txd(o_uart_txd),
@@ -145,14 +132,7 @@ module SummerCart64 (
 
     always_comb begin
         o_n64_irq = dd_interrupt ? 1'b0 : 1'bZ;
-    end
-
-    always_comb begin
-        o_led = gpio_oe[0] ? gpio_o[0] : 1'bZ;
-    end
-
-    always_ff @(posedge sys.clk) begin
-        gpio_i <= {4'b0000, i_n64_nmi, i_n64_reset, gpio_o[1:0]};
+        o_led = 1'bZ;
     end
 
 endmodule

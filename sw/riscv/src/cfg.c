@@ -311,9 +311,7 @@ void process_cfg (void) {
                 break;
 
             case 0xF0:
-                if (args[0] == 0) {
-                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
-                } else if (args[0] == 1) {
+                if (args[0] & (1 << 31)) {
                     p.usb_drive_busy = false;
                 } else {
                     change_scr_bits(CFG_SCR_CMD_ERROR, true);
@@ -321,10 +319,7 @@ void process_cfg (void) {
                 break;
 
             case 0xF1:
-                if (args[0] == 0) {
-                    args[0] = 0;
-                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
-                } else if (args[0] == 1) {
+                if (args[0] & (1 << 31)) {
                     args[0] = p.usb_drive_busy;
                 } else {
                     args[0] = 0;
@@ -334,18 +329,20 @@ void process_cfg (void) {
                 break;
 
             case 0xF2:
-                if ((args[0] & 0xFF) == 0) {
-                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
-                } else if ((args[0] & 0xFF) == 1 && (!p.usb_drive_busy)) {
-                    usb_event_t event;
-                    event.id = EVENT_ID_FSD_READ;
-                    event.trigger = CALLBACK_BUFFER_WRITE;
-                    event.callback = set_usb_drive_not_busy;
-                    uint32_t data[2] = { args[1], (args[0] >> 8) };
-                    if (usb_put_event(&event, data, sizeof(data))) {
-                        p.usb_drive_busy = true;
+                if (args[0] & (1 << 31)) {
+                    if (!p.usb_drive_busy) {
+                        usb_event_t event;
+                        event.id = EVENT_ID_FSD_READ;
+                        event.trigger = CALLBACK_SDRAM_WRITE;
+                        event.callback = set_usb_drive_not_busy;
+                        uint32_t data[3] = { args[1], (args[0] & 0x7FFFFFFF), 1 };
+                        if (usb_put_event(&event, data, sizeof(data))) {
+                            p.usb_drive_busy = true;
+                        } else {
+                            return;
+                        }
                     } else {
-                        return;
+                        change_scr_bits(CFG_SCR_CMD_ERROR, true);
                     }
                 } else {
                     change_scr_bits(CFG_SCR_CMD_ERROR, true);
@@ -353,18 +350,20 @@ void process_cfg (void) {
                 break;
 
             case 0xF3:
-                if ((args[0] & 0xFF) == 0) {
-                    change_scr_bits(CFG_SCR_CMD_ERROR, true);
-                } else if ((args[0] & 0xFF) == 1 && (!p.usb_drive_busy)) {
-                    usb_event_t event;
-                    event.id = EVENT_ID_FSD_WRITE;
-                    event.trigger = CALLBACK_BUFFER_READ;
-                    event.callback = set_usb_drive_not_busy;
-                    uint32_t data[2] = { args[1], (args[0] >> 8) };
-                    if (usb_put_event(&event, data, sizeof(data))) {
-                        p.usb_drive_busy = true;
+                if (args[0] & (1 << 31)) {
+                    if (!p.usb_drive_busy) {
+                        usb_event_t event;
+                        event.id = EVENT_ID_FSD_WRITE;
+                        event.trigger = CALLBACK_SDRAM_READ;
+                        event.callback = set_usb_drive_not_busy;
+                        uint32_t data[3] = { args[1], (args[0] & 0x7FFFFFFF), 1 };
+                        if (usb_put_event(&event, data, sizeof(data))) {
+                            p.usb_drive_busy = true;
+                        } else {
+                            return;
+                        }
                     } else {
-                        return;
+                        change_scr_bits(CFG_SCR_CMD_ERROR, true);
                     }
                 } else {
                     change_scr_bits(CFG_SCR_CMD_ERROR, true);

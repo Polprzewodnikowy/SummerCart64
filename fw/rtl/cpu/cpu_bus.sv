@@ -1,6 +1,6 @@
-interface if_cpu_bus ();
-
-    localparam [3:0] NUM_DEVICES = sc64::__ID_CPU_END;
+interface if_cpu_bus #(
+    parameter bit [3:0] NUM_DEVICES
+) ();
 
     logic request;
     logic ack;

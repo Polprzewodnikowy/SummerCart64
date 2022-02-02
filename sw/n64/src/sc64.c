@@ -83,7 +83,7 @@ void sc64_set_time (rtc_time_t *t) {
 }
 
 static uint32_t sc64_wait_drive_ready (drive_id_t drive) {
-    uint32_t args[2] = { (drive & 0xFF), 0 };
+    uint32_t args[2] = { ((drive & 0x01) << 31), 0 };
     uint32_t result[2];
     do {
         sc64_perform_cmd(SC64_CMD_DRIVE_BUSY, args, result);
@@ -92,7 +92,7 @@ static uint32_t sc64_wait_drive_ready (drive_id_t drive) {
 }
 
 bool sc64_storage_init (drive_id_t drive) {
-    uint32_t args[2] = { (drive & 0xFF), 0 };
+    uint32_t args[2] = { ((drive & 0x01) << 31), 0 };
     if (sc64_perform_cmd(SC64_CMD_DRIVE_INIT, args, NULL)) {
         return true;
     }
@@ -103,7 +103,7 @@ bool sc64_storage_init (drive_id_t drive) {
 }
 
 static bool sc64_drive_start_rw (drive_id_t drive, bool write, uint32_t sector, uint32_t offset) {
-    uint32_t args[2] = { (((offset & 0xFFFFFF) << 8) | (drive & 0xFF)), sector };
+    uint32_t args[2] = { (((drive & 0x01) << 31) | (offset & 0x7FFFFFFF)), sector };
     if (sc64_perform_cmd(write ? SC64_CMD_DRIVE_WRITE : SC64_CMD_DRIVE_READ, args, NULL)) {
         return true;
     }
@@ -116,7 +116,7 @@ bool sc64_storage_read (drive_id_t drive, void *buffer, uint32_t sector, uint32_
     uint32_t current_offset = 0;
     uint32_t next_offset = SECTOR_SIZE;
 
-    if (sc64_drive_start_rw(drive, false, sector++, 0)) {
+    if (sc64_drive_start_rw(drive, false, sector++, 0x03FF0000UL)) {
         return true;
     }
     while (count > 0) {
@@ -124,12 +124,12 @@ bool sc64_storage_read (drive_id_t drive, void *buffer, uint32_t sector, uint32_
             return true;
         }
         if (count > 1) {
-            if (sc64_drive_start_rw(drive, false, sector++, next_offset)) {
+            if (sc64_drive_start_rw(drive, false, sector++, 0x03FF0000UL + next_offset)) {
                 return true;
             }
             next_offset = next_offset ? 0 : SECTOR_SIZE;
         }
-        src = &SC64->BUFFER[current_offset / sizeof(io32_t)];
+        src = (io32_t *) (0x13FF0000UL + current_offset);
         for (int i = 0; i < (SECTOR_SIZE / sizeof(uint32_t)); i++) {
             uint32_t data = pi_io_read(src + i);
             *dst++ = ((data >> 24) & 0xFF);
@@ -146,7 +146,7 @@ bool sc64_storage_read (drive_id_t drive, void *buffer, uint32_t sector, uint32_
 
 bool sc64_storage_write (drive_id_t drive, const void *buffer, uint32_t sector, uint32_t count) {
     uint8_t *src = (uint8_t *) (buffer);
-    io32_t *dst = SC64->BUFFER;
+    io32_t *dst = (io32_t *) (0x13FF0000UL);
 
     while (count > 0) {
         for (int i = 0; i < (SECTOR_SIZE / sizeof(uint32_t)); i++) {
@@ -157,7 +157,7 @@ bool sc64_storage_write (drive_id_t drive, const void *buffer, uint32_t sector, 
             data |= ((*src++) << 0);
             pi_io_write((dst + i), data);
         }
-        if (sc64_drive_start_rw(drive, true, sector, 0)) {
+        if (sc64_drive_start_rw(drive, true, sector, 0x03FF0000UL)) {
             return true;
         }
         if (sc64_wait_drive_ready(drive)) {

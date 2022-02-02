@@ -1,7 +1,6 @@
 MEMORY {
-    ram (rwx)   : org = 0x00000000, len = 15k
-    buffer (rw) : org = 0x00003C00, len = 1k
-    rom (rx)    : org = 0x10010000, len = 26k
+    rom (rx)    : org = 0x00010000, len = 26k
+    ram (rwx)   : org = 0x10000000, len = 32k
 }
 
 ENTRY(reset_handler)
@@ -44,10 +43,6 @@ SECTIONS {
         . = ALIGN(4);
         _ebss = .;
     } > ram
-
-    .buffer : {
-        *(.buffer)
-    } > buffer
 
     __global_pointer$ = MIN(_ssdata + 0x800, MAX(_sdata + 0x800, _ebss - 0x800));
     __stack_pointer$ = ORIGIN(ram) + LENGTH(ram);

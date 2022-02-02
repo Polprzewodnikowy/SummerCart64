@@ -1,7 +1,6 @@
 #include "process.h"
 #include "usb.h"
 #include "cfg.h"
-#include "dma.h"
 #include "joybus.h"
 #include "rtc.h"
 #include "i2c.h"
@@ -29,7 +28,6 @@ __attribute__((naked)) void process_loop (void) {
 
     usb_init();
     cfg_init();
-    dma_init();
     joybus_init();
     rtc_init();
     i2c_init();

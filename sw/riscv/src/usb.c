@@ -1,5 +1,4 @@
 #include "usb.h"
-#include "dma.h"
 #include "cfg.h"
 #include "dd.h"
 
@@ -140,24 +139,12 @@ static bool rx_cmd (uint32_t *data) {
     return false;
 }
 
-static void handle_escape (void) {
-    if (USB->SCR & USB_SCR_ESCAPE_PENDING) {
-        if (USB->ESCAPE == 'R') {
-            if (p.dma_in_progress) {
-                dma_stop();
-                while (dma_busy());
-            }
-            usb_init();
-        }
-        USB->SCR |= USB_SCR_ESCAPE_ACK;
-    }
-}
-
 
 void usb_init (void) {
-    USB->SCR = (USB_SCR_ENABLED | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX);
+    USB->SCR = (USB_SCR_DMA_STOP | USB_SCR_ENABLE | USB_SCR_FLUSH_TX | USB_SCR_FLUSH_RX);
 
     p.state = STATE_IDLE;
+    p.dma_in_progress = false;
     p.event_pending = false;
     p.event_callback_pending = false;
 
@@ -170,7 +157,11 @@ void usb_init (void) {
 
 
 void process_usb (void) {
-    handle_escape();
+    if (USB->SCR & USB_SCR_RESET_PENDING) {
+        usb_init();
+        USB->SCR |= USB_SCR_RESET_ACK;
+        return;
+    }
 
     switch (p.state) {
         case STATE_IDLE:
@@ -247,11 +238,15 @@ void process_usb (void) {
                 case 'W':
                 case 'L':
                 case 'S':
-                    if (!dma_busy()) {
+                    if (!(USB->SCR & USB_SCR_DMA_BUSY)) {
                         if (!p.dma_in_progress) {
-                            bool is_write = (p.cmd == 'W') || (p.cmd == 'S');
-                            enum dma_dir dir = is_write ? DMA_DIR_TO_SDRAM : DMA_DIR_FROM_SDRAM;
-                            dma_start(p.args[0], p.args[1], DMA_ID_USB, dir);
+                            USB->ADDR = p.args[0];
+                            USB->LEN = p.args[1];
+                            if ((p.cmd == 'W') || (p.cmd == 'S')) {
+                                USB->SCR |= (USB_SCR_DMA_DIR | USB_SCR_DMA_START);
+                            } else {
+                                USB->SCR |= USB_SCR_DMA_START;
+                            }
                             p.dma_in_progress = true;
                         } else {
                             if (p.cmd == 'L' || p.cmd == 'S') {
@@ -273,43 +268,6 @@ void process_usb (void) {
                                 p.state = STATE_RESPONSE;
                             }
                         }
-                    }
-                    break;
-
-                case 'F':
-                case 'T':
-                    while ((p.args[0] + p.counter) != (p.args[0] + p.args[1])) {
-                        uint8_t *buffer = (uint8_t *) (RAMBUFFER_BASE + p.args[0] + p.counter);
-                        if (p.cmd == 'F') {
-                            if (tx_byte(*buffer)) {
-                                p.counter += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                        if (p.cmd == 'T') {
-                            if (rx_byte(buffer)) {
-                                p.counter += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                    if ((p.args[0] + p.counter) == (p.args[0] + p.args[1])) {
-                        if (p.event_callback_pending) {
-                            if (p.cmd == 'F' && p.event.trigger == CALLBACK_BUFFER_READ) {
-                                p.event_callback_pending = false;
-                                p.event.callback();
-                            }
-                            if (p.cmd == 'T' && p.event.trigger == CALLBACK_BUFFER_WRITE) {
-                                p.event_callback_pending = false;
-                                p.event.callback();
-                            }
-                        }
-                        if (p.cmd == 'F') {
-                            USB->SCR |= USB_SCR_FORCE_TX;
-                        }
-                        p.state = STATE_IDLE;
                     }
                     break;
 

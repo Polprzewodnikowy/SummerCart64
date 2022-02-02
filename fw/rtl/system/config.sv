@@ -20,6 +20,10 @@ interface if_config ();
     logic [25:0] save_offset;
     logic [25:0] isv_offset;
     logic [15:0] isv_rd_ptr;
+    logic flash_erase_start;
+    logic flash_erase_busy;
+    logic flash_wp_enable;
+    logic flash_wp_disable;
 
     modport pi (
         input sdram_switch,
@@ -37,6 +41,13 @@ interface if_config ();
 
     modport flashram (
         output flashram_read_mode
+    );
+
+    modport flash (
+        input flash_erase_start,
+        output flash_erase_busy,
+        input flash_wp_enable,
+        input flash_wp_disable
     );
 
     modport n64 (
@@ -70,7 +81,11 @@ interface if_config ();
         output ddipl_offset,
         output save_offset,
         output isv_offset,
-        input isv_rd_ptr
+        input isv_rd_ptr,
+        output flash_erase_start,
+        input flash_erase_busy,
+        output flash_wp_enable,
+        output flash_wp_disable
     );
 
 endinterface

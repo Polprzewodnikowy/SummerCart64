@@ -18,8 +18,6 @@ typedef enum {
     CALLBACK_NONE = 0,
     CALLBACK_SDRAM_WRITE = 1,
     CALLBACK_SDRAM_READ = 2,
-    CALLBACK_BUFFER_WRITE = 3,
-    CALLBACK_BUFFER_READ = 4,
 } usb_event_callback_t;
 
 typedef struct {

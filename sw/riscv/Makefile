@@ -6,7 +6,7 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
 FLAGS = -mabi=ilp32 -march=rv32i $(USER_FLAGS)
-CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
+CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -fno-delete-null-pointer-checks -MMD -MP
 LDFLAGS = -nostartfiles -Wl,--gc-sections
 
 SRC_DIR = src
@@ -17,7 +17,6 @@ SRC_FILES = \
 	process.c \
 	usb.c \
 	cfg.c \
-	dma.c \
 	joybus.c \
 	rtc.c \
 	i2c.c \
@@ -46,7 +45,7 @@ $(BUILD_DIR)/governor.elf: $(OBJS) SC64.ld
 	@$(OBJDUMP) -D $@ > $(BUILD_DIR)/governor.lst
 
 $(BUILD_DIR)/governor.bin: $(BUILD_DIR)/governor.elf
-	@$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to 0x10016800 $< $@
+	@$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to 0x00016800 $< $@
 
 $(BUILD_DIR)/governor.hex: $(BUILD_DIR)/governor.bin
 	@$(OBJCOPY) -I binary -O ihex $< $@

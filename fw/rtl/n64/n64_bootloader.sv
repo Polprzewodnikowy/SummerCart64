@@ -1,19 +1,9 @@
 module n64_bootloader (
     if_system.sys sys,
     if_n64_bus bus,
-    if_flash.memory flash
+    if_config.flash cfg,
+    if_flash.flash flash
 );
-
-    logic mem_request;
-    logic csr_ack;
-    logic data_ack;
-    logic write_ack;
-    logic data_busy;
-    logic mem_write;
-    logic [31:0] mem_address;
-    logic [31:0] csr_rdata;
-    logic [31:0] data_rdata;
-    logic [31:0] mem_wdata;
 
     typedef enum bit [0:0] { 
         S_IDLE,
@@ -28,97 +18,77 @@ module n64_bootloader (
     e_state state;
     e_source_request source_request;
 
-    always_ff @(posedge sys.clk) begin
-        csr_ack <= 1'b0;
-        write_ack <= 1'b0;
+    logic request;
+    logic ack;
+    logic write;
+    logic [31:0] address;
+    logic [31:0] wdata;
+    logic [31:0] rdata;
 
+    always_ff @(posedge sys.clk) begin
         if (sys.reset) begin
             state <= S_IDLE;
-            mem_request <= 1'b0;
+            request <= 1'b0;
         end else begin
             case (state)
                 S_IDLE: begin
                     if (bus.request || flash.request) begin
                         state <= S_WAIT;
-                        mem_request <= 1'b1;
+                        request <= 1'b1;
                         if (bus.request) begin
-                            mem_write <= 1'b0;
-                            mem_address <= bus.address;
-                            mem_wdata <= bus.wdata;
+                            write <= 1'b0;
+                            address <= bus.address;
+                            wdata <= bus.wdata;
                             source_request <= T_N64;
                         end else if (flash.request) begin
-                            mem_write <= flash.write;
-                            mem_address <= flash.address;
-                            mem_wdata <= flash.wdata;
+                            write <= flash.write;
+                            address <= flash.address;
+                            wdata <= flash.wdata;
                             source_request <= T_CPU;
                         end
                     end
                 end
 
                 S_WAIT: begin
-                    if (mem_address[27] && source_request != T_N64 && !csr_ack) begin
-                        mem_request <= 1'b0;
-                        csr_ack <= 1'b1;
-                    end
-                    if ((!mem_address[27] || source_request == T_N64) && !data_busy) begin
-                        mem_request <= 1'b0;
-                    end
-                    if (!mem_address[27] && mem_write && !data_busy && !write_ack) begin
-                        write_ack <= 1'b1;
-                    end
-                    if (csr_ack || data_ack || write_ack) begin
+                    if (ack) begin
                         state <= S_IDLE;
+                        request <= 1'b0;
                     end
                 end
             endcase
         end
     end
 
-    logic csr_or_data;
-    logic csr_read;
-    logic csr_write;
-    logic data_read;
-    logic data_write;
-
     always_comb begin
-        csr_or_data = mem_address[27] && source_request == T_CPU;
-        csr_read = csr_or_data && mem_request && !mem_write;
-        csr_write = csr_or_data && mem_request && mem_write;
-        data_read = !csr_or_data && mem_request && !mem_write;
-        data_write = !csr_or_data && mem_request && mem_write;
-
-        bus.ack = source_request == T_N64 && data_ack;
+        bus.ack = source_request == T_N64 && ack;
         bus.rdata = 16'd0;
         if (bus.ack && bus.address < 32'h00010000) begin
-            if (bus.address[1]) bus.rdata = {data_rdata[23:16], data_rdata[31:24]};
-            else bus.rdata = {data_rdata[7:0], data_rdata[15:8]};
+            if (bus.address[1]) bus.rdata = {rdata[23:16], rdata[31:24]};
+            else bus.rdata = {rdata[7:0], rdata[15:8]};
         end
 
-        flash.ack = source_request == T_CPU && (csr_ack || data_ack || write_ack);
+        flash.ack = source_request == T_CPU && ack;
         flash.rdata = 32'd0;
         if (flash.ack) begin
-            flash.rdata = csr_or_data ? csr_rdata : data_rdata;
+            flash.rdata = rdata;
         end
     end
 
-    intel_flash intel_flash_inst (
-        .clock(sys.clk),
-        .reset_n(~sys.reset),
+    vendor_flash vendor_flash_inst (
+        .clk(sys.clk),
+        .reset(sys.reset),
 
-        .avmm_csr_addr(mem_address[2]),
-        .avmm_csr_read(csr_read),
-        .avmm_csr_writedata(mem_wdata),
-        .avmm_csr_write(csr_write),
-        .avmm_csr_readdata(csr_rdata),
+        .erase_start(cfg.flash_erase_start),
+        .erase_busy(cfg.flash_erase_busy),
+        .wp_enable(cfg.flash_wp_enable),
+        .wp_disable(cfg.flash_wp_disable),
 
-        .avmm_data_addr(mem_address[31:2]),
-        .avmm_data_read(data_read),
-        .avmm_data_writedata(mem_wdata),
-        .avmm_data_write(data_write),
-        .avmm_data_readdata(data_rdata),
-        .avmm_data_waitrequest(data_busy),
-        .avmm_data_readdatavalid(data_ack),
-        .avmm_data_burstcount(2'd1)
+        .request(request),
+        .ack(ack),
+        .write(write),
+        .address(address),
+        .wdata(wdata),
+        .rdata(rdata)
     );
 
 endmodule

@@ -1,13 +1,12 @@
 module n64_soc (
     if_system sys,
     if_config cfg,
-    if_dma.memory dma,
+    if_memory_dma.memory usb_dma,
     if_sdram.memory sdram,
     if_flashram.flashram flashram,
     if_si.si si,
-    if_flash.memory flash,
+    if_flash.flash flash,
     if_dd dd,
-    if_cpu_ram.external cpu_ram,
 
     input n64_pi_alel,
     input n64_pi_aleh,
@@ -52,7 +51,7 @@ module n64_soc (
     n64_sdram n64_sdram_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_SDRAM].device),
-        .dma(dma),
+        .usb_dma(usb_dma),
         .sdram(sdram),
 
         .sdram_cs(sdram_cs),
@@ -67,6 +66,7 @@ module n64_soc (
     n64_bootloader n64_bootloader_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_BOOTLOADER].device),
+        .cfg(cfg),
         .flash(flash)
     );
 
@@ -91,8 +91,7 @@ module n64_soc (
     n64_cfg n64_cfg_inst (
         .sys(sys),
         .bus(bus.at[sc64::ID_N64_CFG].device),
-        .cfg(cfg),
-        .cpu_ram(cpu_ram)
+        .cfg(cfg)
     );
 
 endmodule

@@ -18,7 +18,8 @@ module cpu_cfg (
         R_VERSION,
         R_RECONFIGURE,
         R_ISV_OFFSET,
-        R_ISV_RD_PTR
+        R_ISV_RD_PTR,
+        R_FLASH
     } e_reg_id;
 
     const logic [31:0] RECONFIGURE_MAGIC = 32'h52535446;
@@ -39,7 +40,10 @@ module cpu_cfg (
                     cfg.cpu_busy,
                     1'b0,
                     cfg.cmd_error,
-                    20'd0,
+                    2'd0,
+                    cfg.flash_erase_busy,
+                    1'd0,
+                    16'd0,
                     cfg.isv_enabled,
                     skip_bootloader,
                     cfg.flashram_enabled,
@@ -73,6 +77,10 @@ module cpu_cfg (
     end
 
     always_ff @(posedge sys.clk) begin
+        cfg.flash_erase_start <= 1'b0;
+        cfg.flash_wp_enable <= 1'b0;
+        cfg.flash_wp_disable <= 1'b0;
+
         if (sys.reset) begin
             cfg.cpu_ready <= 1'b0;
             cfg.cpu_busy <= 1'b0;
@@ -95,9 +103,11 @@ module cpu_cfg (
                 cfg.sdram_writable <= 1'b0;
                 isv_current_rd_ptr <= 16'd0;
             end
+
             if (cfg.cmd_request) begin
                 cfg.cpu_busy <= 1'b1;
             end
+
             if (bus.request) begin
                 case (bus.address[5:2])
                     R_SCR: begin
@@ -105,8 +115,11 @@ module cpu_cfg (
                             {
                                 cfg.cpu_ready,
                                 cfg.cpu_busy,
-                                cfg.cmd_error
-                            } <= {bus.wdata[31:30], bus.wdata[28]};
+                                cfg.cmd_error,
+                                cfg.flash_wp_disable,
+                                cfg.flash_wp_enable,
+                                cfg.flash_erase_start
+                            } <= {bus.wdata[31:30], bus.wdata[28:26], bus.wdata[24]};
                         end
                         if (bus.wmask[0]) begin
                             {
@@ -156,31 +169,11 @@ module cpu_cfg (
         end
     end
 
-    logic [1:0] ru_clk;
-    logic ru_rconfig;
-    logic ru_regout;
+    vendor_reconfigure vendor_reconfigure_inst (
+        .clk(sys.clk),
+        .reset(sys.reset),
 
-    always_ff @(posedge sys.clk) begin
-        if (sys.reset) begin
-            ru_clk <= 2'd0;
-            ru_rconfig <= 1'b0;
-        end else begin
-            ru_clk <= ru_clk + 1'd1;
-
-            if (ru_clk == 2'd1) begin
-                ru_rconfig <= trigger_reconfiguration;
-            end
-        end
-    end
-
-    fiftyfivenm_rublock fiftyfivenm_rublock_inst (
-        .clk(ru_clk[1]),
-        .shiftnld(1'b0),
-        .captnupdt(1'b0),
-        .regin(1'b0),
-        .rsttimer(1'b0),
-        .rconfig(ru_rconfig),
-        .regout(ru_regout)
+        .trigger_reconfiguration(trigger_reconfiguration)
     );
 
 endmodule

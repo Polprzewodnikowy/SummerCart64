@@ -7,9 +7,9 @@ set sdram_pll_clk {system_inst|intel_pll_inst|altpll_component|auto_generated|pl
 # set sd_reg_clk {sd_interface_inst|sd_clk_inst|o_sd_clk|q}
 
 create_generated_clock -name sdram_clk -source [get_pins $sdram_pll_clk] [get_ports {o_sdram_clk}]
+create_clock -name usb_clk -period 40.0 [get_ports {o_usb_clk}]
 # create_generated_clock -name sd_reg_clk -source [get_pins {sd_interface_inst|sd_clk_inst|o_sd_clk|clk}] -divide_by 2 [get_pins $sd_reg_clk]
 # create_generated_clock -name sd_clk -source [get_pins $sd_reg_clk] [get_ports {o_sd_clk}]
-
 create_generated_clock -name flash_se_neg_reg \
     -source [get_pins -compatibility_mode {*altera_onchip_flash:*onchip_flash_0|altera_onchip_flash_avmm_data_controller:avmm_data_controller|flash_se_neg_reg|clk}] \
     -divide_by 2 \
@@ -30,6 +30,7 @@ set_input_delay -clock [get_clocks {sdram_clk}] -max 5.4 [get_ports $sdram_input
 set_input_delay -clock [get_clocks {sdram_clk}] -min 2.5 [get_ports $sdram_inputs]
 
 set_multicycle_path -setup -end 2 -from [get_clocks {sdram_clk}] -to [get_clocks $sys_clk]
+set_multicycle_path -hold -end 1 -from [get_clocks {sdram_clk}] -to [get_clocks $sys_clk]
 
 
 # SD card timings
@@ -48,8 +49,17 @@ set_multicycle_path -setup -end 2 -from [get_clocks {sdram_clk}] -to [get_clocks
 
 # FT1248 timings
 
-set_false_path -to [get_ports {o_usb_clk io_usb_miosi[*] o_usb_cs}]
-set_false_path -from [get_ports {io_usb_miosi[*] i_usb_miso i_usb_pwren}]
+set_output_delay -clock [get_clocks {usb_clk}] -max 5.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
+set_output_delay -clock [get_clocks {usb_clk}] -min -5.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
+
+set_input_delay -clock [get_clocks {usb_clk}] -max 5.0 [get_ports {io_usb_miosi[*] i_usb_miso}]
+set_input_delay -clock [get_clocks {usb_clk}] -min 5.0 [get_ports {io_usb_miosi[*] i_usb_miso}]
+
+set_multicycle_path -setup -start 2 -from [get_clocks $sys_clk] -to [get_clocks {usb_clk}]
+set_multicycle_path -hold -start 3 -from [get_clocks $sys_clk] -to [get_clocks {usb_clk}]
+
+set_multicycle_path -setup -end 2 -from [get_clocks {usb_clk}] -to [get_clocks $sys_clk]
+set_multicycle_path -hold -end 3 -from [get_clocks {usb_clk}] -to [get_clocks $sys_clk]
 
 
 # N64, PI and SI timings

@@ -16,7 +16,7 @@ interface if_flash ();
         output wdata
     );
 
-    modport memory (
+    modport flash (
         input request,
         output ack,
         input write,

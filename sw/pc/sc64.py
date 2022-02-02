@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
-from ft232 import Ft232, Ft232Exception
+from serial import Serial, SerialException
+from serial.tools import list_ports
 from io import TextIOWrapper
 from typing import Union
 import argparse
@@ -9,7 +10,6 @@ import filecmp
 import helpers
 import os
 import progressbar
-import re
 import struct
 import sys
 import time
@@ -50,8 +50,6 @@ class SC64:
     __DEBUG_ID_TEXT = 0x01
     __EVENT_ID_FSD_READ = 0xF0
     __EVENT_ID_FSD_WRITE = 0xF1
-    __EVENT_ID_FSD_LOAD = 0xF2
-    __EVENT_ID_FSD_STORE = 0xF3
     __EVENT_ID_DD_BLOCK = 0xF4
     __EVENT_ID_IS_VIEWER = 0xF5
 
@@ -76,7 +74,6 @@ class SC64:
 
     def __del__(self) -> None:
         if (self.__usb):
-            self.__reset_n64("release")
             self.__usb.close()
         if (self.__fsd_file):
             self.__fsd_file.close()
@@ -101,14 +98,15 @@ class SC64:
         return (value + (align - 1)) & ~(align - 1)
 
 
-    def __escape(self, data: bytes) -> bytes:
-        return re.sub(b"\x1B", b"\x1B\x1B", data)
-
-
     def reset_link(self) -> None:
-        self.__usb.write(b"\x1BR")
-        time.sleep(0.1)
-        self.__usb.flushInput()
+        if (self.__usb):
+            self.__usb.flush()
+            self.__usb.setDTR(1)
+            while (self.__usb.getDSR() == 0):
+                pass
+            self.__usb.setDTR(0)
+            while (self.__usb.getDSR() == 1):
+                pass
 
 
     def __read(self, bytes: int) -> bytes:
@@ -116,7 +114,7 @@ class SC64:
 
 
     def __write(self, data: bytes) -> None:
-        self.__usb.write(self.__escape(data))
+        self.__usb.write(data)
 
 
     def __read_long(self, length: int) -> bytes:
@@ -151,29 +149,28 @@ class SC64:
         self.__write_int(arg2)
 
 
-    def __reset_n64(self, type: str) -> None:
-        if (self.__usb):
-            if (type == "hold"):
-                self.__usb.cbus_setup(mask=1, init=0)
-                time.sleep(0.6)
-            elif (type == "release"):
-                self.__usb.cbus_setup(mask=0)
-
-
     def __find_sc64(self) -> None:
-        if (self.__usb != None and not self.__usb.closed):
+        ports = list_ports.comports()
+        device_found = False
+
+        if (self.__usb != None and self.__usb.isOpen()):
             self.__usb.close()
 
-        try:
-            self.__usb = Ft232(description="SummerCart64")
-            self.__reset_n64("hold")
-            self.__usb.flushOutput()
-            self.reset_link()
-            self.__probe_device()
-        except Ft232Exception as e:
-            if (self.__usb):
-                self.__usb.close()
-            raise SC64Exception(f"No SummerCart64 device was found: {e}")
+        for p in ports:
+            if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC")):
+                try:
+                    self.__usb = Serial(p.device, timeout=0.5, write_timeout=0.5)
+                    self.reset_link()
+                    self.__probe_device()
+                except (SerialException, SC64Exception):
+                    if (self.__usb):
+                        self.__usb.close()
+                    continue
+                device_found = True
+                break
+
+        if (not device_found):
+            raise SC64Exception("No SummerCart64 device was found")
 
 
     def __probe_device(self) -> None:
@@ -197,25 +194,22 @@ class SC64:
             self.__read_cmd_status("C")
 
 
-    def __read_file_from_sdram(self, file: str, offset: int, length: int, align: int = 2) -> None:
+    def __read_file_from_sdram(self, file: str, offset: int, length: int) -> None:
         with open(file, "wb") as f:
-            transfer_size = self.__align(length, align)
-            self.__set_progress_init(transfer_size, os.path.basename(f.name))
-            self.__write_cmd("R", offset, transfer_size)
+            self.__set_progress_init(length, os.path.basename(f.name))
+            self.__write_cmd("R", offset, length)
             while (f.tell() < length):
                 chunk_size = min(self.__CHUNK_SIZE, length - f.tell())
                 f.write(self.__read(chunk_size))
                 self.__set_progress_value(f.tell())
-            if (transfer_size != length):
-                self.__read(transfer_size - length)
             self.__read_cmd_status("R")
             self.__set_progress_finish()
 
 
-    def __write_file_to_sdram(self, file: str, offset: int, align: int = 2, min_length: int = 0) -> None:
+    def __write_file_to_sdram(self, file: str, offset: int, min_length: int = 0) -> None:
         with open(file, "rb") as f:
             length = os.fstat(f.fileno()).st_size
-            transfer_size = self.__align(max(length, min_length), align)
+            transfer_size = max(length, min_length)
             self.__set_progress_init(transfer_size, os.path.basename(f.name))
             self.__write_cmd("W", offset, transfer_size)
             while (f.tell() < length):
@@ -243,7 +237,7 @@ class SC64:
     def __reconfigure(self) -> None:
         magic = self.__query_config(self.__CFG_ID_RECONFIGURE)
         self.__change_config(self.__CFG_ID_RECONFIGURE, magic, ignore_response=True)
-        time.sleep(0.2)
+        time.sleep(0.5)
 
 
     def backup_firmware(self, file: str) -> None:
@@ -259,7 +253,6 @@ class SC64:
         self.__change_config(self.__CFG_ID_FLASH_PROGRAM, self.__UPDATE_OFFSET)
         self.__usb.timeout = saved_timeout
         self.__reconfigure()
-        self.__find_sc64()
 
 
     def set_rtc(self, t: datetime) -> None:
@@ -544,7 +537,7 @@ class SC64:
                     data += struct.pack(">I", offset)
                     self.__disk_lba_table[lba] = offset
                 self.__write_cmd("W", thb_table_offset, len(data))
-                self.__write(data)
+                self.__write(bytes(data))
                 self.__read_cmd_status("W")
                 id_mapping = {
                     "retail": self.__DD_DRIVE_ID_RETAIL,
@@ -561,26 +554,28 @@ class SC64:
     def __debug_process_fsd_read(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder="little")
         offset = int.from_bytes(data[4:8], byteorder="little")
+        count = int.from_bytes(data[8:12], byteorder="little")
 
         if (self.__fsd_file):
             self.__fsd_file.seek(sector * 512)
-            self.__write_cmd("T", offset, 512)
-            self.__write(self.__fsd_file.read(512))
+            self.__write_cmd("S", offset, count * 512)
+            self.__write(self.__fsd_file.read(count * 512))
         else:
-            self.__write_cmd("T", offset, 0)
+            self.__write_cmd("S", offset, 0)
 
 
     def __debug_process_fsd_write(self, data: bytes) -> None:
         sector = int.from_bytes(data[0:4], byteorder="little")
         offset = int.from_bytes(data[4:8], byteorder="little")
+        count = int.from_bytes(data[8:12], byteorder="little")
 
         if (self.__fsd_file):
             with helpers.lock_volume(self.__fsd_file):
                 self.__fsd_file.seek(sector * 512)
-                self.__write_cmd("F", offset, 512)
-                self.__fsd_file.write(self.__read(512))
+                self.__write_cmd("L", offset, count * 512)
+                self.__fsd_file.write(self.__read(count * 512))
         else:
-            self.__write_cmd("F", offset, 0)
+            self.__write_cmd("L", offset, 0)
 
 
     def __debug_process_dd_block(self, data: bytes) -> None:
@@ -588,7 +583,7 @@ class SC64:
         sdram_offset = int.from_bytes(data[4:8], byteorder="little")
         disk_file_offset = int.from_bytes(data[8:12], byteorder="big")
         block_length = int.from_bytes(data[12:16], byteorder="little")
-
+        print(f"DD BLOCK {disk_file_offset:08X} {block_length}")
         if (self.__disk_file):
             self.__disk_file.seek(disk_file_offset)
             if (transfer_mode):
@@ -605,10 +600,8 @@ class SC64:
     def __debug_process_is_viewer(self, data: bytes) -> None:
         length = int.from_bytes(data[0:4], byteorder="little")
         address = int.from_bytes(data[4:8], byteorder="little")
-        offset = (address & 0x01)
-        transfer_length = self.__align(length + offset, 2)
-        self.__write_cmd("L", (address & 0xFFFFFFFE), transfer_length)
-        text = self.__read(transfer_length)[offset:][:length]
+        self.__write_cmd("L", address, length)
+        text = self.__read(length)
         print(text.decode("EUC-JP", errors="backslashreplace"), end="")
 
 
@@ -625,12 +618,8 @@ class SC64:
 
         print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
-        self.__usb.setTimeout(0.1)
-
         start_indicator = bytearray()
         dropped_bytes = 0
-
-        self.__reset_n64("release")
 
         while (True):
             while (start_indicator != b"DMA@"):
@@ -752,6 +741,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    sc64 = None
+
     try:
         sc64 = SC64()
 
@@ -855,7 +846,6 @@ if __name__ == "__main__":
         pass
     finally:
         if (sc64):
-            sc64.reset_link()
             if (disk_file):
                 print(f"Setting 64DD disk state to [Ejected]")
                 sc64.set_dd_disk_state("ejected")

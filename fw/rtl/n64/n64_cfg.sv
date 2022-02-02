@@ -1,8 +1,7 @@
 module n64_cfg (
     if_system sys,
     if_n64_bus bus,
-    if_config.n64 cfg,
-    if_cpu_ram.external cpu_ram
+    if_config.n64 cfg
 );
 
     typedef enum bit [2:0] { 
@@ -32,10 +31,6 @@ module n64_cfg (
     logic [31:0] isv_id;
 
     always_comb begin
-        cpu_ram.write = bus.request && bus.write && (bus.address[15:14] == 2'b01);
-        cpu_ram.address = bus.address[13:1];
-        cpu_ram.wdata = {bus.wdata[7:0], bus.wdata[15:8]};
-
         bus.rdata = 16'd0;
         if (bus.ack) begin
             if (bus.address[15:14] == 2'b00) begin
@@ -54,14 +49,14 @@ module n64_cfg (
                     R_DATA_1_L: bus.rdata = cfg.data[1][15:0];
                     R_VERSION_H: bus.rdata = sc64::SC64_VER[31:16];
                     R_VERSION_L: bus.rdata = sc64::SC64_VER[15:0];
+                    default: bus.rdata = 16'd0;
                 endcase
-            end else if (bus.address[15:14] == 2'b01) begin
-                bus.rdata = {cpu_ram.rdata[7:0], cpu_ram.rdata[15:8]};
             end else if (bus.address[15:14] == 2'b11) begin
                 case (bus.address[4:1])
                     R_ISV_ID_H: bus.rdata = isv_id[31:16];
                     R_ISV_ID_L: bus.rdata = isv_id[15:0];
                     R_ISV_RD_PTR: bus.rdata = cfg.isv_rd_ptr;
+                    default: bus.rdata = 16'd0;
                 endcase
             end
         end

@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
-# Date created = 13:29:40  November 11, 2021
+# Date created = 19:00:58  February 02, 2022
 #
 # -------------------------------------------------------------------------- #
 #
@@ -46,6 +46,7 @@ set_global_assignment -name LAST_QUARTUS_VERSION "21.1.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
+set_global_assignment -name POST_MODULE_SCRIPT_FILE "quartus_sh:scripts/post_module.tcl"
 set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
 set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
 set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
@@ -55,10 +56,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_cfg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dd.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_dma.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flash.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_flashram.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_gpio.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_i2c.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_ram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_sdram.sv
@@ -67,6 +66,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_soc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_uart.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_usb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_wrapper.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_dma.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory_sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bootloader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/n64/n64_bus.sv
@@ -83,7 +83,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
-set_global_assignment -name POST_MODULE_SCRIPT_FILE "quartus_sh:scripts/post_module.tcl"
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/vendor_flash.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/vendor_reconfigure.sv
 
 # Pin & Location Assignments
 # ==========================
@@ -164,8 +165,11 @@ set_location_assignment PIN_114 -to o_sd_clk
 set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
+set_location_assignment PIN_121 -to io_usb_miosi[5]
+set_location_assignment PIN_122 -to io_usb_miosi[7]
 set_location_assignment PIN_123 -to o_n64_irq
-set_location_assignment PIN_138 -to i_usb_pwren
+set_location_assignment PIN_124 -to io_usb_miosi[6]
+set_location_assignment PIN_126 -to io_usb_miosi[4]
 set_location_assignment PIN_140 -to o_usb_cs
 set_location_assignment PIN_141 -to i_usb_miso
 
@@ -191,6 +195,7 @@ set_global_assignment -name VHDL_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
 set_global_assignment -name VERILOG_SHOW_LMF_MAPPING_MESSAGES OFF
 set_global_assignment -name TOP_LEVEL_ENTITY SummerCart64
+set_global_assignment -name VERILOG_MACRO DEBUG
 
 # Fitter Assignments
 # ==================
@@ -200,7 +205,7 @@ set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE COMP IMAGE"
 set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
-set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.0-V LVTTL"
 
 # Assembler Assignments
 # =====================
@@ -226,10 +231,8 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 	# Pin & Location Assignments
 	# ==========================
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_si_dq
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
@@ -239,25 +242,19 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_write
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_pwren
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_*
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cs
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_ras
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cas
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_we
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_a[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_ba[*]
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sd_clk
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_n64_pi_ad[*]
 	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sd_*
-	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_rtc_sda
 
 	# Fitter Assignments
 	# ==================
@@ -272,7 +269,6 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_write
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_pi_alel
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to o_n64_irq
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_pwren
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_usb_miso
 
 	# start DESIGN_PARTITION(Top)
