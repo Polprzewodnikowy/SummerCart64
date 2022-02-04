@@ -19,7 +19,7 @@
 #
 # Quartus Prime
 # Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
-# Date created = 19:00:58  February 02, 2022
+# Date created = 19:19:14  February 04, 2022
 #
 # -------------------------------------------------------------------------- #
 #
@@ -88,11 +88,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/vendor_reconfigure.sv
 
 # Pin & Location Assignments
 # ==========================
-set_location_assignment PIN_6 -to o_usb_clk
-set_location_assignment PIN_7 -to io_usb_miosi[2]
-set_location_assignment PIN_8 -to io_usb_miosi[3]
-set_location_assignment PIN_10 -to io_usb_miosi[0]
-set_location_assignment PIN_11 -to io_usb_miosi[1]
+set_location_assignment PIN_6 -to o_usb_cs
+set_location_assignment PIN_7 -to i_usb_miso
+set_location_assignment PIN_8 -to o_usb_clk
 set_location_assignment PIN_12 -to i_uart_rxd
 set_location_assignment PIN_13 -to o_uart_txd
 set_location_assignment PIN_17 -to o_led
@@ -165,13 +163,15 @@ set_location_assignment PIN_114 -to o_sd_clk
 set_location_assignment PIN_118 -to io_sd_cmd
 set_location_assignment PIN_119 -to io_sd_dat[3]
 set_location_assignment PIN_120 -to io_sd_dat[2]
-set_location_assignment PIN_121 -to io_usb_miosi[5]
-set_location_assignment PIN_122 -to io_usb_miosi[7]
 set_location_assignment PIN_123 -to o_n64_irq
-set_location_assignment PIN_124 -to io_usb_miosi[6]
-set_location_assignment PIN_126 -to io_usb_miosi[4]
-set_location_assignment PIN_140 -to o_usb_cs
-set_location_assignment PIN_141 -to i_usb_miso
+set_location_assignment PIN_124 -to io_usb_miosi[7]
+set_location_assignment PIN_127 -to io_usb_miosi[6]
+set_location_assignment PIN_130 -to io_usb_miosi[4]
+set_location_assignment PIN_131 -to io_usb_miosi[5]
+set_location_assignment PIN_134 -to io_usb_miosi[3]
+set_location_assignment PIN_135 -to io_usb_miosi[2]
+set_location_assignment PIN_140 -to io_usb_miosi[1]
+set_location_assignment PIN_141 -to io_usb_miosi[0]
 
 # Classic Timing Assignments
 # ==========================
@@ -231,34 +231,39 @@ set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -
 
 	# Pin & Location Assignments
 	# ==========================
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_nmi
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_pi_ad[*]
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_aleh
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_read
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_write
-	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_pi_alel
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_reset
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_n64_si_clk
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_uart_rxd
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to i_usb_miso
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_n64_pi_ad[*]
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_rtc_sda
 	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_sdram_dq[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
+	set_instance_assignment -name FAST_INPUT_REGISTER ON -to io_usb_miosi[*]
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_n64_pi_ad[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cs
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_ras
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cas
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_we
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_rtc_sda
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_usb_miosi[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_rtc_scl
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_a[*]
 	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_ba[*]
-	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cas
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_cs
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_ras
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_sdram_we
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_uart_txd
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_clk
+	set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to o_usb_cs
 	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_n64_pi_ad[*]
 	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_sdram_dq[*]
+	set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to io_usb_miosi[*]
 
 	# Fitter Assignments
 	# ==================
-	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_usb_miosi[*]
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_n64_nmi
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to i_uart_rxd
 	set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to io_n64_si_dq

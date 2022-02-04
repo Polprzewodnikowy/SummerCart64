@@ -157,9 +157,9 @@ class SC64:
             self.__usb.close()
 
         for p in ports:
-            if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC")):
+            if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC64")):
                 try:
-                    self.__usb = Serial(p.device, timeout=0.5, write_timeout=0.5)
+                    self.__usb = Serial(p.device, timeout=1.0, write_timeout=1.0)
                     self.reset_link()
                     self.__probe_device()
                 except (SerialException, SC64Exception):

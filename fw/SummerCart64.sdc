@@ -49,11 +49,11 @@ set_multicycle_path -hold -end 1 -from [get_clocks {sdram_clk}] -to [get_clocks 
 
 # FT1248 timings
 
-set_output_delay -clock [get_clocks {usb_clk}] -max 5.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
-set_output_delay -clock [get_clocks {usb_clk}] -min -5.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
+set_output_delay -clock [get_clocks {usb_clk}] -max 2.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
+set_output_delay -clock [get_clocks {usb_clk}] -min -1.0 [get_ports {io_usb_miosi[*] o_usb_cs}]
 
 set_input_delay -clock [get_clocks {usb_clk}] -max 5.0 [get_ports {io_usb_miosi[*] i_usb_miso}]
-set_input_delay -clock [get_clocks {usb_clk}] -min 5.0 [get_ports {io_usb_miosi[*] i_usb_miso}]
+set_input_delay -clock [get_clocks {usb_clk}] -min 2.5 [get_ports {io_usb_miosi[*] i_usb_miso}]
 
 set_multicycle_path -setup -start 2 -from [get_clocks $sys_clk] -to [get_clocks {usb_clk}]
 set_multicycle_path -hold -start 3 -from [get_clocks $sys_clk] -to [get_clocks {usb_clk}]
