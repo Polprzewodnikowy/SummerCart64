@@ -9,7 +9,6 @@ interface if_n64_bus ();
     logic [31:0] address;
     logic [15:0] wdata;
     logic [15:0] rdata;
-    logic n64_active;
     logic [31:0] real_address;
     logic read_op;
     logic write_op;
@@ -39,7 +38,6 @@ interface if_n64_bus ();
         output address,
         output wdata,
         input rdata,
-        output n64_active,
         output real_address,
         output read_op,
         output write_op
@@ -49,11 +47,9 @@ interface if_n64_bus ();
     generate
         for (n = 0; n < NUM_DEVICES; n++) begin : at
             logic device_request;
-            logic device_n64_active;
 
             always_comb begin
                 device_request = request && id == sc64::e_n64_id'(n);
-                device_n64_active = n64_active && id == sc64::e_n64_id'(n);
             end
 
             modport device (
@@ -63,7 +59,6 @@ interface if_n64_bus ();
                 input .address(address),
                 input .wdata(wdata),
                 output .rdata(device_rdata[n]),
-                input .n64_active(device_n64_active),
                 input .real_address(real_address),
                 input .read_op(read_op),
                 input .write_op(write_op)

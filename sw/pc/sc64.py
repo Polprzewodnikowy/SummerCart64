@@ -835,8 +835,8 @@ if __name__ == "__main__":
                 if (disk_file):
                     print(f"Using 64DD disk image file [{disk_file}]")
                     sc64.set_dd_configuration_for_disk(disk_file)
-                    print(f"Setting 64DD disk state to [Changed]")
-                sc64.set_dd_disk_state("changed" if disk_file else "ejected")
+                    print(f"Setting 64DD disk state to [Inserted]")
+                sc64.set_dd_disk_state("inserted" if disk_file else "ejected")
                 sc64.debug_loop(is_viewer_enabled)
 
     except SC64Exception as e:

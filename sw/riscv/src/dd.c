@@ -5,9 +5,10 @@
 
 #define DD_USER_SECTORS_PER_BLOCK   (85)
 
-#define DD_BUFFERS_OFFSET           (SDRAM_BASE + 0x03BC0000UL)
-#define DD_THB_TABLE_OFFSET         (DD_BUFFERS_OFFSET + 0x0000)
-#define DD_BLOCK_BUFFER_OFFSET      (DD_BUFFERS_OFFSET + 0x5000)
+#define DD_BUFFERS_OFFSET           (SDRAM_BASE + 0x07E5A7F8UL)
+#define DD_STORAGE_TABLE_OFFSET     (DD_BUFFERS_OFFSET + 0x00000000UL)
+#define DD_THB_TABLE_OFFSET         (DD_BUFFERS_OFFSET + 0x0007BD90UL)
+#define DD_BLOCK_BUFFER_OFFSET      (DD_BUFFERS_OFFSET + 0x00080700UL)
 
 #define USB_DEBUG_ID_DD_BLOCK       (0xF5)
 
@@ -185,10 +186,6 @@ void dd_set_drive_id (uint16_t id) {
 
 uint16_t dd_get_drive_id (void) {
     return DD->DRIVE_ID;
-}
-
-void dd_set_thb_table_offset (uint32_t offset) {
-    p.thb_table = (io32_t *) (SDRAM_BASE + offset);
 }
 
 uint32_t dd_get_thb_table_offset (void) {

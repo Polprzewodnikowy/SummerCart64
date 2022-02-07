@@ -8,20 +8,6 @@
 #include "usb.h"
 
 
-#define SAVE_SIZE_EEPROM_4K     (512)
-#define SAVE_SIZE_EEPROM_16K    (2048)
-#define SAVE_SIZE_SRAM          (32 * 1024)
-#define SAVE_SIZE_FLASHRAM      (128 * 1024)
-#define SAVE_SIZE_SRAM_BANKED   (3 * 32 * 1024)
-
-#define ISV_SIZE                (64 * 1024)
-
-#define SAVE_OFFSET_PKST2       (0x01608000UL)
-
-#define DEFAULT_SAVE_OFFSET     (0x03FD0000UL)
-#define DEFAULT_DDIPL_OFFSET    (0x03BD0000UL)
-
-
 enum cfg_id {
     CFG_ID_SCR,
     CFG_ID_SDRAM_SWITCH,
@@ -86,8 +72,6 @@ static void set_usb_drive_not_busy (void) {
 }
 
 static void set_save_type (enum save_type save_type) {
-    uint32_t save_offset = DEFAULT_SAVE_OFFSET;
-
     change_scr_bits(CFG_SCR_FLASHRAM_EN | CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN, false);
     joybus_set_eeprom(EEPROM_NONE);
 
@@ -95,28 +79,19 @@ static void set_save_type (enum save_type save_type) {
         case SAVE_TYPE_NONE:
             break;
         case SAVE_TYPE_EEPROM_4K:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_4K - ISV_SIZE;
             joybus_set_eeprom(EEPROM_4K);
             break;
         case SAVE_TYPE_EEPROM_16K:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_EEPROM_16K - ISV_SIZE;
             joybus_set_eeprom(EEPROM_16K);
             break;
         case SAVE_TYPE_SRAM:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM - ISV_SIZE;
             change_scr_bits(CFG_SCR_SRAM_EN, true);
             break;
         case SAVE_TYPE_FLASHRAM:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_FLASHRAM - ISV_SIZE;
             change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         case SAVE_TYPE_SRAM_BANKED:
-            save_offset = SDRAM_SIZE - SAVE_SIZE_SRAM_BANKED - ISV_SIZE;
             change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_EN, true);
-            break;
-        case SAVE_TYPE_FLASHRAM_PKST2:
-            save_offset = SAVE_OFFSET_PKST2;
-            change_scr_bits(CFG_SCR_FLASHRAM_EN, true);
             break;
         default:
             save_type = SAVE_TYPE_NONE;
@@ -124,8 +99,6 @@ static void set_save_type (enum save_type save_type) {
     }
 
     p.save_type = save_type;
-
-    CFG->SAVE_OFFSET = save_offset;
 }
 
 
@@ -157,10 +130,10 @@ void cfg_query (uint32_t *args) {
             args[1] = (uint32_t) (p.tv_type);
             break;
         case CFG_ID_SAVE_OFFEST:
-            args[1] = CFG->SAVE_OFFSET;
+            args[1] = SAVE_OFFSET;
             break;
         case CFG_ID_DDIPL_OFFEST:
-            args[1] = CFG->DDIPL_OFFSET;
+            args[1] = DDIPL_OFFSET;
             break;
         case CFG_ID_BOOT_MODE:
             args[1] = p.boot_mode;
@@ -210,10 +183,8 @@ void cfg_update (uint32_t *args) {
             p.tv_type = (uint8_t) (args[1] & 0x03);
             break;
         case CFG_ID_SAVE_OFFEST:
-            CFG->SAVE_OFFSET = args[1];
             break;
         case CFG_ID_DDIPL_OFFEST:
-            CFG->DDIPL_OFFSET = args[1];
             break;
         case CFG_ID_BOOT_MODE:
             p.boot_mode = args[1];
@@ -240,7 +211,6 @@ void cfg_update (uint32_t *args) {
             dd_set_drive_id((uint16_t) (args[1]));
             break;
         case CFG_ID_DD_THB_TABLE_OFFSET:
-            dd_set_thb_table_offset(args[1]);
             break;
         case CFG_ID_IS_VIEWER_ENABLE:
             isv_set_enabled(args[1]);
@@ -270,7 +240,6 @@ void cfg_set_time (uint32_t *args) {
 void cfg_init (void) {
     set_save_type(SAVE_TYPE_NONE);
 
-    CFG->DDIPL_OFFSET = DEFAULT_DDIPL_OFFSET;
     CFG->SCR = CFG_SCR_CPU_READY;
 
     p.cic_seed = 0xFFFF;

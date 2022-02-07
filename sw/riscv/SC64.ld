@@ -1,6 +1,6 @@
 MEMORY {
     rom (rx)    : org = 0x00010000, len = 26k
-    ram (rwx)   : org = 0x10000000, len = 32k
+    ram (rwx)   : org = 0x10000000, len = 16k
 }
 
 ENTRY(reset_handler)

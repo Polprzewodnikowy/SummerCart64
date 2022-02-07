@@ -21,6 +21,10 @@ typedef volatile uint16_t           io16_t;
 typedef volatile uint32_t           io32_t;
 
 
+#define DDIPL_OFFSET                (0x07800000UL)
+#define SAVE_OFFSET                 (0x07EE0000UL)
+
+
 #define FLASH_BASE                  (0x00000000UL)
 #define FLASH_SIZE                  (0x39800)
 #define FLASH                       (*((io32_t *) FLASH_BASE))
@@ -33,16 +37,11 @@ typedef volatile uint32_t           io32_t;
 
 typedef volatile struct cfg_regs {
     io32_t SCR;
-    io32_t DDIPL_OFFSET;
-    io32_t SAVE_OFFSET;
     io8_t CMD;
     io8_t __padding[3];
     io32_t DATA[2];
     io32_t VERSION;
     io32_t RECONFIGURE;
-    io32_t ISV_OFFSET;
-    io16_t ISV_RD_PTR;
-    io16_t ISV_CURRENT_RD_PTR;
 } cfg_regs_t;
 
 #define CFG_BASE                    (0x20000000UL)
@@ -55,7 +54,7 @@ typedef volatile struct cfg_regs {
 #define CFG_SCR_SRAM_BANKED         (1 << 4)
 #define CFG_SCR_FLASHRAM_EN         (1 << 5)
 #define CFG_SCR_SKIP_BOOTLOADER     (1 << 6)
-#define CFG_SCR_ISV_EN              (1 << 7)
+#define CFG_SCR_WRITES_ON_RESET_EN  (1 << 7)
 #define CFG_SCR_FLASH_ERASE_START   (1 << 24)
 #define CFG_SCR_FLASH_ERASE_BUSY    (1 << 25)
 #define CFG_SCR_FLASH_WP_ENABLE     (1 << 26)

@@ -133,8 +133,8 @@ module usb_ft1248 (
         end else begin
             if (reset_ack) begin
                 reset_pending <= 1'b0;
-                write_modem_status_pending <= 1'b1;
                 reset_reply <= 1'b1;
+                write_modem_status_pending <= 1'b1;
             end
 
             if (write_buffer_flush) begin
@@ -152,8 +152,8 @@ module usb_ft1248 (
                         reset_pending <= 1'b1;
                     end
                     if (last_reset_status && !ft_miosi_in[0]) begin
-                        write_modem_status_pending <= 1'b1;
                         reset_reply <= 1'b0;
+                        write_modem_status_pending <= 1'b1;
                     end
                 end
                 if (cmd == CMD_WRITE_MODEM_STATUS) begin
@@ -193,10 +193,10 @@ module usb_ft1248 (
         end
 
         if (state == STATE_DATA) begin
-            ft_cs = 1'b0;
             if (phase[0] || phase[1]) begin
                 ft_clk = 1'b1;
             end
+            ft_cs = 1'b0;
             if (cmd == CMD_WRITE) begin
                 ft_miosi_out = tx_rdata;
                 ft_oe = 1'b1;
@@ -215,11 +215,11 @@ module usb_ft1248 (
         rx_wdata = ft_miosi_in;
 
         if (!ft_miso && (state == STATE_DATA) && phase[3]) begin
-            if (cmd == CMD_WRITE) begin
-                tx_read = 1'b1; 
-            end
             if (cmd == CMD_READ) begin
                 rx_write = 1'b1;
+            end
+            if (cmd == CMD_WRITE) begin
+                tx_read = 1'b1; 
             end
         end
     end
@@ -277,12 +277,12 @@ module usb_ft1248 (
                     if (phase[3]) begin
                         if (ft_miso) begin
                             next_state = STATE_DESELECT;
-                        end else if (cmd == CMD_WRITE) begin
-                            if (tx_almost_empty) begin
-                                next_state = STATE_DESELECT;
-                            end
                         end else if (cmd == CMD_READ) begin
                             if (rx_almost_full) begin
+                                next_state = STATE_DESELECT;
+                            end
+                        end else if (cmd == CMD_WRITE) begin
+                            if (tx_almost_empty) begin
                                 next_state = STATE_DESELECT;
                             end
                         end else begin

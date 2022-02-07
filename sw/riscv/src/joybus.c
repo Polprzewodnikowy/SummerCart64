@@ -1,5 +1,6 @@
 #include "joybus.h"
 #include "rtc.h"
+#include "sys.h"
 
 
 #define CMD_EEPROM_STATUS       (0x00)
@@ -83,7 +84,7 @@ void process_joybus (void) {
             }
 
             if (p.eeprom_type != EEPROM_NONE) {
-                save_data = (io32_t *) (SDRAM_BASE + CFG->SAVE_OFFSET + (rx_data[1] * EEPROM_PAGE_SIZE));
+                save_data = (io32_t *) (SDRAM_BASE + SAVE_OFFSET + (rx_data[1] * EEPROM_PAGE_SIZE));
                 switch (rx_data[0]) {
                     case CMD_EEPROM_STATUS:
                         tx_data[1] = p.eeprom_type == EEPROM_16K ? EEPROM_ID_16K : EEPROM_ID_4K;

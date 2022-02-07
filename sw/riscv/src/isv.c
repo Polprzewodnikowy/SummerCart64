@@ -2,13 +2,21 @@
 #include "usb.h"
 
 
-#define ISV_REGS_SIZE       (0x20)
-#define ISV_BUFFER_SIZE     ((64 * 1024) - ISV_REGS_SIZE)
-#define ISV_DEFAULT_OFFSET  (0x03FF0000UL)
+typedef struct {
+    io32_t __padding_1[5];
+    io32_t RD_PTR;
+    io32_t __padding_2[2];
+    io8_t BUFFER[(64 * 1024) - 0x20];
+} isv_t;
+
+#define ISV_BASE            (SDRAM_BASE + 0x03FF0000UL)
+#define ISV                 ((isv_t *) ISV_BASE)
 
 
 struct process {
+    bool enabled;
     bool ready;
+    uint16_t current_read_pointer;
 };
 
 static struct process p;
@@ -20,35 +28,36 @@ static void isv_set_ready (void) {
 
 void isv_set_enabled (bool enabled) {
     if (enabled) {
-        CFG->SCR |= CFG_SCR_ISV_EN;
-        CFG->ISV_CURRENT_RD_PTR = CFG->ISV_RD_PTR;
+        CFG->SCR |= CFG_SCR_WRITES_ON_RESET_EN;
+        ISV->RD_PTR = SWAP32(0);
+        p.enabled = true;
         p.ready = true;
+        p.current_read_pointer = 0;
     } else {
-        CFG->SCR &= ~(CFG_SCR_ISV_EN);
+        CFG->SCR &= ~(CFG_SCR_WRITES_ON_RESET_EN);
+        p.enabled = false;
     }
 }
 
 bool isv_get_enabled (void) {
-    return (CFG->SCR & CFG_SCR_ISV_EN);
+    return p.enabled;
 }
 
 
 void isv_init (void) {
-    CFG->ISV_OFFSET = ISV_DEFAULT_OFFSET;
-    p.ready = true;
+    p.enabled = false;
 }
 
 
 void process_isv (void) {
-    if (p.ready && (CFG->SCR & CFG_SCR_ISV_EN)) {
-        uint16_t read_pointer = CFG->ISV_RD_PTR;
-        uint16_t current_read_pointer = CFG->ISV_CURRENT_RD_PTR;
+    if (p.enabled && p.ready) {
+        uint16_t read_pointer = (uint16_t) (SWAP32(ISV->RD_PTR));
 
-        if (read_pointer != current_read_pointer) {
-            bool wrap = read_pointer < current_read_pointer;
+        if (read_pointer != p.current_read_pointer) {
+            bool wrap = read_pointer < p.current_read_pointer;
 
-            uint32_t length = ((wrap ? ISV_BUFFER_SIZE : read_pointer) - current_read_pointer);
-            uint32_t offset = CFG->ISV_OFFSET + ISV_REGS_SIZE + current_read_pointer;
+            uint32_t length = ((wrap ? sizeof(ISV->BUFFER) : read_pointer) - p.current_read_pointer);
+            uint32_t offset = (((uint32_t) (&ISV->BUFFER[p.current_read_pointer])) & 0x0FFFFFFF);
 
             usb_event_t event;
             event.id = EVENT_ID_IS_VIEWER;
@@ -57,7 +66,7 @@ void process_isv (void) {
             uint32_t data[2] = { length, offset };
 
             if (usb_put_event(&event, data, sizeof(data))) {
-                CFG->ISV_CURRENT_RD_PTR = wrap ? 0 : read_pointer;
+                p.current_read_pointer = wrap ? 0 : read_pointer;
                 p.ready = false;
             }
         }

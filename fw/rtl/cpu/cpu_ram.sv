@@ -3,7 +3,7 @@ module cpu_ram (
     if_cpu_bus bus
 );
 
-    logic [3:0][7:0] ram [0:8191];
+    logic [3:0][7:0] ram [0:4095];
     logic [31:0] q;
 
     always_ff @(posedge sys.clk) begin
@@ -21,12 +21,12 @@ module cpu_ram (
     end
 
     always_ff @(posedge sys.clk) begin
-        q <= ram[bus.address[14:2]];
+        q <= ram[bus.address[13:2]];
         if (bus.request) begin
-            if (bus.wmask[0]) ram[bus.address[14:2]][0] <= bus.wdata[7:0];
-            if (bus.wmask[1]) ram[bus.address[14:2]][1] <= bus.wdata[15:8];
-            if (bus.wmask[2]) ram[bus.address[14:2]][2] <= bus.wdata[23:16];
-            if (bus.wmask[3]) ram[bus.address[14:2]][3] <= bus.wdata[31:24];
+            if (bus.wmask[0]) ram[bus.address[13:2]][0] <= bus.wdata[7:0];
+            if (bus.wmask[1]) ram[bus.address[13:2]][1] <= bus.wdata[15:8];
+            if (bus.wmask[2]) ram[bus.address[13:2]][2] <= bus.wdata[23:16];
+            if (bus.wmask[3]) ram[bus.address[13:2]][3] <= bus.wdata[31:24];
         end
     end
 

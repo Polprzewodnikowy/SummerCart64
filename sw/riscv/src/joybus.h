@@ -2,9 +2,6 @@
 #define JOYBUS_H__
 
 
-#include "sys.h"
-
-
 enum eeprom_type {
     EEPROM_NONE,
     EEPROM_4K,

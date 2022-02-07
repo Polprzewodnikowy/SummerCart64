@@ -1,4 +1,4 @@
-#include "flashram.h"
+#include "sys.h"
 
 
 #define FLASHRAM_SIZE           (128 * 1024)
@@ -65,7 +65,7 @@ void process_flashram (void) {
         p.op = get_operation_type();
 
         if (p.op != OP_NONE) {
-            uint32_t sdram_address = SDRAM_BASE + CFG->SAVE_OFFSET;
+            uint32_t sdram_address = SDRAM_BASE + SAVE_OFFSET;
 
             p.save_in_progress = true;
             if (p.op != OP_ERASE_ALL) {

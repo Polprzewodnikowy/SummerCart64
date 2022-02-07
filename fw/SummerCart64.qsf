@@ -47,10 +47,10 @@ set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 set_global_assignment -name FLOW_ENABLE_POWER_ANALYZER ON
 set_global_assignment -name POST_MODULE_SCRIPT_FILE "quartus_sh:scripts/post_module.tcl"
-set_global_assignment -name QSYS_FILE rtl/intel/flash/intel_flash.qsys
+set_global_assignment -name QSYS_FILE rtl/vendor/intel/generated/intel_flash.qsys
 set_global_assignment -name QIP_FILE rtl/intel/fifo/intel_fifo_8.qip
-set_global_assignment -name QIP_FILE rtl/intel/gpio/intel_gpio_ddro.qip
-set_global_assignment -name QIP_FILE rtl/intel/pll/intel_pll.qip
+set_global_assignment -name QIP_FILE rtl/vendor/intel/generated/intel_gpio_ddro.qip
+set_global_assignment -name QIP_FILE rtl/vendor/intel/generated/intel_pll.qip
 set_global_assignment -name SDC_FILE SummerCart64.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE picorv32/picorv32.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cpu/cpu_bus.sv
@@ -83,8 +83,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/config.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/sc64.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/system/system.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/usb/usb_ft1248.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/vendor_flash.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/vendor_reconfigure.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/intel/vendor_flash.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/intel/vendor_reconfigure.sv
 
 # Pin & Location Assignments
 # ==========================
@@ -205,7 +205,7 @@ set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
 set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE COMP IMAGE"
 set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
-set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.0-V LVTTL"
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 
 # Assembler Assignments
 # =====================
