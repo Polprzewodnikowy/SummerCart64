@@ -2,15 +2,54 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "build_bootloader",
             "type": "shell",
-            "command": "./docker_build.sh update -s -c -d",
+            "command": "./docker_build.sh bootloader",
             "presentation": {
                 "showReuseMessage": false,
                 "clear": true
             },
-            "windows":{
-                "command": "wsl -- ./docker_build.sh update -s -c -d"
+            "windows": {
+                "command": "wsl -- ./docker_build.sh bootloader"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_controller",
+            "type": "shell",
+            "command": "./docker_build.sh controller",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh controller"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_fpga",
+            "type": "shell",
+            "command": "./docker_build.sh fpga",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh fpga"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_update",
+            "type": "shell",
+            "command": "./docker_build.sh update",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh update"
             },
             "group": {
                 "kind": "build",
@@ -18,30 +57,17 @@
             }
         },
         {
-            "label": "build_full",
+            "label": "build_release",
             "type": "shell",
-            "command": "./docker_build.sh release -c -d",
+            "command": "./docker_build.sh release --force-clean",
             "presentation": {
                 "showReuseMessage": false,
                 "clear": true
             },
-            "windows": {
-                "command": "wsl -- ./docker_build.sh update -c -d"
+            "windows":{
+                "command": "wsl -- ./docker_build.sh release --force-clean"
             },
             "group": "build"
         },
-        {
-            "label": "build_n64",
-            "type": "shell",
-            "command": "./docker_build.sh n64 -d",
-            "presentation": {
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "windows": {
-                "command": "wsl -- ./docker_build.sh n64 -d"
-            },
-            "group": "build"
-        }
     ]
 }

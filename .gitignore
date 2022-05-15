@@ -1,4 +1,8 @@
 **/.DS_Store
-**/.vscode/settings.json
+**/.vscode/
 **/*.bak
 **/*.zip
+/flexlm
+
+!**/.vscode/launch.json
+!**/.vscode/tasks.json

@@ -22,25 +22,41 @@ class SC64Exception(Exception):
 
 
 class SC64:
+    # __CFG_ID_DD_ENABLE = 3
+    # __CFG_ID_SAVE_TYPE = 4
+    # __CFG_ID_CIC_SEED = 5
+    # __CFG_ID_TV_TYPE = 6
+    # __CFG_ID_SAVE_OFFEST = 7
+    # __CFG_ID_DDIPL_OFFEST = 8
+    # __CFG_ID_BOOT_MODE = 9
+    # __CFG_ID_FLASH_SIZE = 10
+    # __CFG_ID_FLASH_READ = 11
+    # __CFG_ID_FLASH_PROGRAM = 12
+    # __CFG_ID_RECONFIGURE = 13
+    # __CFG_ID_DD_DRIVE_ID = 14
+    # __CFG_ID_DD_DISK_STATE = 15
+    # __CFG_ID_DD_THB_TABLE_OFFSET = 16
+    # __CFG_ID_IS_VIEWER_ENABLE = 17
+
+    
+    __CFG_ID_BOOTLOADER_SWITCH = 0
+    __CFG_ID_ROM_WRITE_ENABLE = 1
+    __CFG_ID_ROM_SHADOW_ENABLE = 2
     __CFG_ID_DD_ENABLE = 3
-    __CFG_ID_SAVE_TYPE = 4
-    __CFG_ID_CIC_SEED = 5
-    __CFG_ID_TV_TYPE = 6
-    __CFG_ID_SAVE_OFFEST = 7
-    __CFG_ID_DDIPL_OFFEST = 8
-    __CFG_ID_BOOT_MODE = 9
-    __CFG_ID_FLASH_SIZE = 10
-    __CFG_ID_FLASH_READ = 11
-    __CFG_ID_FLASH_PROGRAM = 12
-    __CFG_ID_RECONFIGURE = 13
-    __CFG_ID_DD_DRIVE_ID = 14
-    __CFG_ID_DD_DISK_STATE = 15
-    __CFG_ID_DD_THB_TABLE_OFFSET = 16
-    __CFG_ID_IS_VIEWER_ENABLE = 17
+    __CFG_ID_ISV_ENABLE = 4
+    __CFG_ID_BOOT_MODE = 5
+    __CFG_ID_SAVE_TYPE = 6
+    __CFG_ID_CIC_SEED = 7
+    __CFG_ID_TV_TYPE = 8
+    __CFG_ID_FLASH_ERASE_BLOCK = 9
+
+    __FLASH_ERASE_BLOCK_SIZE = 64 * 1024
 
     __SC64_VERSION_V2 = 0x53437632
 
-    __UPDATE_OFFSET = 0x03B00000
+    __BOOTLOADER_OFFSET = (64 + 14) * 1024 * 1024
+    __SAVE_OFFSET = (64 * 1024 * 1024) - (256 * 1024)
+    __DDIPL_OFFSET = 0x3bc0000 # (64 - 16 - 4) * 1024 * 1024
 
     __CHUNK_SIZE = 256 * 1024
 
@@ -159,7 +175,7 @@ class SC64:
         for p in ports:
             if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith("SC64")):
                 try:
-                    self.__usb = Serial(p.device, timeout=1.0, write_timeout=1.0)
+                    self.__usb = Serial(p.device, timeout=10.0, write_timeout=10.0)
                     self.reset_link()
                     self.__probe_device()
                 except (SerialException, SC64Exception):
@@ -174,17 +190,17 @@ class SC64:
 
 
     def __probe_device(self) -> None:
-        self.__write_cmd("V", 0, 0)
+        self.__write_cmd("v", 0, 0)
         version = self.__read_int()
-        self.__read_cmd_status("V")
+        self.__read_cmd_status("v")
         if (version != self.__SC64_VERSION_V2):
             raise SC64Exception(f"Unknown hardware version: {hex(version)}")
 
 
     def __query_config(self, id: int) -> int:
-        self.__write_cmd("Q", id, 0)
+        self.__write_cmd("c", id, 0)
         value = self.__read_int()
-        self.__read_cmd_status("Q")
+        self.__read_cmd_status("c")
         return value
 
 
@@ -197,12 +213,25 @@ class SC64:
     def __read_file_from_sdram(self, file: str, offset: int, length: int) -> None:
         with open(file, "wb") as f:
             self.__set_progress_init(length, os.path.basename(f.name))
-            self.__write_cmd("R", offset, length)
+            self.__write_cmd("m", offset, length)
             while (f.tell() < length):
                 chunk_size = min(self.__CHUNK_SIZE, length - f.tell())
                 f.write(self.__read(chunk_size))
                 self.__set_progress_value(f.tell())
-            self.__read_cmd_status("R")
+            self.__read_cmd_status("m")
+            self.__set_progress_finish()
+
+
+    def __read_file_from_eeprom(self, file: str) -> None:
+        length = 2048
+        with open(file, "wb") as f:
+            self.__set_progress_init(length, os.path.basename(f.name))
+            self.__write_cmd("e", 0, length)
+            while (f.tell() < length):
+                chunk_size = min(self.__CHUNK_SIZE, length - f.tell())
+                f.write(self.__read(chunk_size))
+                self.__set_progress_value(f.tell())
+            self.__read_cmd_status("e")
             self.__set_progress_finish()
 
 
@@ -211,13 +240,51 @@ class SC64:
             length = os.fstat(f.fileno()).st_size
             transfer_size = max(length, min_length)
             self.__set_progress_init(transfer_size, os.path.basename(f.name))
-            self.__write_cmd("W", offset, transfer_size)
+            self.__write_cmd("M", offset, transfer_size)
             while (f.tell() < length):
                 self.__write(f.read(min(self.__CHUNK_SIZE, length - f.tell())))
                 self.__set_progress_value(f.tell())
             if (transfer_size != length):
                 self.__write_dummy(transfer_size - length)
-            self.__read_cmd_status("W")
+            self.__read_cmd_status("M")
+            self.__set_progress_finish()
+
+
+    def __write_file_to_eeprom(self, file: str) -> None:
+        length = 2048
+        with open(file, "rb") as f:
+            file_length = os.fstat(f.fileno()).st_size
+            # transfer_size = max(length, min_length)
+            self.__set_progress_init(file_length, os.path.basename(f.name))
+            self.__write_cmd("E", 0, length)
+            while (f.tell() < file_length):
+                self.__write(f.read(min(self.__CHUNK_SIZE, file_length - f.tell())))
+                self.__set_progress_value(f.tell())
+            if (file_length != length):
+                self.__write_dummy(length - file_length)
+            self.__read_cmd_status("E")
+            self.__set_progress_finish()
+
+
+    def upload_bootloader(self, file: str, min_length: int = 1028 * 1024) -> None:
+        offset = self.__BOOTLOADER_OFFSET
+        with open(file, "rb") as f:
+            length = os.fstat(f.fileno()).st_size
+            transfer_size = max(length, min_length)
+            self.__set_progress_init(transfer_size, "Erase...")
+            for block in range(offset, offset + transfer_size, self.__FLASH_ERASE_BLOCK_SIZE):
+                self.__change_config(self.__CFG_ID_FLASH_ERASE_BLOCK, block)
+                self.__set_progress_value(block - offset)
+            self.__set_progress_finish()
+
+            self.__set_progress_init(transfer_size, os.path.basename(f.name))
+            self.__write_cmd("M", offset, transfer_size)
+            while (f.tell() < length):
+                self.__write(f.read(min(self.__CHUNK_SIZE, length - f.tell())))
+                self.__set_progress_value(f.tell())
+            if (transfer_size != length):
+                self.__write_dummy(transfer_size - length)
+            self.__read_cmd_status("M")
             self.__set_progress_finish()
 
 
@@ -229,30 +296,32 @@ class SC64:
             2: 2048,
             3: (32 * 1024),
             4: (128 * 1024),
-            5: (3 * 32 * 1024),
-            6: (128 * 1024)
+            5: (3 * 32 * 1024)
         }[save_type]
 
 
     def __reconfigure(self) -> None:
-        magic = self.__query_config(self.__CFG_ID_RECONFIGURE)
-        self.__change_config(self.__CFG_ID_RECONFIGURE, magic, ignore_response=True)
-        time.sleep(0.5)
+        pass
+        # magic = self.__query_config(self.__CFG_ID_RECONFIGURE)
+        # self.__change_config(self.__CFG_ID_RECONFIGURE, magic, ignore_response=True)
+        # time.sleep(0.5)
 
 
     def backup_firmware(self, file: str) -> None:
-        length = self.__query_config(self.__CFG_ID_FLASH_SIZE)
-        self.__change_config(self.__CFG_ID_FLASH_READ, self.__UPDATE_OFFSET)
-        self.__read_file_from_sdram(file, self.__UPDATE_OFFSET, length)
+        pass
+        # length = self.__query_config(self.__CFG_ID_FLASH_SIZE)
+        # self.__change_config(self.__CFG_ID_FLASH_READ, self.__UPDATE_OFFSET)
+        # self.__read_file_from_sdram(file, self.__UPDATE_OFFSET, length)
 
 
     def update_firmware(self, file: str) -> None:
-        self.__write_file_to_sdram(file, self.__UPDATE_OFFSET)
-        saved_timeout = self.__usb.timeout
-        self.__usb.timeout = 20.0
-        self.__change_config(self.__CFG_ID_FLASH_PROGRAM, self.__UPDATE_OFFSET)
-        self.__usb.timeout = saved_timeout
-        self.__reconfigure()
+        pass
+        # self.__write_file_to_sdram(file, self.__UPDATE_OFFSET)
+        # saved_timeout = self.__usb.timeout
+        # self.__usb.timeout = 20.0
+        # self.__change_config(self.__CFG_ID_FLASH_PROGRAM, self.__UPDATE_OFFSET)
+        # self.__usb.timeout = saved_timeout
+        # self.__reconfigure()
 
 
     def set_rtc(self, t: datetime) -> None:
@@ -261,8 +330,8 @@ class SC64:
             (to_bcd(t.weekday() + 1) << 24) | (to_bcd(t.hour) << 16) | (to_bcd(t.minute) << 8) | to_bcd(t.second),
             (to_bcd(t.year) << 16) | (to_bcd(t.month) << 8) | to_bcd(t.day),
         ]
-        self.__write_cmd(0xEF, args[0], args[1])
-        self.__read_cmd_status(0xEF)
+        self.__write_cmd("T", args[0], args[1])
+        self.__read_cmd_status("T")
 
 
     def set_boot_mode(self, mode: int) -> None:
@@ -321,14 +390,14 @@ class SC64:
 
 
     def set_save_type(self, type: int) -> None:
-        if (type >= 0 and type <= 6):
+        if (type >= 0 and type <= 5):
             self.__change_config(self.__CFG_ID_SAVE_TYPE, type)
         else:
             raise SC64Exception("Save type outside of supported values")
 
 
     def get_save_type_label(self, type: int) -> None:
-        if (type < 0 or type > 6):
+        if (type < 0 or type > 5):
             return "Unknown"
         return {
             0: "No save",
@@ -336,30 +405,30 @@ class SC64:
             2: "EEPROM 16Kb",
             3: "SRAM 256Kb",
             4: "FlashRAM 1Mb",
-            5: "SRAM 768Kb",
-            6: "FlashRAM 1Mb (Pokemon Stadium 2 special case)"
+            5: "SRAM 768Kb"
         }[type]
 
 
     def download_save(self, file: str) -> None:
-        length = self.__get_save_length()
-        if (length > 0):
-            offset = self.__query_config(self.__CFG_ID_SAVE_OFFEST)
-            self.__read_file_from_sdram(file, offset, length)
-        else:
-            raise SC64Exception("Can't read save data - no save type is set")
+        self.__read_file_from_eeprom(file)
+        # length = self.__get_save_length()
+        # if (length > 0):
+        #     self.__read_file_from_sdram(file, self.__SAVE_OFFSET, length)
+
+        # else:
+        #     raise SC64Exception("Can't read save data - no save type is set")
 
 
     def upload_save(self, file: str) -> None:
-        length = self.__get_save_length()
-        save_length = os.path.getsize(file)
-        if (length <= 0):
-            raise SC64Exception("Can't write save data - no save type is set")
-        elif (length != save_length):
-            raise SC64Exception("Can't write save data - save file size is different than expected")
-        else:
-            offset = self.__query_config(self.__CFG_ID_SAVE_OFFEST)
-            self.__write_file_to_sdram(file, offset)
+        self.__write_file_to_eeprom(file)
+        # length = self.__get_save_length()
+        # save_length = os.path.getsize(file)
+        # if (length <= 0):
+        #     raise SC64Exception("Can't write save data - no save type is set")
+        # elif (length != save_length):
+        #     raise SC64Exception("Can't write save data - save file size is different than expected")
+        # else:
+        #     self.__write_file_to_sdram(file, self.__SAVE_OFFSET)
 
 
     def set_dd_enable(self, enable: bool) -> None:
@@ -367,294 +436,290 @@ class SC64:
 
 
     def download_dd_ipl(self, file: str) -> None:
-        dd_ipl_offset = self.__query_config(self.__CFG_ID_DDIPL_OFFEST)
-        self.__read_file_from_sdram(file, dd_ipl_offset, length=self.__DDIPL_ROM_LENGTH)
+        self.__read_file_from_sdram(file, self.__DDIPL_OFFSET, length=self.__DDIPL_ROM_LENGTH)
 
 
-    def upload_dd_ipl(self, file: str, offset: int = None) -> None:
-        if (offset != None):
-            self.__change_config(self.__CFG_ID_DDIPL_OFFEST, offset)
-        dd_ipl_offset = self.__query_config(self.__CFG_ID_DDIPL_OFFEST)
-        self.__write_file_to_sdram(file, dd_ipl_offset, min_length=self.__DDIPL_ROM_LENGTH)
+    def upload_dd_ipl(self, file: str) -> None:
+        self.__write_file_to_sdram(file, self.__DDIPL_OFFSET, min_length=self.__DDIPL_ROM_LENGTH)
 
 
-    def set_dd_disk_state(self, state: str) -> None:
-        state_mapping = {
-            "ejected": self.__DD_DISK_STATE_EJECTED,
-            "inserted": self.__DD_DISK_STATE_INSERTED,
-            "changed": self.__DD_DISK_STATE_CHANGED,
-        }
-        if (state in state_mapping):
-            self.__change_config(self.__CFG_ID_DD_DISK_STATE, state_mapping[state])
-        else:
-            raise SC64Exception("DD disk state outside of supported values")
+    # def set_dd_disk_state(self, state: str) -> None:
+    #     state_mapping = {
+    #         "ejected": self.__DD_DISK_STATE_EJECTED,
+    #         "inserted": self.__DD_DISK_STATE_INSERTED,
+    #         "changed": self.__DD_DISK_STATE_CHANGED,
+    #     }
+    #     if (state in state_mapping):
+    #         self.__change_config(self.__CFG_ID_DD_DISK_STATE, state_mapping[state])
+    #     else:
+    #         raise SC64Exception("DD disk state outside of supported values")
 
 
-    def __dd_create_configuration(self, handle: TextIOWrapper) -> tuple[str, int, list[tuple[int, int]]]:
-        DISK_HEADS = 2
-        DISK_TRACKS = 1175
-        DISK_BLOCKS_PER_TRACK = 2
-        DISK_SECTORS_PER_BLOCK = 85
-        DISK_BAD_TRACKS_PER_ZONE = 12
-        DISK_SYSTEM_SECTOR_SIZE = 232
+    # def __dd_create_configuration(self, handle: TextIOWrapper) -> tuple[str, int, list[tuple[int, int]]]:
+    #     DISK_HEADS = 2
+    #     DISK_TRACKS = 1175
+    #     DISK_BLOCKS_PER_TRACK = 2
+    #     DISK_SECTORS_PER_BLOCK = 85
+    #     DISK_BAD_TRACKS_PER_ZONE = 12
+    #     DISK_SYSTEM_SECTOR_SIZE = 232
 
-        DISK_ZONES = [
-            (0, 232, 158, 0),
-            (0, 216, 158, 158),
-            (0, 208, 149, 316),
-            (0, 192, 149, 465),
-            (0, 176, 149, 614),
-            (0, 160, 149, 763),
-            (0, 144, 149, 912),
-            (0, 128, 114, 1061),
-            (1, 216, 158, 157),
-            (1, 208, 158, 315),
-            (1, 192, 149, 464),
-            (1, 176, 149, 613),
-            (1, 160, 149, 762),
-            (1, 144, 149, 911),
-            (1, 128, 149, 1060),
-            (1, 112, 114, 1174),
-        ]
+    #     DISK_ZONES = [
+    #         (0, 232, 158, 0),
+    #         (0, 216, 158, 158),
+    #         (0, 208, 149, 316),
+    #         (0, 192, 149, 465),
+    #         (0, 176, 149, 614),
+    #         (0, 160, 149, 763),
+    #         (0, 144, 149, 912),
+    #         (0, 128, 114, 1061),
+    #         (1, 216, 158, 157),
+    #         (1, 208, 158, 315),
+    #         (1, 192, 149, 464),
+    #         (1, 176, 149, 613),
+    #         (1, 160, 149, 762),
+    #         (1, 144, 149, 911),
+    #         (1, 128, 149, 1060),
+    #         (1, 112, 114, 1174),
+    #     ]
 
-        DISK_VZONE_TO_PZONE = [
-            [0, 1, 2, 9, 8, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10],
-            [0, 1, 2, 3, 10, 9, 8, 4, 5, 6, 7, 15, 14, 13, 12, 11],
-            [0, 1, 2, 3, 4, 11, 10, 9, 8, 5, 6, 7, 15, 14, 13, 12],
-            [0, 1, 2, 3, 4, 5, 12, 11, 10, 9, 8, 6, 7, 15, 14, 13],
-            [0, 1, 2, 3, 4, 5, 6, 13, 12, 11, 10, 9, 8, 7, 15, 14],
-            [0, 1, 2, 3, 4, 5, 6, 7, 14, 13, 12, 11, 10, 9, 8, 15],
-            [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
-        ]
+    #     DISK_VZONE_TO_PZONE = [
+    #         [0, 1, 2, 9, 8, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10],
+    #         [0, 1, 2, 3, 10, 9, 8, 4, 5, 6, 7, 15, 14, 13, 12, 11],
+    #         [0, 1, 2, 3, 4, 11, 10, 9, 8, 5, 6, 7, 15, 14, 13, 12],
+    #         [0, 1, 2, 3, 4, 5, 12, 11, 10, 9, 8, 6, 7, 15, 14, 13],
+    #         [0, 1, 2, 3, 4, 5, 6, 13, 12, 11, 10, 9, 8, 7, 15, 14],
+    #         [0, 1, 2, 3, 4, 5, 6, 7, 14, 13, 12, 11, 10, 9, 8, 15],
+    #         [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
+    #     ]
 
-        DISK_DRIVE_TYPES = [(
-            "development",
-            192,
-            [11, 10, 3, 2],
-            [0, 1, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23],
-        ), (
-            "retail",
-            232,
-            [9, 8, 1, 0],
-            [2, 3, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23],
-        )]
+    #     DISK_DRIVE_TYPES = [(
+    #         "development",
+    #         192,
+    #         [11, 10, 3, 2],
+    #         [0, 1, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23],
+    #     ), (
+    #         "retail",
+    #         232,
+    #         [9, 8, 1, 0],
+    #         [2, 3, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23],
+    #     )]
 
-        def __check_system_block(lba: int, sector_size: int, check_disk_type: bool) -> tuple[bool, bytes]:
-            handle.seek(lba * DISK_SYSTEM_SECTOR_SIZE * DISK_SECTORS_PER_BLOCK)
-            system_block_data = handle.read(sector_size * DISK_SECTORS_PER_BLOCK)
-            system_data = system_block_data[:sector_size]
-            for sector in range(1, DISK_SECTORS_PER_BLOCK):
-                sector_data = system_block_data[(sector * sector_size):][:sector_size]
-                if (system_data != sector_data):
-                    return (False, None)
-            if (check_disk_type):
-                if (system_data[4] != 0x10):
-                    return (False, None)
-                if ((system_data[5] & 0xF0) != 0x10):
-                    return (False, None)
-            return (True, system_data)
+    #     def __check_system_block(lba: int, sector_size: int, check_disk_type: bool) -> tuple[bool, bytes]:
+    #         handle.seek(lba * DISK_SYSTEM_SECTOR_SIZE * DISK_SECTORS_PER_BLOCK)
+    #         system_block_data = handle.read(sector_size * DISK_SECTORS_PER_BLOCK)
+    #         system_data = system_block_data[:sector_size]
+    #         for sector in range(1, DISK_SECTORS_PER_BLOCK):
+    #             sector_data = system_block_data[(sector * sector_size):][:sector_size]
+    #             if (system_data != sector_data):
+    #                 return (False, None)
+    #         if (check_disk_type):
+    #             if (system_data[4] != 0x10):
+    #                 return (False, None)
+    #             if ((system_data[5] & 0xF0) != 0x10):
+    #                 return (False, None)
+    #         return (True, system_data)
 
-        disk_drive_type = None
-        disk_system_data = None
-        disk_id_data = None
-        disk_bad_lbas = []
+    #     disk_drive_type = None
+    #     disk_system_data = None
+    #     disk_id_data = None
+    #     disk_bad_lbas = []
 
-        drive_index = 0
-        while (disk_system_data == None) and (drive_index < len(DISK_DRIVE_TYPES)):
-            (drive_type, system_sector_size, system_data_lbas, bad_lbas) = DISK_DRIVE_TYPES[drive_index]
-            disk_bad_lbas.clear()
-            disk_bad_lbas.extend(bad_lbas)
-            for system_lba in system_data_lbas:
-                (valid, system_data) = __check_system_block(system_lba, system_sector_size, check_disk_type=True)
-                if (valid):
-                    disk_drive_type = drive_type
-                    disk_system_data = system_data
-                else:
-                    disk_bad_lbas.append(system_lba)
-            drive_index += 1
+    #     drive_index = 0
+    #     while (disk_system_data == None) and (drive_index < len(DISK_DRIVE_TYPES)):
+    #         (drive_type, system_sector_size, system_data_lbas, bad_lbas) = DISK_DRIVE_TYPES[drive_index]
+    #         disk_bad_lbas.clear()
+    #         disk_bad_lbas.extend(bad_lbas)
+    #         for system_lba in system_data_lbas:
+    #             (valid, system_data) = __check_system_block(system_lba, system_sector_size, check_disk_type=True)
+    #             if (valid):
+    #                 disk_drive_type = drive_type
+    #                 disk_system_data = system_data
+    #             else:
+    #                 disk_bad_lbas.append(system_lba)
+    #         drive_index += 1
 
-        for id_lba in [15, 14]:
-            (valid, id_data) = __check_system_block(id_lba, DISK_SYSTEM_SECTOR_SIZE, check_disk_type=False)
-            if (valid):
-                disk_id_data = id_data
-            else:
-                disk_bad_lbas.append(id_lba)
+    #     for id_lba in [15, 14]:
+    #         (valid, id_data) = __check_system_block(id_lba, DISK_SYSTEM_SECTOR_SIZE, check_disk_type=False)
+    #         if (valid):
+    #             disk_id_data = id_data
+    #         else:
+    #             disk_bad_lbas.append(id_lba)
 
-        if not (disk_system_data and disk_id_data):
-            raise SC64Exception("Provided 64DD disk file is not valid")
+    #     if not (disk_system_data and disk_id_data):
+    #         raise SC64Exception("Provided 64DD disk file is not valid")
 
-        disk_zone_bad_tracks = []
+    #     disk_zone_bad_tracks = []
 
-        for zone in range(len(DISK_ZONES)):
-            zone_bad_tracks = []
-            start = 0 if zone == 0 else system_data[0x07 + zone]
-            stop = system_data[0x07 + zone + 1]
-            for offset in range(start, stop):
-                zone_bad_tracks.append(system_data[0x20 + offset])
-            for ignored_track in range(DISK_BAD_TRACKS_PER_ZONE - len(zone_bad_tracks)):
-                zone_bad_tracks.append(DISK_ZONES[zone][2] - ignored_track - 1)
-            disk_zone_bad_tracks.append(zone_bad_tracks)
+    #     for zone in range(len(DISK_ZONES)):
+    #         zone_bad_tracks = []
+    #         start = 0 if zone == 0 else system_data[0x07 + zone]
+    #         stop = system_data[0x07 + zone + 1]
+    #         for offset in range(start, stop):
+    #             zone_bad_tracks.append(system_data[0x20 + offset])
+    #         for ignored_track in range(DISK_BAD_TRACKS_PER_ZONE - len(zone_bad_tracks)):
+    #             zone_bad_tracks.append(DISK_ZONES[zone][2] - ignored_track - 1)
+    #         disk_zone_bad_tracks.append(zone_bad_tracks)
 
-        thb_lba_table = [(0xFFFFFFFF, -1)] * (DISK_HEADS * DISK_TRACKS * DISK_BLOCKS_PER_TRACK)
+    #     thb_lba_table = [(0xFFFFFFFF, -1)] * (DISK_HEADS * DISK_TRACKS * DISK_BLOCKS_PER_TRACK)
 
-        disk_type = disk_system_data[5] & 0x0F
+    #     disk_type = disk_system_data[5] & 0x0F
 
-        current_lba = 0
-        starting_block = 0
-        disk_file_offset = 0
+    #     current_lba = 0
+    #     starting_block = 0
+    #     disk_file_offset = 0
 
-        for zone in DISK_VZONE_TO_PZONE[disk_type]:
-            (head, sector_size, tracks, track) = DISK_ZONES[zone]
+    #     for zone in DISK_VZONE_TO_PZONE[disk_type]:
+    #         (head, sector_size, tracks, track) = DISK_ZONES[zone]
 
-            for zone_track in range(tracks):
-                current_zone_track = ((tracks - 1) - zone_track) if head else zone_track
+    #         for zone_track in range(tracks):
+    #             current_zone_track = ((tracks - 1) - zone_track) if head else zone_track
 
-                if (current_zone_track in disk_zone_bad_tracks[zone]):
-                    track += (-1) if head else 1 
-                    continue
+    #             if (current_zone_track in disk_zone_bad_tracks[zone]):
+    #                 track += (-1) if head else 1 
+    #                 continue
 
-                for block in range(DISK_BLOCKS_PER_TRACK):
-                    if (current_lba not in disk_bad_lbas):
-                        index = (track << 2) | (head << 1) | (starting_block ^ block)
-                        thb_lba_table[index] = (disk_file_offset, current_lba)
-                    disk_file_offset += sector_size * DISK_SECTORS_PER_BLOCK
-                    current_lba += 1
+    #             for block in range(DISK_BLOCKS_PER_TRACK):
+    #                 if (current_lba not in disk_bad_lbas):
+    #                     index = (track << 2) | (head << 1) | (starting_block ^ block)
+    #                     thb_lba_table[index] = (disk_file_offset, current_lba)
+    #                 disk_file_offset += sector_size * DISK_SECTORS_PER_BLOCK
+    #                 current_lba += 1
 
-                track += (-1) if head else 1
-                starting_block ^= 1
+    #             track += (-1) if head else 1
+    #             starting_block ^= 1
 
-        return (disk_drive_type, thb_lba_table)
-
-
-    def set_dd_configuration_for_disk(self, file: str = None) -> None:
-        if (file):
-            with open(file, "rb+") as handle:
-                (disk_drive_type, thb_lba_table) = self.__dd_create_configuration(handle)
-                thb_table_offset = self.__query_config(self.__CFG_ID_DD_THB_TABLE_OFFSET)            
-                data = bytearray()
-                self.__disk_lba_table = [0xFFFFFFFF] * len(thb_lba_table)
-                for (offset, lba) in thb_lba_table:
-                    data += struct.pack(">I", offset)
-                    self.__disk_lba_table[lba] = offset
-                self.__write_cmd("W", thb_table_offset, len(data))
-                self.__write(bytes(data))
-                self.__read_cmd_status("W")
-                id_mapping = {
-                    "retail": self.__DD_DRIVE_ID_RETAIL,
-                    "development": self.__DD_DRIVE_ID_DEVELOPMENT,
-                }
-                if (disk_drive_type in id_mapping):
-                    self.__change_config(self.__CFG_ID_DD_DRIVE_ID, id_mapping[disk_drive_type])
-                else:
-                    raise SC64Exception("DD drive type outside of supported values")
-        else:
-            raise SC64Exception("No DD disk file provided for disk info creation")
+    #     return (disk_drive_type, thb_lba_table)
 
 
-    def __debug_process_fsd_read(self, data: bytes) -> None:
-        sector = int.from_bytes(data[0:4], byteorder="little")
-        offset = int.from_bytes(data[4:8], byteorder="little")
-        count = int.from_bytes(data[8:12], byteorder="little")
-
-        if (self.__fsd_file):
-            self.__fsd_file.seek(sector * 512)
-            self.__write_cmd("S", offset, count * 512)
-            self.__write(self.__fsd_file.read(count * 512))
-        else:
-            self.__write_cmd("S", offset, 0)
-
-
-    def __debug_process_fsd_write(self, data: bytes) -> None:
-        sector = int.from_bytes(data[0:4], byteorder="little")
-        offset = int.from_bytes(data[4:8], byteorder="little")
-        count = int.from_bytes(data[8:12], byteorder="little")
-
-        if (self.__fsd_file):
-            with helpers.lock_volume(self.__fsd_file):
-                self.__fsd_file.seek(sector * 512)
-                self.__write_cmd("L", offset, count * 512)
-                self.__fsd_file.write(self.__read(count * 512))
-        else:
-            self.__write_cmd("L", offset, 0)
+    # def set_dd_configuration_for_disk(self, file: str = None) -> None:
+    #     if (file):
+    #         with open(file, "rb+") as handle:
+    #             (disk_drive_type, thb_lba_table) = self.__dd_create_configuration(handle)
+    #             thb_table_offset = self.__query_config(self.__CFG_ID_DD_THB_TABLE_OFFSET)            
+    #             data = bytearray()
+    #             self.__disk_lba_table = [0xFFFFFFFF] * len(thb_lba_table)
+    #             for (offset, lba) in thb_lba_table:
+    #                 data += struct.pack(">I", offset)
+    #                 self.__disk_lba_table[lba] = offset
+    #             self.__write_cmd("W", thb_table_offset, len(data))
+    #             self.__write(bytes(data))
+    #             self.__read_cmd_status("W")
+    #             id_mapping = {
+    #                 "retail": self.__DD_DRIVE_ID_RETAIL,
+    #                 "development": self.__DD_DRIVE_ID_DEVELOPMENT,
+    #             }
+    #             if (disk_drive_type in id_mapping):
+    #                 self.__change_config(self.__CFG_ID_DD_DRIVE_ID, id_mapping[disk_drive_type])
+    #             else:
+    #                 raise SC64Exception("DD drive type outside of supported values")
+    #     else:
+    #         raise SC64Exception("No DD disk file provided for disk info creation")
 
 
-    def __debug_process_dd_block(self, data: bytes) -> None:
-        transfer_mode = int.from_bytes(data[0:4], byteorder="little")
-        sdram_offset = int.from_bytes(data[4:8], byteorder="little")
-        disk_file_offset = int.from_bytes(data[8:12], byteorder="big")
-        block_length = int.from_bytes(data[12:16], byteorder="little")
-        print(f"DD BLOCK {disk_file_offset:08X} {block_length}")
-        if (self.__disk_file):
-            self.__disk_file.seek(disk_file_offset)
-            if (transfer_mode):
-                if (not self.__dd_turbo):
-                    # Fixes weird bug in Mario Artist Paint Studio prototype minigame
-                    time.sleep(0.016)
-                self.__write_cmd("S", sdram_offset, block_length)
-                self.__write(self.__disk_file.read(block_length))
-            else:
-                self.__write_cmd("L", sdram_offset, block_length)
-                self.__disk_file.write(self.__read(block_length))
+    # def __debug_process_fsd_read(self, data: bytes) -> None:
+    #     sector = int.from_bytes(data[0:4], byteorder="little")
+    #     offset = int.from_bytes(data[4:8], byteorder="little")
+    #     count = int.from_bytes(data[8:12], byteorder="little")
+
+    #     if (self.__fsd_file):
+    #         self.__fsd_file.seek(sector * 512)
+    #         self.__write_cmd("S", offset, count * 512)
+    #         self.__write(self.__fsd_file.read(count * 512))
+    #     else:
+    #         self.__write_cmd("S", offset, 0)
 
 
-    def __debug_process_is_viewer(self, data: bytes) -> None:
-        length = int.from_bytes(data[0:4], byteorder="little")
-        address = int.from_bytes(data[4:8], byteorder="little")
-        self.__write_cmd("L", address, length)
-        text = self.__read(length)
-        print(text.decode("EUC-JP", errors="backslashreplace"), end="")
+    # def __debug_process_fsd_write(self, data: bytes) -> None:
+    #     sector = int.from_bytes(data[0:4], byteorder="little")
+    #     offset = int.from_bytes(data[4:8], byteorder="little")
+    #     count = int.from_bytes(data[8:12], byteorder="little")
+
+    #     if (self.__fsd_file):
+    #         with helpers.lock_volume(self.__fsd_file):
+    #             self.__fsd_file.seek(sector * 512)
+    #             self.__write_cmd("L", offset, count * 512)
+    #             self.__fsd_file.write(self.__read(count * 512))
+    #     else:
+    #         self.__write_cmd("L", offset, 0)
 
 
-    def debug_init(self, fsd_file: str = None, disk_file: str = None, dd_turbo: bool = False) -> None:
-        if (fsd_file):
-            self.__fsd_file = open(fsd_file, "rb+")
-        if (disk_file):
-            self.__disk_file = open(disk_file, "rb+")
-        self.__dd_turbo = dd_turbo
+    # def __debug_process_dd_block(self, data: bytes) -> None:
+    #     transfer_mode = int.from_bytes(data[0:4], byteorder="little")
+    #     sdram_offset = int.from_bytes(data[4:8], byteorder="little")
+    #     disk_file_offset = int.from_bytes(data[8:12], byteorder="big")
+    #     block_length = int.from_bytes(data[12:16], byteorder="little")
+    #     print(f"DD BLOCK {disk_file_offset:08X} {block_length}")
+    #     if (self.__disk_file):
+    #         self.__disk_file.seek(disk_file_offset)
+    #         if (transfer_mode):
+    #             if (not self.__dd_turbo):
+    #                 # Fixes weird bug in Mario Artist Paint Studio prototype minigame
+    #                 time.sleep(0.016)
+    #             self.__write_cmd("S", sdram_offset, block_length)
+    #             self.__write(self.__disk_file.read(block_length))
+    #         else:
+    #             self.__write_cmd("L", sdram_offset, block_length)
+    #             self.__disk_file.write(self.__read(block_length))
 
 
-    def debug_loop(self, is_viewer_enabled: bool = False) -> None:
-        self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
+    # def __debug_process_is_viewer(self, data: bytes) -> None:
+    #     length = int.from_bytes(data[0:4], byteorder="little")
+    #     address = int.from_bytes(data[4:8], byteorder="little")
+    #     self.__write_cmd("L", address, length)
+    #     text = self.__read(length)
+    #     print(text.decode("EUC-JP", errors="backslashreplace"), end="")
 
-        print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
-        start_indicator = bytearray()
-        dropped_bytes = 0
+    # def debug_init(self, fsd_file: str = None, disk_file: str = None, dd_turbo: bool = False) -> None:
+    #     if (fsd_file):
+    #         self.__fsd_file = open(fsd_file, "rb+")
+    #     if (disk_file):
+    #         self.__disk_file = open(disk_file, "rb+")
+    #     self.__dd_turbo = dd_turbo
 
-        while (True):
-            while (start_indicator != b"DMA@"):
-                start_indicator.append(self.__read_long(1)[0])
-                if (len(start_indicator) > 4):
-                    dropped_bytes += 1
-                    start_indicator.pop(0)
-            start_indicator.clear()
 
-            if (dropped_bytes):
-                print(f"\033[35mWarning - dropped {dropped_bytes} bytes from stream\033[0m", file=sys.stderr)
-                dropped_bytes = 0
+    # def debug_loop(self, is_viewer_enabled: bool = False) -> None:
+    #     self.__change_config(self.__CFG_ID_IS_VIEWER_ENABLE, is_viewer_enabled)
 
-            header = self.__read_long(4)
-            id = int(header[0])
-            length = int.from_bytes(header[1:4], byteorder="big")
-            data = self.__read_long(length)
-            self.__read_long(self.__align(length, 4) - length)
-            end_indicator = self.__read_long(4)
+    #     print("\r\n\033[34m --- Debug server started --- \033[0m\r\n")
 
-            if (end_indicator != b"CMPH"):
-                print(f"\033[35mGot unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}\033[0m", file=sys.stderr)
-            else:
-                if (id == self.__DEBUG_ID_TEXT):
-                    print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
-                elif (id == self.__EVENT_ID_FSD_READ):
-                    self.__debug_process_fsd_read(data)
-                elif (id == self.__EVENT_ID_FSD_WRITE):
-                    self.__debug_process_fsd_write(data)
-                elif (id == self.__EVENT_ID_DD_BLOCK):
-                    self.__debug_process_dd_block(data)
-                elif (id == self.__EVENT_ID_IS_VIEWER):
-                    self.__debug_process_is_viewer(data)
-                else:
-                    print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
+    #     start_indicator = bytearray()
+    #     dropped_bytes = 0
+
+    #     while (True):
+    #         while (start_indicator != b"DMA@"):
+    #             start_indicator.append(self.__read_long(1)[0])
+    #             if (len(start_indicator) > 4):
+    #                 dropped_bytes += 1
+    #                 start_indicator.pop(0)
+    #         start_indicator.clear()
+
+    #         if (dropped_bytes):
+    #             print(f"\033[35mWarning - dropped {dropped_bytes} bytes from stream\033[0m", file=sys.stderr)
+    #             dropped_bytes = 0
+
+    #         header = self.__read_long(4)
+    #         id = int(header[0])
+    #         length = int.from_bytes(header[1:4], byteorder="big")
+    #         data = self.__read_long(length)
+    #         self.__read_long(self.__align(length, 4) - length)
+    #         end_indicator = self.__read_long(4)
+
+    #         if (end_indicator != b"CMPH"):
+    #             print(f"\033[35mGot unknown end indicator: {end_indicator.decode(encoding='ascii', errors='backslashreplace')}\033[0m", file=sys.stderr)
+    #         else:
+    #             if (id == self.__DEBUG_ID_TEXT):
+    #                 print(data.decode(encoding="ascii", errors="backslashreplace"), end="")
+    #             elif (id == self.__EVENT_ID_FSD_READ):
+    #                 self.__debug_process_fsd_read(data)
+    #             elif (id == self.__EVENT_ID_FSD_WRITE):
+    #                 self.__debug_process_fsd_write(data)
+    #             elif (id == self.__EVENT_ID_DD_BLOCK):
+    #                 self.__debug_process_dd_block(data)
+    #             elif (id == self.__EVENT_ID_IS_VIEWER):
+    #                 self.__debug_process_is_viewer(data)
+    #             else:
+    #                 print(f"\033[35mGot unknown id: {id}, length: {length}\033[0m", file=sys.stderr)
 
 
 
@@ -768,16 +833,17 @@ if __name__ == "__main__":
 
         with SC64ProgressBar(sc64):
             if (update_file):
-                if (is_read):
-                    sc64.backup_firmware(update_file)
-                else:
-                    sc64.backup_firmware(firmware_backup_file)
-                    if (not filecmp.cmp(update_file, firmware_backup_file)):
-                        print("Update file different than contents of flash - updating SummerCart64")
-                        sc64.update_firmware(update_file)
-                    else:
-                        print("SummerCart64 is already updated to latest version")
-                    os.remove(firmware_backup_file)
+                sc64.upload_bootloader(update_file)
+                # if (is_read):
+                #     sc64.backup_firmware(update_file)
+                # else:
+                #     sc64.backup_firmware(firmware_backup_file)
+                #     if (not filecmp.cmp(update_file, firmware_backup_file)):
+                #         print("Update file different than contents of flash - updating SummerCart64")
+                #         sc64.update_firmware(update_file)
+                #     else:
+                #         print("SummerCart64 is already updated to latest version")
+                #     os.remove(firmware_backup_file)
 
             if (rtc):
                 now = datetime.now()
@@ -806,7 +872,7 @@ if __name__ == "__main__":
                 sc64.set_dd_enable(dd_enable)
 
             if (rom_file):
-                if (is_read):            
+                if (is_read):
                     if (rom_length > 0):
                         sc64.download_rom(rom_file, rom_length)
                     else:
@@ -826,27 +892,27 @@ if __name__ == "__main__":
                 else:
                     sc64.upload_save(save_file)
 
-            if (debug_server):
-                sc64.debug_init(sd_file, disk_file, dd_turbo)
-                if (is_viewer_enabled):
-                    print(f"Setting IS-Viewer 64 emulation to [Enabled]")
-                if (sd_file):
-                    print(f"Using fake SD emulation file [{sd_file}]")
-                if (disk_file):
-                    print(f"Using 64DD disk image file [{disk_file}]")
-                    sc64.set_dd_configuration_for_disk(disk_file)
-                    print(f"Setting 64DD disk state to [Inserted]")
-                sc64.set_dd_disk_state("inserted" if disk_file else "ejected")
-                sc64.debug_loop(is_viewer_enabled)
+            # if (debug_server):
+            #     sc64.debug_init(sd_file, disk_file, dd_turbo)
+            #     if (is_viewer_enabled):
+            #         print(f"Setting IS-Viewer 64 emulation to [Enabled]")
+            #     if (sd_file):
+            #         print(f"Using fake SD emulation file [{sd_file}]")
+            #     if (disk_file):
+            #         print(f"Using 64DD disk image file [{disk_file}]")
+            #         sc64.set_dd_configuration_for_disk(disk_file)
+            #         print(f"Setting 64DD disk state to [Inserted]")
+            #     sc64.set_dd_disk_state("inserted" if disk_file else "ejected")
+            #     sc64.debug_loop(is_viewer_enabled)
 
     except SC64Exception as e:
         print(f"Error: {e}")
         parser.exit(1)
     except KeyboardInterrupt:
         pass
-    finally:
-        if (sc64):
-            if (disk_file):
-                print(f"Setting 64DD disk state to [Ejected]")
-                sc64.set_dd_disk_state("ejected")
-        sys.stdout.write("\033[0m")
+    # finally:
+    #     if (sc64):
+    #         if (disk_file):
+    #             print(f"Setting 64DD disk state to [Ejected]")
+    #             sc64.set_dd_disk_state("ejected")
+    #     sys.stdout.write("\033[0m")

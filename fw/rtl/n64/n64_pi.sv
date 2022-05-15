@@ -1,8 +1,14 @@
 module n64_pi (
-    if_system.sys sys,
-    if_config.pi cfg,
-    if_n64_bus.n64 bus,
+    input clk,
+    input reset,
 
+    mem_bus.controller mem_bus,
+    n64_reg_bus.controller reg_bus,
+
+    n64_scb.pi n64_scb,
+
+    input n64_reset,
+    input n64_nmi,
     input n64_pi_alel,
     input n64_pi_aleh,
     input n64_pi_read,
@@ -10,79 +16,34 @@ module n64_pi (
     inout [15:0] n64_pi_ad
 );
 
-    // FIFOs
-
-    logic read_fifo_flush;
-
-    logic read_fifo_full;
-    logic read_fifo_write;
-    logic [15:0] read_fifo_wdata;
-
-    logic read_fifo_empty;
-    logic read_fifo_read;
-    logic [15:0] read_fifo_rdata;
-
-    n64_pi_fifo read_fifo_inst (
-        .sys(sys),
-
-        .flush(read_fifo_flush),
-        
-        .full(read_fifo_full),
-        .write(read_fifo_write),
-        .wdata(read_fifo_wdata),
-        
-        .empty(read_fifo_empty),
-        .read(read_fifo_read),
-        .rdata(read_fifo_rdata)
-    );
-
-    logic write_fifo_flush;
-
-    logic write_fifo_full;
-    logic write_fifo_write;
-    logic [15:0] write_fifo_wdata;
-
-    logic write_fifo_empty;
-    logic write_fifo_read;
-    logic [15:0] write_fifo_rdata;
-
-    n64_pi_fifo write_fifo_inst (
-        .sys(sys),
-
-        .flush(write_fifo_flush),
-
-        .full(write_fifo_full),
-        .write(write_fifo_write),
-        .wdata(write_fifo_wdata),
-
-        .empty(write_fifo_empty),
-        .read(write_fifo_read),
-        .rdata(write_fifo_rdata)
-    );
-
-
     // Control signals and input synchronization
 
+    logic [1:0] n64_reset_ff;
+    logic [1:0] n64_nmi_ff;
     logic [2:0] n64_pi_alel_ff;
     logic [2:0] n64_pi_aleh_ff;
-    logic [2:0] n64_pi_read_ff;
+    logic [1:0] n64_pi_read_ff;
     logic [2:0] n64_pi_write_ff;
 
-    always_ff @(posedge sys.clk) begin
+    always_ff @(posedge clk) begin
+        n64_reset_ff <= {n64_reset_ff[0], n64_reset};
+        n64_nmi_ff <= {n64_nmi_ff[0], n64_nmi};
         n64_pi_aleh_ff <= {n64_pi_aleh_ff[1:0], n64_pi_aleh};
         n64_pi_alel_ff <= {n64_pi_alel_ff[1:0], n64_pi_alel};
-        n64_pi_read_ff <= {n64_pi_read_ff[1:0], n64_pi_read};
+        n64_pi_read_ff <= {n64_pi_read_ff[0], n64_pi_read};
         n64_pi_write_ff <= {n64_pi_write_ff[1:0], n64_pi_write};
     end
 
     logic pi_reset;
+    logic pi_nmi;
     logic pi_aleh;
     logic pi_alel;
     logic pi_read;
     logic pi_write;
 
     always_comb begin
-        pi_reset = sys.n64_hard_reset;
+        pi_reset = n64_reset_ff[1];
+        pi_nmi = n64_nmi_ff[1];
         pi_aleh = n64_pi_aleh_ff[2];
         pi_alel = n64_pi_alel_ff[2];
         pi_read = n64_pi_read_ff[1];
@@ -99,16 +60,30 @@ module n64_pi (
         PI_MODE_VALID   = 2'b00
     } e_pi_mode;
 
+    typedef enum bit [1:0] {
+        PORT_NONE,
+        PORT_MEM,
+        PORT_REG
+    } e_port;
+
     e_pi_mode pi_mode;
-    e_pi_mode last_pi_mode;
-    logic last_read;
-    logic last_write;
+
+    e_port read_port;
+    e_port write_port;
 
     always_comb begin
         pi_mode = e_pi_mode'({pi_aleh, pi_alel});
     end
 
-    always_ff @(posedge sys.clk) begin
+    logic last_reset;
+    logic last_nmi;
+    e_pi_mode last_pi_mode;
+    logic last_read;
+    logic last_write;
+
+    always_ff @(posedge clk) begin
+        last_reset <= pi_reset;
+        last_nmi <= pi_nmi;
         last_pi_mode <= pi_mode;
         last_read <= pi_read;
         last_write <= pi_write;
@@ -121,236 +96,339 @@ module n64_pi (
     logic end_op;
 
     always_comb begin
-        aleh_op = !pi_reset && last_pi_mode != PI_MODE_HIGH && pi_mode == PI_MODE_HIGH;
-        alel_op = !pi_reset && last_pi_mode == PI_MODE_HIGH && pi_mode == PI_MODE_LOW;
-        read_op = !pi_reset && pi_mode == PI_MODE_VALID && last_read && !pi_read;
-        write_op = !pi_reset && pi_mode == PI_MODE_VALID && last_write && !pi_write;
-        end_op = !pi_reset && last_pi_mode == PI_MODE_VALID && pi_mode != PI_MODE_VALID;
+        n64_scb.n64_reset = !last_reset && pi_reset;
+        n64_scb.n64_nmi = !last_nmi && pi_nmi;
+        aleh_op = pi_reset && (last_pi_mode != PI_MODE_HIGH) && (pi_mode == PI_MODE_HIGH);
+        alel_op = pi_reset && (last_pi_mode == PI_MODE_HIGH) && (pi_mode == PI_MODE_LOW);
+        read_op = pi_reset && (pi_mode == PI_MODE_VALID) && (read_port != PORT_NONE) && (last_read && !pi_read);
+        write_op = pi_reset && (pi_mode == PI_MODE_VALID) && (write_port != PORT_NONE) && (last_write && !pi_write);
+        end_op = pi_reset && (last_pi_mode == PI_MODE_VALID) && (pi_mode != PI_MODE_VALID);
     end
 
 
     // Input and output data sampling
 
-    logic [15:0] n64_pi_ad_input;
-    logic [15:0] n64_pi_ad_output;
-    logic [15:0] n64_pi_ad_output_data;
-    logic n64_pi_ad_output_enable;
-    logic n64_pi_ad_output_enable_data;
-    
-    logic n64_pi_address_valid;
-    logic pending_operation;
-    logic pending_write;
+    logic n64_pi_ad_oe;
+    logic [15:0] n64_pi_ad_out;
+    logic [15:0] n64_pi_dq_in;
+    logic [15:0] n64_pi_dq_out;
 
-    always_comb begin
-        n64_pi_ad = n64_pi_ad_output_enable ? n64_pi_ad_output : 16'hZZZZ;
-        n64_pi_ad_output_enable_data = !pi_reset && pi_mode == PI_MODE_VALID && n64_pi_address_valid && !n64_pi_read_ff[2];
-    end
+    assign n64_pi_ad = n64_pi_ad_oe ? n64_pi_ad_out : 16'hZZZZ;
 
-    always_ff @(posedge sys.clk) begin
-        n64_pi_ad_input <= n64_pi_ad;
-        n64_pi_ad_output <= n64_pi_ad_output_data;
-        n64_pi_ad_output_enable <= n64_pi_ad_output_enable_data;
-    end
-    
-    logic wait_for_read_fifo;
-    logic wait_for_write_fifo;
-
-    always_comb begin
-        read_fifo_write = bus.ack && !bus.write;
-        read_fifo_wdata = bus.rdata;
-        
-        write_fifo_wdata = n64_pi_ad_input;
-    end
-
-    always_ff @(posedge sys.clk) begin
-        read_fifo_read <= 1'b0;
-        write_fifo_write <= 1'b0;
-
-        if (sys.reset || sys.n64_hard_reset) begin
-            wait_for_read_fifo <= 1'b0;
-            wait_for_write_fifo <= 1'b0;
-        end else if (n64_pi_address_valid) begin
-            if (read_op || wait_for_read_fifo) begin
-                if (read_fifo_empty) begin
-                    wait_for_read_fifo <= 1'b1;
-                end else begin
-                    n64_pi_ad_output_data <= read_fifo_rdata;
-                    read_fifo_read <= 1'b1;
-                    wait_for_read_fifo <= 1'b0;
-                end
-            end
-            if (write_op || wait_for_write_fifo) begin
-                if (write_fifo_full) begin
-                    wait_for_write_fifo <= 1'b1;
-                end else begin
-                    write_fifo_write <= 1'b1;
-                    wait_for_write_fifo <= 1'b0;
-                end
-            end
-        end
-    end
-
-    always_comb begin
-        bus.read_op = read_op;
-        bus.write_op = write_op;
-    end
-
-    always_ff @(posedge sys.clk) begin
-        if (aleh_op) begin
-            bus.real_address[31:16] <= n64_pi_ad_input;           
-        end
-        if (alel_op) begin
-            bus.real_address[15:0] <= {n64_pi_ad_input[15:1], 1'b0};
-        end
-        if (read_op || write_op) begin
-            bus.real_address <= bus.real_address + 2'd2;
-        end
+    always_ff @(posedge clk) begin
+        n64_pi_ad_oe <= pi_reset && (pi_mode == PI_MODE_VALID) && !last_read && (read_port != PORT_NONE);
+        n64_pi_ad_out <= n64_pi_dq_out;
+        n64_pi_dq_in <= n64_pi_ad;
     end
 
 
     // Address decoding
 
-    const bit [31:0] DDIPL_OFFSET   = 32'h0780_0000;
-    const bit [31:0] BUFFERS_OFFSET = 32'h07C0_0000;
-    const bit [31:0] SAVE_OFFSET    = 32'h07EE_0000;
+    const bit [31:0] DDIPL_OFFSET       = 32'h03BC_0000;
+    const bit [31:0] SAVE_OFFSET        = 32'h03FC_0000;
+    const bit [31:0] BUFFER_OFFSET      = 32'h03FE_0000;
+    const bit [31:0] FLASH_OFFSET       = 32'h0400_0000;
+    const bit [31:0] BOOTLOADER_OFFSET  = 32'h04E0_0000;
+    const bit [31:0] SHADOW_OFFSET      = 32'h04FC_0000;
 
-    sc64::e_n64_id next_id;
-    logic [31:0] next_offset;
-    logic sram_selected;
+    logic [31:0] mem_offset;
 
-    always_ff @(posedge sys.clk) begin
-        if (aleh_op) begin
-            n64_pi_address_valid <= 1'b0;
-            next_id <= sc64::__ID_N64_END;
-            next_offset <= 32'd0;
-            sram_selected <= 1'b0;
-            if (cfg.dd_enabled) begin
-                if (n64_pi_ad_input == 16'h0500) begin
-                    n64_pi_address_valid <= 1'b1;
-                    next_id <= sc64::ID_N64_DD;
-                    next_offset <= (-32'h0500_0000);
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            read_port <= PORT_NONE;
+            write_port <= PORT_NONE;
+            reg_bus.dd_select <= 1'b0;
+            reg_bus.flashram_select <= 1'b0;
+            reg_bus.cfg_select <= 1'b0;
+        end else if (aleh_op) begin
+            read_port <= PORT_NONE;
+            write_port <= PORT_NONE;
+            mem_offset <= 32'd0;
+            reg_bus.dd_select <= 1'b0;
+            reg_bus.flashram_select <= 1'b0;
+            reg_bus.cfg_select <= 1'b0;
+
+            if (n64_scb.dd_enabled) begin
+                if (n64_pi_dq_in == 16'h0500) begin
+                    read_port <= PORT_REG;
+                    write_port <= PORT_REG;
+                    reg_bus.dd_select <= 1'b1;
                 end
-                if (n64_pi_ad_input >= 16'h0600 && n64_pi_ad_input < 16'h0640) begin
-                    n64_pi_address_valid <= 1'b1;
-                    next_id <= sc64::ID_N64_SDRAM;
-                    next_offset <= (-32'h0600_0000) + DDIPL_OFFSET;
+                if (n64_pi_dq_in >= 16'h0600 && n64_pi_dq_in < 16'h0640) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h0600_0000) + DDIPL_OFFSET;
                 end
             end
-            if (cfg.flashram_enabled) begin
-                if (n64_pi_ad_input >= 16'h0800 && n64_pi_ad_input < 16'h0802) begin
-                    n64_pi_address_valid <= 1'b1;
-                    next_id <= sc64::ID_N64_FLASHRAM;
-                    if (cfg.flashram_read_mode) begin
-                        next_offset <= (-32'h0800_0000) + SAVE_OFFSET;
+
+            if (n64_scb.flashram_enabled) begin
+                if (n64_pi_dq_in >= 16'h0800 && n64_pi_dq_in < 16'h0802) begin
+                    read_port <= PORT_REG;
+                    write_port <= PORT_REG;
+                    mem_offset <= (-32'h0800_0000) + SAVE_OFFSET;
+                    reg_bus.flashram_select <= 1'b1;
+                    if (n64_scb.flashram_read_mode) begin
+                        read_port <= PORT_MEM;
                     end
                 end
-            end else if (cfg.sram_enabled) begin
-                if (cfg.sram_banked) begin
-                    if (n64_pi_ad_input >= 16'h0800 && n64_pi_ad_input < 16'h0810) begin
-                        if (n64_pi_ad_input[3:2] != 2'b11 && n64_pi_ad_input[1:0] == 2'b00) begin
-                            n64_pi_address_valid <= 1'b1;
-                            next_id <= sc64::ID_N64_SDRAM;
-                            next_offset <= (-32'h0800_0000) - {n64_pi_ad_input[3:2], 18'd0} + {n64_pi_ad_input[3:2], 15'd0} + SAVE_OFFSET;
-                            sram_selected <= 1'b1;
+            end else if (n64_scb.sram_enabled) begin
+                if (n64_scb.sram_banked) begin
+                    if (n64_pi_dq_in >= 16'h0800 && n64_pi_dq_in < 16'h0810) begin
+                        if (n64_pi_dq_in[3:2] != 2'b11 && n64_pi_dq_in[1:0] == 2'b00) begin
+                            read_port <= PORT_MEM;
+                            write_port <= PORT_MEM;
+                            mem_offset <= (-32'h0800_0000) - {n64_pi_dq_in[3:2], 18'd0} + {n64_pi_dq_in[3:2], 15'd0} + SAVE_OFFSET;
                         end
                     end
                 end else begin
-                    if (n64_pi_ad_input == 16'h0800) begin
-                        n64_pi_address_valid <= 1'b1;
-                        next_id <= sc64::ID_N64_SDRAM;
-                        next_offset <= (-32'h0800_0000) + SAVE_OFFSET;
-                        sram_selected <= 1'b1;
+                    if (n64_pi_dq_in >= 16'h0800 && n64_pi_dq_in < 16'h0802) begin
+                        read_port <= PORT_MEM;
+                        write_port <= PORT_MEM;
+                        mem_offset <= (-32'h0800_0000) + SAVE_OFFSET;
                     end
                 end
             end
-            if (n64_pi_ad_input >= 16'h1000 && n64_pi_ad_input < 16'h1800) begin
-                n64_pi_address_valid <= 1'b1;
-                next_id <= cfg.sdram_switch ? sc64::ID_N64_SDRAM : sc64::ID_N64_BOOTLOADER;
-                next_offset <= (-32'h1000_0000);
+
+            if (n64_scb.bootloader_enabled) begin
+                if (n64_pi_dq_in >= 16'h1000 && n64_pi_dq_in < 16'h101C) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h1000_0000) + BOOTLOADER_OFFSET;
+                end
+            end else begin
+                if (n64_pi_dq_in >= 16'h1000 && n64_pi_dq_in < 16'h1400) begin
+                    read_port <= PORT_MEM;
+                    write_port <= n64_scb.rom_write_enabled ? PORT_MEM : PORT_NONE;
+                    mem_offset <= (-32'h1000_0000);
+                end
             end
-            if (n64_pi_ad_input >= 16'h1F80 && n64_pi_ad_input < 16'h1FC0) begin
-                n64_pi_address_valid <= 1'b1;
-                next_id <= sc64::ID_N64_SDRAM;
-                next_offset <= (-32'h1F80_0000) + BUFFERS_OFFSET;
+
+            if (n64_scb.rom_shadow_enabled) begin
+                if (n64_pi_dq_in >= 16'h13FC && n64_pi_dq_in < 16'h1400) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h13FC_0000) + SHADOW_OFFSET;
+                end
             end
-            if (n64_pi_ad_input == 16'h1FFF) begin
-                n64_pi_address_valid <= 1'b1;
-                next_id <= sc64::ID_N64_CFG;
+
+            if (n64_pi_dq_in >= 16'h1400 && n64_pi_dq_in < 16'h14E0) begin
+                read_port <= PORT_MEM;
+                write_port <= PORT_NONE;
+                mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
+            end
+
+            if (n64_pi_dq_in >= 16'h1FFC && n64_pi_dq_in < 16'h1FFE) begin
+                read_port <= PORT_MEM;
+                write_port <= PORT_MEM;
+                mem_offset <= (-32'h1FFC_0000) + BUFFER_OFFSET;
+            end
+
+            if (n64_pi_dq_in >= 16'h1FFE && n64_pi_dq_in < 16'h2000) begin
+                read_port <= PORT_REG;
+                write_port <= PORT_REG;
+                reg_bus.cfg_select <= 1'b1;
             end
         end
     end
 
 
-    // Bus controller
+    // Mem bus read FIFO controller
 
-    logic can_read;
-    logic first_write_op;
-    logic load_starting_address;
-    sc64::e_n64_id starting_id;
+    logic read_fifo_full;
+    logic read_fifo_write;
+    logic [15:0] read_fifo_wdata;
+
+    logic read_fifo_empty;
+    logic read_fifo_read;
+    logic [15:0] read_fifo_rdata;
+
+    logic read_fifo_wait;
+
+    n64_pi_fifo read_fifo_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .flush(reset || !pi_reset || alel_op),
+        
+        .full(read_fifo_full),
+        .write(read_fifo_write),
+        .wdata(read_fifo_wdata),
+        
+        .empty(read_fifo_empty),
+        .read(read_fifo_read),
+        .rdata(read_fifo_rdata)
+    );
+
+    always_ff @(posedge clk) begin
+        read_fifo_read <= 1'b0;
+
+        if (reset || !pi_reset || alel_op) begin
+            read_fifo_wait <= 1'b0;
+        end
+
+        if (read_port == PORT_MEM) begin
+            if (read_op) begin
+                if (read_fifo_empty) begin
+                    read_fifo_wait <= 1'b1;
+                end else begin
+                    read_fifo_read <= 1'b1;
+                    n64_pi_dq_out <= read_fifo_rdata;
+                end
+            end
+
+            if (!read_fifo_empty && read_fifo_wait) begin
+                read_fifo_read <= 1'b1;
+                read_fifo_wait <= 1'b0;
+                n64_pi_dq_out <= read_fifo_rdata;
+            end
+        end
+
+        if (read_port == PORT_REG) begin
+            if (read_op) begin
+                n64_pi_dq_out <= reg_bus.rdata;
+            end
+        end
+    end
+
+
+    // Mem bus write FIFO controller
+
+    logic write_fifo_full;
+    logic write_fifo_write;
+    logic [15:0] write_fifo_wdata;
+
+    logic write_fifo_empty;
+    logic write_fifo_read;
+    logic [15:0] write_fifo_rdata;
+
+    logic write_fifo_wait;
+
+    n64_pi_fifo write_fifo_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .flush(reset),
+
+        .full(write_fifo_full),
+        .write(write_fifo_write),
+        .wdata(write_fifo_wdata),
+
+        .empty(write_fifo_empty),
+        .read(write_fifo_read),
+        .rdata(write_fifo_rdata)
+    );
+
+    always_ff @(posedge clk) begin
+        write_fifo_write <= 1'b0;
+
+        if (reset) begin
+            write_fifo_wait <= 1'b0;
+        end
+
+        if (write_port == PORT_MEM) begin
+            if (write_op) begin
+                if (write_fifo_full) begin
+                    write_fifo_wait <= 1'b1;
+                end else begin
+                    write_fifo_write <= 1'b1;
+                    write_fifo_wdata <= n64_pi_dq_in;
+                end
+            end
+
+            if (!write_fifo_full && write_fifo_wait) begin
+                write_fifo_write <= 1'b1;
+                write_fifo_wait <= 1'b0;
+                write_fifo_wdata <= n64_pi_dq_in;
+            end
+        end
+    end
+
+
+    // Mem bus controller
+
     logic [31:0] starting_address;
+    logic load_starting_address;
+    logic read_enabled;
+    logic first_write_op;
 
-    always_ff @(posedge sys.clk) begin
-        read_fifo_flush <= 1'b0;
-
+    always_ff @(posedge clk) begin
         write_fifo_read <= 1'b0;
+        load_starting_address <= 1'b0;
 
-        if (sys.reset || sys.n64_hard_reset) begin
-            bus.request <= 1'b0;
-            read_fifo_flush <= 1'b1;
-            write_fifo_flush <= 1'b1;
+        if (reset || !pi_reset) begin
+            mem_bus.request <= 1'b0;
+            read_enabled <= 1'b0;
         end else begin
-            write_fifo_flush <= starting_id == sc64::ID_N64_SDRAM && !cfg.sdram_writable && !sram_selected;
-
             if (aleh_op) begin
-                starting_address[31:16] <= n64_pi_ad_input;
+                starting_address[31:16] <= n64_pi_dq_in;
             end
 
             if (alel_op) begin
-                read_fifo_flush <= 1'b1;
-                can_read <= 1'b1;
-                first_write_op <= 1'b1;
+                starting_address <= {starting_address[31:16], n64_pi_dq_in} + mem_offset;
                 load_starting_address <= 1'b1;
-                starting_id <= next_id;
-                starting_address <= {starting_address[31:16], n64_pi_ad_input[15:1], 1'b0};
+                read_enabled <= 1'b1;
+                first_write_op <= 1'b1;
             end
 
-            if (write_op) begin
-                can_read <= 1'b0;
-                if (first_write_op) begin
-                    first_write_op <= 1'b0;
-                    load_starting_address <= 1'b1;
-                end
+            if (load_starting_address) begin
+                mem_bus.address <= starting_address;
             end
 
-            if (!bus.request) begin
-                if (!write_fifo_empty) begin
-                    bus.request <= 1'b1;
-                    bus.write <= 1'b1;
-                    if (load_starting_address) begin
-                        bus.id <= starting_id;
-                        bus.address <= starting_address + next_offset;
-                        load_starting_address <= 1'b0;
-                    end
-                    bus.wdata <= write_fifo_rdata;
+            if (!mem_bus.request) begin
+                if ((write_port == PORT_MEM) && !write_fifo_empty) begin
+                    mem_bus.request <= 1'b1;
+                    mem_bus.write <= 1'b1;
+                    mem_bus.wdata <= write_fifo_rdata;
                     write_fifo_read <= 1'b1;
-                end else if (!read_fifo_full && can_read) begin
-                    bus.request <= 1'b1;
-                    bus.write <= 1'b0;
-                    if (load_starting_address) begin
-                        bus.id <= (starting_id == sc64::ID_N64_FLASHRAM && cfg.flashram_read_mode) ? sc64::ID_N64_SDRAM : starting_id;
-                        bus.address <= starting_address + next_offset;
-                        load_starting_address <= 1'b0;
+                    read_enabled <= 1'b0;
+                    if (first_write_op) begin
+                        mem_bus.address <= starting_address;
+                        first_write_op <= 1'b0;
                     end
+                end else if ((read_port == PORT_MEM) && !read_fifo_full && read_enabled) begin
+                    mem_bus.request <= 1'b1;
+                    mem_bus.write <= 1'b0;
                 end
-            end else if (bus.ack) begin
-                bus.request <= 1'b0;
-                bus.address <= bus.address + 2'd2;
+            end
+
+            if (mem_bus.ack) begin
+                mem_bus.request <= 1'b0;
+                mem_bus.address[16:0] <= mem_bus.address[16:0] + 2'd2;
             end
 
             if (end_op) begin
-                can_read <= 1'b0;
+                read_enabled <= 1'b0;
             end
         end
+    end
+
+    always_comb begin
+        read_fifo_write = !mem_bus.write && mem_bus.ack;
+        read_fifo_wdata = mem_bus.rdata;
+        mem_bus.wmask = 2'b11;
+    end
+
+
+    // Reg bus controller
+
+    always_ff @(posedge clk) begin
+        if (aleh_op) begin
+            reg_bus.address[16] <= n64_pi_dq_in[0];
+        end
+
+        if (alel_op) begin
+            reg_bus.address[15:0] <= n64_pi_dq_in;
+        end
+
+        if (read_op || write_op) begin
+            reg_bus.address <= reg_bus.address + 2'd2;
+        end
+    end
+
+    always_comb begin
+        reg_bus.read = read_op && (read_port == PORT_REG);
+        reg_bus.write = write_op && (write_port == PORT_REG);
+        reg_bus.wdata = n64_pi_dq_in;
     end
 
 endmodule

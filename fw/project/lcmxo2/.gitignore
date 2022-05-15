@@ -1,0 +1,15 @@
+.recovery
+*.dir/
+*.html
+*.ini
+*.rva
+*.rvl
+*.rvs
+*.svf
+*.tcl
+*.tpf
+*.trc
+*.xml
+impl*/
+
+!build.tcl

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BaliProject version="3.2" title="sc64" device="LCMXO2-7000HC-6TG144C" default_implementation="impl1">
+    <Options/>
+    <Implementation title="impl1" dir="impl1" description="impl1" synthesis="synplify" default_strategy="Strategy">
+        <Options VerilogStandard="System Verilog" def_top="top"/>
+        <Source name="../../rtl/memory/mem_bus.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/fifo/fifo_bus.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/fifo/fifo_junction.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/mcu/mcu_spi.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/mcu/mcu_top.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/memory/memory_arbiter.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/memory/memory_dma.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/memory/memory_flash.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/memory/memory_sdram.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_cfg.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_flashram.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_pi.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_pi_fifo.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_reg_bus.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_scb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_si.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/n64/n64_top.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_clk.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_cmd.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_crc_7.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog" top_module="sd_crc_7"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_scb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_top.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/usb/usb_ft1248.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/fifo_8kb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/pll.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/generated/fifo_8kb_lattice_generated.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/generated/pll_lattice_generated.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="../../rtl/top.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog" top_module="top"/>
+        </Source>
+        <Source name="impl1/sc64.xcf" type="Programming Project File" type_short="Programming">
+            <Options/>
+        </Source>
+        <Source name="sc64.lpf" type="Logic Preference" type_short="LPF">
+            <Options/>
+        </Source>
+        <Source name="si.rva" type="Reveal Analyzer Project File" type_short="RVA">
+            <Options/>
+        </Source>
+        <Source name="si.rvl" type="Reveal" type_short="Reveal">
+            <Options/>
+        </Source>
+    </Implementation>
+    <Strategy name="Strategy" file="sc64.sty"/>
+</BaliProject>

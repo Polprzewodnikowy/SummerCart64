@@ -1,17 +1,8 @@
 #!/bin/bash
 
-CONTAINER_NAME="sc64builder"
+BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.4"
 
-docker ps | grep $CONTAINER_NAME > /dev/null
-
-if [ $? -eq 1 ]; then
-    docker run \
-        -dt --rm \
-        --name $CONTAINER_NAME \
-        --user $(id -u):$(id -g) \
-        --mount type=bind,src="$(pwd)",target="/workdir" \
-        ghcr.io/polprzewodnikowy/sc64env:v1.2
-fi
+pushd $(dirname $0) > /dev/null
 
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 GIT_TAG=$(git describe --tags 2> /dev/null)
@@ -21,10 +12,18 @@ if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
 
-docker exec \
+docker run \
     $DOCKER_OPTIONS \
+    --rm \
+    --privileged \
+    --user $(id -u):$(id -g) \
+    --mac-address ${MAC_ADDRESS:-F8:12:34:56:78:90} \
+    --mount type=bind,src="$(pwd)/flexlm",target="/flexlm" \
+    --mount type=bind,src="$(pwd)",target="/workdir" \
     -e GIT_BRANCH="$GIT_BRANCH" \
     -e GIT_TAG="$GIT_TAG" \
     -e GIT_SHA="$GIT_SHA" \
-    $CONTAINER_NAME \
+    $BUILDER_IMAGE \
     ./build.sh $@
+
+popd > /dev/null
