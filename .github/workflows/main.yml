@@ -28,6 +28,8 @@ jobs:
           mkdir -p ./flexlm
           echo "$ENCODED_LICENSE" > ./flexlm/encoded_license
           base64 -d ./flexlm/encoded_license > ./flexlm/license.dat
+          cat ./flexlm/encoded_license
+          cat ./flexlm/license.dat
 
       - name: Build script
         env:

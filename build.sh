@@ -152,6 +152,9 @@ while test $# -gt 0; do
     shift
 done
 
+ls /flexlm
+cat /flexlm/license.dat
+
 if [ "$TRIGGER_BOOTLOADER" = true ]; then build_bootloader; fi
 if [ "$TRIGGER_CONTROLLER" = true ]; then build_controller; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi

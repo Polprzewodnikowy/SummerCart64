@@ -11,7 +11,7 @@ GIT_SHA=$(git rev-parse HEAD)
 if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
-
+echo $MAC_ADDRESS
 docker run \
     $DOCKER_OPTIONS \
     --rm \
