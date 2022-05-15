@@ -93,10 +93,10 @@
         <Source name="sc64.lpf" type="Logic Preference" type_short="LPF">
             <Options/>
         </Source>
-        <Source name="si.rva" type="Reveal Analyzer Project File" type_short="RVA">
+        <Source name="si.rva" type="Reveal Analyzer Project File" type_short="RVA" excluded="TRUE">
             <Options/>
         </Source>
-        <Source name="si.rvl" type="Reveal" type_short="Reveal">
+        <Source name="si.rvl" type="Reveal" type_short="Reveal" excluded="TRUE">
             <Options/>
         </Source>
     </Implementation>
