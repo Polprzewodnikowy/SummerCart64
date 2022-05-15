@@ -37,8 +37,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: SummerCart64
-          path: SummerCart64.zip
+          name: SC64
+          path: SC64.zip
 
       - name: Get release
         if: github.event_name == 'release' && github.event.action == 'created'
@@ -54,6 +54,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: SummerCart64.zip
-          asset_name: SummerCart64.zip
+          asset_path: SC64.zip
+          asset_name: SC64.zip
           asset_content_type: application/zip

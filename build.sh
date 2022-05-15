@@ -5,9 +5,9 @@ set -e
 PACKAGE_FILE_NAME="SC64"
 
 FILES=(
+    "./fw/ftdi-template.xml"
     "./fw/project/lcmxo2/impl1/sc64_impl1.bit"
     "./fw/project/lcmxo2/impl1/sc64_impl1.jed"
-    "./hw/ftdi-template.xml"
     "./sw/bootloader/build/bootloader.bin"
     "./sw/controller/build/controller.bin"
     "./sw/controller/build/controller.elf"

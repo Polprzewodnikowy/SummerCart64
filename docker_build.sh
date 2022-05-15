@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.4"
+BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.5"
 
 pushd $(dirname $0) > /dev/null
 
@@ -15,6 +15,7 @@ fi
 docker run \
     $DOCKER_OPTIONS \
     --rm \
+    --user $(id -u):$(id -g) \
     --mac-address ${MAC_ADDRESS:-F8:12:34:56:78:90} \
     --mount type=bind,src="$(pwd)/flexlm",target="/flexlm" \
     --mount type=bind,src="$(pwd)",target="/workdir" \
