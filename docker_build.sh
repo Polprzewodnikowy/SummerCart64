@@ -15,7 +15,6 @@ fi
 docker run \
     $DOCKER_OPTIONS \
     --rm \
-    --privileged \
     --user $(id -u):$(id -g) \
     --mac-address ${MAC_ADDRESS:-F8:12:34:56:78:90} \
     --mount type=bind,src="$(pwd)/flexlm",target="/flexlm" \
