@@ -7,6 +7,7 @@
 #include "sc64.h"
 #include "version.h"
 #include "vr4300.h"
+#include "../assets/assets.h"
 
 
 #define EXCEPTION_INTERRUPT     (0)
@@ -26,7 +27,6 @@
 #define LINE_HEIGHT             (10)
 
 
-extern const uint32_t _binary_build_background_png_o_start;
 static io32_t exception_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((aligned(64)));
 static const vi_regs_t vi_config[] = {{
     .CR = (
@@ -75,7 +75,7 @@ static const vi_regs_t vi_config[] = {{
 
 static void exception_init_screen (void) {
     const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
-    uint32_t *background_data = (uint32_t *) (&_binary_build_background_png_o_start);
+    uint32_t *background_data = (uint32_t *) (&assets_exception_background);
 
     for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 2) {
         io_write(&exception_framebuffer[i], *background_data);

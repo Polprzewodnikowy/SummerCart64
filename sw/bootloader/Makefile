@@ -38,13 +38,13 @@ SRC_FILES = \
 	fatfs/ffunicode.c
 
 ASSET_FILES = \
-	background.png
+	exception_background.png
 
 SRCS = $(SRC_FILES) $(ASSET_FILES)
-OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(patsubst %,%.o,$(SRCS))))
+SRC_OBJS = $(patsubst %,%.o,$(SRC_FILES))
+ASSET_OBJS = $(patsubst %,%.asset.o,$(basename $(ASSET_FILES)))
+OBJS = $(addprefix $(BUILD_DIR)/,$(notdir $(SRC_OBJS) $(ASSET_OBJS)))
 DEPS = $(OBJS:.o=.d)
-$(info $(SRCS))
-$(info $(OBJS))
 VPATH = $(SRC_DIR) $(SRC_DIR)/fatfs $(ASSET_DIR)
 
 $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
@@ -55,9 +55,11 @@ $(BUILD_DIR)/%.S.o: %.S
 $(BUILD_DIR)/%.c.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.png.o: %.png
+$(BUILD_DIR)/%.asset: $(ASSET_DIR)/%.png
 	$(PYTHON) tools/asset_converter.py $< $@
-	$(OBJCOPY) -I binary -O elf32-bigmips -B mips:4000 $@ $@
+
+$(BUILD_DIR)/%.asset.o: $(BUILD_DIR)/%.asset $(ASSET_DIR)/assets.S
+	@sed -e "s,@sym@,$*,g" -e "s,@file@,$<," < $(ASSET_DIR)/assets.S | $(CC) -x assembler-with-cpp $(FLAGS) $(ASFLAGS) $(CFLAGS) -c - -o $@
 
 $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 	$(CXX) $(FLAGS) $(LDFLAGS) -TN64.ld $(OBJS) -o $@
