@@ -1,3 +1,4 @@
+#include "error.h"
 #include "exception.h"
 #include "io.h"
 #include "sc64.h"
@@ -8,6 +9,11 @@ void init (void) {
     si_io_write((io32_t *) (&PIFRAM[0x3C]), pifram | 0x08);
 
     exception_install();
+
+    if (!sc64_check_presence()) {
+        error_display("SC64 hardware not detected");
+    }
+
     exception_enable_watchdog();
     exception_enable_interrupts();
 

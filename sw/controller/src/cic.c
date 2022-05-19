@@ -12,6 +12,7 @@ typedef enum {
 
 
 static volatile bool cic_enabled = false;
+static volatile bool cic_detect_enabled;
 
 static volatile uint8_t cic_next_rd;
 static volatile uint8_t cic_next_wr;
@@ -54,6 +55,12 @@ static void cic_irq_clk_falling (void) {
 
 static void cic_irq_clk_rising (void) {
     hw_gpio_set(GPIO_ID_N64_CIC_DQ);
+    if (cic_detect_enabled) {
+        cic_detect_enabled = false;
+        if (!hw_gpio_get(GPIO_ID_N64_CIC_DQ)) {
+            cic_enabled = false;
+        }
+    }
 }
 
 static uint8_t cic_read (void) {
@@ -65,6 +72,10 @@ static uint8_t cic_read (void) {
 static void cic_write (uint8_t bit) {
     cic_next_wr = bit;
     task_yield();
+}
+
+static void cic_start_detect (void) {
+    cic_detect_enabled = cic_dd_mode;
 }
 
 static uint8_t cic_read_nibble (void) {
@@ -97,17 +108,11 @@ static void cic_encode_round (uint8_t index) {
 }
 
 static void cic_write_id (cic_region_t region) {
-    uint8_t id = 0x01;
-
-    if (cic_dd_mode) {
-        id |= 0x08;
-    }
-
-    if (region == REGION_PAL) {
-        id |= 0x04;
-    }
-
-    cic_write_nibble(id);
+    cic_start_detect();
+    cic_write(cic_dd_mode ? 1 : 0);
+    cic_write(region == REGION_PAL ? 1 : 0);
+    cic_write(0);
+    cic_write(1);
 }
 
 static void cic_write_id_failed (void) {

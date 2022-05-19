@@ -50,7 +50,6 @@ void sc64_get_info (sc64_info_t *info) {
 }
 
 void sc64_init (void) {
-    while (!sc64_check_presence());
     sc64_change_config(CFG_ID_BOOTLOADER_SWITCH, false);
 }
 

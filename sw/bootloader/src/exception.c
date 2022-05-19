@@ -34,7 +34,6 @@ static const vi_regs_t vi_config[] = {{
         VI_CR_PIXEL_ADVANCE_0 |
         VI_CR_ANTIALIAS_1 |
         VI_CR_ANTIALIAS_0 |
-        VI_CR_GAMMA_ON |
         VI_CR_TYPE_32
     ),
     .H_WIDTH = SCREEN_WIDTH,
@@ -55,7 +54,6 @@ static const vi_regs_t vi_config[] = {{
         VI_CR_PIXEL_ADVANCE_0 |
         VI_CR_ANTIALIAS_1 |
         VI_CR_ANTIALIAS_0 |
-        VI_CR_GAMMA_ON |
         VI_CR_TYPE_32
     ),
     .H_WIDTH = SCREEN_WIDTH,
