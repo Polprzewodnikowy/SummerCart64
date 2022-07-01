@@ -471,9 +471,10 @@ module mcu_top (
 
                 REG_CFG_SCR: begin
                     reg_rdata <= {
-                        22'd0,
+                        21'd0,
                         n64_scb.eeprom_16k_mode,
                         n64_scb.eeprom_enabled,
+                        n64_scb.ddipl_enabled,
                         n64_scb.dd_enabled,
                         n64_scb.flashram_enabled,
                         n64_scb.sram_banked,
@@ -620,6 +621,7 @@ module mcu_top (
             n64_scb.eeprom_16k_mode <= 1'b0;
             n64_scb.eeprom_enabled <= 1'b0;
             n64_scb.dd_enabled <= 1'b0;
+            n64_scb.ddipl_enabled <= 1'b0;
             n64_scb.flashram_enabled <= 1'b0;
             n64_scb.sram_banked <= 1'b0;
             n64_scb.sram_enabled <= 1'b0;
@@ -673,6 +675,7 @@ module mcu_top (
                     {
                         n64_scb.eeprom_16k_mode,
                         n64_scb.eeprom_enabled,
+                        n64_scb.ddipl_enabled,
                         n64_scb.dd_enabled,
                         n64_scb.flashram_enabled,
                         n64_scb.sram_banked,
@@ -681,7 +684,7 @@ module mcu_top (
                         n64_scb.rom_write_enabled,
                         bootloader_skip,
                         n64_scb.bootloader_enabled
-                    } <= reg_wdata[9:0];
+                    } <= reg_wdata[10:0];
                 end
 
                 REG_CFG_DATA_0: begin

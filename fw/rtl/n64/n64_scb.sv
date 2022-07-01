@@ -11,6 +11,7 @@ interface n64_scb ();
     logic flashram_enabled;
     logic flashram_read_mode;
     logic dd_enabled;
+    logic ddipl_enabled;
     logic eeprom_enabled;
     logic eeprom_16k_mode;
 
@@ -52,6 +53,7 @@ interface n64_scb ();
         output sram_banked,
         output flashram_enabled,
         output dd_enabled,
+        output ddipl_enabled,
         output eeprom_enabled,
         output eeprom_16k_mode,
 
@@ -94,12 +96,14 @@ interface n64_scb ();
         input sram_banked,
         input flashram_enabled,
         input flashram_read_mode,
-        input dd_enabled
+        input dd_enabled,
+        input ddipl_enabled
     );
 
-    // modport dd (
-
-    // );
+    modport dd (
+        input n64_reset,
+        input n64_nmi
+    );
 
     modport flashram (
         output flashram_read_mode,

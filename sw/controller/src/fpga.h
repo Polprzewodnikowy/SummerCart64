@@ -93,8 +93,9 @@ typedef enum {
 #define CFG_SCR_SRAM_BANKED         (1 << 5)
 #define CFG_SCR_FLASHRAM_ENABLED    (1 << 6)
 #define CFG_SCR_DD_ENABLED          (1 << 7)
-#define CFG_SCR_EEPROM_ENABLED      (1 << 8)
-#define CFG_SCR_EEPROM_16K          (1 << 9)
+#define CFG_SCR_DDIPL_ENABLED       (1 << 8)
+#define CFG_SCR_EEPROM_ENABLED      (1 << 9)
+#define CFG_SCR_EEPROM_16K          (1 << 10)
 
 #define CFG_CMD_DONE                (1 << 0)
 #define CFG_CMD_ERROR               (1 << 1)

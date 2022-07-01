@@ -45,18 +45,16 @@ module n64_top (
         .n64_pi_ad(n64_pi_ad)
     );
 
-    assign n64_dd_irq = 1'b0;
+    n64_dd n64_dd_inst (
+        .clk(clk),
+        .reset(reset),
 
-    // n64_dd n64_dd_inst (
-    //     .clk(clk),
-    //     .reset(reset),
+        .reg_bus(reg_bus),
 
-    //     .reg_bus(reg_bus),
+        .n64_scb(n64_scb),
 
-    //     .n64_scb(n64_scb),
-
-    //     .irq(n64_dd_irq)
-    // );
+        .irq(n64_dd_irq)
+    );
 
     n64_flashram n64_flashram_inst (
         .clk(clk),

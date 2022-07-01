@@ -154,6 +154,9 @@ module n64_pi (
                     write_port <= PORT_REG;
                     reg_bus.dd_select <= 1'b1;
                 end
+            end
+
+            if (n64_scb.ddipl_enabled) begin
                 if (n64_pi_dq_in >= 16'h0600 && n64_pi_dq_in < 16'h0640) begin
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
