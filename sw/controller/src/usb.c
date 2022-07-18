@@ -180,36 +180,6 @@ void usb_process (void) {
                     p.state = STATE_RESPONSE;
                     break;
 
-                case 'e':
-                    if (p.args[1] == 0) {
-                        p.state = STATE_RESPONSE;
-                    } else {
-                        uint8_t data[8];
-                        int length = (p.args[1] > 8) ? 8 : p.args[1];
-                        fpga_eeprom_read(p.args[0], length, data);
-                        for (int i = 0; i < length; i++) {
-                            while (!usb_tx_byte(data[i]));
-                        }
-                        p.args[0] += length;
-                        p.args[1] -= length;
-                    }
-                    break;
-
-                case 'E':
-                    if (p.args[1] == 0) {
-                        p.state = STATE_RESPONSE;
-                    } else {
-                        uint8_t data[8];
-                        int length = (p.args[1] > 8) ? 8 : p.args[1];
-                        for (int i = 0; i < length; i++) {
-                            while (!usb_rx_byte(&data[i]));
-                        }
-                        fpga_eeprom_write(p.args[0], length, data);
-                        p.args[0] += length;
-                        p.args[1] -= length;
-                    }
-                    break;
-
                 case 'm':
                 case 'M':
                     if (!((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY))) {

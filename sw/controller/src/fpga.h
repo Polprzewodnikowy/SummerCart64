@@ -14,10 +14,7 @@ typedef enum {
     CMD_MEM_WRITE,
     CMD_USB_STATUS,
     CMD_USB_READ,
-    CMD_USB_WRITE,
-    CMD_FLASHRAM_READ,
-    CMD_EEPROM_READ,
-    CMD_EEPROM_WRITE
+    CMD_USB_WRITE
 } fpga_cmd_t;
 
 typedef enum {
@@ -127,9 +124,6 @@ void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer);
 uint8_t fpga_usb_status_get (void);
 uint8_t fpga_usb_pop (void);
 void fpga_usb_push (uint8_t data);
-void fpga_flashram_buffer_read (uint8_t *buffer);
-void fpga_eeprom_read (uint16_t address, size_t length, uint8_t *buffer);
-void fpga_eeprom_write (uint16_t address, size_t length, uint8_t *buffer);
 
 
 #endif

@@ -75,10 +75,7 @@ module mcu_top (
         CMD_MEM_WRITE,
         CMD_USB_STATUS,
         CMD_USB_READ,
-        CMD_USB_WRITE,
-        CMD_FLASHRAM_READ,
-        CMD_EEPROM_READ,
-        CMD_EEPROM_WRITE
+        CMD_USB_WRITE
     } cmd_e;
 
     phase_e phase;
@@ -102,8 +99,6 @@ module mcu_top (
         fifo_bus.rx_read <= 1'b0;
         fifo_bus.tx_write <= 1'b0;
 
-        n64_scb.eeprom_write <= 1'b0;
-
         reg_read <= 1'b0;
         reg_write <= 1'b0;
 
@@ -119,10 +114,6 @@ module mcu_top (
 
             if (reg_read || reg_write || (mem_word_select && (mem_read || mem_write))) begin
                 address <= address + 1'd1;
-            end
-
-            if (n64_scb.eeprom_write) begin
-                n64_scb.eeprom_address <= n64_scb.eeprom_address + 1'd1;
             end
 
             if (data_ready) begin
@@ -156,15 +147,6 @@ module mcu_top (
                         if (cmd == CMD_MEM_READ) begin
                             mem_read <= 1'b1;
                             mem_word_select <= 1'b0;
-                        end
-
-                        if (cmd == CMD_FLASHRAM_READ) begin
-                            n64_scb.flashram_buffer_address <= rdata[6:1];
-                            counter <= {1'b0, rdata[0]};
-                        end
-
-                        if ((cmd == CMD_EEPROM_READ) || (cmd == CMD_EEPROM_WRITE)) begin
-                            n64_scb.eeprom_address <= {rdata, 3'd0};
                         end
                     end
 
@@ -216,21 +198,6 @@ module mcu_top (
                             fifo_bus.tx_wdata <= rdata;
                             phase <= PHASE_NOP;
                         end
-
-                        if (cmd == CMD_FLASHRAM_READ) begin
-                            if (counter[0]) begin
-                                n64_scb.flashram_buffer_address <= n64_scb.flashram_buffer_address + 1'd1;
-                            end
-                        end
-
-                        if (cmd == CMD_EEPROM_READ) begin
-                            n64_scb.eeprom_address <= n64_scb.eeprom_address + 1'd1;
-                        end
-
-                        if (cmd == CMD_EEPROM_WRITE) begin
-                            n64_scb.eeprom_write <= 1'b1;
-                            n64_scb.eeprom_wdata <= rdata;
-                        end
                     end
 
                     PHASE_NOP: begin end
@@ -280,21 +247,6 @@ module mcu_top (
             end
 
             CMD_USB_WRITE: begin
-                wdata = 8'h00;
-            end
-
-            CMD_FLASHRAM_READ: begin
-                case (counter[0])
-                    1'd0: wdata = n64_scb.flashram_buffer_rdata[15:8];
-                    1'd1: wdata = n64_scb.flashram_buffer_rdata[7:0];
-                endcase
-            end
-            
-            CMD_EEPROM_READ: begin
-                wdata = n64_scb.eeprom_rdata;
-            end
-
-            CMD_EEPROM_WRITE: begin
                 wdata = 8'h00;
             end
         endcase

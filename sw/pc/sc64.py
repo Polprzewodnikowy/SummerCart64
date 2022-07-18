@@ -55,7 +55,8 @@ class SC64:
     __SC64_VERSION_V2 = 0x53437632
 
     __BOOTLOADER_OFFSET = (64 + 14) * 1024 * 1024
-    __SAVE_OFFSET = (64 * 1024 * 1024) - (256 * 1024)
+    __SAVE_OFFSET = (64 * 1024 * 1024) - (128 * 1024)
+    __EEPROM_OFFSET = (96 * 1024 * 1024) + 8192
     __DDIPL_OFFSET = 0x3bc0000 # (64 - 16 - 4) * 1024 * 1024
 
     __CHUNK_SIZE = 256 * 1024
@@ -222,19 +223,6 @@ class SC64:
             self.__set_progress_finish()
 
 
-    def __read_file_from_eeprom(self, file: str) -> None:
-        length = 2048
-        with open(file, "wb") as f:
-            self.__set_progress_init(length, os.path.basename(f.name))
-            self.__write_cmd("e", 0, length)
-            while (f.tell() < length):
-                chunk_size = min(self.__CHUNK_SIZE, length - f.tell())
-                f.write(self.__read(chunk_size))
-                self.__set_progress_value(f.tell())
-            self.__read_cmd_status("e")
-            self.__set_progress_finish()
-
-
     def __write_file_to_sdram(self, file: str, offset: int, min_length: int = 0) -> None:
         with open(file, "rb") as f:
             length = os.fstat(f.fileno()).st_size
@@ -247,22 +235,6 @@ class SC64:
             if (transfer_size != length):
                 self.__write_dummy(transfer_size - length)
             self.__read_cmd_status("M")
-            self.__set_progress_finish()
-
-
-    def __write_file_to_eeprom(self, file: str) -> None:
-        length = 2048
-        with open(file, "rb") as f:
-            file_length = os.fstat(f.fileno()).st_size
-            # transfer_size = max(length, min_length)
-            self.__set_progress_init(file_length, os.path.basename(f.name))
-            self.__write_cmd("E", 0, length)
-            while (f.tell() < file_length):
-                self.__write(f.read(min(self.__CHUNK_SIZE, file_length - f.tell())))
-                self.__set_progress_value(f.tell())
-            if (file_length != length):
-                self.__write_dummy(length - file_length)
-            self.__read_cmd_status("E")
             self.__set_progress_finish()
 
 
@@ -410,25 +382,22 @@ class SC64:
 
 
     def download_save(self, file: str) -> None:
-        self.__read_file_from_eeprom(file)
-        # length = self.__get_save_length()
-        # if (length > 0):
-        #     self.__read_file_from_sdram(file, self.__SAVE_OFFSET, length)
-
-        # else:
-        #     raise SC64Exception("Can't read save data - no save type is set")
+        length = self.__get_save_length()
+        if (length > 0):
+            self.__read_file_from_sdram(file, self.__SAVE_OFFSET if length > 2048 else self.__EEPROM_OFFSET, length)
+        else:
+            raise SC64Exception("Can't read save data - no save type is set")
 
 
     def upload_save(self, file: str) -> None:
-        self.__write_file_to_eeprom(file)
-        # length = self.__get_save_length()
-        # save_length = os.path.getsize(file)
-        # if (length <= 0):
-        #     raise SC64Exception("Can't write save data - no save type is set")
-        # elif (length != save_length):
-        #     raise SC64Exception("Can't write save data - save file size is different than expected")
-        # else:
-        #     self.__write_file_to_sdram(file, self.__SAVE_OFFSET)
+        length = self.__get_save_length()
+        save_length = os.path.getsize(file)
+        if (length <= 0):
+            raise SC64Exception("Can't write save data - no save type is set")
+        elif (length != save_length):
+            raise SC64Exception("Can't write save data - save file size is different than expected")
+        else:
+            self.__write_file_to_sdram(file, self.__SAVE_OFFSET if length > 2048 else self.__EEPROM_OFFSET)
 
 
     def set_dd_enable(self, enable: bool) -> None:

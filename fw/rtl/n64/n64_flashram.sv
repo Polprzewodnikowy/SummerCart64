@@ -40,12 +40,6 @@ module n64_flashram (
     logic [7:0] cmd;
     logic erase_enabled;
 
-    logic [15:0] write_buffer [0:63];
-
-    always_ff @(posedge clk) begin
-        n64_scb.flashram_buffer_rdata <= write_buffer[n64_scb.flashram_buffer_address];
-    end
-
     always_comb begin
         n64_scb.flashram_read_mode = (state == STATE_READ);
 
@@ -140,15 +134,19 @@ module n64_flashram (
                         endcase
                     end
                 end else begin
-                    if (state == STATE_BUFFER) begin
-                        write_buffer[reg_bus.address[6:1]] <= reg_bus.wdata;
-                    end else if (reg_bus.address[1]) begin
+                    if (reg_bus.address[1] && state != STATE_BUFFER) begin
                         status[ERASE_BUSY] <= reg_bus.wdata[ERASE_BUSY];
                         status[WRITE_BUSY] <= reg_bus.wdata[WRITE_BUSY];
                     end
                 end
             end
         end
+    end
+
+    always_comb begin
+        n64_scb.flashram_write = reg_bus.write && !reg_bus.address[16] && state == STATE_BUFFER;
+        n64_scb.flashram_address = reg_bus.address[6:1];
+        n64_scb.flashram_wdata = reg_bus.wdata;
     end
 
 endmodule

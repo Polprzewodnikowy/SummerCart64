@@ -99,36 +99,3 @@ void fpga_usb_push (uint8_t data) {
     hw_spi_trx(&data, 1, SPI_TX);
     hw_spi_stop();
 }
-
-void fpga_flashram_buffer_read (uint8_t *buffer) {
-    fpga_cmd_t cmd = CMD_FLASHRAM_READ;
-    uint8_t address = 0;
-
-    hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&address, 1, SPI_TX);
-    hw_spi_trx(buffer, 128, SPI_RX);
-    hw_spi_stop();
-}
-
-void fpga_eeprom_read (uint16_t address, size_t length, uint8_t *buffer) {
-    fpga_cmd_t cmd = CMD_EEPROM_READ;
-    uint8_t adjusted_address = ((address >> 3) & 0xFF);
-
-    hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&adjusted_address, 1, SPI_TX);
-    hw_spi_trx(buffer, length, SPI_RX);
-    hw_spi_stop();
-}
-
-void fpga_eeprom_write (uint16_t address, size_t length, uint8_t *buffer) {
-    fpga_cmd_t cmd = CMD_EEPROM_WRITE;
-    uint8_t adjusted_address = ((address >> 3) & 0xFF);
-
-    hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&adjusted_address, 1, SPI_TX);
-    hw_spi_trx(buffer, length, SPI_TX);
-    hw_spi_stop();
-}

@@ -9,28 +9,25 @@ interface n64_scb ();
     logic sram_enabled;
     logic sram_banked;
     logic flashram_enabled;
-    logic flashram_read_mode;
     logic dd_enabled;
     logic ddipl_enabled;
     logic eeprom_enabled;
     logic eeprom_16k_mode;
+
+    logic dd_write;
+    logic [8:0] dd_address;
+    logic [15:0] dd_rdata;
+    logic [15:0] dd_wdata;
 
     logic flashram_pending;
     logic flashram_done;
     logic [9:0] flashram_sector;
     logic flashram_sector_or_all;
     logic flashram_write_or_erase;
-    logic [5:0] flashram_buffer_address;
-    logic [15:0] flashram_buffer_rdata;
-
-    logic cfg_pending;
-    logic cfg_done;
-    logic cfg_error;
-    logic cfg_irq;
-    logic [7:0] cfg_cmd;
-    logic [31:0] cfg_rdata [0:1];
-    logic [31:0] cfg_wdata [0:1];
-    logic [31:0] cfg_version;
+    logic flashram_read_mode;
+    logic flashram_write;
+    logic [5:0] flashram_address;
+    logic [15:0] flashram_wdata;
 
     logic eeprom_write;
     logic [10:0] eeprom_address;
@@ -41,6 +38,15 @@ interface n64_scb ();
     logic rtc_done;
     logic [41:0] rtc_rdata;
     logic [41:0] rtc_wdata;
+
+    logic cfg_pending;
+    logic cfg_done;
+    logic cfg_error;
+    logic cfg_irq;
+    logic [7:0] cfg_cmd;
+    logic [31:0] cfg_rdata [0:1];
+    logic [31:0] cfg_wdata [0:1];
+    logic [31:0] cfg_version;
 
     modport controller (
         input n64_reset,
@@ -62,8 +68,11 @@ interface n64_scb ();
         input flashram_sector,
         input flashram_sector_or_all,
         input flashram_write_or_erase,
-        output flashram_buffer_address,
-        input flashram_buffer_rdata,
+
+        input rtc_pending,
+        output rtc_done,
+        input rtc_rdata,
+        output rtc_wdata,
 
         input cfg_pending,
         output cfg_done,
@@ -72,17 +81,7 @@ interface n64_scb ();
         input cfg_cmd,
         input cfg_rdata,
         output cfg_wdata,
-        output cfg_version,
-
-        output eeprom_write,
-        output eeprom_address,
-        input eeprom_rdata,
-        output eeprom_wdata,
-
-        input rtc_pending,
-        output rtc_done,
-        input rtc_rdata,
-        output rtc_wdata
+        output cfg_version
     );
 
     modport pi (
@@ -95,25 +94,65 @@ interface n64_scb ();
         input sram_enabled,
         input sram_banked,
         input flashram_enabled,
-        input flashram_read_mode,
         input dd_enabled,
-        input ddipl_enabled
-    );
+        input ddipl_enabled,
 
-    modport dd (
-        input n64_reset,
-        input n64_nmi
+        input flashram_read_mode
     );
 
     modport flashram (
-        output flashram_read_mode,
         output flashram_pending,
         input flashram_done,
         output flashram_sector,
         output flashram_sector_or_all,
         output flashram_write_or_erase,
-        input flashram_buffer_address,
-        output flashram_buffer_rdata
+
+        output flashram_read_mode,
+
+        output flashram_write,
+        output flashram_address,
+        output flashram_wdata
+    );
+
+    modport si (
+        input eeprom_enabled,
+        input eeprom_16k_mode,
+
+        output eeprom_write,
+        output eeprom_address,
+        input eeprom_rdata,
+        output eeprom_wdata,
+
+        output rtc_pending,
+        input rtc_done,
+        output rtc_rdata,
+        input rtc_wdata
+    );
+
+    modport dd (
+        input n64_reset,
+        input n64_nmi,
+
+        output dd_write,
+        output dd_address,
+        input dd_rdata,
+        output dd_wdata
+    );
+
+    modport bram (
+        input flashram_write,
+        input flashram_address,
+        input flashram_wdata,
+
+        input eeprom_write,
+        input eeprom_address,
+        output eeprom_rdata,
+        input eeprom_wdata,
+
+        input dd_write,
+        input dd_address,
+        output dd_rdata,
+        input dd_wdata
     );
 
     modport cfg (
@@ -125,21 +164,6 @@ interface n64_scb ();
         output cfg_rdata,
         input cfg_wdata,
         input cfg_version
-    );
-
-    modport si (
-        input eeprom_enabled,
-        input eeprom_16k_mode,
-
-        input eeprom_write,
-        input eeprom_address,
-        output eeprom_rdata,
-        input eeprom_wdata,
-
-        output rtc_pending,
-        input rtc_done,
-        output rtc_rdata,
-        input rtc_wdata
     );
 
 endinterface

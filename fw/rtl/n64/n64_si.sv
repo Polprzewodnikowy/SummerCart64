@@ -332,20 +332,10 @@ module n64_si (
 
     // EEPROM controller
 
-    logic [7:0] eeprom_memory [0:2047];
-    logic [7:0] eeprom_data;
-
-    always_ff @(posedge clk) begin
-        eeprom_data <= eeprom_memory[joybus_full_address];
-        n64_scb.eeprom_rdata <= eeprom_memory[n64_scb.eeprom_address];
-        if (rx_data_valid && (cmd == CMD_EEPROM_WRITE)) begin
-            if (rx_byte_counter > 4'd0) begin
-                eeprom_memory[joybus_full_address] <= rx_byte_data;
-            end
-        end
-        if (n64_scb.eeprom_write) begin
-            eeprom_memory[n64_scb.eeprom_address] <= n64_scb.eeprom_wdata;
-        end
+    always_comb begin
+        n64_scb.eeprom_write = rx_data_valid && (cmd == CMD_EEPROM_WRITE) && rx_byte_counter > 4'd0;
+        n64_scb.eeprom_address = joybus_full_address;
+        n64_scb.eeprom_wdata = rx_byte_data;
     end
 
 
@@ -439,7 +429,7 @@ module n64_si (
             end
             CMD_EEPROM_READ: begin
                 tx_length = 4'd7;
-                tx_byte_data = eeprom_data;
+                tx_byte_data = n64_scb.eeprom_rdata;
             end
             CMD_EEPROM_WRITE: begin
                 tx_length = 4'd0;

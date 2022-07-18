@@ -125,11 +125,11 @@ module n64_pi (
     // Address decoding
 
     const bit [31:0] DDIPL_OFFSET       = 32'h03BC_0000;
-    const bit [31:0] SAVE_OFFSET        = 32'h03FC_0000;
-    const bit [31:0] BUFFER_OFFSET      = 32'h03FE_0000;
+    const bit [31:0] SAVE_OFFSET        = 32'h03FE_0000;
     const bit [31:0] FLASH_OFFSET       = 32'h0400_0000;
     const bit [31:0] BOOTLOADER_OFFSET  = 32'h04E0_0000;
-    const bit [31:0] SHADOW_OFFSET      = 32'h04FC_0000;
+    const bit [31:0] SHADOW_OFFSET      = 32'h04FE_0000;
+    const bit [31:0] BUFFER_OFFSET      = 32'h0600_0000;
 
     logic [31:0] mem_offset;
 
@@ -207,10 +207,10 @@ module n64_pi (
             end
 
             if (n64_scb.rom_shadow_enabled) begin
-                if (n64_pi_dq_in >= 16'h13FC && n64_pi_dq_in < 16'h1400) begin
+                if (n64_pi_dq_in >= 16'h13FE && n64_pi_dq_in < 16'h1400) begin
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
-                    mem_offset <= (-32'h13FC_0000) + SHADOW_OFFSET;
+                    mem_offset <= (-32'h13FE_0000) + SHADOW_OFFSET;
                 end
             end
 
@@ -220,13 +220,13 @@ module n64_pi (
                 mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
             end
 
-            if (n64_pi_dq_in >= 16'h1FFC && n64_pi_dq_in < 16'h1FFE) begin
+            if (n64_pi_dq_in >= 16'h1FFE && n64_pi_dq_in < 16'h1FFF) begin
                 read_port <= PORT_MEM;
                 write_port <= PORT_MEM;
-                mem_offset <= (-32'h1FFC_0000) + BUFFER_OFFSET;
+                mem_offset <= (-32'h1FFE_0000) + BUFFER_OFFSET;
             end
 
-            if (n64_pi_dq_in >= 16'h1FFE && n64_pi_dq_in < 16'h2000) begin
+            if (n64_pi_dq_in >= 16'h1FFF && n64_pi_dq_in < 16'h2000) begin
                 read_port <= PORT_REG;
                 write_port <= PORT_REG;
                 reg_bus.cfg_select <= 1'b1;

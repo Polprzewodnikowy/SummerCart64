@@ -221,7 +221,6 @@ module memory_flash (
     } e_state;
 
     e_state state;
-    e_state next_state;
     logic [2:0] counter;
     logic valid_counter;
     logic [23:0] current_address;
