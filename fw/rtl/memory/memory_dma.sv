@@ -38,129 +38,216 @@ module memory_dma (
     mem_bus.controller mem_bus
 );
 
-    typedef enum bit [0:0] { 
-        STATE_FETCH,
-        STATE_TRANSFER
-    } e_state;
+    // DMA start/stop control
 
-    // logic [31:0] remaining;
-    logic [26:0] end_address;
-    logic [15:0] data_buffer;
-    logic byte_counter;
-    e_state state;
-    logic rx_delay;
+    logic dma_start;
+    logic dma_stop;
+
+    always_comb begin
+        dma_start = dma_scb.start && !dma_scb.stop && !dma_scb.busy;
+        dma_stop = dma_scb.stop;
+    end
+
+
+    // Remaining counter and FIFO enable
+
+    logic [26:0] remaining;
+    logic trx_enabled;
+
+    always_comb begin
+        trx_enabled = remaining > 27'd0;
+    end
+
+
+    // RX FIFO controller
+
+    logic rx_rdata_pop;
+    logic rx_rdata_shift;
+    logic rx_rdata_valid;
+    logic [15:0] rx_buffer;
+    logic rx_buffer_valid;
+    logic [1:0] rx_buffer_counter;
+    logic [1:0] rx_buffer_valid_counter;
+
+    always_comb begin
+        rx_buffer_valid = rx_buffer_valid_counter == 2'd2;
+    end
 
     always_ff @(posedge clk) begin
-        fifo_bus.rx_read <= 1'b0;
-        fifo_bus.tx_write <= 1'b0;
-        rx_delay <= fifo_bus.rx_read;
+        rx_rdata_pop <= (
+            !rx_rdata_pop &&
+            trx_enabled &&
+            rx_buffer_counter < 2'd2 &&
+            !fifo_bus.rx_empty &&
+            mem_bus.write
+        );
+        rx_rdata_shift <= 1'b0;
+        fifo_bus.rx_read <= rx_rdata_pop;
+        rx_rdata_valid <= fifo_bus.rx_read;
 
-        if (rx_delay) begin
-            // if (dma.address[0] || (remaining == 32'd1)) begin
-                // dma.wdata <= {dma.rx_rdata, dma.rx_rdata};
-            // end else begin
-                mem_bus.wdata <= {mem_bus.wdata[7:0], fifo_bus.rx_rdata};
-            // end
+        if (dma_start) begin
+            if (dma_scb.starting_address[0]) begin
+                mem_bus.wmask <= 2'b01;
+                rx_buffer_counter <= 2'd1;
+                rx_buffer_valid_counter <= 2'd1;
+            end else begin
+                mem_bus.wmask <= 2'b11;
+                rx_buffer_counter <= 2'd0;
+                rx_buffer_valid_counter <= 2'd0;
+            end
         end
 
-        if (reset) begin
-            dma_scb.busy <= 1'b0;
-            mem_bus.request <= 1'b0;
+        if (rx_rdata_pop) begin
+            rx_buffer_counter <= rx_buffer_counter + 1'd1;
+        end
+
+        if (rx_rdata_shift || rx_rdata_valid) begin
+            rx_buffer <= {rx_buffer[7:0], fifo_bus.rx_rdata};
+            rx_buffer_valid_counter <= rx_buffer_valid_counter + 1'd1;
+            if (remaining == 27'd0 && rx_buffer_counter == 2'd1) begin
+                mem_bus.wmask <= 2'b10;
+                rx_rdata_shift <= 1'b1;
+                rx_buffer_counter <= rx_buffer_counter + 1'd1;
+            end
+        end
+
+        if (rx_buffer_valid && !mem_bus.request) begin
+            rx_buffer_counter <= 2'd0;
+            rx_buffer_valid_counter <= 2'd0;
+        end
+    end
+
+
+    // TX FIFO controller
+
+    logic tx_wdata_push;
+    logic tx_wdata_first_push;
+    logic [7:0] tx_buffer;
+    logic tx_buffer_counter;
+    logic tx_buffer_ready;
+    logic tx_buffer_valid;
+
+    always_comb begin
+        fifo_bus.tx_write = tx_wdata_push;
+    end
+
+    always_ff @(posedge clk) begin
+        tx_wdata_push <= (
+            !tx_wdata_push &&
+            trx_enabled &&
+            tx_buffer_valid &&
+            !fifo_bus.tx_full &&
+            !mem_bus.write
+        );
+
+        if (reset || dma_stop) begin
+            tx_buffer_ready <= 1'b0;
+            tx_buffer_valid <= 1'b0;
+        end
+
+        if (dma_start) begin
+            tx_wdata_first_push <= 1'b1;
+            tx_buffer_ready <= 1'b1;
+            tx_buffer_valid <= 1'b0;
+        end
+
+        if (tx_buffer_ready && mem_bus.request) begin
+            tx_buffer_ready <= 1'b0;
+        end
+
+        if (mem_bus.ack) begin
+            tx_wdata_first_push <= 1'b0;
+            tx_buffer_counter <= 1'd1;
+            tx_buffer_valid <= 1'b1;
+            {fifo_bus.tx_wdata, tx_buffer} <= mem_bus.rdata;
+            if (tx_wdata_first_push && dma_scb.starting_address[0]) begin
+                fifo_bus.tx_wdata <= mem_bus.rdata[7:0];
+                tx_buffer_counter <= 1'd0;
+            end
+        end
+
+        if (tx_wdata_push) begin
+            tx_buffer_counter <= tx_buffer_counter - 1'd1;
+            fifo_bus.tx_wdata <= tx_buffer;
+            if (tx_buffer_counter == 1'd0) begin
+                tx_buffer_ready <= 1'b1;
+                tx_buffer_valid <= 1'b0;
+            end
+        end
+    end
+
+
+    // Remaining counter controller
+
+    always_ff @(posedge clk) begin
+        if (reset || dma_stop) begin
+            remaining <= 27'd0;
         end else begin
-            if (!dma_scb.busy) begin
-                if (dma_scb.start) begin
-                    dma_scb.busy <= 1'b1;
-                    mem_bus.write <= dma_scb.direction;
-                    mem_bus.address <= dma_scb.starting_address;
-                    end_address <= dma_scb.starting_address + dma_scb.transfer_length;
-                    // remaining <= dma.transfer_length;
-                    byte_counter <= 1'd0;
-                    state <= STATE_FETCH;
-                end
-            end else begin
-                if (dma_scb.stop) begin
-                    dma_scb.busy <= 1'b0;
-                    mem_bus.request <= 1'b0;
-                end else if (mem_bus.address != end_address/* remaining != 32'd0*/) begin
-                    if (mem_bus.write) begin
-                        case (state)
-                            STATE_FETCH: begin
-                                if (!fifo_bus.rx_empty && !(fifo_bus.rx_read && fifo_bus.rx_almost_empty)) begin
-                                    fifo_bus.rx_read <= 1'b1;
-                                    // if (dma.address[0]) begin
-                                        // dma.wmask <= 2'b01;
-                                        // state <= STATE_TRANSFER;
-                                    // end else if (dma.starting_address[0] remaining == 32'd1) begin
-                                        // dma.wmask <= 2'b10;
-                                        // state <= STATE_TRANSFER;
-                                    // end else begin
-                                        byte_counter <= byte_counter + 1'd1;
-                                        if (byte_counter) begin
-                                            mem_bus.wmask <= 2'b11;
-                                            state <= STATE_TRANSFER;
-                                        end
-                                    // end
-                                end
-                            end
+            if (dma_start) begin
+                remaining <= dma_scb.transfer_length;
+            end
 
-                            STATE_TRANSFER: begin
-                                if (!fifo_bus.rx_read) begin
-                                    mem_bus.request <= 1'b1;
-                                end
-                                if (mem_bus.ack) begin
-                                    mem_bus.request <= 1'b0;
-                                    // if (dma.wmask != 2'b11) begin
-                                        // dma.address <= dma.address + 1'd1;
-                                        // remaining <= remaining - 1'd1;
-                                    // end else begin
-                                        mem_bus.address <= mem_bus.address + 2'd2;
-                                        // remaining <= remaining - 2'd2;
-                                    // end
-                                    state <= STATE_FETCH;
-                                end
-                            end
-                        endcase
-                    end else begin
-                        case (state)
-                            STATE_FETCH: begin
-                                mem_bus.request <= 1'b1;
-                                if (mem_bus.ack) begin
-                                    mem_bus.request <= 1'b0;
-                                    data_buffer <= mem_bus.rdata;
-                                    state <= STATE_TRANSFER;
-                                end
-                            end
+            if ((mem_bus.write && rx_rdata_pop) || (!mem_bus.write && tx_wdata_push)) begin
+                remaining <= remaining - 1'd1;
+            end
+        end
+    end
 
-                            STATE_TRANSFER: begin
-                              if (!fifo_bus.tx_full && !(fifo_bus.tx_write && fifo_bus.tx_almost_full)) begin
-                                    fifo_bus.tx_write <= 1'b1;
-                                    // if (dma.address[0]) begin
-                                    //     dma.address <= dma.address + 1'd1;
-                                    //     // remaining <= remaining - 1'd1;
-                                    //     dma.dma_tx_wdata <= data_buffer[7:0];
-                                    //     state <= STATE_FETCH;
-                                    // end else if (remaining == 32'd1) begin
-                                    //     dma.address <= dma.address + 1'd1;
-                                    //     // remaining <= remaining - 1'd1;
-                                    //     dma.dma_tx_wdata <= data_buffer[15:8];
-                                    //     state <= STATE_FETCH;
-                                    // end else begin
-                                        fifo_bus.tx_wdata <= byte_counter ? data_buffer[7:0] : data_buffer[15:8];
-                                        byte_counter <= byte_counter + 1'd1;
-                                        if (byte_counter) begin
-                                            mem_bus.address <= mem_bus.address + 2'd2;
-                                            // remaining <= remaining - 2'd2;
-                                            state <= STATE_FETCH;
-                                        end
-                                    // end
-                                end
-                            end
-                        endcase
-                    end
-                end else begin
+
+    // Mem bus controller
+
+    always_ff @(posedge clk) begin
+        if (reset || dma_scb.stop) begin
+            dma_scb.busy <= 1'b0;
+        end else begin
+            if (dma_start) begin
+                dma_scb.busy <= 1'b1;
+            end
+
+            if (dma_scb.busy) begin
+                if (!trx_enabled) begin
                     dma_scb.busy <= 1'b0;
                 end
             end
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset || dma_scb.stop) begin
+            mem_bus.request <= 1'b0;
+        end else begin
+            if (dma_scb.busy && !mem_bus.request) begin
+                if (mem_bus.write) begin
+                    if (rx_buffer_valid) begin
+                        mem_bus.request <= 1'b1;
+                        mem_bus.wdata <= rx_buffer;
+                    end
+                end else begin
+                    if (tx_buffer_ready) begin
+                        mem_bus.request <= 1'b1;
+                    end
+                end
+            end
+        end
+
+        if (mem_bus.ack) begin
+            mem_bus.request <= 1'b0;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (dma_start) begin
+            mem_bus.write <= dma_scb.direction;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (dma_start) begin
+            mem_bus.address <= {dma_scb.starting_address[26:1], 1'b0};
+        end
+
+        if (mem_bus.ack) begin
+            mem_bus.address <= mem_bus.address + 2'd2;
         end
     end
 

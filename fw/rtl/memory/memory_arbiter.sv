@@ -5,7 +5,7 @@ module memory_arbiter (
     mem_bus.memory n64_bus,
     mem_bus.memory cfg_bus,
     mem_bus.memory usb_dma_bus,
-    // mem_bus.memory sd_dma_bus,
+    mem_bus.memory sd_dma_bus,
 
     mem_bus.controller sdram_mem_bus,
     mem_bus.controller flash_mem_bus,
@@ -15,39 +15,39 @@ module memory_arbiter (
     typedef enum bit [1:0] {
         SOURCE_N64,
         SOURCE_CFG,
-        SOURCE_USB_DMA//,
-        // SOURCE_SD_DMA
+        SOURCE_USB_DMA,
+        SOURCE_SD_DMA
     } e_source_request;
 
     logic n64_sdram_request;
     logic cfg_sdram_request;
     logic usb_dma_sdram_request;
-    // logic sd_dma_sdram_request;
+    logic sd_dma_sdram_request;
 
     logic n64_flash_request;
     logic cfg_flash_request;
     logic usb_dma_flash_request;
-    // logic sd_dma_flash_request;
+    logic sd_dma_flash_request;
 
     logic n64_bram_request;
     logic cfg_bram_request;
     logic usb_dma_bram_request;
-    // logic sd_dma_bram_request;
+    logic sd_dma_bram_request;
 
     assign n64_sdram_request = n64_bus.request && !n64_bus.address[26];
     assign cfg_sdram_request = cfg_bus.request && !cfg_bus.address[26];
     assign usb_dma_sdram_request = usb_dma_bus.request && !usb_dma_bus.address[26];
-    // assign sd_dma_sdram_request = sd_dma_bus.request && !sd_dma_bus.address[26];
+    assign sd_dma_sdram_request = sd_dma_bus.request && !sd_dma_bus.address[26];
 
     assign n64_flash_request = n64_bus.request && (n64_bus.address[26:25] == 2'b10);
     assign cfg_flash_request = cfg_bus.request && (cfg_bus.address[26:25] == 2'b10);
     assign usb_dma_flash_request = usb_dma_bus.request && (usb_dma_bus.address[26:25] == 2'b10);
-    // assign sd_dma_flash_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b10);
+    assign sd_dma_flash_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b10);
 
     assign n64_bram_request = n64_bus.request && (n64_bus.address[26:25] == 2'b11);
     assign cfg_bram_request = cfg_bus.request && (cfg_bus.address[26:25] == 2'b11);
     assign usb_dma_bram_request = usb_dma_bus.request && (usb_dma_bus.address[26:25] == 2'b11);
-    // assign sd_dma_bram_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b11);
+    assign sd_dma_bram_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b11);
 
     e_source_request sdram_source_request;
 
@@ -59,8 +59,8 @@ module memory_arbiter (
                 sdram_mem_bus.request <= (
                     n64_sdram_request ||
                     cfg_sdram_request ||
-                    usb_dma_sdram_request// ||
-                    // sd_dma_sdram_request
+                    usb_dma_sdram_request ||
+                    sd_dma_sdram_request
                 );
 
                 if (n64_sdram_request) begin
@@ -81,12 +81,12 @@ module memory_arbiter (
                     sdram_mem_bus.address <= usb_dma_bus.address;
                     sdram_mem_bus.wdata <= usb_dma_bus.wdata;
                     sdram_source_request <= SOURCE_USB_DMA;
-                // end else if (sd_dma_sdram_request) begin
-                //     sdram_mem_bus.write <= sd_dma_bus.write;
-                //     sdram_mem_bus.wmask <= sd_dma_bus.wmask;
-                //     sdram_mem_bus.address <= sd_dma_bus.address;
-                //     sdram_mem_bus.wdata <= sd_dma_bus.wdata;
-                //     sdram_source_request <= SOURCE_SD_DMA;
+                end else if (sd_dma_sdram_request) begin
+                    sdram_mem_bus.write <= sd_dma_bus.write;
+                    sdram_mem_bus.wmask <= sd_dma_bus.wmask;
+                    sdram_mem_bus.address <= sd_dma_bus.address;
+                    sdram_mem_bus.wdata <= sd_dma_bus.wdata;
+                    sdram_source_request <= SOURCE_SD_DMA;
                 end
             end
 
@@ -106,8 +106,8 @@ module memory_arbiter (
                 flash_mem_bus.request <= (
                     n64_flash_request ||
                     cfg_flash_request ||
-                    usb_dma_flash_request// ||
-                    // sd_dma_flash_request
+                    usb_dma_flash_request ||
+                    sd_dma_flash_request
                 );
 
                 if (n64_flash_request) begin
@@ -128,12 +128,12 @@ module memory_arbiter (
                     flash_mem_bus.address <= usb_dma_bus.address;
                     flash_mem_bus.wdata <= usb_dma_bus.wdata;
                     flash_source_request <= SOURCE_USB_DMA;
-                // end else if (sd_dma_flash_request) begin
-                //     flash_mem_bus.write <= sd_dma_bus.write;
-                //     flash_mem_bus.wmask <= sd_dma_bus.wmask;
-                //     flash_mem_bus.address <= sd_dma_bus.address;
-                //     flash_mem_bus.wdata <= sd_dma_bus.wdata;
-                //     flash_source_request <= SOURCE_SD_DMA;
+                end else if (sd_dma_flash_request) begin
+                    flash_mem_bus.write <= sd_dma_bus.write;
+                    flash_mem_bus.wmask <= sd_dma_bus.wmask;
+                    flash_mem_bus.address <= sd_dma_bus.address;
+                    flash_mem_bus.wdata <= sd_dma_bus.wdata;
+                    flash_source_request <= SOURCE_SD_DMA;
                 end
             end
 
@@ -153,8 +153,8 @@ module memory_arbiter (
                 bram_mem_bus.request <= (
                     n64_bram_request ||
                     cfg_bram_request ||
-                    usb_dma_bram_request// ||
-                    // sd_dma_bram_request
+                    usb_dma_bram_request ||
+                    sd_dma_bram_request
                 );
 
                 if (n64_bram_request) begin
@@ -175,12 +175,12 @@ module memory_arbiter (
                     bram_mem_bus.address <= usb_dma_bus.address;
                     bram_mem_bus.wdata <= usb_dma_bus.wdata;
                     bram_source_request <= SOURCE_USB_DMA;
-                // end else if (sd_dma_bram_request) begin
-                //     bram_mem_bus.write <= sd_dma_bus.write;
-                //     bram_mem_bus.wmask <= sd_dma_bus.wmask;
-                //     bram_mem_bus.address <= sd_dma_bus.address;
-                //     bram_mem_bus.wdata <= sd_dma_bus.wdata;
-                //     bram_source_request <= SOURCE_SD_DMA;
+                end else if (sd_dma_bram_request) begin
+                    bram_mem_bus.write <= sd_dma_bus.write;
+                    bram_mem_bus.wmask <= sd_dma_bus.wmask;
+                    bram_mem_bus.address <= sd_dma_bus.address;
+                    bram_mem_bus.wdata <= sd_dma_bus.wdata;
+                    bram_source_request <= SOURCE_SD_DMA;
                 end
             end
 
@@ -206,11 +206,11 @@ module memory_arbiter (
             ((flash_source_request == SOURCE_USB_DMA) && flash_mem_bus.ack) ||
             ((bram_source_request == SOURCE_USB_DMA) && bram_mem_bus.ack)
         );
-        // sd_dma_bus.ack = (
-        //     ((sdram_source_request == SOURCE_SD_DMA) && sdram_mem_bus.ack) ||
-        //     ((flash_source_request == SOURCE_SD_DMA) && flash_mem_bus.ack) ||
-        //     ((bram_source_request == SOURCE_SD_DMA) && bram_mem_bus.ack)
-        // );
+        sd_dma_bus.ack = (
+            ((sdram_source_request == SOURCE_SD_DMA) && sdram_mem_bus.ack) ||
+            ((flash_source_request == SOURCE_SD_DMA) && flash_mem_bus.ack) ||
+            ((bram_source_request == SOURCE_SD_DMA) && bram_mem_bus.ack)
+        );
 
         n64_bus.rdata = n64_bram_request ? bram_mem_bus.rdata :
             n64_flash_request ? flash_mem_bus.rdata :
@@ -221,9 +221,9 @@ module memory_arbiter (
         usb_dma_bus.rdata = usb_dma_bram_request ? bram_mem_bus.rdata :
             usb_dma_flash_request ? flash_mem_bus.rdata :
             sdram_mem_bus.rdata;
-        // sd_dma_bus.rdata = sd_dma_bram_request ? bram_mem_bus.rdata :
-        //     sd_dma_flash_request ? flash_mem_bus.rdata :
-        //     sdram_mem_bus.rdata;
+        sd_dma_bus.rdata = sd_dma_bram_request ? bram_mem_bus.rdata :
+            sd_dma_flash_request ? flash_mem_bus.rdata :
+            sdram_mem_bus.rdata;
     end
 
 endmodule

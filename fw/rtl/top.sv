@@ -66,7 +66,7 @@ module top (
     mem_bus n64_mem_bus ();
     mem_bus cfg_mem_bus ();
     mem_bus usb_dma_mem_bus ();
-    // mem_bus sd_dma_mem_bus ();
+    mem_bus sd_dma_mem_bus ();
     mem_bus sdram_mem_bus ();
     mem_bus flash_mem_bus ();
     mem_bus bram_mem_bus ();
@@ -167,28 +167,28 @@ module top (
 
     // SD card
 
-    // sd_top sd_top_inst (
-    //     .clk(clk),
-    //     .reset(reset),
+    sd_top sd_top_inst (
+        .clk(clk),
+        .reset(reset),
 
-    //     .sd_scb(sd_scb),
+        .sd_scb(sd_scb),
 
-    //     .fifo_bus(sd_fifo_bus),
+        .fifo_bus(sd_fifo_bus),
 
-    //     .sd_clk(sd_clk),
-    //     .sd_cmd(sd_cmd),
-    //     .sd_dat(sd_dat)
-    // );
+        .sd_clk(sd_clk),
+        .sd_cmd(sd_cmd),
+        .sd_dat(sd_dat)
+    );
 
-    // memory_dma memory_sd_dma_inst (
-    //     .clk(clk),
-    //     .reset(reset),
+    memory_dma memory_sd_dma_inst (
+        .clk(clk),
+        .reset(reset),
 
-    //     .dma_scb(sd_dma_scb),
+        .dma_scb(sd_dma_scb),
 
-    //     .fifo_bus(sd_fifo_bus),
-    //     .mem_bus(sd_dma_mem_bus)
-    // );
+        .fifo_bus(sd_fifo_bus),
+        .mem_bus(sd_dma_mem_bus)
+    );
 
 
     // Memory bus arbiter
@@ -200,7 +200,7 @@ module top (
         .n64_bus(n64_mem_bus),
         .cfg_bus(cfg_mem_bus),
         .usb_dma_bus(usb_dma_mem_bus),
-        // .sd_dma_bus(sd_dma_mem_bus),
+        .sd_dma_bus(sd_dma_mem_bus),
 
         .sdram_mem_bus(sdram_mem_bus),
         .flash_mem_bus(flash_mem_bus),
