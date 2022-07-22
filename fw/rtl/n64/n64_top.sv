@@ -2,9 +2,10 @@ module n64_top (
     input clk,
     input reset,
 
-    mem_bus.controller mem_bus,
-
     n64_scb n64_scb,
+    dd_scb.dd dd_scb,
+
+    mem_bus.controller mem_bus,
 
     input n64_reset,
     input n64_nmi,
@@ -52,6 +53,7 @@ module n64_top (
         .reg_bus(reg_bus),
 
         .n64_scb(n64_scb),
+        .dd_scb(dd_scb),
 
         .irq(n64_dd_irq)
     );

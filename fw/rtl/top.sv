@@ -52,6 +52,7 @@ module top (
     logic reset;
 
     n64_scb n64_scb ();
+    dd_scb dd_scb ();
     usb_scb usb_scb ();
     dma_scb usb_dma_scb ();
     sd_scb sd_scb ();
@@ -86,6 +87,7 @@ module top (
         .reset(reset),
 
         .n64_scb(n64_scb),
+        .dd_scb(dd_scb),
         .usb_scb(usb_scb),
         .usb_dma_scb(usb_dma_scb),
         .sd_scb(sd_scb),
@@ -113,6 +115,7 @@ module top (
         .reset(reset),
 
         .n64_scb(n64_scb),
+        .dd_scb(dd_scb),
 
         .mem_bus(n64_mem_bus),
 

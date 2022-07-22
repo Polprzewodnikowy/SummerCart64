@@ -141,7 +141,7 @@ void cfg_update (uint32_t *args) {
             change_scr_bits(CFG_SCR_ROM_SHADOW_ENABLED, args[1]);
             break;
         case CFG_ID_DD_ENABLE:
-            change_scr_bits(CFG_SCR_DD_ENABLED, args[1]);
+            change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, args[1]);
             break;
         case CFG_ID_ISV_ENABLE:
             break;

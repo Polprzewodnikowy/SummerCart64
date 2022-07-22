@@ -16,6 +16,7 @@ SRC_FILES = \
 	startup.S \
 	cfg.c \
 	cic.c \
+	dd.c \
 	flash.c \
 	flashram.c \
 	fpga.c \

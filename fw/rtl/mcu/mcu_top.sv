@@ -2,11 +2,12 @@ module mcu_top (
     input clk,
     input reset,
 
+    n64_scb.controller n64_scb,
+    dd_scb.controller dd_scb,
     usb_scb.controller usb_scb,
     dma_scb.controller usb_dma_scb,
     sd_scb.controller sd_scb,
     dma_scb.controller sd_dma_scb,
-    n64_scb.controller n64_scb,
     flash_scb.controller flash_scb,
 
     fifo_bus.controller fifo_bus,
@@ -347,12 +348,19 @@ module mcu_top (
         REG_SD_DAT,
         REG_SD_DMA_ADDRESS,
         REG_SD_DMA_LENGTH,
-        REG_SD_DMA_SCR
+        REG_SD_DMA_SCR,
+        REG_DD_SCR,
+        REG_DD_CMD_DATA,
+        REG_DD_HEAD_TRACK,
+        REG_DD_SECTOR_INFO,
+        REG_DD_DRIVE_ID
     } reg_address_e;
 
     logic bootloader_skip;
 
     assign n64_scb.cfg_version = 32'h53437632;
+
+    logic dd_bm_ack;
 
 
     // Register read logic
@@ -529,6 +537,47 @@ module mcu_top (
                         2'b00
                     };
                 end
+
+                REG_DD_SCR: begin
+                    reg_rdata <= {
+                        14'd0,
+                        dd_bm_ack,
+                        dd_scb.bm_micro_error,
+                        dd_scb.bm_transfer_c2,
+                        dd_scb.bm_transfer_data,
+                        dd_scb.bm_transfer_blocks,
+                        dd_scb.bm_transfer_mode,
+                        1'b0,
+                        dd_scb.bm_stop_pending,
+                        1'b0,
+                        dd_scb.bm_start_pending,
+                        dd_scb.disk_changed,
+                        dd_scb.disk_inserted,
+                        1'b0,
+                        dd_scb.bm_pending,
+                        1'b0,
+                        dd_scb.cmd_pending,
+                        1'b0,
+                        dd_scb.hard_reset
+                    };
+                end
+
+                REG_DD_CMD_DATA: begin
+                    reg_rdata <= {8'd0, dd_scb.cmd, dd_scb.data};
+                end
+
+                REG_DD_HEAD_TRACK: begin
+                    reg_rdata <= {18'd0, dd_scb.index_lock, dd_scb.head_track};
+                end
+
+                REG_DD_SECTOR_INFO: begin
+                    reg_rdata <= {
+                        dd_scb.sectors_in_block,
+                        dd_scb.sector_size_full,
+                        dd_scb.sector_size,
+                        dd_scb.sector_num
+                    };
+                end
             endcase
         end
     end
@@ -559,12 +608,23 @@ module mcu_top (
 
         n64_scb.rtc_done <= 1'b0;
 
+        dd_scb.hard_reset_clear <= 1'b0;
+        dd_scb.cmd_ready <= 1'b0;
+        dd_scb.bm_start_clear <= 1'b0;
+        dd_scb.bm_stop_clear <= 1'b0;
+        dd_scb.bm_clear <= 1'b0;
+        dd_scb.bm_ready <= 1'b0;
+
         if (n64_scb.n64_nmi) begin
             n64_scb.bootloader_enabled <= !bootloader_skip;
         end
 
         if (flash_scb.erase_done) begin
             flash_scb.erase_pending <= 1'b0;
+        end
+
+        if (dd_scb.bm_interrupt_ack) begin
+            dd_bm_ack <= 1'b1;
         end
 
         if (reset) begin
@@ -582,6 +642,7 @@ module mcu_top (
             bootloader_skip <= 1'b0;
             n64_scb.bootloader_enabled <= 1'b1;
             flash_scb.erase_pending <= 1'b0;
+            dd_bm_ack <= 1'b0;
         end else if (reg_write) begin
             case (address)
                 REG_STATUS: begin end
@@ -700,6 +761,35 @@ module mcu_top (
                         sd_dma_scb.stop,
                         sd_dma_scb.start
                     } <= reg_wdata[2:0];
+                end
+
+                REG_DD_SCR: begin
+                    dd_scb.bm_clear <= reg_wdata[19];
+                    if (reg_wdata[18]) begin
+                        dd_bm_ack <= 1'b0;
+                    end
+                    dd_scb.bm_micro_error <= reg_wdata[16];
+                    dd_scb.bm_transfer_c2 <= reg_wdata[15];
+                    dd_scb.bm_transfer_data <= reg_wdata[14];
+                    dd_scb.bm_stop_clear <= reg_wdata[11];
+                    dd_scb.bm_start_clear <= reg_wdata[9];
+                    dd_scb.disk_changed <= reg_wdata[7];
+                    dd_scb.disk_inserted <= reg_wdata[6];
+                    dd_scb.bm_ready <= reg_wdata[5];
+                    dd_scb.cmd_ready <= reg_wdata[3];
+                    dd_scb.hard_reset_clear <= reg_wdata[1];
+                end
+
+                REG_DD_CMD_DATA: begin
+                    dd_scb.cmd_data <= reg_wdata[15:0];
+                end
+
+                REG_DD_HEAD_TRACK: begin
+                    {dd_scb.index_lock, dd_scb.head_track} <= reg_wdata[13:0];
+                end
+
+                REG_DD_DRIVE_ID: begin
+                    dd_scb.drive_id <= reg_wdata[15:0];
                 end
             endcase
         end
