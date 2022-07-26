@@ -52,8 +52,8 @@ static volatile uint8_t *i2c_data_rxptr;
 static volatile uint32_t i2c_next_cr2;
 static void (*volatile i2c_callback)(void);
 
-static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17 };
-static void (*volatile tim_callbacks[3])(void);
+static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17, TIM3 };
+static void (*volatile tim_callbacks[4])(void);
 
 
 void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_ospeed_t ospeed, gpio_pupd_t pupd, gpio_af_t af, int value) {
@@ -111,6 +111,13 @@ void hw_gpio_reset (gpio_id_t id) {
     GPIO_TypeDef *gpio = ((GPIO_TypeDef *) (gpios[(id >> 4) & 0x07]));
     uint8_t pin = (id & 0x0F);
     gpio->BSRR = (GPIO_BSRR_BR0 << pin);
+}
+
+void hw_uart_write (uint8_t *data, int length) {
+    for (int i = 0; i < length; i++) {
+        while (!(USART1->ISR & USART_ISR_TXE_TXFNF));
+        USART1->TDR = *data++;
+    }
 }
 
 void hw_spi_start (void) {
@@ -213,6 +220,9 @@ void hw_tim_disable_irq (tim_id_t id) {
         case TIM_ID_GVR:
             NVIC_DisableIRQ(TIM17_IRQn);
             break;
+        case TIM_ID_DD:
+            NVIC_DisableIRQ(TIM3_IRQn);
+            break;
         default:
             break;
     }
@@ -228,6 +238,9 @@ void hw_tim_enable_irq (tim_id_t id) {
             break;
         case TIM_ID_GVR:
             NVIC_EnableIRQ(TIM17_IRQn);
+            break;
+        case TIM_ID_DD:
+            NVIC_EnableIRQ(TIM3_IRQn);
             break;
         default:
             break;
@@ -261,7 +274,8 @@ void hw_init (void) {
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
     RCC->APBENR1 |= (
         RCC_APBENR1_DBGEN |
-        RCC_APBENR1_I2C1EN
+        RCC_APBENR1_I2C1EN |
+        RCC_APBENR1_TIM3EN
     );
     RCC->APBENR2 |= (
         RCC_APBENR2_TIM17EN |
@@ -317,7 +331,7 @@ void hw_init (void) {
 
     hw_gpio_init(GPIO_ID_SPI_CS, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 1);
     hw_gpio_init(GPIO_ID_SPI_CLK, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
-    hw_gpio_init(GPIO_ID_SPI_MISO, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
+    hw_gpio_init(GPIO_ID_SPI_MISO, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_SPI_MOSI, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
 
     hw_gpio_init(GPIO_ID_FPGA_INT, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
@@ -345,6 +359,7 @@ void hw_init (void) {
     NVIC_EnableIRQ(TIM14_IRQn);
     NVIC_EnableIRQ(TIM16_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
+    NVIC_EnableIRQ(TIM3_IRQn);
 }
 
 void EXTI0_1_IRQHandler (void) {
@@ -441,5 +456,13 @@ void TIM17_IRQHandler (void) {
     if (tim_callbacks[2]) {
         tim_callbacks[2]();
         tim_callbacks[2] = 0;
+    }
+}
+
+void TIM3_IRQHandler (void) {
+    TIM3->SR &= ~(TIM_SR_UIF);
+    if (tim_callbacks[3]) {
+        tim_callbacks[3]();
+        tim_callbacks[3] = 0;
     }
 }

@@ -22,23 +22,6 @@ class SC64Exception(Exception):
 
 
 class SC64:
-    # __CFG_ID_DD_ENABLE = 3
-    # __CFG_ID_SAVE_TYPE = 4
-    # __CFG_ID_CIC_SEED = 5
-    # __CFG_ID_TV_TYPE = 6
-    # __CFG_ID_SAVE_OFFEST = 7
-    # __CFG_ID_DDIPL_OFFEST = 8
-    # __CFG_ID_BOOT_MODE = 9
-    # __CFG_ID_FLASH_SIZE = 10
-    # __CFG_ID_FLASH_READ = 11
-    # __CFG_ID_FLASH_PROGRAM = 12
-    # __CFG_ID_RECONFIGURE = 13
-    # __CFG_ID_DD_DRIVE_ID = 14
-    # __CFG_ID_DD_DISK_STATE = 15
-    # __CFG_ID_DD_THB_TABLE_OFFSET = 16
-    # __CFG_ID_IS_VIEWER_ENABLE = 17
-
-    
     __CFG_ID_BOOTLOADER_SWITCH = 0
     __CFG_ID_ROM_WRITE_ENABLE = 1
     __CFG_ID_ROM_SHADOW_ENABLE = 2
@@ -57,7 +40,7 @@ class SC64:
     __BOOTLOADER_OFFSET = (64 + 14) * 1024 * 1024
     __SAVE_OFFSET = (64 * 1024 * 1024) - (128 * 1024)
     __EEPROM_OFFSET = (96 * 1024 * 1024) + 8192
-    __DDIPL_OFFSET = 0x3bc0000 # (64 - 16 - 4) * 1024 * 1024
+    __DDIPL_OFFSET = 0x03BC0000
 
     __CHUNK_SIZE = 256 * 1024
 

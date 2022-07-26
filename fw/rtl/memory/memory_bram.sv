@@ -123,7 +123,7 @@ module memory_bram (
 
     // DD memory
 
-    logic [15:0] dd_bram [0:511];
+    logic [15:0] dd_bram [0:1023];
     logic [15:0] dd_bram_rdata;
 
     always_ff @(posedge clk) begin

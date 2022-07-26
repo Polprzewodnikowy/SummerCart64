@@ -62,8 +62,7 @@ void flashram_process (void) {
             break;
 
         case OP_WRITE_PAGE:
-            fpga_mem_read(FLASHRAM_BUFFER_OFFSET, FLASHRAM_PAGE_SIZE, buffer);
-            fpga_mem_write(address, FLASHRAM_PAGE_SIZE, buffer);
+            fpga_mem_copy(FLASHRAM_BUFFER_OFFSET, address, FLASHRAM_PAGE_SIZE);
             fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
             break;
 

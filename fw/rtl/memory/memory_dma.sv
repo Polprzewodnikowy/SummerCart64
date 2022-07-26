@@ -197,26 +197,14 @@ module memory_dma (
     // Mem bus controller
 
     always_ff @(posedge clk) begin
-        if (reset || dma_scb.stop) begin
-            dma_scb.busy <= 1'b0;
-        end else begin
-            if (dma_start) begin
-                dma_scb.busy <= 1'b1;
-            end
-
-            if (dma_scb.busy) begin
-                if (!trx_enabled) begin
-                    dma_scb.busy <= 1'b0;
-                end
-            end
-        end
+        dma_scb.busy <= mem_bus.request || trx_enabled;
     end
 
     always_ff @(posedge clk) begin
-        if (reset || dma_scb.stop) begin
+        if (reset) begin
             mem_bus.request <= 1'b0;
         end else begin
-            if (dma_scb.busy && !mem_bus.request) begin
+            if (!mem_bus.request) begin
                 if (mem_bus.write) begin
                     if (rx_buffer_valid) begin
                         mem_bus.request <= 1'b1;

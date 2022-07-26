@@ -1,7 +1,9 @@
 #include <stdbool.h>
 #include "cfg.h"
+#include "dd.h"
 #include "flash.h"
 #include "fpga.h"
+#include "isv.h"
 #include "rtc.h"
 
 
@@ -16,6 +18,8 @@ typedef enum {
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
     CFG_ID_FLASH_ERASE_BLOCK,
+    CFG_ID_DD_DRIVE_TYPE,
+    CFG_ID_DD_DISK_STATE,
 } cfg_id_t;
 
 typedef enum {
@@ -111,6 +115,7 @@ void cfg_query (uint32_t *args) {
             args[1] = (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_DD_ENABLED);
             break;
         case CFG_ID_ISV_ENABLE:
+            args[1] = isv_get_enabled();
             break;
         case CFG_ID_BOOT_MODE:
             args[1] = p.boot_mode;
@@ -125,6 +130,10 @@ void cfg_query (uint32_t *args) {
             args[1] = p.tv_type;
             break;
         case CFG_ID_FLASH_ERASE_BLOCK:
+            break;
+        case CFG_ID_DD_DRIVE_TYPE:
+            break;
+        case CFG_ID_DD_DISK_STATE:
             break;
     }
 }
@@ -144,6 +153,7 @@ void cfg_update (uint32_t *args) {
             change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, args[1]);
             break;
         case CFG_ID_ISV_ENABLE:
+            isv_set_enabled(args[1]);
             break;
         case CFG_ID_BOOT_MODE:
             p.boot_mode = args[1];
@@ -160,6 +170,12 @@ void cfg_update (uint32_t *args) {
             break;
         case CFG_ID_FLASH_ERASE_BLOCK:
             flash_erase_block(args[1]);
+            break;
+        case CFG_ID_DD_DRIVE_TYPE:
+            dd_set_drive_type(args[1]);
+            break;
+        case CFG_ID_DD_DISK_STATE:
+            dd_set_disk_state(args[1]);
             break;
     }
 }
@@ -185,7 +201,7 @@ void cfg_set_time (uint32_t *args) {
 
 
 void cfg_init (void) {
-    // fpga_reg_set(REG_CFG_SCR, 0);
+    fpga_reg_set(REG_CFG_SCR, 0);
     set_save_type(SAVE_TYPE_NONE);
 
     p.cic_seed = 0xFFFF;
@@ -193,14 +209,6 @@ void cfg_init (void) {
     p.boot_mode = BOOT_MODE_MENU_SD;
 }
 
-#include "stm32g030xx.h"
-
-void uart_print (const char *str) {
-    while (*str != '\0') {
-        while (!(USART1->ISR & USART_ISR_TXE_TXFNF));
-        USART1->TDR = *str++;
-    }
-}
 
 void cfg_process (void) {
     uint32_t args[2];
@@ -209,10 +217,7 @@ void cfg_process (void) {
         args[0] = fpga_reg_get(REG_CFG_DATA_0);
         args[1] = fpga_reg_get(REG_CFG_DATA_1);
         char cmd = (char) fpga_reg_get(REG_CFG_CMD);
-        uart_print("GOT_CMD");
-        char tmp[2] = {cmd, 0};
-        uart_print(tmp);
-        uart_print("\n");
+
         switch (cmd) {
             case 'v':
                 args[0] = cfg_get_version();
@@ -232,10 +237,6 @@ void cfg_process (void) {
 
             case 'T':
                 cfg_set_time(args);
-                break;
-
-            case 'U':
-                // uart_put((char) (args[0] & 0xFF));
                 break;
 
             default:

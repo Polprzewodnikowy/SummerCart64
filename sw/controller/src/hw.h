@@ -33,6 +33,7 @@ typedef enum {
     TIM_ID_CIC          = 0,
     TIM_ID_RTC          = 1,
     TIM_ID_GVR          = 2,
+    TIM_ID_DD           = 3,
 } tim_id_t;
 
 typedef enum {
@@ -45,6 +46,7 @@ void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void));
 uint32_t hw_gpio_get (gpio_id_t id);
 void hw_gpio_set (gpio_id_t id);
 void hw_gpio_reset (gpio_id_t id);
+void hw_uart_write (uint8_t *data, int length);
 void hw_spi_start (void);
 void hw_spi_stop (void);
 void hw_spi_trx (uint8_t *data, int length, spi_direction_t direction);

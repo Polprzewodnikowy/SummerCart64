@@ -17,11 +17,13 @@ SRC_FILES = \
 	cfg.c \
 	cic.c \
 	dd.c \
+	debug.c \
 	flash.c \
 	flashram.c \
 	fpga.c \
 	gvr.c \
 	hw.c \
+	isv.c \
 	main.c \
 	rtc.c \
 	task.c \

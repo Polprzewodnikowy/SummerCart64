@@ -1,12 +1,23 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include "dd.h"
 #include "fpga.h"
+#include "hw.h"
 #include "rtc.h"
+#include "usb.h"
 
+
+#define DD_SECTOR_MAX_SIZE          (232)
+#define DD_BLOCK_DATA_SECTORS_NUM   (85)
+#define DD_BLOCK_BUFFER_ADDRESS     (0x03BC0000UL - (DD_SECTOR_MAX_SIZE * DD_BLOCK_DATA_SECTORS_NUM))
+#define DD_SECTOR_BUFFER_ADDRESS    (0x06006000UL)
 
 #define DD_DRIVE_ID_RETAIL          (0x0003)
 #define DD_DRIVE_ID_DEVELOPMENT     (0x0004)
 #define DD_VERSION_RETAIL           (0x0114)
+
+#define DD_SPIN_UP_TIME             (2000)
 
 
 typedef enum {
@@ -27,89 +38,373 @@ typedef enum {
 } dd_cmd_t;
 
 
-static rtc_time_t time;
+enum state {
+    STATE_IDLE,
+    STATE_START,
+    STATE_BLOCK_READ_WAIT,
+    STATE_SECTOR_READ,
+    STATE_SECTOR_WRITE,
+    STATE_BLOCK_WRITE,
+    STATE_BLOCK_WRITE_WAIT,
+    STATE_NEXT_BLOCK,
+};
 
 
-void dd_init (void) {
-    fpga_reg_set(REG_DD_SCR, 0);
-    fpga_reg_set(REG_DD_HEAD_TRACK, 0);
-    fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
+typedef union sector_info {
+    uint32_t full;
+    struct {
+        uint8_t sector_num;
+        uint8_t sector_size;
+        uint8_t sector_size_full;
+        uint8_t sectors_in_block;
+    };
+} sector_info_t;
+
+struct process {
+    enum state state;
+    rtc_time_t time;
+    bool disk_spinning;
+    bool cmd_response_delayed;
+    bool cmd_response_ready;
+    bool bm_running;
+    bool transfer_mode;
+    bool full_track_transfer;
+    bool starting_block;
+    uint16_t head_track;
+    uint8_t current_sector;
+    sector_info_t sector_info;
+    bool block_ready;
+    bool block_valid;
+};
+
+
+static struct process p;
+
+
+static uint16_t dd_track_head_block (void) {
+    uint16_t track = ((p.head_track & DD_TRACK_MASK) << 2);
+    uint16_t head = (((p.head_track & DD_HEAD_MASK) ? 1 : 0) << 1);
+    uint16_t block = (p.starting_block ? 1 : 0);
+    return (track | head | block);
+}
+
+static bool dd_block_read_request (void) {
+    usb_tx_info_t packet_info;
+    packet_info.cmd = PACKET_CMD_DD_REQUEST;
+    packet_info.data_length = 12;
+    packet_info.data[0] = 1;
+    packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
+    packet_info.data[2] = dd_track_head_block();
+    packet_info.dma_length = 0;
+    p.block_ready = false;
+    return usb_enqueue_packet(&packet_info);
+}
+
+static bool dd_block_write_request (void) {
+    usb_tx_info_t packet_info;
+    packet_info.cmd = PACKET_CMD_DD_REQUEST;
+    packet_info.data_length = 12;
+    packet_info.data[0] = 2;
+    packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
+    packet_info.data[2] = dd_track_head_block();
+    packet_info.dma_length = (p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM;
+    packet_info.dma_address = DD_BLOCK_BUFFER_ADDRESS;
+    p.block_ready = false;
+    return usb_enqueue_packet(&packet_info);
+}
+
+static void dd_set_cmd_response_ready (void) {
+    p.cmd_response_ready = true;
 }
 
 
-void dd_process (void) {
+void dd_set_block_ready (bool valid) {
+    p.block_ready = true;
+    p.block_valid = valid;
+}
+
+void dd_set_drive_type (dd_drive_type_t type) {
+    switch (type) {
+        case DD_DRIVE_TYPE_RETAIL:
+            fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
+            break;
+
+        case DD_DRIVE_TYPE_DEVELOPMENT:
+            fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_DEVELOPMENT);
+            break;
+    }
+}
+
+void dd_set_disk_state (dd_disk_state_t state) {
     uint32_t scr = fpga_reg_get(REG_DD_SCR);
+    scr &= ~(DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED);
+    switch (state) {
+        case DD_DISK_STATE_EJECTED:
+            break;
+
+        case DD_DISK_STATE_INSERTED:
+            scr |= DD_SCR_DISK_INSERTED;
+            break;
+
+        case DD_DISK_STATE_CHANGED:
+            scr |= (DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED);
+            break;
+    }
+    fpga_reg_set(REG_DD_SCR, scr);
+}
+
+void dd_init (void) {
+    fpga_reg_set(REG_DD_SCR, DD_SCR_DISK_INSERTED);
+    fpga_reg_set(REG_DD_HEAD_TRACK, 0);
+    fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
+    p.state = STATE_IDLE;
+    p.cmd_response_delayed = false;
+    p.cmd_response_ready = false;
+    p.disk_spinning = false;
+    p.bm_running = false;
+}
+
+void dd_process (void) {
+    uint32_t starting_scr = fpga_reg_get(REG_DD_SCR);
+    uint32_t scr = starting_scr;
 
     if (scr & DD_SCR_HARD_RESET) {
-        fpga_reg_set(REG_DD_SCR, scr & ~(DD_SCR_DISK_CHANGED));
-        fpga_reg_set(REG_DD_HEAD_TRACK, 0);
+        p.state = STATE_IDLE;
+        p.cmd_response_delayed = false;
+        p.cmd_response_ready = false;
+        p.disk_spinning = false;
+        p.bm_running = false;
+        p.head_track = 0;
+        scr &= ~(DD_SCR_DISK_CHANGED);
     }
 
     if (scr & DD_SCR_CMD_PENDING) {
         uint32_t cmd_data = fpga_reg_get(REG_DD_CMD_DATA);
         uint8_t cmd = (cmd_data >> 16) & 0xFF;
         uint16_t data = cmd_data & 0xFFFF;
-        fpga_reg_set(REG_DD_CMD_DATA, data);
 
-        switch (cmd) {
-            case DD_CMD_CLEAR_DISK_CHANGE:
-                fpga_reg_set(REG_DD_SCR, scr & ~(DD_SCR_DISK_CHANGED));
-                break;
+        if (p.cmd_response_delayed) {
+            if (p.cmd_response_ready) {
+                p.cmd_response_delayed = false;
+                fpga_reg_set(REG_DD_HEAD_TRACK, DD_HEAD_TRACK_INDEX_LOCK | data);
+                scr |= DD_SCR_CMD_READY;
+            }
+        } else if ((cmd == DD_CMD_SEEK_READ) || (cmd == DD_CMD_SEEK_WRITE)) {
+            p.cmd_response_delayed = true;
+            p.cmd_response_ready = false;
+            if (!p.disk_spinning) {
+                p.disk_spinning = true;
+                hw_tim_setup(TIM_ID_DD, DD_SPIN_UP_TIME, dd_set_cmd_response_ready);
+            } else {
+                p.cmd_response_ready = true;
+            }
+            fpga_reg_set(REG_DD_HEAD_TRACK, p.head_track & ~(DD_HEAD_TRACK_INDEX_LOCK));
+            p.head_track = data & DD_HEAD_TRACK_MASK;
+        } else {
+            switch (cmd) {
+                case DD_CMD_CLEAR_DISK_CHANGE:
+                    scr &= ~(DD_SCR_DISK_CHANGED);
+                    break;
 
-            case DD_CMD_CLEAR_RESET_STATE:
-                fpga_reg_set(REG_DD_SCR, scr & ~(DD_SCR_DISK_CHANGED));
-                fpga_reg_set(REG_DD_SCR, scr | DD_SCR_HARD_RESET_CLEAR);
-                
-                break;
+                case DD_CMD_CLEAR_RESET_STATE:
+                    scr &= ~(DD_SCR_DISK_CHANGED);
+                    scr |= DD_SCR_HARD_RESET_CLEAR;
+                    break;
 
-            case DD_CMD_READ_VERSION:
-                fpga_reg_set(REG_DD_CMD_DATA, DD_VERSION_RETAIL);
-                break;
+                case DD_CMD_READ_VERSION:
+                    data = DD_VERSION_RETAIL;
+                    break;
 
-            case DD_CMD_SET_DISK_TYPE:
-                break;
+                case DD_CMD_SET_DISK_TYPE:
+                    break;
 
-            case DD_CMD_REQUEST_STATUS:
-                fpga_reg_set(REG_DD_CMD_DATA, 0);
-                break;
+                case DD_CMD_REQUEST_STATUS:
+                    data = 0;
+                    break;
 
-            case DD_CMD_SET_RTC_YEAR_MONTH:
-                time.year = ((data >> 8) & 0xFF);
-                time.month = (data & 0xFF);
-                break;
+                case DD_CMD_SET_RTC_YEAR_MONTH:
+                    p.time.year = ((data >> 8) & 0xFF);
+                    p.time.month = (data & 0xFF);
+                    break;
 
-            case DD_CMD_SET_RTC_DAY_HOUR:
-                time.day = ((data >> 8) & 0xFF);
-                time.hour = (data & 0xFF);
-                break;
+                case DD_CMD_SET_RTC_DAY_HOUR:
+                    p.time.day = ((data >> 8) & 0xFF);
+                    p.time.hour = (data & 0xFF);
+                    break;
 
-            case DD_CMD_SET_RTC_MINUTE_SECOND:
-                time.minute = ((data >> 8) & 0xFF);
-                time.second = (data & 0xFF);
-                rtc_set_time(&time);
-                break;
+                case DD_CMD_SET_RTC_MINUTE_SECOND:
+                    p.time.minute = ((data >> 8) & 0xFF);
+                    p.time.second = (data & 0xFF);
+                    rtc_set_time(&p.time);
+                    break;
 
-            case DD_CMD_GET_RTC_YEAR_MONTH:
-                fpga_reg_set(REG_DD_CMD_DATA, (time.year << 8) | time.month);
-                break;
+                case DD_CMD_GET_RTC_YEAR_MONTH:
+                    data = (p.time.year << 8) | p.time.month;
+                    break;
 
-            case DD_CMD_GET_RTC_DAY_HOUR:
-                fpga_reg_set(REG_DD_CMD_DATA, (time.day << 8) | time.hour);
-                break;
+                case DD_CMD_GET_RTC_DAY_HOUR:
+                    data = (p.time.day << 8) | p.time.hour;
+                    break;
 
-            case DD_CMD_GET_RTC_MINUTE_SECOND:
-                rtc_get_time(&time);
-                fpga_reg_set(REG_DD_CMD_DATA, (time.minute << 8) | time.second);
-                break;
+                case DD_CMD_GET_RTC_MINUTE_SECOND:
+                    rtc_get_time(&p.time);
+                    data = (p.time.minute << 8) | p.time.second;
+                    break;
 
-            case DD_CMD_READ_PROGRAM_VERSION:
-                fpga_reg_set(REG_DD_CMD_DATA, 0);
-                break;
+                case DD_CMD_READ_PROGRAM_VERSION:
+                    data = 0;
+                    break;
 
-            default:
-                break;
+                default:
+                    break;
+            }
+
+            fpga_reg_set(REG_DD_CMD_DATA, data);
+            scr |= DD_SCR_CMD_READY;
+        }
+    } 
+
+    if (scr & DD_SCR_BM_STOP) {
+        scr |= DD_SCR_BM_STOP_CLEAR;
+        scr &= ~(DD_SCR_BM_MICRO_ERROR | DD_SCR_BM_TRANSFER_C2 | DD_SCR_BM_TRANSFER_DATA);
+        p.bm_running = false;
+    } else if (scr & DD_SCR_BM_START) {
+        scr |= DD_SCR_BM_CLEAR | DD_SCR_BM_ACK_CLEAR | DD_SCR_BM_START_CLEAR;
+        scr &= ~(DD_SCR_BM_MICRO_ERROR | DD_SCR_BM_TRANSFER_C2 | DD_SCR_BM_TRANSFER_DATA);
+        p.state = STATE_START;
+        p.bm_running = true;
+        p.transfer_mode = (scr & DD_SCR_BM_TRANSFER_MODE);
+        p.full_track_transfer = (scr & DD_SCR_BM_TRANSFER_BLOCKS);
+        p.sector_info.full = fpga_reg_get(REG_DD_SECTOR_INFO);
+        p.starting_block = (p.sector_info.sector_num == (p.sector_info.sectors_in_block + 1));
+    } else if (p.bm_running) {
+        if (scr & DD_SCR_BM_PENDING) {
+            scr |= DD_SCR_BM_CLEAR;
+            if (p.transfer_mode) {
+                if (p.current_sector < (p.sector_info.sectors_in_block - 4)) {
+                    p.state = STATE_SECTOR_READ;
+                } else if (p.current_sector == (p.sector_info.sectors_in_block - 4)) {
+                    p.current_sector += 1;
+                    scr &= ~(DD_SCR_BM_TRANSFER_DATA);
+                    scr |= DD_SCR_BM_READY;
+                } else if (p.current_sector >= p.sector_info.sectors_in_block) {
+                    p.state = STATE_NEXT_BLOCK;
+                } else {
+                }
+            } else {
+                if (p.current_sector < (p.sector_info.sectors_in_block - 4)) {
+                    p.state = STATE_SECTOR_WRITE;
+                }
+            }
+        }
+        if (scr & DD_SCR_BM_ACK) {
+            scr |= DD_SCR_BM_ACK_CLEAR;
+            if (p.transfer_mode) {
+                if ((p.current_sector <= (p.sector_info.sectors_in_block - 4))) {
+                } else if (p.current_sector < p.sector_info.sectors_in_block) {
+                    p.current_sector += 1;
+                    scr |= DD_SCR_BM_READY;
+                } else if (p.current_sector == p.sector_info.sectors_in_block) {
+                    p.current_sector += 1;
+                    scr |= DD_SCR_BM_TRANSFER_C2 | DD_SCR_BM_READY;
+                }
+            } else {
+                if (p.current_sector == (p.sector_info.sectors_in_block - 4)) {
+                    p.bm_running = false;
+                }
+            }
         }
 
-        fpga_reg_set(REG_DD_SCR, scr | DD_SCR_CMD_READY);
+        switch (p.state) {
+            case STATE_IDLE:
+                break;
+
+            case STATE_START:
+                p.current_sector = 0;
+                if (dd_block_read_request()) {
+                    p.state = STATE_BLOCK_READ_WAIT;
+                }
+                break;
+
+            case STATE_BLOCK_READ_WAIT:
+                if (p.block_ready) {
+                    if (p.transfer_mode) {
+                        if (p.block_valid) {
+                            p.state = STATE_SECTOR_READ;
+                            scr |= DD_SCR_BM_TRANSFER_DATA;
+                        } else {
+                            p.state = STATE_SECTOR_READ;
+                            scr |= DD_SCR_BM_MICRO_ERROR;
+                        }
+                    } else {
+                        p.state = STATE_IDLE;
+                        if (p.block_valid) {
+                            scr |= DD_SCR_BM_TRANSFER_DATA | DD_SCR_BM_READY;
+                        } else {
+                            scr |= DD_SCR_BM_MICRO_ERROR | DD_SCR_BM_READY;
+                        }
+                    }
+                }
+                break;
+
+            case STATE_SECTOR_READ:
+                fpga_mem_copy(
+                    DD_BLOCK_BUFFER_ADDRESS + (p.current_sector * (p.sector_info.sector_size + 1)),
+                    DD_SECTOR_BUFFER_ADDRESS,
+                    p.sector_info.sector_size + 1
+                );
+                p.state = STATE_IDLE;
+                p.current_sector += 1;
+                scr |= DD_SCR_BM_READY;
+                break;
+
+            case STATE_SECTOR_WRITE:
+                fpga_mem_copy(
+                    DD_SECTOR_BUFFER_ADDRESS,
+                    DD_BLOCK_BUFFER_ADDRESS + (p.current_sector * (p.sector_info.sector_size + 1)),
+                    p.sector_info.sector_size + 1
+                );
+                p.current_sector += 1;
+                if (p.current_sector < (p.sector_info.sectors_in_block - 4)) {
+                    p.state = STATE_IDLE;
+                    scr |= DD_SCR_BM_READY;
+                } else {
+                    p.state = STATE_BLOCK_WRITE;
+                }
+                break;
+
+            case STATE_BLOCK_WRITE:
+                if (dd_block_write_request()) {
+                    p.state = STATE_BLOCK_WRITE_WAIT;
+                }
+                break;
+
+            case STATE_BLOCK_WRITE_WAIT:
+                if (p.block_ready) {
+                    p.state = STATE_NEXT_BLOCK;
+                }
+                break;
+
+            case STATE_NEXT_BLOCK:
+                if (p.full_track_transfer) {
+                    p.state = STATE_START;
+                    p.full_track_transfer = false;
+                    p.starting_block = !p.starting_block;
+                    scr &= ~(DD_SCR_BM_TRANSFER_C2);
+                } else {
+                    if (p.transfer_mode) {
+                        p.bm_running = false;
+                    } else {
+                        p.state = STATE_IDLE;
+                        scr &= ~(DD_SCR_BM_TRANSFER_C2 | DD_SCR_BM_TRANSFER_DATA);
+                        scr |= DD_SCR_BM_READY;
+                    }
+                }
+                break;
+        }
+    }
+
+    if (scr != starting_scr) {
+        fpga_reg_set(REG_DD_SCR, scr);
     }
 }

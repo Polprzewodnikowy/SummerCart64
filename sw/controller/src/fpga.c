@@ -67,6 +67,16 @@ void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer) {
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 }
 
+void fpga_mem_copy (uint32_t src, uint32_t dst, size_t length) {
+    fpga_reg_set(REG_MEM_ADDRESS, src);
+    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_START);
+    while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
+
+    fpga_reg_set(REG_MEM_ADDRESS, dst);
+    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_DIRECTION | MEM_SCR_START);
+    while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
+}
+
 uint8_t fpga_usb_status_get (void) {
     fpga_cmd_t cmd = CMD_USB_STATUS;
     uint8_t status;

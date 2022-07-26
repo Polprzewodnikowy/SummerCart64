@@ -152,6 +152,7 @@ uint32_t fpga_reg_get (fpga_reg_t reg);
 void fpga_reg_set (fpga_reg_t reg, uint32_t value);
 void fpga_mem_read (uint32_t address, size_t length, uint8_t *buffer);
 void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer);
+void fpga_mem_copy (uint32_t src, uint32_t dst, size_t length);
 uint8_t fpga_usb_status_get (void);
 uint8_t fpga_usb_pop (void);
 void fpga_usb_push (uint8_t data);
