@@ -13,6 +13,7 @@ struct process {
     uint32_t current_read_pointer;
 };
 
+
 static struct process p;
 
 
@@ -29,9 +30,11 @@ static uint32_t isv_get_read_pointer (void) {
 
 
 void isv_set_enabled (bool enabled) {
+    uint32_t read_pointer = 0;
     if (enabled) {
         p.enabled = true;
         p.current_read_pointer = 0;
+        fpga_mem_write(ISV_READ_POINTER_ADDRESS, 4, (uint8_t *) (&read_pointer));
     } else {
         p.enabled = false;
     }
@@ -55,8 +58,7 @@ void isv_process (void) {
             uint32_t offset = ISV_BUFFER_ADDRESS + p.current_read_pointer;
 
             usb_tx_info_t packet_info;
-            packet_info.cmd = PACKET_CMD_ISV_OUTPUT;
-            packet_info.data_length = 0;
+            usb_create_packet(&packet_info, PACKET_CMD_ISV_OUTPUT);
             packet_info.dma_length = length;
             packet_info.dma_address = offset;
             if (usb_enqueue_packet(&packet_info)) {

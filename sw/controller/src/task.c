@@ -12,6 +12,7 @@ typedef enum {
     TASK_FLAG_RESET = (1 << 1),
 } task_flags_t;
 
+
 typedef struct {
     uint32_t initial_pc;
     uint32_t initial_sp;
@@ -62,6 +63,7 @@ static uint32_t task_switch_context (uint32_t sp) {
     return task_table[task_current].sp;
 }
 
+
 void task_create (task_id_t id, void (*code)(void), void *stack, size_t stack_size) {
     if (id < __TASK_ID_MAX) {
         task_t *task = &task_table[id];
@@ -109,6 +111,7 @@ __attribute__((naked)) void task_scheduler_start (void) {
 
     while (1);
 }
+
 
 __attribute__((naked)) void PendSV_Handler (void) {
     asm volatile (

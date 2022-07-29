@@ -226,13 +226,27 @@ typedef struct {
 
 
 typedef struct {
+    io8_t BUFFER[8192];
+    io8_t EEPROM[2048];
+    io8_t __unused_1[8192 - 2048];
+    io8_t FLASHRAM[128];
+    io8_t __unused_2[8192 - 128];
+    io8_t DD_SECTOR[2048];
+    io8_t __unused_3[8192 - 2048];
+} sc64_buffers_t;
+
+#define SC64_BUFFERS_BASE           (0x1FFE0000UL)
+#define SC64_BUFFERS                ((sc64_buffers_t *) SC64_BUFFERS_BASE)
+
+
+typedef struct {
     io32_t SR_CMD;
     io32_t DATA[2];
     io32_t VERSION;
 } sc64_regs_t;
 
-#define SC64_BASE                   (0x1FFF0000UL)
-#define SC64                        ((sc64_regs_t *) SC64_BASE)
+#define SC64_REGS_BASE              (0x1FFF0000UL)
+#define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
 
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)

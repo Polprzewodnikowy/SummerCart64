@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "cic.h"
 #include "hw.h"
 #include "rtc.h"
@@ -290,18 +291,16 @@ static void cic_soft_reset (void) {
     task_yield();
 }
 
-void cic_set_dd_mode (bool enabled) {
-    cic_dd_mode = enabled;
-}
 
-void cic_set_seed (uint8_t seed) {
-    cic_seed = seed;
-}
-
-void cic_set_checksum (uint8_t *checksum) {
-    for (int i = 0; i < 6; i++) {
-        cic_checksum[i] = checksum[i];
-    }
+void cic_set_parameters (uint32_t *args) {
+    cic_dd_mode = (args[0] >> 24) & 0x01;
+    cic_seed = (args[0] >> 16) & 0xFF;
+    cic_checksum[0] = (args[0] >> 8) & 0xFF;
+    cic_checksum[1] = args[0] & 0xFF;
+    cic_checksum[2] = (args[1] >> 24) & 0xFF;
+    cic_checksum[3] = (args[1] >> 16) & 0xFF;
+    cic_checksum[4] = (args[1] >> 8) & 0xFF;
+    cic_checksum[5] = args[1] & 0xFF;
 }
 
 void cic_hw_init (void) {

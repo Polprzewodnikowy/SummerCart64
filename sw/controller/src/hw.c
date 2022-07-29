@@ -38,6 +38,7 @@ typedef enum {
     GPIO_AF_7           = 0x07
 } gpio_af_t;
 
+
 typedef struct {
     void (*volatile falling)(void);
     void (*volatile rising)(void);
@@ -46,12 +47,10 @@ typedef struct {
 
 static const GPIO_TypeDef *gpios[] = { GPIOA, GPIOB };
 static gpio_irq_callback_t gpio_irq_callbacks[16];
-
 static volatile uint8_t *i2c_data_txptr;
 static volatile uint8_t *i2c_data_rxptr;
 static volatile uint32_t i2c_next_cr2;
 static void (*volatile i2c_callback)(void);
-
 static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17, TIM3 };
 static void (*volatile tim_callbacks[4])(void);
 
@@ -198,6 +197,12 @@ void hw_i2c_enable_irq (void) {
 }
 
 void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void)) {
+    if (delay == 0) {
+        if (callback) {
+            callback();
+        }
+        return;
+    }
     TIM_TypeDef *tim = ((TIM_TypeDef *) (tims[id]));
     tim->CR1 = (TIM_CR1_OPM | TIM_CR1_URS);
     tim->PSC = (64000 - 1);
@@ -361,6 +366,7 @@ void hw_init (void) {
     NVIC_EnableIRQ(TIM17_IRQn);
     NVIC_EnableIRQ(TIM3_IRQn);
 }
+
 
 void EXTI0_1_IRQHandler (void) {
     for (int i = 0; i <= 1; i++) {

@@ -114,6 +114,8 @@ typedef enum {
 
 #define RTC_SCR_PENDING             (1 << 0)
 #define RTC_SCR_DONE                (1 << 1)
+#define RTC_SCR_MAGIC               (0x52544300)
+#define RTC_SCR_MAGIC_MASK          (0xFFFFFF00)
 
 #define SD_SCR_CLOCK_MODE_OFF       (0 << 0)
 #define SD_SCR_CLOCK_MODE_400KHZ    (1 << 0)

@@ -5,13 +5,14 @@
 #include "fpga.h"
 #include "isv.h"
 #include "rtc.h"
+#include "usb.h"
 
 
 typedef enum {
     CFG_ID_BOOTLOADER_SWITCH,
     CFG_ID_ROM_WRITE_ENABLE,
     CFG_ID_ROM_SHADOW_ENABLE,
-    CFG_ID_DD_ENABLE,
+    CFG_ID_DD_MODE,
     CFG_ID_ISV_ENABLE,
     CFG_ID_BOOT_MODE,
     CFG_ID_SAVE_TYPE,
@@ -23,13 +24,11 @@ typedef enum {
 } cfg_id_t;
 
 typedef enum {
-    SAVE_TYPE_NONE = 0,
-    SAVE_TYPE_EEPROM_4K = 1,
-    SAVE_TYPE_EEPROM_16K = 2,
-    SAVE_TYPE_SRAM = 3,
-    SAVE_TYPE_FLASHRAM = 4,
-    SAVE_TYPE_SRAM_BANKED = 5
-} save_type_t;
+    DD_MODE_DISABLED = 0,
+    DD_MODE_REGS = 1,
+    DD_MODE_IPL = 2,
+    DD_MODE_FULL = 3
+} dd_mode_t;
 
 typedef enum {
     BOOT_MODE_MENU_SD = 0,
@@ -39,16 +38,42 @@ typedef enum {
     BOOT_MODE_DIRECT = 4
 } boot_mode_t;
 
+typedef enum {
+    SAVE_TYPE_NONE = 0,
+    SAVE_TYPE_EEPROM_4K = 1,
+    SAVE_TYPE_EEPROM_16K = 2,
+    SAVE_TYPE_SRAM = 3,
+    SAVE_TYPE_FLASHRAM = 4,
+    SAVE_TYPE_SRAM_BANKED = 5
+} save_type_t;
+
+typedef enum {
+    CIC_SEED_UNKNOWN = 0xFFFF
+} cic_seed_t;
+
+typedef enum {
+    TV_TYPE_PAL = 0,
+    TV_TYPE_NTSC = 1,
+    TV_TYPE_MPAL = 2,
+    TV_TYPE_UNKNOWN = 3
+} tv_type_t;
+
 
 struct process {
     boot_mode_t boot_mode;
     save_type_t save_type;
-    uint16_t cic_seed;
-    uint8_t tv_type;
+    cic_seed_t cic_seed;
+    tv_type_t tv_type;
+    bool usb_output_ready;
 };
+
 
 static struct process p;
 
+
+static void cfg_set_usb_output_ready (void) {
+    p.usb_output_ready = true;
+}
 
 static void change_scr_bits (uint32_t mask, bool value) {
     if (value) {
@@ -101,18 +126,26 @@ uint32_t cfg_get_version (void) {
 }
 
 void cfg_query (uint32_t *args) {
+    uint32_t scr = fpga_reg_get(REG_CFG_SCR);
+
     switch (args[0]) {
         case CFG_ID_BOOTLOADER_SWITCH:
-            args[1] = (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_BOOTLOADER_ENABLED);
+            args[1] = (scr & CFG_SCR_BOOTLOADER_ENABLED);
             break;
         case CFG_ID_ROM_WRITE_ENABLE:
-            args[1] = (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_ROM_WRITE_ENABLED);
+            args[1] = (scr & CFG_SCR_ROM_WRITE_ENABLED);
             break;
         case CFG_ID_ROM_SHADOW_ENABLE:
-            args[1] = (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_ROM_SHADOW_ENABLED);
+            args[1] = (scr & CFG_SCR_ROM_SHADOW_ENABLED);
             break;
-        case CFG_ID_DD_ENABLE:
-            args[1] = (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_DD_ENABLED);
+        case CFG_ID_DD_MODE:
+            args[1] = DD_MODE_DISABLED;
+            if (scr & CFG_SCR_DDIPL_ENABLED) {
+                args[1] |= DD_MODE_IPL;
+            }
+            if (scr & CFG_SCR_DD_ENABLED) {
+                args[1] |= DD_MODE_REGS;
+            }
             break;
         case CFG_ID_ISV_ENABLE:
             args[1] = isv_get_enabled();
@@ -130,10 +163,13 @@ void cfg_query (uint32_t *args) {
             args[1] = p.tv_type;
             break;
         case CFG_ID_FLASH_ERASE_BLOCK:
+            args[1] = 0xFFFFFFFF;
             break;
         case CFG_ID_DD_DRIVE_TYPE:
+            args[1] = dd_get_drive_type();
             break;
         case CFG_ID_DD_DISK_STATE:
+            args[1] = dd_get_disk_state();
             break;
     }
 }
@@ -149,8 +185,18 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_ROM_SHADOW_ENABLE:
             change_scr_bits(CFG_SCR_ROM_SHADOW_ENABLED, args[1]);
             break;
-        case CFG_ID_DD_ENABLE:
-            change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, args[1]);
+        case CFG_ID_DD_MODE:
+            if (args[1] == DD_MODE_DISABLED) {
+                change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, false);
+            } else if (args[1] == DD_MODE_REGS) {
+                change_scr_bits(CFG_SCR_DD_ENABLED, true);
+                change_scr_bits(CFG_SCR_DDIPL_ENABLED, false);
+            } else if (args[1] == DD_MODE_IPL) {
+                change_scr_bits(CFG_SCR_DD_ENABLED, false);
+                change_scr_bits(CFG_SCR_DDIPL_ENABLED, true);
+            } else {
+                change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, true);
+            }
             break;
         case CFG_ID_ISV_ENABLE:
             isv_set_enabled(args[1]);
@@ -163,10 +209,10 @@ void cfg_update (uint32_t *args) {
             set_save_type((save_type_t) (args[1]));
             break;
         case CFG_ID_CIC_SEED:
-            p.cic_seed = (uint16_t) (args[1] & 0xFFFF);
+            p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);
             break;
         case CFG_ID_TV_TYPE:
-            p.tv_type = (uint8_t) (args[1] & 0x03);
+            p.tv_type = (tv_type_t) (args[1] & 0x03);
             break;
         case CFG_ID_FLASH_ERASE_BLOCK:
             flash_erase_block(args[1]);
@@ -199,19 +245,19 @@ void cfg_set_time (uint32_t *args) {
     rtc_set_time(&t);
 }
 
-
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, 0);
     set_save_type(SAVE_TYPE_NONE);
 
-    p.cic_seed = 0xFFFF;
-    p.tv_type = 0x03;
+    p.cic_seed = CIC_SEED_UNKNOWN;
+    p.tv_type = TV_TYPE_UNKNOWN;
     p.boot_mode = BOOT_MODE_MENU_SD;
+    p.usb_output_ready = true;
 }
-
 
 void cfg_process (void) {
     uint32_t args[2];
+    usb_tx_info_t packet_info;
 
     if (fpga_reg_get(REG_STATUS) & STATUS_CFG_PENDING) {
         args[0] = fpga_reg_get(REG_CFG_DATA_0);
@@ -237,6 +283,32 @@ void cfg_process (void) {
 
             case 'T':
                 cfg_set_time(args);
+                break;
+
+            case 'm':
+                if (!usb_prepare_read(args)) {
+                    return;
+                }
+                break;
+
+            case 'M':
+                usb_create_packet(&packet_info, PACKET_CMD_USB_OUTPUT);
+                packet_info.dma_length = args[1];
+                packet_info.dma_address = args[0];
+                packet_info.done_callback = cfg_set_usb_output_ready;
+                if (usb_enqueue_packet(&packet_info)) {
+                    p.usb_output_ready = false;
+                } else {
+                    return;
+                }
+                break;
+
+            case 'u':
+                usb_get_read_info(args);
+                break;
+
+            case 'U':
+                args[0] = p.usb_output_ready ? 1 : 0;
                 break;
 
             default:

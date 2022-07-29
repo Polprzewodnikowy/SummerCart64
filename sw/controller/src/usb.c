@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include "cic.h"
 #include "dd.h"
 #include "cfg.h"
 #include "fpga.h"
@@ -42,6 +43,10 @@ struct process {
 
     bool packet_pending;
     usb_tx_info_t packet_info;
+
+    bool read_ready;
+    uint32_t read_length;
+    uint32_t read_address;
 };
 
 
@@ -53,6 +58,10 @@ static const uint32_t CMP_TOKEN = (0x434D5000UL);
 static const uint32_t ERR_TOKEN = (0x45525200UL);
 static const uint32_t PKT_TOKEN = (0x504B5400UL);
 
+
+static bool usb_dma_ready (void) {
+    return !((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY));
+}
 
 static bool usb_rx_byte (uint8_t *data) {
     if (fpga_usb_status_get() & USB_STATUS_RXNE) {
@@ -119,7 +128,6 @@ static bool usb_rx_cmd (uint8_t *cmd) {
     return false;
 }
 
-
 static void usb_rx_process (void) {
     if (p.rx_state == RX_STATE_IDLE) {
         if (!p.response_pending && usb_rx_cmd(&p.rx_cmd)) {
@@ -130,6 +138,7 @@ static void usb_rx_process (void) {
             p.response_info.cmd = p.rx_cmd;
             p.response_info.data_length = 0;
             p.response_info.dma_length = 0;
+            p.response_info.done_callback = NULL;
         }
     }
 
@@ -151,6 +160,12 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 p.response_info.data_length = 4;
                 p.response_info.data[0] = cfg_get_version();
+                break;
+
+            case 'B':
+                cic_set_parameters(p.rx_args);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
                 break;
 
             case 'c':
@@ -197,7 +212,7 @@ static void usb_rx_process (void) {
 
             case 'M':
             case 'D':
-                if (!((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY))) {
+                if (usb_dma_ready()) {
                     if (!p.rx_dma_running) {
                         fpga_reg_set(REG_USB_DMA_ADDRESS, p.rx_args[0]);
                         fpga_reg_set(REG_USB_DMA_LENGTH, p.rx_args[1]);
@@ -208,6 +223,27 @@ static void usb_rx_process (void) {
                         p.response_pending = true;
                         if (p.rx_cmd == 'D') {
                             dd_set_block_ready(true);
+                        }
+                    }
+                }
+                break;
+
+            case 'U':
+                if ((p.read_length > 0) && usb_dma_ready()) {
+                    uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
+                    if (!p.rx_dma_running) {
+                        fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
+                        fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                        fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                        p.rx_dma_running = true;
+                        p.read_ready = false;
+                    } else {
+                        p.rx_args[1] -= length;
+                        p.read_length -= length;
+                        p.read_address += length;
+                        p.read_ready = true;
+                        if (p.rx_args[1] == 0) {
+                            p.rx_state = RX_STATE_IDLE;
                         }
                     }
                 }
@@ -273,7 +309,7 @@ static void usb_tx_process (void) {
 
     if (p.tx_state == TX_STATE_DMA) {
         if (p.tx_info.dma_length > 0) {
-            if (!((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY))) {
+            if (usb_dma_ready()) {
                 if (!p.tx_dma_running) {
                     p.tx_dma_running = true;
                     fpga_reg_set(REG_USB_DMA_ADDRESS, p.tx_info.dma_address);
@@ -290,10 +326,24 @@ static void usb_tx_process (void) {
 
     if (p.tx_state == TX_STATE_FLUSH) {
         fpga_reg_set(REG_USB_SCR, USB_SCR_WRITE_FLUSH);
+        if (p.tx_info.done_callback) {
+            p.tx_info.done_callback();
+        }
         p.tx_state = TX_STATE_IDLE;
     }
 }
 
+
+void usb_create_packet (usb_tx_info_t *info, uint8_t cmd) {
+    info->cmd = cmd;
+    info->data_length = 0;
+    for (int i = 0; i < 4; i++) {
+        info->data[i] = 0;
+    }
+    info->dma_length = 0;
+    info->dma_address = 0;
+    info->done_callback = NULL;
+}
 
 bool usb_enqueue_packet (usb_tx_info_t *info) {
     if (p.packet_pending) {
@@ -306,6 +356,25 @@ bool usb_enqueue_packet (usb_tx_info_t *info) {
     return true;
 }
 
+bool usb_prepare_read (uint32_t *args) {
+    if (!p.read_ready) {
+        return false;
+    }
+    p.read_length = args[1];
+    p.read_address = args[0];
+    return true;
+}
+
+void usb_get_read_info (uint32_t *args) {
+    args[0] = 0;
+    args[1] = 0;
+    if (p.rx_state == RX_STATE_DATA && p.rx_cmd == 'U') {
+        args[0] = p.rx_args[0] & 0xFF;
+        args[1] = p.rx_args[1];
+    }
+    args[0] |= (p.read_length > 0) ? (1 << 24) : 0;
+}
+
 void usb_init (void) {
     fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
     fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
@@ -316,6 +385,10 @@ void usb_init (void) {
     p.response_pending = false;
     p.packet_pending = false;
 
+    p.read_ready = true;
+    p.read_length = 0;
+    p.read_address = 0;
+
     usb_rx_word_counter = 0;
     usb_rx_word_buffer = 0;
     usb_tx_word_counter = 0;
@@ -324,6 +397,9 @@ void usb_init (void) {
 
 void usb_process (void) {
     if (fpga_reg_get(REG_USB_SCR) & USB_SCR_RESET_PENDING) {
+        if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
+            p.tx_info.done_callback();
+        }
         usb_init();
         fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
     } else {

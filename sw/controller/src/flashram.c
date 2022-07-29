@@ -6,9 +6,9 @@
 #define FLASHRAM_SIZE           (128 * 1024)
 #define FLASHRAM_SECTOR_SIZE    (16 * 1024)
 #define FLASHRAM_PAGE_SIZE      (128)
+#define FLASHRAM_OFFSET         (0x03FE0000UL)
+#define FLASHRAM_BUFFER_OFFSET  (0x06004000UL)
 
-#define FLASHRAM_OFFSET         ((64 * 1024 * 1024) - (128 * 1024))
-#define FLASHRAM_BUFFER_OFFSET  (((64 + 32) * 1024 * 1024) + ((8 + 8) * 1024))
 
 enum operation {
     OP_NONE,
@@ -38,7 +38,6 @@ static enum operation flashram_operation_type (uint32_t scr) {
 void flashram_init (void) {
     fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
 }
-
 
 void flashram_process (void) {
     uint32_t scr = fpga_reg_get(REG_FLASHRAM_SCR);

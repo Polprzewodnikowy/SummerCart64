@@ -26,7 +26,6 @@
 
 static uint8_t rtc_region = 0xFF;
 static volatile bool rtc_region_pending = false;
-
 static rtc_time_t rtc_time = {
     .second     = 0x00,
     .minute     = 0x00,
@@ -174,6 +173,7 @@ static void rtc_init (void) {
     }
 }
 
+
 bool rtc_get_time (rtc_time_t *time) {
     bool vaild;
 
@@ -248,8 +248,9 @@ void rtc_task (void) {
 void rtc_process (void) {
     rtc_time_t time;
     uint32_t data[2];
+    uint32_t scr = fpga_reg_get(REG_RTC_SCR);
 
-    if (fpga_reg_get(REG_RTC_SCR) & RTC_SCR_PENDING) {
+    if ((scr & RTC_SCR_PENDING) && ((scr & RTC_SCR_MAGIC_MASK) == RTC_SCR_MAGIC)) {
         data[0] = fpga_reg_get(REG_RTC_TIME_0);
         data[1] = fpga_reg_get(REG_RTC_TIME_1);
 

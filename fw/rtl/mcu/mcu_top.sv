@@ -485,7 +485,8 @@ module mcu_top (
 
                 REG_RTC_SCR: begin
                     reg_rdata <= {
-                        31'd0,
+                        24'h525443,
+                        7'd0,
                         n64_scb.rtc_pending
                     };
                 end

@@ -75,6 +75,7 @@ struct process {
     sector_info_t sector_info;
     bool block_ready;
     bool block_valid;
+    dd_drive_type_t drive_type;
 };
 
 
@@ -90,19 +91,18 @@ static uint16_t dd_track_head_block (void) {
 
 static bool dd_block_read_request (void) {
     usb_tx_info_t packet_info;
-    packet_info.cmd = PACKET_CMD_DD_REQUEST;
+    usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
     packet_info.data_length = 12;
     packet_info.data[0] = 1;
     packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
     packet_info.data[2] = dd_track_head_block();
-    packet_info.dma_length = 0;
     p.block_ready = false;
     return usb_enqueue_packet(&packet_info);
 }
 
 static bool dd_block_write_request (void) {
     usb_tx_info_t packet_info;
-    packet_info.cmd = PACKET_CMD_DD_REQUEST;
+    usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
     packet_info.data_length = 12;
     packet_info.data[0] = 2;
     packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
@@ -123,16 +123,33 @@ void dd_set_block_ready (bool valid) {
     p.block_valid = valid;
 }
 
+dd_drive_type_t dd_get_drive_type (void) {
+    return p.drive_type;
+}
+
 void dd_set_drive_type (dd_drive_type_t type) {
     switch (type) {
         case DD_DRIVE_TYPE_RETAIL:
             fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
+            p.drive_type = type;
             break;
 
         case DD_DRIVE_TYPE_DEVELOPMENT:
             fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_DEVELOPMENT);
+            p.drive_type = type;
             break;
     }
+}
+
+dd_disk_state_t dd_get_disk_state (void) {
+    uint32_t scr = fpga_reg_get(REG_DD_SCR);
+    if (scr & DD_SCR_DISK_CHANGED) {
+        return DD_DISK_STATE_CHANGED;
+    }
+    if (scr & DD_SCR_DISK_INSERTED) {
+        return DD_DISK_STATE_INSERTED;
+    }
+    return DD_DISK_STATE_EJECTED;
 }
 
 void dd_set_disk_state (dd_disk_state_t state) {
@@ -162,6 +179,7 @@ void dd_init (void) {
     p.cmd_response_ready = false;
     p.disk_spinning = false;
     p.bm_running = false;
+    p.drive_type = DD_DRIVE_TYPE_RETAIL;
 }
 
 void dd_process (void) {

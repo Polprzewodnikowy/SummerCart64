@@ -17,7 +17,9 @@ typedef enum {
 } dd_disk_state_t;
 
 
+dd_drive_type_t dd_get_drive_type (void);
 void dd_set_drive_type (dd_drive_type_t type);
+dd_disk_state_t dd_get_disk_state (void);
 void dd_set_disk_state (dd_disk_state_t state);
 void dd_set_block_ready (bool valid);
 void dd_init (void);

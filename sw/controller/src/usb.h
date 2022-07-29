@@ -9,6 +9,7 @@
 typedef enum packet_cmd {
     PACKET_CMD_DD_REQUEST = 'D',
     PACKET_CMD_ISV_OUTPUT = 'I',
+    PACKET_CMD_USB_OUTPUT = 'U',
 } usb_packet_cmd_e;
 
 
@@ -18,10 +19,14 @@ typedef struct usb_tx_info {
     uint32_t data[4];
     uint32_t dma_length;
     uint32_t dma_address;
+    void (*done_callback)(void);
 } usb_tx_info_t;
 
 
+void usb_create_packet (usb_tx_info_t *info, uint8_t cmd);
 bool usb_enqueue_packet (usb_tx_info_t *info);
+bool usb_prepare_read (uint32_t *args);
+void usb_get_read_info (uint32_t *args);
 void usb_init (void);
 void usb_process (void);
 

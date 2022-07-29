@@ -180,7 +180,7 @@ static const char *exception_get_description (uint8_t exception_code) {
 
 void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, exception_t *e) {
     version_t *version = version_get();
-    uint32_t sc64_version = pi_io_read(&SC64->VERSION);
+    uint32_t sc64_version = pi_io_read(&SC64_REGS->VERSION);
     uint32_t *instruction_address = (((uint32_t *) (e->epc.u32)) + ((e->cr & C0_CR_BD) ? 1 : 0));
 
     exception_init_screen();
