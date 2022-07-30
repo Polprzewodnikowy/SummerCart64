@@ -96,7 +96,7 @@ bool sc64_usb_write_ready (void) {
 void sc64_usb_write (uint32_t *address, uint32_t length) {
     while (!sc64_usb_write_ready());
     uint32_t args[2] = { (uint32_t) (address), length };
-    sc64_execute_cmd(SC64_CMD_USB_WRITE, args, NULL);
+    return sc64_execute_cmd(SC64_CMD_USB_WRITE, args, NULL);
 }
 
 bool sc64_usb_read_ready (uint8_t *type, uint32_t *length) {
@@ -111,11 +111,14 @@ bool sc64_usb_read_ready (uint8_t *type, uint32_t *length) {
     return result[1] > 0;
 }
 
-void sc64_usb_read (uint32_t *address, uint32_t length) {
+bool sc64_usb_read (uint32_t *address, uint32_t length) {
     uint32_t args[2] = { (uint32_t) (address), length };
     uint32_t result[2];
-    sc64_execute_cmd(SC64_CMD_USB_READ, args, NULL);
+    if (sc64_execute_cmd(SC64_CMD_USB_READ, args, NULL)) {
+        return true;
+    }
     do {
         sc64_execute_cmd(SC64_CMD_USB_READ_STATUS, NULL, result);
     } while(result[0] & (1 << 24));
+    return false;
 }

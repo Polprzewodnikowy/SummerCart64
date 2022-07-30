@@ -279,7 +279,7 @@ module n64_dd (
 
     always_comb begin
         n64_scb.dd_write = reg_bus.write && reg_bus.address[10:8] == MEM_SECTOR_BUFFER[10:8];
-        n64_scb.dd_address = {2'b00, reg_bus.address[7:1]};
+        n64_scb.dd_address = reg_bus.address[7:1];
         n64_scb.dd_wdata = reg_bus.wdata;
     end
 

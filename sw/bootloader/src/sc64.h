@@ -82,9 +82,9 @@ void sc64_get_boot_info (sc64_boot_info_t *info);
 void sc64_get_time (rtc_time_t *t);
 void sc64_set_time (rtc_time_t *t);
 bool sc64_write_usb_ready (void);
-void sc64_write_usb (uint32_t *address, uint32_t length);
+bool sc64_write_usb (uint32_t *address, uint32_t length);
 bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
-void sc64_usb_read (uint32_t *address, uint32_t length);
+bool sc64_usb_read (uint32_t *address, uint32_t length);
 
 
 #endif

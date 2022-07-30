@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <BaliProject version="3.2" title="sc64" device="LCMXO2-7000HC-6TG144C" default_implementation="impl1">
     <Options/>
-    <Implementation title="impl1" dir="impl1" description="impl1" synthesis="synplify" default_strategy="Timing">
+    <Implementation title="impl1" dir="impl1" description="impl1" synthesis="synplify" default_strategy="Strategy">
         <Options VerilogStandard="System Verilog" def_top="top" top="top"/>
         <Source name="../../rtl/memory/mem_bus.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>

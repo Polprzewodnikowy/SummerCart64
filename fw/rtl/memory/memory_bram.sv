@@ -28,14 +28,20 @@ module memory_bram (
 
     logic buffer_selected;
     logic eeprom_selected;
-    logic flashram_selected;
     logic dd_selected;
+    logic flashram_selected;
 
     always_comb begin
-        buffer_selected = mem_bus.address[14:13] == 2'b00;
-        eeprom_selected = mem_bus.address[14:13] == 2'b01;
-        flashram_selected = mem_bus.address[14:13] == 2'b10;
-        dd_selected = mem_bus.address[14:13] == 2'b11;
+        buffer_selected = 1'b0;
+        eeprom_selected = 1'b0;
+        dd_selected = 1'b0;
+        flashram_selected = 1'b0;
+        if (mem_bus.address[25:24] == 2'b01 && mem_bus.address[23:14] == 10'd0) begin
+            buffer_selected = mem_bus.address[13] == 1'b0;
+            eeprom_selected = mem_bus.address[13:11] == 3'b100;
+            dd_selected = mem_bus.address[13:8] == 6'b101000;
+            flashram_selected = mem_bus.address[13:7] == 7'b1010010;
+        end
     end
 
 
@@ -46,7 +52,8 @@ module memory_bram (
 
     always_ff @(posedge clk) begin
         if (write && buffer_selected) begin
-            buffer_bram[mem_bus.address[12:1]] <= mem_bus.wdata;
+            if (mem_bus.wmask[1]) buffer_bram[mem_bus.address[12:1]][15:8] <= mem_bus.wdata[15:8];
+            if (mem_bus.wmask[0]) buffer_bram[mem_bus.address[12:1]][7:0] <= mem_bus.wdata[7:0];
         end
     end
 
@@ -66,7 +73,7 @@ module memory_bram (
     logic [15:0] eeprom_bram_rdata;
 
     always_ff @(posedge clk) begin
-        if (write && eeprom_selected) begin
+        if (write && mem_bus.wmask[1] && eeprom_selected) begin
             eeprom_bram_high[mem_bus.address[10:1]] <= mem_bus.wdata[15:8];
         end
         if (n64_scb.eeprom_write && !n64_scb.eeprom_address[0]) begin
@@ -75,7 +82,7 @@ module memory_bram (
     end
 
     always_ff @(posedge clk) begin
-        if (write && eeprom_selected) begin
+        if (write && mem_bus.wmask[0] && eeprom_selected) begin
             eeprom_bram_low[mem_bus.address[10:1]] <= mem_bus.wdata[7:0];
         end
         if (n64_scb.eeprom_write && n64_scb.eeprom_address[0]) begin
@@ -105,6 +112,29 @@ module memory_bram (
     end
 
 
+    // DD memory
+
+    logic [15:0] dd_bram [0:127];
+    logic [15:0] dd_bram_rdata;
+
+    always_ff @(posedge clk) begin
+        if (write && dd_selected) begin
+            dd_bram[mem_bus.address[7:1]] <= mem_bus.wdata;
+        end
+        if (n64_scb.dd_write) begin
+            dd_bram[n64_scb.dd_address] <= n64_scb.dd_wdata;
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        dd_bram_rdata <= dd_bram[mem_bus.address[7:1]];
+    end
+
+    always_ff @(posedge clk) begin
+        n64_scb.dd_rdata <= dd_bram[n64_scb.dd_address];
+    end
+
+
     // FlashRAM memory
 
     logic [15:0] flashram_bram [0:63];
@@ -121,37 +151,14 @@ module memory_bram (
     end
 
 
-    // DD memory
-
-    logic [15:0] dd_bram [0:1023];
-    logic [15:0] dd_bram_rdata;
-
-    always_ff @(posedge clk) begin
-        if (write && dd_selected) begin
-            dd_bram[mem_bus.address[9:1]] <= mem_bus.wdata;
-        end
-        if (n64_scb.dd_write) begin
-            dd_bram[n64_scb.dd_address] <= n64_scb.dd_wdata;
-        end
-    end
-
-    always_ff @(posedge clk) begin
-        dd_bram_rdata <= dd_bram[mem_bus.address[9:1]];
-    end
-
-    always_ff @(posedge clk) begin
-        n64_scb.dd_rdata <= dd_bram[n64_scb.dd_address];
-    end
-
-
     // Output data mux
 
     always_ff @(posedge clk) begin
         mem_bus.rdata <= 16'd0;
         if (buffer_selected) mem_bus.rdata <= buffer_bram_rdata;
         if (eeprom_selected) mem_bus.rdata <= eeprom_bram_rdata;
-        if (flashram_selected) mem_bus.rdata <= flashram_bram_rdata;
         if (dd_selected) mem_bus.rdata <= dd_bram_rdata;
+        if (flashram_selected) mem_bus.rdata <= flashram_bram_rdata;
     end
 
 endmodule

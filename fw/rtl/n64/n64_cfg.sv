@@ -40,6 +40,7 @@ module n64_cfg (
     always_ff @(posedge clk) begin
         if (reset) begin
             n64_scb.cfg_pending <= 1'b0;
+            n64_scb.cfg_cmd <= 8'h00;
             irq <= 1'b0;
         end else begin
             if (n64_scb.cfg_done) begin

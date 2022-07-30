@@ -586,8 +586,6 @@ module mcu_top (
 
     // Register write logic
 
-    logic [31:0] reg_buffer;
-
     always_ff @(posedge clk) begin
         mem_start <= 1'b0;
         mem_stop <= 1'b0;
@@ -644,6 +642,7 @@ module mcu_top (
             n64_scb.bootloader_enabled <= 1'b1;
             flash_scb.erase_pending <= 1'b0;
             dd_bm_ack <= 1'b0;
+            n64_scb.rtc_wdata_valid <= 1'b0;
         end else if (reg_write) begin
             case (address)
                 REG_STATUS: begin end
@@ -731,17 +730,18 @@ module mcu_top (
                 end
 
                 REG_RTC_TIME_0: begin
-                    reg_buffer <= reg_wdata;
+                    n64_scb.rtc_wdata_valid <= 1'b0;
+                    n64_scb.rtc_wdata[28:26] <= reg_wdata[26:24];
+                    n64_scb.rtc_wdata[19:14] <= reg_wdata[21:16];
+                    n64_scb.rtc_wdata[13:7] <= reg_wdata[14:8];
+                    n64_scb.rtc_wdata[6:0] <= reg_wdata[6:0];
                 end
 
                 REG_RTC_TIME_1: begin
+                    n64_scb.rtc_wdata_valid <= 1'b1;
                     n64_scb.rtc_wdata[41:34] <= reg_wdata[23:16];
                     n64_scb.rtc_wdata[33:29] <= reg_wdata[12:8];
                     n64_scb.rtc_wdata[25:20] <= reg_wdata[5:0];
-                    n64_scb.rtc_wdata[28:26] <= reg_buffer[26:24];
-                    n64_scb.rtc_wdata[19:14] <= reg_buffer[21:16];
-                    n64_scb.rtc_wdata[13:7] <= reg_buffer[14:8];
-                    n64_scb.rtc_wdata[6:0] <= reg_buffer[6:0];
                 end
 
                 REG_SD_SCR: begin

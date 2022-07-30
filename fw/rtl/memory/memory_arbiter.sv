@@ -39,15 +39,15 @@ module memory_arbiter (
     assign usb_dma_sdram_request = usb_dma_bus.request && !usb_dma_bus.address[26];
     assign sd_dma_sdram_request = sd_dma_bus.request && !sd_dma_bus.address[26];
 
-    assign n64_flash_request = n64_bus.request && (n64_bus.address[26:25] == 2'b10);
-    assign cfg_flash_request = cfg_bus.request && (cfg_bus.address[26:25] == 2'b10);
-    assign usb_dma_flash_request = usb_dma_bus.request && (usb_dma_bus.address[26:25] == 2'b10);
-    assign sd_dma_flash_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b10);
+    assign n64_flash_request = n64_bus.request && (n64_bus.address[26:24] == 3'b100);
+    assign cfg_flash_request = cfg_bus.request && (cfg_bus.address[26:24] == 3'b100);
+    assign usb_dma_flash_request = usb_dma_bus.request && (usb_dma_bus.address[26:24] == 3'b100);
+    assign sd_dma_flash_request = sd_dma_bus.request && (sd_dma_bus.address[26:24] == 3'b100);
 
-    assign n64_bram_request = n64_bus.request && (n64_bus.address[26:25] == 2'b11);
-    assign cfg_bram_request = cfg_bus.request && (cfg_bus.address[26:25] == 2'b11);
-    assign usb_dma_bram_request = usb_dma_bus.request && (usb_dma_bus.address[26:25] == 2'b11);
-    assign sd_dma_bram_request = sd_dma_bus.request && (sd_dma_bus.address[26:25] == 2'b11);
+    assign n64_bram_request = n64_bus.request && (n64_bus.address[26:24] >= 3'b101);
+    assign cfg_bram_request = cfg_bus.request && (cfg_bus.address[26:24] >= 3'b101);
+    assign usb_dma_bram_request = usb_dma_bus.request && (usb_dma_bus.address[26:24] >= 3'b101);
+    assign sd_dma_bram_request = sd_dma_bus.request && (sd_dma_bus.address[26:24] >= 3'b101);
 
     e_source_request sdram_source_request;
 

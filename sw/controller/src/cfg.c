@@ -58,6 +58,14 @@ typedef enum {
     TV_TYPE_UNKNOWN = 3
 } tv_type_t;
 
+typedef enum {
+    CFG_ERROR_OK = 0,
+    CFG_ERROR_BAD_ADDRESS = 1,
+    CFG_ERROR_BAD_CONFIG_ID = 2,
+    CFG_ERROR_TIMEOUT = 3,
+    CFG_ERROR_UNKNOWN_CMD = -1,
+} cfg_error_t;
+
 
 struct process {
     boot_mode_t boot_mode;
@@ -75,7 +83,31 @@ static void cfg_set_usb_output_ready (void) {
     p.usb_output_ready = true;
 }
 
-static void change_scr_bits (uint32_t mask, bool value) {
+static bool cfg_translate_address (uint32_t *args) {
+    uint32_t address = args[0];
+    uint32_t length = args[1];
+    if (address >= 0x10000000 && address < 0x14000000) {
+        if ((address + length) <= 0x14000000) {
+            args[0] = address - 0x10000000 + 0x00000000;
+            return false;
+        }
+    }
+    if (address >= 0x1FFE0000 && address < 0x1FFE2000) {
+        if ((address + length) <= 0x1FFE2000) {
+            args[0] = address - 0x1FFE0000 + 0x05000000;
+            return false;
+        }
+    }
+    return true;
+}
+
+static void cfg_set_error (cfg_error_t error) {
+    fpga_reg_set(REG_CFG_DATA_0, error);
+    fpga_reg_set(REG_CFG_DATA_1, 0);
+    fpga_reg_set(REG_CFG_CMD, CFG_CMD_ERROR | CFG_CMD_DONE);
+}
+
+static void cfg_change_scr_bits (uint32_t mask, bool value) {
     if (value) {
         fpga_reg_set(REG_CFG_SCR, fpga_reg_get(REG_CFG_SCR) | mask);
     } else {
@@ -83,7 +115,7 @@ static void change_scr_bits (uint32_t mask, bool value) {
     }
 }
 
-static void set_save_type (save_type_t save_type) {
+static void cfg_set_save_type (save_type_t save_type) {
     uint32_t save_reset_mask = (
         CFG_SCR_EEPROM_16K |
         CFG_SCR_EEPROM_ENABLED |
@@ -92,25 +124,25 @@ static void set_save_type (save_type_t save_type) {
         CFG_SCR_SRAM_ENABLED
     );
 
-    change_scr_bits(save_reset_mask, false);
+    cfg_change_scr_bits(save_reset_mask, false);
 
     switch (save_type) {
         case SAVE_TYPE_NONE:
             break;
         case SAVE_TYPE_EEPROM_4K:
-            change_scr_bits(CFG_SCR_EEPROM_ENABLED, true);
+            cfg_change_scr_bits(CFG_SCR_EEPROM_ENABLED, true);
             break;
         case SAVE_TYPE_EEPROM_16K:
-            change_scr_bits(CFG_SCR_EEPROM_16K | CFG_SCR_EEPROM_ENABLED, true);
+            cfg_change_scr_bits(CFG_SCR_EEPROM_16K | CFG_SCR_EEPROM_ENABLED, true);
             break;
         case SAVE_TYPE_SRAM:
-            change_scr_bits(CFG_SCR_SRAM_ENABLED, true);
+            cfg_change_scr_bits(CFG_SCR_SRAM_ENABLED, true);
             break;
         case SAVE_TYPE_FLASHRAM:
-            change_scr_bits(CFG_SCR_FLASHRAM_ENABLED, true);
+            cfg_change_scr_bits(CFG_SCR_FLASHRAM_ENABLED, true);
             break;
         case SAVE_TYPE_SRAM_BANKED:
-            change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_ENABLED, true);
+            cfg_change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_ENABLED, true);
             break;
         default:
             save_type = SAVE_TYPE_NONE;
@@ -125,7 +157,7 @@ uint32_t cfg_get_version (void) {
     return fpga_reg_get(REG_CFG_VERSION);
 }
 
-void cfg_query (uint32_t *args) {
+bool cfg_query (uint32_t *args) {
     uint32_t scr = fpga_reg_get(REG_CFG_SCR);
 
     switch (args[0]) {
@@ -171,31 +203,35 @@ void cfg_query (uint32_t *args) {
         case CFG_ID_DD_DISK_STATE:
             args[1] = dd_get_disk_state();
             break;
+        default:
+            return true;
     }
+
+    return false;
 }
 
-void cfg_update (uint32_t *args) {
+bool cfg_update (uint32_t *args) {
     switch (args[0]) {
         case CFG_ID_BOOTLOADER_SWITCH:
-            change_scr_bits(CFG_SCR_BOOTLOADER_ENABLED, args[1]);
+            cfg_change_scr_bits(CFG_SCR_BOOTLOADER_ENABLED, args[1]);
             break;
         case CFG_ID_ROM_WRITE_ENABLE:
-            change_scr_bits(CFG_SCR_ROM_WRITE_ENABLED, args[1]);
+            cfg_change_scr_bits(CFG_SCR_ROM_WRITE_ENABLED, args[1]);
             break;
         case CFG_ID_ROM_SHADOW_ENABLE:
-            change_scr_bits(CFG_SCR_ROM_SHADOW_ENABLED, args[1]);
+            cfg_change_scr_bits(CFG_SCR_ROM_SHADOW_ENABLED, args[1]);
             break;
         case CFG_ID_DD_MODE:
             if (args[1] == DD_MODE_DISABLED) {
-                change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, false);
+                cfg_change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, false);
             } else if (args[1] == DD_MODE_REGS) {
-                change_scr_bits(CFG_SCR_DD_ENABLED, true);
-                change_scr_bits(CFG_SCR_DDIPL_ENABLED, false);
+                cfg_change_scr_bits(CFG_SCR_DD_ENABLED, true);
+                cfg_change_scr_bits(CFG_SCR_DDIPL_ENABLED, false);
             } else if (args[1] == DD_MODE_IPL) {
-                change_scr_bits(CFG_SCR_DD_ENABLED, false);
-                change_scr_bits(CFG_SCR_DDIPL_ENABLED, true);
+                cfg_change_scr_bits(CFG_SCR_DD_ENABLED, false);
+                cfg_change_scr_bits(CFG_SCR_DDIPL_ENABLED, true);
             } else {
-                change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, true);
+                cfg_change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, true);
             }
             break;
         case CFG_ID_ISV_ENABLE:
@@ -203,10 +239,10 @@ void cfg_update (uint32_t *args) {
             break;
         case CFG_ID_BOOT_MODE:
             p.boot_mode = args[1];
-            change_scr_bits(CFG_SCR_BOOTLOADER_SKIP, (args[1] == BOOT_MODE_DIRECT));
+            cfg_change_scr_bits(CFG_SCR_BOOTLOADER_SKIP, (args[1] == BOOT_MODE_DIRECT));
             break;
         case CFG_ID_SAVE_TYPE:
-            set_save_type((save_type_t) (args[1]));
+            cfg_set_save_type((save_type_t) (args[1]));
             break;
         case CFG_ID_CIC_SEED:
             p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);
@@ -223,7 +259,11 @@ void cfg_update (uint32_t *args) {
         case CFG_ID_DD_DISK_STATE:
             dd_set_disk_state(args[1]);
             break;
+        default:
+            return true;
     }
+
+    return false;
 }
 
 void cfg_get_time (uint32_t *args) {
@@ -247,7 +287,7 @@ void cfg_set_time (uint32_t *args) {
 
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, 0);
-    set_save_type(SAVE_TYPE_NONE);
+    cfg_set_save_type(SAVE_TYPE_NONE);
 
     p.cic_seed = CIC_SEED_UNKNOWN;
     p.tv_type = TV_TYPE_UNKNOWN;
@@ -270,11 +310,17 @@ void cfg_process (void) {
                 break;
 
             case 'c':
-                cfg_query(args);
+                if (cfg_query(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
+                    return;
+                }
                 break;
 
             case 'C':
-                cfg_update(args);
+                if (cfg_update(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
+                    return;
+                }
                 break;
 
             case 't':
@@ -286,12 +332,20 @@ void cfg_process (void) {
                 break;
 
             case 'm':
+                if (cfg_translate_address(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
                 if (!usb_prepare_read(args)) {
                     return;
                 }
                 break;
 
             case 'M':
+                if (cfg_translate_address(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
                 usb_create_packet(&packet_info, PACKET_CMD_USB_OUTPUT);
                 packet_info.dma_length = args[1];
                 packet_info.dma_address = args[0];
@@ -312,7 +366,7 @@ void cfg_process (void) {
                 break;
 
             default:
-                fpga_reg_set(REG_CFG_CMD, CFG_CMD_ERROR | CFG_CMD_DONE);
+                cfg_set_error(CFG_ERROR_UNKNOWN_CMD);
                 return;
         }
 

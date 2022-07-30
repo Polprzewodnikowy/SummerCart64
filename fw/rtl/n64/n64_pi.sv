@@ -129,7 +129,7 @@ module n64_pi (
     const bit [31:0] FLASH_OFFSET       = 32'h0400_0000;
     const bit [31:0] BOOTLOADER_OFFSET  = 32'h04E0_0000;
     const bit [31:0] SHADOW_OFFSET      = 32'h04FE_0000;
-    const bit [31:0] BUFFER_OFFSET      = 32'h0600_0000;
+    const bit [31:0] BUFFER_OFFSET      = 32'h0500_0000;
 
     logic [31:0] mem_offset;
 

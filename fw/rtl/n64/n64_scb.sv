@@ -15,7 +15,7 @@ interface n64_scb ();
     logic eeprom_16k_mode;
 
     logic dd_write;
-    logic [8:0] dd_address;
+    logic [6:0] dd_address;
     logic [15:0] dd_rdata;
     logic [15:0] dd_wdata;
 
@@ -36,6 +36,7 @@ interface n64_scb ();
 
     logic rtc_pending;
     logic rtc_done;
+    logic rtc_wdata_valid;
     logic [41:0] rtc_rdata;
     logic [41:0] rtc_wdata;
 
@@ -71,6 +72,7 @@ interface n64_scb ();
 
         input rtc_pending,
         output rtc_done,
+        output rtc_wdata_valid,
         input rtc_rdata,
         output rtc_wdata,
 
@@ -125,6 +127,7 @@ interface n64_scb ();
 
         output rtc_pending,
         input rtc_done,
+        input rtc_wdata_valid,
         output rtc_rdata,
         input rtc_wdata
     );

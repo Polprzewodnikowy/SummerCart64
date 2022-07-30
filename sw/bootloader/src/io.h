@@ -228,11 +228,8 @@ typedef struct {
 typedef struct {
     io8_t BUFFER[8192];
     io8_t EEPROM[2048];
-    io8_t __unused_1[8192 - 2048];
+    io8_t DD_SECTOR[256];
     io8_t FLASHRAM[128];
-    io8_t __unused_2[8192 - 128];
-    io8_t DD_SECTOR[2048];
-    io8_t __unused_3[8192 - 2048];
 } sc64_buffers_t;
 
 #define SC64_BUFFERS_BASE           (0x1FFE0000UL)

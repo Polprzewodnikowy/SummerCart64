@@ -364,7 +364,7 @@ module n64_si (
             n64_scb.rtc_pending <= 1'b0;
         end
 
-        if (!rtc_stopped && !n64_scb.rtc_pending && (tx_state != TX_STATE_DATA)) begin
+        if (!rtc_stopped && !n64_scb.rtc_pending && n64_scb.rtc_wdata_valid && (tx_state != TX_STATE_DATA)) begin
             {
                 rtc_time_year,
                 rtc_time_month,
