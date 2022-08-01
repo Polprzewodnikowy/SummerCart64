@@ -1,12 +1,13 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include "cfg.h"
 #include "cic.h"
 #include "dd.h"
-#include "cfg.h"
+#include "flash.h"
 #include "fpga.h"
 #include "rtc.h"
 #include "usb.h"
-#include "flash.h"
+#include "vendor.h"
 
 
 enum rx_state {
@@ -249,12 +250,33 @@ static void usb_rx_process (void) {
                 }
                 break;
 
+            case 'f':
+                p.response_info.data[0] = vendor_backup(p.rx_args[0], &p.response_info.data[1]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 8;
+                if (p.response_info.data[0] != VENDOR_OK) {
+                    p.response_error = true;
+                }
+                break;
+
+            case 'F':
+                p.response_info.data[0] = vendor_update(p.rx_args[0], p.rx_args[1]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                if (p.response_info.data[0] != VENDOR_OK) {
+                    p.response_error = true;
+                }
+                break;
+
             default:
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_error = true;
                 p.response_info.data_length = 4;
                 p.response_info.data[0] = 0xFF;
+                break;
         }
     }
 }

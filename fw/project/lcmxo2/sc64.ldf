@@ -78,11 +78,20 @@
         <Source name="../../rtl/usb/usb_ft1248.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
+        <Source name="../../rtl/vendor/vendor_scb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
         <Source name="../../rtl/vendor/lcmxo2/fifo_8kb.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
         <Source name="../../rtl/vendor/lcmxo2/pll.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/vendor.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/vendor/lcmxo2/generated/efb_lattice_generated.v" type="Verilog" type_short="Verilog">
+            <Options/>
         </Source>
         <Source name="../../rtl/vendor/lcmxo2/generated/fifo_8kb_lattice_generated.v" type="Verilog" type_short="Verilog">
             <Options/>

@@ -50,7 +50,9 @@ typedef enum {
     REG_DD_CMD_DATA,
     REG_DD_HEAD_TRACK,
     REG_DD_SECTOR_INFO,
-    REG_DD_DRIVE_ID
+    REG_DD_DRIVE_ID,
+    REG_VENDOR_SCR,
+    REG_VENDOR_DATA
 } fpga_reg_t;
 
 

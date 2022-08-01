@@ -58,6 +58,7 @@ module top (
     sd_scb sd_scb ();
     dma_scb sd_dma_scb ();
     flash_scb flash_scb ();
+    vendor_scb vendor_scb ();
 
     fifo_bus usb_cfg_fifo_bus ();
     fifo_bus usb_dma_fifo_bus ();
@@ -93,6 +94,7 @@ module top (
         .sd_scb(sd_scb),
         .sd_dma_scb(sd_dma_scb),
         .flash_scb(flash_scb),
+        .vendor_scb(vendor_scb),
 
         .fifo_bus(usb_cfg_fifo_bus),
         .mem_bus(cfg_mem_bus),
@@ -248,6 +250,16 @@ module top (
         .n64_scb(n64_scb),
 
         .mem_bus(bram_mem_bus)
+    );
+
+
+    // Vendor specific control
+
+    vendor vendor_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .vendor_scb(vendor_scb)
     );
 
 endmodule

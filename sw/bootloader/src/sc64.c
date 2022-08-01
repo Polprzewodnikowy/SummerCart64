@@ -93,7 +93,7 @@ bool sc64_usb_write_ready (void) {
     return result[0];
 }
 
-void sc64_usb_write (uint32_t *address, uint32_t length) {
+bool sc64_usb_write (uint32_t *address, uint32_t length) {
     while (!sc64_usb_write_ready());
     uint32_t args[2] = { (uint32_t) (address), length };
     return sc64_execute_cmd(SC64_CMD_USB_WRITE, args, NULL);

@@ -9,6 +9,7 @@ module mcu_top (
     sd_scb.controller sd_scb,
     dma_scb.controller sd_dma_scb,
     flash_scb.controller flash_scb,
+    vendor_scb.controller vendor_scb,
 
     fifo_bus.controller fifo_bus,
     mem_bus.controller mem_bus,
@@ -353,7 +354,9 @@ module mcu_top (
         REG_DD_CMD_DATA,
         REG_DD_HEAD_TRACK,
         REG_DD_SECTOR_INFO,
-        REG_DD_DRIVE_ID
+        REG_DD_DRIVE_ID,
+        REG_VENDOR_SCR,
+        REG_VENDOR_DATA
     } reg_address_e;
 
     logic bootloader_skip;
@@ -579,6 +582,14 @@ module mcu_top (
                         dd_scb.sector_num
                     };
                 end
+
+                REG_VENDOR_SCR: begin
+                    reg_rdata <= vendor_scb.control_rdata;
+                end
+
+                REG_VENDOR_DATA: begin
+                    reg_rdata <= vendor_scb.data_rdata;
+                end
             endcase
         end
     end
@@ -613,6 +624,8 @@ module mcu_top (
         dd_scb.bm_stop_clear <= 1'b0;
         dd_scb.bm_clear <= 1'b0;
         dd_scb.bm_ready <= 1'b0;
+
+        vendor_scb.control_valid <= 1'b0;
 
         if (n64_scb.n64_nmi) begin
             n64_scb.bootloader_enabled <= !bootloader_skip;
@@ -791,6 +804,15 @@ module mcu_top (
 
                 REG_DD_DRIVE_ID: begin
                     dd_scb.drive_id <= reg_wdata[15:0];
+                end
+
+                REG_VENDOR_SCR: begin
+                    vendor_scb.control_valid <= 1'b1;
+                    vendor_scb.control_wdata <= reg_wdata;
+                end
+
+                REG_VENDOR_DATA: begin
+                    vendor_scb.data_wdata <= reg_wdata;
                 end
             endcase
         end

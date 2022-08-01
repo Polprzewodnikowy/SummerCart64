@@ -24,6 +24,7 @@ SRC_FILES = \
 	gvr.c \
 	hw.c \
 	isv.c \
+	lcmxo2.c \
 	main.c \
 	rtc.c \
 	task.c \
