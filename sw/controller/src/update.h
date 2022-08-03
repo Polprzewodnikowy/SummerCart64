@@ -15,6 +15,7 @@ typedef enum {
 uint32_t update_backup (uint32_t address);
 update_error_t update_prepare (uint32_t address, uint32_t length);
 void update_start (void);
+void update_perform (uint32_t *parameters);
 void update_notify_done (void);
 
 

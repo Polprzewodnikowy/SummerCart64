@@ -1,7 +1,9 @@
 #include <stdint.h>
+#include "fpga.h"
 #include "hw.h"
 #include "update.h"
 #include "usb.h"
+#include "vendor.h"
 
 
 static uint32_t update_mcu_address;
@@ -33,6 +35,24 @@ void update_start (void) {
         update_fpga_length,
     };
     hw_loader_reset(parameters);
+}
+
+void update_perform (uint32_t *parameters) {
+    uint64_t buffer;
+
+    if (parameters[2] != 0) {
+        hw_flash_erase();
+        for (int i = 0; i < parameters[2]; i += sizeof(buffer)) {
+            fpga_mem_read(parameters[1] + i, sizeof(buffer), (uint8_t *) (&buffer));
+            hw_flash_program(HW_FLASH_ADDRESS + i, buffer);
+        }
+    }
+
+    if (parameters[4] != 0) {
+        vendor_update(parameters[3], parameters[4]);
+    }
+
+    vendor_reconfigure();
 }
 
 void update_notify_done (void) {

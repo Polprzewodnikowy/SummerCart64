@@ -8,6 +8,7 @@ SRC_FILES = \
 	fpga.c \
 	hw.c \
 	lcmxo2.c \
-	loader_main.c
+	loader_main.c \
+	update.c
 
 include common.mk
