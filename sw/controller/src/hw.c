@@ -55,7 +55,7 @@ static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17, TIM3 };
 static void (*volatile tim_callbacks[4])(void);
 
 
-void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_ospeed_t ospeed, gpio_pupd_t pupd, gpio_af_t af, int value) {
+static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_ospeed_t ospeed, gpio_pupd_t pupd, gpio_af_t af, int value) {
     GPIO_TypeDef tmp;
     GPIO_TypeDef *gpio = ((GPIO_TypeDef *) (gpios[(id >> 4) & 0x07]));
     uint8_t pin = (id & 0x0F);
@@ -258,7 +258,71 @@ void hw_tim_stop (tim_id_t id) {
     tim_callbacks[id] = 0;
 }
 
-void hw_init (void) {
+static void hw_flash_unlock (void) {
+    while (FLASH->SR & FLASH_SR_BSY1);
+    if (FLASH->CR & FLASH_CR_LOCK) {
+        FLASH->KEYR = 0x45670123;
+        FLASH->KEYR = 0xCDEF89AB;
+    }
+}
+
+void hw_flash_erase (void) {
+    hw_flash_unlock();
+    FLASH->CR |= FLASH_CR_MER1;
+    FLASH->CR |= FLASH_CR_STRT;
+    while (FLASH->SR & FLASH_SR_BSY1);
+    FLASH->CR &= ~(FLASH_CR_MER1);
+}
+
+void hw_flash_program (uint32_t address, uint64_t value) {
+    hw_flash_unlock();
+    FLASH->CR |= FLASH_CR_PG;
+    *(__IO uint32_t *) (address) = ((value) & 0xFFFFFFFF);
+    __ISB();
+    *(__IO uint32_t *) (address + 4) = ((value >> 32) & 0xFFFFFFFF);
+    while (FLASH->SR & FLASH_SR_BSY1);
+    if (FLASH->SR & FLASH_SR_EOP) {
+        FLASH->SR |= FLASH_SR_EOP;
+    }
+    FLASH->CR &= ~(FLASH_CR_PG);
+}
+
+void hw_loader_reset (uint32_t *parameters) {
+    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+    PWR->CR1 |= PWR_CR1_DBP;
+    TAMP->BKP0R = *parameters++;
+    TAMP->BKP1R = *parameters++;
+    TAMP->BKP2R = *parameters++;
+    TAMP->BKP3R = *parameters++;
+    TAMP->BKP4R = *parameters++;
+    PWR->CR1 &= ~(PWR_CR1_DBP);
+    RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
+    NVIC_SystemReset();
+}
+
+void hw_loader_get_parameters (uint32_t *parameters) {
+    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+    *parameters++ = TAMP->BKP0R;
+    *parameters++ = TAMP->BKP1R;
+    *parameters++ = TAMP->BKP2R;
+    *parameters++ = TAMP->BKP3R;
+    *parameters++ = TAMP->BKP4R;
+    RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
+}
+
+void hw_loader_clear_parameters (void) {
+    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+    PWR->CR1 |= PWR_CR1_DBP;
+    TAMP->BKP0R = 0;
+    TAMP->BKP1R = 0;
+    TAMP->BKP2R = 0;
+    TAMP->BKP3R = 0;
+    TAMP->BKP4R = 0;
+    PWR->CR1 &= ~(PWR_CR1_DBP);
+    RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
+}
+
+static void hw_init_mcu (void) {
     FLASH->ACR |= (FLASH_ACR_PRFTEN | (2 << FLASH_ACR_LATENCY_Pos));
     while ((FLASH->ACR & FLASH_ACR_LATENCY_Msk) != (2 << FLASH_ACR_LATENCY_Pos));
 
@@ -276,36 +340,20 @@ void hw_init (void) {
     RCC->CFGR = RCC_CFGR_SW_1;
     while ((RCC->CFGR & RCC_CFGR_SWS_Msk) != RCC_CFGR_SWS_1);
 
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-    RCC->APBENR1 |= (
-        RCC_APBENR1_DBGEN |
-        RCC_APBENR1_I2C1EN |
-        RCC_APBENR1_TIM3EN
-    );
-    RCC->APBENR2 |= (
-        RCC_APBENR2_TIM17EN |
-        RCC_APBENR2_TIM16EN |
-        RCC_APBENR2_TIM14EN |
-        RCC_APBENR2_USART1EN |
-        RCC_APBENR2_SPI1EN |
-        RCC_APBENR2_SYSCFGEN
-    );
-
-    DBG->APBFZ2 = (
-        DBG_APB_FZ2_DBG_TIM17_STOP |
-        DBG_APB_FZ2_DBG_TIM16_STOP |
-        DBG_APB_FZ2_DBG_TIM14_STOP
-    );
-
     RCC->IOPENR |= RCC_IOPENR_GPIOAEN | RCC_IOPENR_GPIOBEN;
+
+    hw_gpio_init(GPIO_ID_LED, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_0, 0);
+}
+
+static void hw_init_spi (void) {
+    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+    RCC->APBENR2 |= RCC_APBENR2_SPI1EN;
 
     DMAMUX1_Channel0->CCR = (16 << DMAMUX_CxCR_DMAREQ_ID_Pos);
     DMAMUX1_Channel1->CCR = (17 << DMAMUX_CxCR_DMAREQ_ID_Pos);
 
     DMA1_Channel1->CPAR = (uint32_t) (&SPI1->DR);
     DMA1_Channel2->CPAR = (uint32_t) (&SPI1->DR);
-
-    SYSCFG->CFGR1 |= (SYSCFG_CFGR1_PA12_RMP | SYSCFG_CFGR1_PA11_RMP);
 
     SPI1->CR2 = (
         SPI_CR2_FRXTH |
@@ -322,32 +370,68 @@ void hw_init (void) {
         SPI_CR1_CPHA
     );
 
-    USART1->BRR = (64000000UL) / 1000000;
-    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_TE | USART_CR1_UE;
-
-    I2C1->TIMINGR = 0x10B17DB5UL;
-    I2C1->CR1 |= (I2C_CR1_TCIE | I2C_CR1_STOPIE | I2C_CR1_RXIE | I2C_CR1_TXIE | I2C_CR1_PE);
-
-    hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
-    hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
-    hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_OUTPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);
-
-    hw_gpio_init(GPIO_ID_LED, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_0, 0);
-
     hw_gpio_init(GPIO_ID_SPI_CS, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 1);
     hw_gpio_init(GPIO_ID_SPI_CLK, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_SPI_MISO, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_SPI_MOSI, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
-
     hw_gpio_init(GPIO_ID_FPGA_INT, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
+}
 
-    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
-    hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
+static void hw_init_i2c (void) {
+    RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
+
+    I2C1->TIMINGR = 0x10B17DB5UL;
+    I2C1->CR1 |= (I2C_CR1_TCIE | I2C_CR1_STOPIE | I2C_CR1_RXIE | I2C_CR1_TXIE | I2C_CR1_PE);
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
     hw_gpio_init(GPIO_ID_I2C_SDA, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
-
     hw_gpio_init(GPIO_ID_RTC_MFP, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
+}
+
+static void hw_init_uart (void) {
+    RCC->APBENR2 |= (RCC_APBENR2_USART1EN | RCC_APBENR2_SYSCFGEN);
+
+    SYSCFG->CFGR1 |= (SYSCFG_CFGR1_PA12_RMP | SYSCFG_CFGR1_PA11_RMP);
+
+    USART1->BRR = (64000000UL) / 1000000;
+    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_TE | USART_CR1_UE;
+
+    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
+    hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
+}
+
+static void hw_init_tim (void) {
+    RCC->APBENR1 |= (
+        RCC_APBENR1_DBGEN |
+        RCC_APBENR1_TIM3EN
+    );
+    RCC->APBENR2 |= (
+        RCC_APBENR2_TIM17EN |
+        RCC_APBENR2_TIM16EN |
+        RCC_APBENR2_TIM14EN |
+        RCC_APBENR2_USART1EN
+    );
+
+    DBG->APBFZ2 |= (
+        DBG_APB_FZ2_DBG_TIM17_STOP |
+        DBG_APB_FZ2_DBG_TIM16_STOP |
+        DBG_APB_FZ2_DBG_TIM14_STOP
+    );
+}
+
+static void hw_init_misc (void) {
+    hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
+    hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
+    hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_OUTPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);
+}
+
+void hw_init (void) {
+    hw_init_mcu();
+    hw_init_spi();
+    hw_init_i2c();
+    hw_init_uart();
+    hw_init_tim();
+    hw_init_misc();
 
     NVIC_SetPriority(EXTI0_1_IRQn, 0);
     NVIC_SetPriority(EXTI2_3_IRQn, 1);
@@ -365,6 +449,11 @@ void hw_init (void) {
     NVIC_EnableIRQ(TIM16_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     NVIC_EnableIRQ(TIM3_IRQn);
+}
+
+void hw_loader_init (void) {
+    hw_init_mcu();
+    hw_init_spi();
 }
 
 

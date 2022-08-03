@@ -10,25 +10,6 @@ CFLAGS = -Og -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP -
 LDFLAGS = -nostartfiles -Wl,--gc-sections
 
 SRC_DIR = src
-BUILD_DIR = build
-
-SRC_FILES = \
-	startup.S \
-	cfg.c \
-	cic.c \
-	dd.c \
-	debug.c \
-	flash.c \
-	flashram.c \
-	fpga.c \
-	gvr.c \
-	hw.c \
-	isv.c \
-	lcmxo2.c \
-	main.c \
-	rtc.c \
-	task.c \
-	usb.c
 
 SRCS = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(patsubst %,%.o,$(SRCS))))
@@ -44,23 +25,23 @@ $(BUILD_DIR)/%.S.o: %.S
 $(BUILD_DIR)/%.c.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/controller.elf: $(OBJS) STM32G030F6Px_FLASH.ld
-	$(CXX) $(FLAGS) $(LDFLAGS) -TSTM32G030F6Px_FLASH.ld $(OBJS) -o $@
-	@$(OBJDUMP) -S -D $@ > $(BUILD_DIR)/controller.lst
+$(BUILD_DIR)/$(EXE_NAME).elf: $(OBJS) $(LD_SCRIPT)
+	$(CXX) $(FLAGS) $(LDFLAGS) -T$(LD_SCRIPT) $(OBJS) -o $@
+	@$(OBJDUMP) -S -D $@ > $(BUILD_DIR)/$(EXE_NAME).lst
 
-$(BUILD_DIR)/controller.bin: $(BUILD_DIR)/controller.elf
-	@$(OBJCOPY) -O binary $< $@
+$(BUILD_DIR)/$(EXE_NAME).bin: $(BUILD_DIR)/$(EXE_NAME).elf
+	$(OBJCOPY) -O binary $< $@
 
-$(BUILD_DIR)/controller.hex: $(BUILD_DIR)/controller.bin
+$(BUILD_DIR)/$(EXE_NAME).hex: $(BUILD_DIR)/$(EXE_NAME).bin
 	@$(OBJCOPY) -I binary -O ihex $< $@
 
-print_size: $(BUILD_DIR)/controller.elf
+print_size: $(BUILD_DIR)/$(EXE_NAME).elf
 	@echo 'Size of modules:'
 	@$(SIZE) -B -d -t --common $(OBJS)
-	@echo 'Size of controller:'
+	@echo 'Size of $(EXE_NAME):'
 	@$(SIZE) -B -d $<
 
-all: $(BUILD_DIR)/controller.hex print_size
+all: $(BUILD_DIR)/$(EXE_NAME).hex print_size
 
 clean:
 	@rm -rf ./$(BUILD_DIR)/*

@@ -16,7 +16,7 @@ uint8_t rtc_stack[RTC_STACK_SIZE] __attribute__((aligned(8)));
 uint8_t gvr_stack[GVR_STACK_SIZE] __attribute__((aligned(8)));
 
 
-void main (void) {
+void app_main (void) {
     hw_init();
     cic_hw_init();
 

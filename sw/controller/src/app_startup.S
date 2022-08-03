@@ -3,6 +3,12 @@
 .fpu softvfp
 .thumb
 
+.section .loader, "a", %progbits
+.type g_pfnVectors, %object
+loader:
+    .incbin "../build_loader/loader.bin"
+
+
 .section .text.Reset_Handler
 .type Reset_Handler, %function
 Reset_Handler:
@@ -37,7 +43,7 @@ init_bss:
     bcc 1b
 
 run:
-    bl main
+    bl app_main
 
 loop:
     b loop
@@ -57,7 +63,7 @@ g_pfnVectors:
     .word Reset_Handler
     .word NMI_Handler
     .word HardFault_Handler
-    .word 0
+    .word 0x34364353
     .word 0
     .word 0
     .word 0

@@ -47,9 +47,9 @@ build_controller () {
 
     pushd sw/controller > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        make clean
+        ./build.sh clean
     fi
-    make all -j USER_FLAGS="$USER_FLAGS"
+    USER_FLAGS="$USER_FLAGS" ./build.sh all
     popd > /dev/null
 
     BUILT_CONTROLLER=true

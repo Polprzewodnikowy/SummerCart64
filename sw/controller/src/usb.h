@@ -10,6 +10,7 @@ typedef enum packet_cmd {
     PACKET_CMD_DD_REQUEST = 'D',
     PACKET_CMD_ISV_OUTPUT = 'I',
     PACKET_CMD_USB_OUTPUT = 'U',
+    PACKET_CMD_UPDATE_DONE = 'F',
 } usb_packet_cmd_e;
 
 

@@ -6,8 +6,8 @@
 #include "flash.h"
 #include "fpga.h"
 #include "rtc.h"
+#include "update.h"
 #include "usb.h"
-#include "vendor.h"
 
 
 enum rx_state {
@@ -251,21 +251,20 @@ static void usb_rx_process (void) {
                 break;
 
             case 'f':
-                p.response_info.data[0] = vendor_backup(p.rx_args[0], &p.response_info.data[1]);
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                p.response_info.data_length = 8;
-                if (p.response_info.data[0] != VENDOR_OK) {
-                    p.response_error = true;
-                }
-                break;
-
-            case 'F':
-                p.response_info.data[0] = vendor_update(p.rx_args[0], p.rx_args[1]);
+                p.response_info.data[0] = update_backup(p.rx_args[0]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 4;
-                if (p.response_info.data[0] != VENDOR_OK) {
+                break;
+
+            case 'F':
+                p.response_info.data[0] = update_prepare(p.rx_args[0], p.rx_args[1]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                if (p.response_info.data[0] == UPDATE_OK) {
+                    p.response_info.done_callback = update_start;
+                } else {
                     p.response_error = true;
                 }
                 break;
@@ -371,10 +370,8 @@ bool usb_enqueue_packet (usb_tx_info_t *info) {
     if (p.packet_pending) {
         return false;
     }
-
     p.packet_pending = true;
     p.packet_info = *info;
-
     return true;
 }
 
@@ -397,7 +394,7 @@ void usb_get_read_info (uint32_t *args) {
     args[0] |= (p.read_length > 0) ? (1 << 24) : 0;
 }
 
-void usb_init (void) {
+static void usb_reinit (void) {
     fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
     fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
 
@@ -417,12 +414,17 @@ void usb_init (void) {
     usb_rx_cmd_counter = 0;
 }
 
+void usb_init (void) {
+    usb_reinit();
+    update_notify_done();
+}
+
 void usb_process (void) {
     if (fpga_reg_get(REG_USB_SCR) & USB_SCR_RESET_PENDING) {
         if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
             p.tx_info.done_callback();
         }
-        usb_init();
+        usb_reinit();
         fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
     } else {
         usb_rx_process();

@@ -5,6 +5,10 @@
 #include <stdint.h>
 
 
+#define HW_UPDATE_START_MAGIC   (0x54535055)
+#define HW_UPDATE_DONE_MAGIC    (0x4B4F5055)
+#define HW_FLASH_ADDRESS        (0x08000000)
+
 #define GPIO_PORT_PIN(p, n)     ((((p) & 0x07) << 4) | ((n) & 0x0F))
 
 typedef enum {
@@ -59,6 +63,12 @@ void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void));
 void hw_tim_stop (tim_id_t id);
 void hw_tim_disable_irq (tim_id_t id);
 void hw_tim_enable_irq (tim_id_t id);
+void hw_flash_erase (void);
+void hw_flash_program (uint32_t address, uint64_t value);
+void hw_loader_reset (uint32_t *parameters);
+void hw_loader_get_parameters (uint32_t *parameters);
+void hw_loader_clear_parameters (void);
+void hw_loader_init (void);
 void hw_init (void);
 
 
