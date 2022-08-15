@@ -6,7 +6,7 @@
 .section .loader, "a", %progbits
 .type g_pfnVectors, %object
 loader:
-    .incbin "../build_loader/loader.bin"
+    .incbin "../build/loader/loader.bin"
 
 
 .section .text.Reset_Handler
@@ -43,7 +43,7 @@ init_bss:
     bcc 1b
 
 run:
-    bl app_main
+    bl app
 
 loop:
     b loop

@@ -45,7 +45,7 @@ typedef struct {
 } gpio_irq_callback_t;
 
 
-static const GPIO_TypeDef *gpios[] = { GPIOA, GPIOB };
+static const GPIO_TypeDef *gpios[] = { GPIOA, GPIOB, 0, 0, 0, 0, 0, 0 };
 static gpio_irq_callback_t gpio_irq_callbacks[16];
 static volatile uint8_t *i2c_data_txptr;
 static volatile uint8_t *i2c_data_rxptr;
@@ -60,10 +60,6 @@ static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_osp
     GPIO_TypeDef *gpio = ((GPIO_TypeDef *) (gpios[(id >> 4) & 0x07]));
     uint8_t pin = (id & 0x0F);
     uint8_t afr = ((pin < 8) ? 0 : 1);
-
-    if (!gpio) {
-        return;
-    }
 
     tmp.MODER = (gpio->MODER & ~(GPIO_MODER_MODE0_Msk << (pin * 2)));
     tmp.OTYPER = (gpio->OTYPER & ~(GPIO_OTYPER_OT0_Msk << pin));
@@ -81,7 +77,7 @@ static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_osp
 }
 
 void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void)) {
-    uint8_t port = ((id >> 4) & 0x0F);
+    uint8_t port = ((id >> 4) & 0x07);
     uint8_t pin = (id & 0x0F);
     if (irq == GPIO_IRQ_FALLING) {
         EXTI->FTSR1 |= (EXTI_FTSR1_FT0 << pin);
@@ -214,6 +210,12 @@ void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void)) {
     tim_callbacks[id] = callback;
 }
 
+void hw_tim_stop (tim_id_t id) {
+    TIM_TypeDef *tim = ((TIM_TypeDef *) (tims[id]));
+    tim->CR1 &= ~(TIM_CR1_CEN);
+    tim_callbacks[id] = 0;
+}
+
 void hw_tim_disable_irq (tim_id_t id) {
     switch (id) {
         case TIM_ID_CIC:
@@ -252,10 +254,26 @@ void hw_tim_enable_irq (tim_id_t id) {
     }
 }
 
-void hw_tim_stop (tim_id_t id) {
-    TIM_TypeDef *tim = ((TIM_TypeDef *) (tims[id]));
-    tim->CR1 &= ~(TIM_CR1_CEN);
-    tim_callbacks[id] = 0;
+void hw_delay_ms (uint32_t ms) {
+    SysTick->VAL = 0;
+    for (uint32_t i = 0; i < ms; i++) {
+        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+    }
+}
+
+void hw_crc32_reset (void) {
+    CRC->CR |= CRC_CR_RESET;
+}
+
+uint32_t hw_crc32_calculate (uint8_t *data, uint32_t length) {
+    for (uint32_t i = 0; i < length; i++) {
+        *(__IO uint8_t *) (CRC->DR) = data[i];
+    }
+    return CRC->DR;
+}
+
+uint32_t hw_flash_size (void) {
+    return FLASH_SIZE;
 }
 
 static void hw_flash_unlock (void) {
@@ -274,12 +292,12 @@ void hw_flash_erase (void) {
     FLASH->CR &= ~(FLASH_CR_MER1);
 }
 
-void hw_flash_program (uint32_t address, uint64_t value) {
+void hw_flash_program (uint32_t offset, hw_flash_t value) {
     hw_flash_unlock();
     FLASH->CR |= FLASH_CR_PG;
-    *(__IO uint32_t *) (address) = ((value) & 0xFFFFFFFF);
+    *(__IO uint32_t *) (FLASH_BASE + offset) = ((value) & 0xFFFFFFFF);
     __ISB();
-    *(__IO uint32_t *) (address + 4) = ((value >> 32) & 0xFFFFFFFF);
+    *(__IO uint32_t *) (FLASH_BASE + offset + 4) = ((value >> 32) & 0xFFFFFFFF);
     while (FLASH->SR & FLASH_SR_BSY1);
     if (FLASH->SR & FLASH_SR_EOP) {
         FLASH->SR |= FLASH_SR_EOP;
@@ -287,31 +305,30 @@ void hw_flash_program (uint32_t address, uint64_t value) {
     FLASH->CR &= ~(FLASH_CR_PG);
 }
 
-void hw_loader_reset (uint32_t *parameters) {
+hw_flash_t hw_flash_read (uint32_t offset) {
+    return *(uint64_t *) (FLASH_BASE + offset);
+}
+
+void hw_loader_reset (loader_parameters_t *parameters) {
     RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
     PWR->CR1 |= PWR_CR1_DBP;
-    TAMP->BKP0R = *parameters++;
-    TAMP->BKP1R = *parameters++;
-    TAMP->BKP2R = *parameters++;
-    TAMP->BKP3R = *parameters++;
-    TAMP->BKP4R = *parameters++;
+    TAMP->BKP0R = parameters->magic;
+    TAMP->BKP1R = parameters->mcu_address;
+    TAMP->BKP2R = parameters->mcu_length;
+    TAMP->BKP3R = parameters->fpga_address;
+    TAMP->BKP4R = parameters->fpga_length;
     PWR->CR1 &= ~(PWR_CR1_DBP);
     RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
     NVIC_SystemReset();
 }
 
-void hw_loader_get_parameters (uint32_t *parameters) {
+void hw_loader_get_parameters (loader_parameters_t *parameters) {
     RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
-    *parameters++ = TAMP->BKP0R;
-    *parameters++ = TAMP->BKP1R;
-    *parameters++ = TAMP->BKP2R;
-    *parameters++ = TAMP->BKP3R;
-    *parameters++ = TAMP->BKP4R;
-    RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
-}
-
-void hw_loader_clear_parameters (void) {
-    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+    parameters->magic = TAMP->BKP0R;
+    parameters->mcu_address = TAMP->BKP1R;
+    parameters->mcu_length = TAMP->BKP2R;
+    parameters->fpga_address = TAMP->BKP3R;
+    parameters->fpga_length = TAMP->BKP4R;
     PWR->CR1 |= PWR_CR1_DBP;
     TAMP->BKP0R = 0;
     TAMP->BKP1R = 0;
@@ -420,6 +437,12 @@ static void hw_init_tim (void) {
 }
 
 static void hw_init_misc (void) {
+    SysTick->LOAD = (((64000000 / 1000)) - 1);
+    SysTick->VAL = 0;
+    SysTick->CTRL = (SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk);
+
+    RCC->AHBENR |= RCC_AHBENR_CRCEN;
+
     hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_OUTPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);

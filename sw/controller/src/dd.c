@@ -1,6 +1,4 @@
-#include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include "dd.h"
 #include "fpga.h"
 #include "hw.h"

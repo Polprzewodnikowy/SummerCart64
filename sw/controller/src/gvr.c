@@ -1,5 +1,5 @@
-#include "dd.h"
 #include "cfg.h"
+#include "dd.h"
 #include "flashram.h"
 #include "fpga.h"
 #include "isv.h"

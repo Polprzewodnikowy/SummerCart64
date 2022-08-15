@@ -40,7 +40,7 @@ init_bss:
     bcc 1b
 
 run:
-    bl loader_main
+    bl loader
 
 boot:
     ldr r0, =_app_magic

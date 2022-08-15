@@ -2,6 +2,7 @@
 #define CFG_H__
 
 
+#include <stdbool.h>
 #include <stdint.h>
 
 

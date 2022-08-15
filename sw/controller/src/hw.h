@@ -5,10 +5,6 @@
 #include <stdint.h>
 
 
-#define HW_UPDATE_START_MAGIC   (0x54535055)
-#define HW_UPDATE_DONE_MAGIC    (0x4B4F5055)
-#define HW_FLASH_ADDRESS        (0x08000000)
-
 #define GPIO_PORT_PIN(p, n)     ((((p) & 0x07) << 4) | ((n) & 0x0F))
 
 typedef enum {
@@ -45,6 +41,16 @@ typedef enum {
     SPI_RX,
 } spi_direction_t;
 
+typedef uint64_t hw_flash_t;
+
+typedef struct {
+    uint32_t magic;
+    uint32_t mcu_address;
+    uint32_t mcu_length;
+    uint32_t fpga_address;
+    uint32_t fpga_length;
+} loader_parameters_t;
+
 
 void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void));
 uint32_t hw_gpio_get (gpio_id_t id);
@@ -63,13 +69,17 @@ void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void));
 void hw_tim_stop (tim_id_t id);
 void hw_tim_disable_irq (tim_id_t id);
 void hw_tim_enable_irq (tim_id_t id);
+void hw_delay_ms (uint32_t ms);
+void hw_crc32_reset (void);
+uint32_t hw_crc32_calculate (uint8_t *data, uint32_t length);
+uint32_t hw_flash_size (void);
 void hw_flash_erase (void);
-void hw_flash_program (uint32_t address, uint64_t value);
-void hw_loader_reset (uint32_t *parameters);
-void hw_loader_get_parameters (uint32_t *parameters);
-void hw_loader_clear_parameters (void);
-void hw_loader_init (void);
+void hw_flash_program (uint32_t offset, hw_flash_t value);
+hw_flash_t hw_flash_read (uint32_t offset);
+void hw_loader_reset (loader_parameters_t *parameters);
+void hw_loader_get_parameters (loader_parameters_t *parameters);
 void hw_init (void);
+void hw_loader_init (void);
 
 
 #endif

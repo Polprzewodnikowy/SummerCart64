@@ -1,4 +1,3 @@
-#include <stdbool.h>
 #include "cfg.h"
 #include "dd.h"
 #include "flash.h"
@@ -346,7 +345,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                usb_create_packet(&packet_info, PACKET_CMD_USB_OUTPUT);
+                usb_create_packet(&packet_info, PACKET_CMD_DEBUG_OUTPUT);
                 packet_info.dma_length = args[1];
                 packet_info.dma_address = args[0];
                 packet_info.done_callback = cfg_set_usb_output_ready;

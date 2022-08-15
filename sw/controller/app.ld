@@ -55,7 +55,7 @@ SECTIONS {
         . = ALIGN(4);
         *(.rodata)
         *(.rodata*)
-        . = ALIGN(8);
+        . = ALIGN(4);
     } > rom
 
     _estack = ORIGIN(ram) + LENGTH(ram);

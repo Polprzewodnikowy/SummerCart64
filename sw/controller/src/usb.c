@@ -1,5 +1,3 @@
-#include <stdbool.h>
-#include <stdint.h>
 #include "cfg.h"
 #include "cic.h"
 #include "dd.h"
@@ -211,8 +209,8 @@ static void usb_rx_process (void) {
                 p.response_info.dma_length = p.rx_args[1];
                 break;
 
-            case 'M':
             case 'D':
+            case 'M':
                 if (usb_dma_ready()) {
                     if (!p.rx_dma_running) {
                         fpga_reg_set(REG_USB_DMA_ADDRESS, p.rx_args[0]);
@@ -251,10 +249,11 @@ static void usb_rx_process (void) {
                 break;
 
             case 'f':
-                p.response_info.data[0] = update_backup(p.rx_args[0]);
+                p.response_info.data[0] = update_backup(p.rx_args[0], &p.response_info.data[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.data_length = 4;
+                p.response_error = (p.response_info.data[0] != UPDATE_OK);
+                p.response_info.data_length = 8;
                 break;
 
             case 'F':
@@ -355,8 +354,8 @@ static void usb_tx_process (void) {
 }
 
 
-void usb_create_packet (usb_tx_info_t *info, uint8_t cmd) {
-    info->cmd = cmd;
+void usb_create_packet (usb_tx_info_t *info, usb_packet_cmd_e cmd) {
+    info->cmd = (uint8_t) (cmd);
     info->data_length = 0;
     for (int i = 0; i < 4; i++) {
         info->data[i] = 0;
@@ -394,7 +393,7 @@ void usb_get_read_info (uint32_t *args) {
     args[0] |= (p.read_length > 0) ? (1 << 24) : 0;
 }
 
-static void usb_reinit (void) {
+void usb_init (void) {
     fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
     fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
 
@@ -414,17 +413,12 @@ static void usb_reinit (void) {
     usb_rx_cmd_counter = 0;
 }
 
-void usb_init (void) {
-    usb_reinit();
-    update_notify_done();
-}
-
 void usb_process (void) {
     if (fpga_reg_get(REG_USB_SCR) & USB_SCR_RESET_PENDING) {
         if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
             p.tx_info.done_callback();
         }
-        usb_reinit();
+        usb_init();
         fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
     } else {
         usb_rx_process();

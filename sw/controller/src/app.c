@@ -16,7 +16,7 @@ uint8_t rtc_stack[RTC_STACK_SIZE] __attribute__((aligned(8)));
 uint8_t gvr_stack[GVR_STACK_SIZE] __attribute__((aligned(8)));
 
 
-void app_main (void) {
+void app (void) {
     hw_init();
     cic_hw_init();
 
@@ -25,6 +25,4 @@ void app_main (void) {
     task_create(TASK_ID_GVR, gvr_task, gvr_stack, GVR_STACK_SIZE);
 
     task_scheduler_start();
-
-    while (1);
 }

@@ -1,14 +1,12 @@
 EXE_NAME = loader
 LD_SCRIPT = loader.ld
-BUILD_DIR = build_loader
+BUILD_DIR = build/loader
 SRC_FILES = \
-	loader_startup.S \
-	boot.c \
-	debug.c \
+	loader.S \
 	fpga.c \
 	hw.c \
 	lcmxo2.c \
-	loader_main.c \
+	loader.c \
 	update.c
 
 include common.mk

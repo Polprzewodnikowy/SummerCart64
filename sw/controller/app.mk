@@ -1,9 +1,9 @@
 EXE_NAME = app
 LD_SCRIPT = app.ld
-BUILD_DIR = build_app
+BUILD_DIR = build/app
 SRC_FILES = \
-	app_startup.S \
-	app_main.c \
+	app.S \
+	app.c \
 	cfg.c \
 	cic.c \
 	dd.c \
@@ -22,4 +22,4 @@ SRC_FILES = \
 
 include common.mk
 
-$(BUILD_DIR)/app_startup.S.o: ../build_loader/loader.bin
+$(BUILD_DIR)/app.S.o: ../build/loader/loader.bin

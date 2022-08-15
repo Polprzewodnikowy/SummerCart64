@@ -58,7 +58,7 @@ SECTIONS {
         _srodata = .;
         *(.rodata)
         *(.rodata*)
-        . = ALIGN(8);
+        . = ALIGN(4);
         _erodata = .;
     } > ram AT > rom
 

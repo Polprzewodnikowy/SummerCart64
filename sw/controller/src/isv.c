@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "fpga.h"
 #include "isv.h"
 #include "usb.h"

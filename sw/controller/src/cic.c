@@ -1,3 +1,5 @@
+// Original code from https://github.com/jago85/UltraCIC_C licensed under the MIT License
+
 #include <stdbool.h>
 #include "cic.h"
 #include "hw.h"
