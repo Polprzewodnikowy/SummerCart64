@@ -38,7 +38,7 @@ static uint8_t status_data[12] = {
 static uint32_t update_checksum (uint32_t address, uint32_t length) {
     uint32_t remaining = length;
     uint32_t block_size;
-    uint32_t checksum;
+    uint32_t checksum = 0;
     uint8_t buffer[32];
 
     hw_crc32_reset();
@@ -46,7 +46,7 @@ static uint32_t update_checksum (uint32_t address, uint32_t length) {
     for (uint32_t i = 0; i < length; i += sizeof(buffer)) {
         block_size = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
         fpga_mem_read(address, block_size, buffer);
-        checksum = hw_crc32_calculate(buffer, sizeof(buffer));
+        checksum = hw_crc32_calculate(buffer, block_size);
         remaining -= block_size;
     }
 
