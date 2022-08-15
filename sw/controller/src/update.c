@@ -55,7 +55,7 @@ static uint32_t update_checksum (uint32_t address, uint32_t length) {
 
 static uint32_t update_write_token (uint32_t *address) {
     uint32_t length = sizeof(update_token);
-    fpga_mem_write(*address, sizeof(update_token), update_token);
+    fpga_mem_write(*address, sizeof(update_token), (uint8_t *) (update_token));
     *address += length;
     return length;
 }
@@ -91,11 +91,11 @@ static bool update_check_token (uint32_t *address) {
 static bool update_get_chunk (uint32_t *address, chunk_id_t *chunk_id, uint32_t *data_address, uint32_t *data_length) {
     uint32_t id;
     uint32_t checksum;
-    fpga_mem_read(*address, sizeof(id), (uint8_t *) (id));
+    fpga_mem_read(*address, sizeof(id), (uint8_t *) (&id));
     *address += sizeof(id);
     fpga_mem_read(*address, sizeof(*data_length), (uint8_t *) (data_length));
     *address += sizeof(*data_length);
-    fpga_mem_read(*address, sizeof(checksum), (uint8_t *) (checksum));
+    fpga_mem_read(*address, sizeof(checksum), (uint8_t *) (&checksum));
     *address += sizeof(checksum);
     *data_address = *address;
     *address += *data_length;
