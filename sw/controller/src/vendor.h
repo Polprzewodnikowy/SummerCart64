@@ -15,8 +15,9 @@ typedef enum {
 } vendor_error_t;
 
 
-vendor_error_t vendor_update (uint32_t address, uint32_t length);
+uint32_t vendor_flash_size (void);
 vendor_error_t vendor_backup (uint32_t address, uint32_t *length);
+vendor_error_t vendor_update (uint32_t address, uint32_t length);
 vendor_error_t vendor_reconfigure (void);
 
 

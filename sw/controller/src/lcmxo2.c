@@ -157,6 +157,31 @@ static vendor_error_t lcmxo2_fail (vendor_error_t error) {
     return error;
 }
 
+uint32_t vendor_flash_size (void) {
+    return (FLASH_PAGE_SIZE * FLASH_NUM_PAGES);
+}
+
+vendor_error_t vendor_backup (uint32_t address, uint32_t *length) {
+    uint8_t buffer[FLASH_PAGE_SIZE];
+
+    *length = 0;
+
+    lcmxo2_reset_bus();
+    if (lcmxo2_enable_flash()) {
+        return lcmxo2_fail(VENDOR_ERROR_INIT);
+    }
+    lcmxo2_reset_flash_address();
+    for (int i = 0; i < (FLASH_PAGE_SIZE * FLASH_NUM_PAGES); i += FLASH_PAGE_SIZE) {
+        lcmxo2_read_flash_page(buffer);
+        fpga_mem_write(address + i, FLASH_PAGE_SIZE, buffer);
+        *length += FLASH_PAGE_SIZE;
+    }
+    lcmxo2_disable_flash();
+    lcmxo2_cleanup();
+
+    return VENDOR_OK;
+}
+
 vendor_error_t vendor_update (uint32_t address, uint32_t length) {
     uint8_t buffer[FLASH_PAGE_SIZE];
     uint8_t verify_buffer[FLASH_PAGE_SIZE];
@@ -195,27 +220,6 @@ vendor_error_t vendor_update (uint32_t address, uint32_t length) {
                 return lcmxo2_fail(VENDOR_ERROR_VERIFY);
             }
         }
-    }
-    lcmxo2_disable_flash();
-    lcmxo2_cleanup();
-
-    return VENDOR_OK;
-}
-
-vendor_error_t vendor_backup (uint32_t address, uint32_t *length) {
-    uint8_t buffer[FLASH_PAGE_SIZE];
-
-    *length = 0;
-
-    lcmxo2_reset_bus();
-    if (lcmxo2_enable_flash()) {
-        return lcmxo2_fail(VENDOR_ERROR_INIT);
-    }
-    lcmxo2_reset_flash_address();
-    for (int i = 0; i < (FLASH_PAGE_SIZE * FLASH_NUM_PAGES); i += FLASH_PAGE_SIZE) {
-        lcmxo2_read_flash_page(buffer);
-        fpga_mem_write(address + i, FLASH_PAGE_SIZE, buffer);
-        *length += FLASH_PAGE_SIZE;
     }
     lcmxo2_disable_flash();
     lcmxo2_cleanup();

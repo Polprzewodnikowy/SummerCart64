@@ -9,7 +9,6 @@
 
 
 typedef enum {
-    UPDATE_STATUS_NONE = 0,
     UPDATE_STATUS_START = 1,
     UPDATE_STATUS_MCU_START = 2,
     UPDATE_STATUS_MCU_DONE = 3,
@@ -31,7 +30,7 @@ static const uint8_t update_token[16] = "SC64 Update v2.0";
 static uint8_t status_data[12] = {
     'P', 'K', 'T', PACKET_CMD_UPDATE_STATUS,
     0, 0, 0, 4,
-    0, 0, 0, UPDATE_STATUS_NONE,
+    0, 0, 0, UPDATE_STATUS_START,
 };
 
 
@@ -132,16 +131,18 @@ static void update_status_notify (update_status_t status) {
 
 update_error_t update_backup (uint32_t address, uint32_t *length) {
     hw_flash_t buffer;
+    uint32_t mcu_length;
     uint32_t fpga_length;
 
     *length += update_write_token(&address);
 
     *length += update_prepare_chunk(&address, CHUNK_ID_MCU_DATA);
-    for (uint32_t offset = 0; offset < hw_flash_size(); offset += sizeof(hw_flash_t)) {
+    mcu_length = hw_flash_size();
+    for (uint32_t offset = 0; offset < mcu_length; offset += sizeof(hw_flash_t)) {
         buffer = hw_flash_read(offset);
         fpga_mem_write(address + offset, sizeof(hw_flash_t), (uint8_t *) (&buffer));
     }
-    *length += update_finalize_chunk(&address, hw_flash_size());
+    *length += update_finalize_chunk(&address, mcu_length);
 
     *length += update_prepare_chunk(&address, CHUNK_ID_FPGA_DATA);
     if (vendor_backup(address, &fpga_length) != VENDOR_OK) {
@@ -153,7 +154,7 @@ update_error_t update_backup (uint32_t address, uint32_t *length) {
 }
 
 update_error_t update_prepare (uint32_t address, uint32_t length) {
-    uint32_t end_address = address + length;
+    uint32_t end_address = (address + length);
     chunk_id_t id;
     uint32_t data_address;
     uint32_t data_length;
@@ -177,11 +178,17 @@ update_error_t update_prepare (uint32_t address, uint32_t length) {
                 break;
 
             case CHUNK_ID_MCU_DATA:
+                if (data_length > hw_flash_size()) {
+                    return UPDATE_ERROR_SIZE;
+                }
                 parameters.mcu_address = data_address;
                 parameters.mcu_length = data_length;
                 break;
 
             case CHUNK_ID_FPGA_DATA:
+                if (data_length > vendor_flash_size()) {
+                    return UPDATE_ERROR_SIZE;
+                }
                 parameters.fpga_address = data_address;
                 parameters.fpga_length = data_length;
                 break;
