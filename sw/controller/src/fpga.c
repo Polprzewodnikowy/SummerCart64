@@ -40,9 +40,13 @@ void fpga_reg_set (fpga_reg_t reg, uint32_t value) {
 void fpga_mem_read (uint32_t address, size_t length, uint8_t *buffer) {
     fpga_cmd_t cmd = CMD_MEM_READ;
     uint8_t buffer_address = 0;
+    size_t dma_length = length;
+    if ((dma_length % 2) != 0) {
+        dma_length += 1;
+    }
 
     fpga_reg_set(REG_MEM_ADDRESS, address);
-    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_START);
+    fpga_reg_set(REG_MEM_SCR, (dma_length << MEM_SCR_LENGTH_BIT) | MEM_SCR_START);
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 
     hw_spi_start();
@@ -55,6 +59,10 @@ void fpga_mem_read (uint32_t address, size_t length, uint8_t *buffer) {
 void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer) {
     fpga_cmd_t cmd = CMD_MEM_WRITE;
     uint8_t buffer_address = 0;
+    size_t dma_length = length;
+    if ((dma_length % 2) != 0) {
+        dma_length += 1;
+    }
 
     hw_spi_start();
     hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
@@ -63,17 +71,22 @@ void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer) {
     hw_spi_stop();
 
     fpga_reg_set(REG_MEM_ADDRESS, address);
-    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_DIRECTION | MEM_SCR_START);
+    fpga_reg_set(REG_MEM_SCR, (dma_length << MEM_SCR_LENGTH_BIT) | MEM_SCR_DIRECTION | MEM_SCR_START);
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 }
 
 void fpga_mem_copy (uint32_t src, uint32_t dst, size_t length) {
+    size_t dma_length = length;
+    if ((dma_length % 2) != 0) {
+        dma_length += 1;
+    }
+
     fpga_reg_set(REG_MEM_ADDRESS, src);
-    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_START);
+    fpga_reg_set(REG_MEM_SCR, (dma_length << MEM_SCR_LENGTH_BIT) | MEM_SCR_START);
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 
     fpga_reg_set(REG_MEM_ADDRESS, dst);
-    fpga_reg_set(REG_MEM_SCR, (length << MEM_SCR_LENGTH_BIT) | MEM_SCR_DIRECTION | MEM_SCR_START);
+    fpga_reg_set(REG_MEM_SCR, (dma_length << MEM_SCR_LENGTH_BIT) | MEM_SCR_DIRECTION | MEM_SCR_START);
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 }
 

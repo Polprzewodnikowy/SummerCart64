@@ -19,6 +19,7 @@ SRC_FILES = \
 	task.c \
 	update.c \
 	usb.c
+PAD_TO = 0x08008000
 
 include common.mk
 

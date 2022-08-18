@@ -313,10 +313,10 @@ void hw_loader_reset (loader_parameters_t *parameters) {
     RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
     PWR->CR1 |= PWR_CR1_DBP;
     TAMP->BKP0R = parameters->magic;
-    TAMP->BKP1R = parameters->mcu_address;
-    TAMP->BKP2R = parameters->mcu_length;
+    TAMP->BKP1R = parameters->flags;
+    TAMP->BKP2R = parameters->mcu_address;
     TAMP->BKP3R = parameters->fpga_address;
-    TAMP->BKP4R = parameters->fpga_length;
+    TAMP->BKP4R = parameters->bootloader_address;
     PWR->CR1 &= ~(PWR_CR1_DBP);
     RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
     NVIC_SystemReset();
@@ -325,10 +325,10 @@ void hw_loader_reset (loader_parameters_t *parameters) {
 void hw_loader_get_parameters (loader_parameters_t *parameters) {
     RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
     parameters->magic = TAMP->BKP0R;
-    parameters->mcu_address = TAMP->BKP1R;
-    parameters->mcu_length = TAMP->BKP2R;
+    parameters->flags = TAMP->BKP1R;
+    parameters->mcu_address = TAMP->BKP2R;
     parameters->fpga_address = TAMP->BKP3R;
-    parameters->fpga_length = TAMP->BKP4R;
+    parameters->bootloader_address = TAMP->BKP4R;
     PWR->CR1 |= PWR_CR1_DBP;
     TAMP->BKP0R = 0;
     TAMP->BKP1R = 0;

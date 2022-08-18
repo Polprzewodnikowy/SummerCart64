@@ -43,12 +43,18 @@ typedef enum {
 
 typedef uint64_t hw_flash_t;
 
+typedef enum {
+    LOADER_FLAGS_UPDATE_MCU = (1 << 0),
+    LOADER_FLAGS_UPDATE_FPGA = (1 << 1),
+    LOADER_FLAGS_UPDATE_BOOTLOADER = (1 << 2),
+} loader_parameters_flags_t;
+
 typedef struct {
     uint32_t magic;
+    loader_parameters_flags_t flags;
     uint32_t mcu_address;
-    uint32_t mcu_length;
     uint32_t fpga_address;
-    uint32_t fpga_length;
+    uint32_t bootloader_address;
 } loader_parameters_t;
 
 

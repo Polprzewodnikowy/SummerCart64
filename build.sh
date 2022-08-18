@@ -6,13 +6,8 @@ PACKAGE_FILE_NAME="SC64"
 
 FILES=(
     "./fw/ft232h_config.xml"
-    "./fw/project/lcmxo2/impl1/sc64_impl1.bit"
-    "./fw/project/lcmxo2/impl1/sc64_impl1.jed"
-    "./sw/bootloader/build/bootloader.bin"
-    "./sw/controller/build/controller.bin"
-    "./sw/controller/build/controller.elf"
-    "./sw/pc/helpers.py"
     "./sw/pc/sc64.py"
+    "./sw/update/sc64.upd"
     "./LICENSE"
     "./README.md"
 )
@@ -74,6 +69,19 @@ build_update () {
     build_bootloader
     build_controller
     build_fpga
+
+    pushd sw/update > /dev/null
+    INFO=""
+    if [ ! -z "${GIT_BRANCH+x}" ]; then INFO+=" $GIT_BRANCH"; fi
+    if [ ! -z "${GIT_TAG+x}" ]; then INFO+=" $GIT_TAG"; fi
+    if [ ! -z "${GIT_SHA+x}" ]; then INFO+=" $GIT_SHA"; fi
+    python3 update.py \
+        --info "$INFO" \
+        --mcu ../controller/build/app/app.bin \
+        --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
+        --boot ../bootloader/build/bootloader.bin \
+        sc64.upd
+    popd > /dev/null
 
     BUILT_UPDATE=true
 }
