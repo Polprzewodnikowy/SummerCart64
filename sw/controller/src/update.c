@@ -9,12 +9,9 @@
 
 
 typedef enum {
-    UPDATE_STATUS_START = 1,
-    UPDATE_STATUS_MCU_START = 2,
-    UPDATE_STATUS_MCU_DONE = 3,
-    UPDATE_STATUS_FPGA_START = 4,
-    UPDATE_STATUS_FPGA_DONE = 5,
-    UPDATE_STATUS_DONE = 6,
+    UPDATE_STATUS_MCU = 1,
+    UPDATE_STATUS_FPGA = 2,
+    UPDATE_STATUS_DONE = 0x80,
     UPDATE_STATUS_ERROR = 0xFF,
 } update_status_t;
 
@@ -30,25 +27,22 @@ static const uint8_t update_token[16] = "SC64 Update v2.0";
 static uint8_t status_data[12] = {
     'P', 'K', 'T', PACKET_CMD_UPDATE_STATUS,
     0, 0, 0, 4,
-    0, 0, 0, UPDATE_STATUS_START,
+    0, 0, 0, UPDATE_STATUS_ERROR,
 };
 
 
 static uint32_t update_checksum (uint32_t address, uint32_t length) {
-    uint32_t remaining = length;
+    uint8_t buffer[32];
     uint32_t block_size;
     uint32_t checksum = 0;
-    uint8_t buffer[32];
-
     hw_crc32_reset();
-
-    for (uint32_t i = 0; i < length; i += sizeof(buffer)) {
-        block_size = (remaining > sizeof(buffer)) ? sizeof(buffer) : remaining;
+    while (length > 0) {
+        block_size = (length > sizeof(buffer)) ? sizeof(buffer) : length;
         fpga_mem_read(address, block_size, buffer);
         checksum = hw_crc32_calculate(buffer, block_size);
-        remaining -= block_size;
+        address += block_size;
+        length -= block_size;
     }
-
     return checksum;
 }
 
@@ -91,6 +85,7 @@ static bool update_get_chunk (uint32_t *address, chunk_id_t *chunk_id, uint32_t 
     uint32_t id;
     uint32_t checksum;
     fpga_mem_read(*address, sizeof(id), (uint8_t *) (&id));
+    *chunk_id = (chunk_id_t) (id);
     *address += sizeof(id);
     fpga_mem_read(*address, sizeof(*data_length), (uint8_t *) (data_length));
     *address += sizeof(*data_length);
@@ -120,11 +115,13 @@ static void update_status_notify (update_status_t status) {
         fpga_usb_push(status_data[i]);
     }
     fpga_reg_set(REG_USB_SCR, USB_SCR_WRITE_FLUSH);
-    if (status != UPDATE_STATUS_ERROR) {
-        update_blink_led(100, 250, status);
-        hw_delay_ms(1000);
-    } else {
+    if (status == UPDATE_STATUS_DONE) {
+        update_blink_led(15, 85, 10);
+    } else if (status == UPDATE_STATUS_ERROR) {
         update_blink_led(1000, 1000, 30);
+    } else {
+        update_blink_led(15, 185, 2);
+        hw_delay_ms(500);
     }
 }
 
@@ -134,7 +131,7 @@ update_error_t update_backup (uint32_t address, uint32_t *length) {
     uint32_t mcu_length;
     uint32_t fpga_length;
 
-    *length += update_write_token(&address);
+    *length = update_write_token(&address);
 
     *length += update_prepare_chunk(&address, CHUNK_ID_MCU_DATA);
     mcu_length = hw_flash_size();
@@ -214,35 +211,25 @@ bool update_check (void) {
 void update_perform (void) {
     hw_flash_t buffer;
 
-    update_status_notify(UPDATE_STATUS_START);
-
     if (parameters.mcu_length != 0) {
-        update_status_notify(UPDATE_STATUS_MCU_START);
-
+        update_status_notify(UPDATE_STATUS_MCU);
         hw_flash_erase();
-
         for (uint32_t offset = 0; offset < parameters.mcu_length; offset += sizeof(hw_flash_t)) {
             fpga_mem_read(parameters.mcu_address + offset, sizeof(hw_flash_t), (uint8_t *) (&buffer));
             hw_flash_program(offset, buffer);
-
             if (hw_flash_read(offset) != buffer) {
                 update_status_notify(UPDATE_STATUS_ERROR);
-                while (1);  // TODO: jump to STM32 bootloader?
+                while (1);
             }
         }
-
-        update_status_notify(UPDATE_STATUS_MCU_DONE);
     }
 
     if (parameters.fpga_length != 0) {
-        update_status_notify(UPDATE_STATUS_FPGA_START);
-
+        update_status_notify(UPDATE_STATUS_FPGA);
         if (vendor_update(parameters.fpga_address, parameters.fpga_length) != VENDOR_OK) {
             update_status_notify(UPDATE_STATUS_ERROR);
-            while (1);  // TODO: jump to STM32 bootloader?
+            while (1);
         }
-
-        update_status_notify(UPDATE_STATUS_FPGA_DONE);
     }
 
     update_status_notify(UPDATE_STATUS_DONE);

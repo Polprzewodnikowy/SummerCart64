@@ -28,6 +28,8 @@
 
 
 static io32_t exception_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((aligned(64)));
+static int char_x;
+static int char_y;
 static const vi_regs_t vi_config[] = {{
     .CR = (
         VI_CR_PIXEL_ADVANCE_1 |
@@ -75,6 +77,9 @@ static void exception_init_screen (void) {
     const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
     uint32_t *background_data = (uint32_t *) (&assets_exception_background);
 
+    char_x = BORDER_WIDTH;
+    char_y = BORDER_HEIGHT;
+
     for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 2) {
         io_write(&exception_framebuffer[i], *background_data);
         io_write(&exception_framebuffer[i + 1], *background_data);
@@ -98,18 +103,15 @@ static void exception_init_screen (void) {
 }
 
 static void exception_draw_character (char c) {
-    static int x = BORDER_WIDTH;
-    static int y = BORDER_HEIGHT;
-
     if (c == '\n') {
-        x = BORDER_WIDTH;
-        y += LINE_HEIGHT;
+        char_x = BORDER_WIDTH;
+        char_y += LINE_HEIGHT;
         return;
     }
 
-    if ((x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
-        x = BORDER_WIDTH;
-        y += LINE_HEIGHT;
+    if ((char_x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
+        char_x = BORDER_WIDTH;
+        char_y += LINE_HEIGHT;
     }
 
     if ((c < ' ') || (c > '~')) {
@@ -117,8 +119,8 @@ static void exception_draw_character (char c) {
     }
 
     for (int i = 0; i < (FONT_WIDTH * FONT_HEIGHT); i++) {
-        int c_x = x + (i % FONT_WIDTH);
-        int c_y = y + (i / FONT_WIDTH);
+        int c_x = char_x + (i % FONT_WIDTH);
+        int c_y = char_y + (i / FONT_WIDTH);
 
         if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (SCREEN_HEIGHT - BORDER_HEIGHT))) {
             break;
@@ -130,7 +132,7 @@ static void exception_draw_character (char c) {
         }
     }
 
-    x += FONT_WIDTH;
+    char_x += FONT_WIDTH;
 }
 
 static void exception_print_string (const char *s) {

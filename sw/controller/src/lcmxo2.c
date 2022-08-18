@@ -56,16 +56,6 @@ static void lcmxo2_reg_set (uint8_t reg, uint8_t value) {
     while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
 }
 
-static uint8_t lcmxo2_reg_get (uint8_t reg) {
-    fpga_reg_set(REG_VENDOR_SCR,
-        (reg << VENDOR_SCR_ADDRESS_BIT) |
-        (0 << VENDOR_SCR_LENGTH_BIT) |
-        VENDOR_SCR_START
-    );
-    while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
-    return fpga_reg_get(REG_VENDOR_DATA) & 0xFF;
-}
-
 static void lcmxo2_reset_bus (void) {
     lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
     lcmxo2_reg_set(LCMXO2_CFGCR, 0);
@@ -91,14 +81,41 @@ static void lcmxo2_cleanup (void) {
 }
 
 static void lcmxo2_read_data (uint8_t *buffer, uint32_t length) {
-    for (uint32_t i = 0; i < length; i++) {
-        *buffer++ = lcmxo2_reg_get(LCMXO2_CFGRXDR);
+    while (length > 0) {
+        uint32_t block_size = (length > 4) ? 4 : length;
+        fpga_reg_set(REG_VENDOR_SCR,
+            (LCMXO2_CFGRXDR << VENDOR_SCR_ADDRESS_BIT) |
+            ((block_size - 1) << VENDOR_SCR_LENGTH_BIT) |
+            VENDOR_SCR_START
+        );
+        while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
+        uint32_t data = fpga_reg_get(REG_VENDOR_DATA);
+        data <<= ((4 - block_size) * 8);
+        for (int i = 0; i < block_size; i++) {
+            *buffer++ = ((data >> 24) & 0xFF);
+            data <<= 8;
+            length -= 1;
+        }
     }
 }
 
 static void lcmxo2_write_data (uint8_t *buffer, uint32_t length) {
-    for (uint32_t i = 0; i < length; i++) {
-        lcmxo2_reg_set(LCMXO2_CFGTXDR, *buffer++);
+    while (length > 0) {
+        uint32_t block_size = (length > 4) ? 4 : length;
+        uint32_t data = 0;
+        for (int i = 0; i < block_size; i++) {
+            data = ((data << 8) | *buffer++);
+            length -= 1;
+        }
+        data <<= ((4 - block_size) * 8);
+        fpga_reg_set(REG_VENDOR_DATA, data);
+        fpga_reg_set(REG_VENDOR_SCR,
+            (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
+            ((block_size - 1) << VENDOR_SCR_LENGTH_BIT) |
+            VENDOR_SCR_WRITE |
+            VENDOR_SCR_START
+        );
+        while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
     }
 }
 

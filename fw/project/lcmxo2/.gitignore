@@ -1,5 +1,6 @@
 .recovery
 *.dir/
+*.ccl
 *.html
 *.ini
 *.rva

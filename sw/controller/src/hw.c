@@ -267,9 +267,9 @@ void hw_crc32_reset (void) {
 
 uint32_t hw_crc32_calculate (uint8_t *data, uint32_t length) {
     for (uint32_t i = 0; i < length; i++) {
-        *(__IO uint8_t *) (CRC->DR) = data[i];
+        *(__IO uint8_t *) (&CRC->DR) = data[i];
     }
-    return CRC->DR;
+    return (CRC->DR ^ 0xFFFFFFFF);
 }
 
 uint32_t hw_flash_size (void) {
@@ -359,6 +359,10 @@ static void hw_init_mcu (void) {
 
     RCC->IOPENR |= RCC_IOPENR_GPIOAEN | RCC_IOPENR_GPIOBEN;
 
+    SysTick->LOAD = (((64000000 / 1000)) - 1);
+    SysTick->VAL = 0;
+    SysTick->CTRL = (SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk);
+
     hw_gpio_init(GPIO_ID_LED, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_0, 0);
 }
 
@@ -437,11 +441,9 @@ static void hw_init_tim (void) {
 }
 
 static void hw_init_misc (void) {
-    SysTick->LOAD = (((64000000 / 1000)) - 1);
-    SysTick->VAL = 0;
-    SysTick->CTRL = (SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk);
-
     RCC->AHBENR |= RCC_AHBENR_CRCEN;
+
+    CRC->CR = (CRC_CR_REV_OUT | CRC_CR_REV_IN_0);
 
     hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
