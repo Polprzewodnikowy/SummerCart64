@@ -19,7 +19,7 @@ header_crc:
 
     .org 0x20, 0x00
 header_text_info:
-    .ascii "n64boot SummerCart64"
+    .ascii "SC64 bootloader"
     .org 0x40, 0x00
 
 

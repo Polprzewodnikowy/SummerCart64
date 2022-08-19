@@ -1,6 +1,8 @@
 #!/bin/bash
 
 
+set -e
+
 case "$1" in
     all)
         make all -j -f loader.mk USER_FLAGS="$USER_FLAGS"

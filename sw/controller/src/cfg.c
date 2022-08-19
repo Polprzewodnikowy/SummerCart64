@@ -194,7 +194,7 @@ bool cfg_query (uint32_t *args) {
             args[1] = p.tv_type;
             break;
         case CFG_ID_FLASH_ERASE_BLOCK:
-            args[1] = 0xFFFFFFFF;
+            args[1] = FLASH_ERASE_BLOCK_SIZE;
             break;
         case CFG_ID_DD_DRIVE_TYPE:
             args[1] = dd_get_drive_type();

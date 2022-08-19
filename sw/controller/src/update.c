@@ -44,7 +44,7 @@ static uint32_t update_align (uint32_t value) {
 }
 
 static uint32_t update_checksum (uint32_t address, uint32_t length) {
-    uint8_t buffer[32];
+    uint8_t buffer[128];
     uint32_t block_size;
     uint32_t checksum = 0;
     hw_crc32_reset();
@@ -143,6 +143,40 @@ static void update_status_notify (update_status_t status) {
         update_blink_led(15, 185, 2);
         hw_delay_ms(500);
     }
+}
+
+static bool mcu_update (uint32_t address, uint32_t length) {
+    hw_flash_t buffer;
+    hw_flash_erase();
+    for (uint32_t offset = 0; offset < length; offset += sizeof(hw_flash_t)) {
+        fpga_mem_read(address + offset, sizeof(hw_flash_t), (uint8_t *) (&buffer));
+        hw_flash_program(offset, buffer);
+        if (hw_flash_read(offset) != buffer) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool bootloader_update (uint32_t address, uint32_t length) {
+    uint8_t update_buffer[FPGA_MAX_MEM_TRANSFER];
+    uint8_t verify_buffer[FPGA_MAX_MEM_TRANSFER];
+    for (uint32_t offset = 0; offset < BOOTLOADER_LENGTH; offset += FLASH_ERASE_BLOCK_SIZE) {
+        flash_erase_block(BOOTLOADER_ADDRESS + offset);
+    }
+    for (uint32_t offset = 0; offset < length; offset += FPGA_MAX_MEM_TRANSFER) {
+        fpga_mem_copy(address + offset, BOOTLOADER_ADDRESS + offset, FPGA_MAX_MEM_TRANSFER);
+    }
+    for (uint32_t offset = 0; offset < length; offset += sizeof(verify_buffer)) {
+        fpga_mem_read(address + offset, sizeof(update_buffer), update_buffer);
+        fpga_mem_read(BOOTLOADER_ADDRESS + offset, sizeof(verify_buffer), verify_buffer);
+        for (int i = 0; i < sizeof(verify_buffer); i++) {
+            if (update_buffer[i] != verify_buffer[i]) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 
@@ -247,17 +281,11 @@ void update_perform (void) {
     uint32_t length;
 
     if (parameters.flags & LOADER_FLAGS_UPDATE_MCU) {
-        hw_flash_t buffer;
         update_status_notify(UPDATE_STATUS_MCU);
         fpga_mem_read(parameters.mcu_address - 4, sizeof(length), (uint8_t *) (&length));
-        hw_flash_erase();
-        for (uint32_t offset = 0; offset < length; offset += sizeof(hw_flash_t)) {
-            fpga_mem_read(parameters.mcu_address + offset, sizeof(hw_flash_t), (uint8_t *) (&buffer));
-            hw_flash_program(offset, buffer);
-            if (hw_flash_read(offset) != buffer) {
-                update_status_notify(UPDATE_STATUS_ERROR);
-                while (1);
-            }
+        if (mcu_update(parameters.mcu_address, length)) {
+            update_status_notify(UPDATE_STATUS_ERROR);
+            while (1);
         }
     }
 
@@ -273,11 +301,9 @@ void update_perform (void) {
     if (parameters.flags & LOADER_FLAGS_UPDATE_BOOTLOADER) {
         update_status_notify(UPDATE_STATUS_BOOTLOADER);
         fpga_mem_read(parameters.bootloader_address - 4, sizeof(length), (uint8_t *) (&length));
-        for (uint32_t offset = 0; offset < BOOTLOADER_LENGTH; offset += FLASH_ERASE_BLOCK_SIZE) {
-            flash_erase_block(BOOTLOADER_ADDRESS + offset);
-        }
-        for (uint32_t offset = 0; offset < length; offset += FPGA_MAX_MEM_TRANSFER) {
-            fpga_mem_copy(parameters.bootloader_address + offset, BOOTLOADER_ADDRESS + offset, FPGA_MAX_MEM_TRANSFER);
+        if (bootloader_update(parameters.bootloader_address, length)) {
+            update_status_notify(UPDATE_STATUS_ERROR);
+            while (1);
         }
     }
 

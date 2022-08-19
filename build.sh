@@ -71,6 +71,9 @@ build_update () {
     build_fpga
 
     pushd sw/update > /dev/null
+    if [ "$FORCE_CLEAN" = true ]; then
+        rm -f ./sc64.upd
+    fi
     INFO=""
     if [ ! -z "${GIT_BRANCH+x}" ]; then INFO+=" $GIT_BRANCH"; fi
     if [ ! -z "${GIT_TAG+x}" ]; then INFO+=" $GIT_TAG"; fi

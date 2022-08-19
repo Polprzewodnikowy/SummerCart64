@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import math
 import os
@@ -5,6 +7,7 @@ import sys
 from binascii import crc32
 from datetime import datetime
 from io import BufferedRandom
+
 
 
 class JedecError(Exception):
