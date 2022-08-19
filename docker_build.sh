@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.5"
 
 pushd $(dirname $0) > /dev/null
@@ -27,4 +25,10 @@ docker run \
     $BUILDER_IMAGE \
     ./build.sh $@
 
+BUILD_ERROR = $?
+
 popd > /dev/null
+
+if [ $BUILD_ERROR -ne 0 ]; then
+    exit -1
+fi

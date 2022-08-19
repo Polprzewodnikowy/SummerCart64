@@ -71,6 +71,5 @@ Current goal is to rewrite README.md
 
 ## Finished sample
 
-![SC64 HW ver: 2.0 TOP](.github/sc64_v2_top.jpg | width=64)
-
-![SC64 HW ver: 2.0 BOTTOM](.github/sc64_v2_bottom.jpg | width=64)
+<img src=".github/sc64_v2_top.jpg" alt="SC64 HW ver: 2.0 PCB top" width="640" />
+<img src=".github/sc64_v2_bottom.jpg" alt="SC64 HW ver: 2.0 PCB bottom" width="640" />
