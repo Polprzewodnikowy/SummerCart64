@@ -1,4 +1,4 @@
-rvl_alias "clk" "clk";
+RVL_ALIAS "clk" "clk"; 
 BANK 0 VCCIO 3.3 V;
 BANK 1 VCCIO 3.3 V;
 BANK 2 VCCIO 3.3 V;
@@ -202,3 +202,8 @@ LOCATE COMP "usb_miso" SITE "10" ;
 LOCATE COMP "usb_pwrsav" SITE "2" ;
 SYSCONFIG SDM_PORT=DISABLE ;
 VOLTAGE 3.300 V;
+FREQUENCY NET "clk" 100.000000 MHz PAR_ADJ 10.000000 ;
+BLOCK PATH TO PORT "mcu_int" ;
+BLOCK PATH TO PORT "n64_irq" ;
+BLOCK PATH FROM PORT "usb_pwrsav" ;
+BLOCK PATH FROM PORT "sd_det" ;
