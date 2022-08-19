@@ -69,10 +69,8 @@ Folder **`sw`** contains several helper programs that makes flash cart work all 
 Current goal is to rewrite README.md
 
 
-## Finished sample (obsolete v1 version, to be replaced with v2)
+## Finished sample
 
-![SummerCart64 clean PCB](.github/sc64_clean_pcb.jpg)
+![SC64 HW ver: 2.0 TOP](.github/sc64_v2_top.jpg | width=64)
 
-![SummerCart64 on table](.github/sc64_on_table.jpg)
-
-![SummerCart64 in partialy disassembled Nintendo 64](.github/sc64_in_n64.jpg)
+![SC64 HW ver: 2.0 BOTTOM](.github/sc64_v2_bottom.jpg | width=64)
