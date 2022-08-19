@@ -25,7 +25,9 @@ docker run \
     $BUILDER_IMAGE \
     ./build.sh $@
 
-BUILD_ERROR = $?
+BUILD_ERROR=$?
+
+ls -R -lah $(pwd)/fw/project
 
 popd > /dev/null
 
