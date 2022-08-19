@@ -6,8 +6,7 @@ PACKAGE_FILE_NAME="SC64"
 
 FILES=(
     "./fw/ftdi/ft232h_config.xml"
-    "./fw/project/lcmxo2/impl1/sc64_impl1_tw1.html"
-    "./fw/project/lcmxo2/impl1/sc64_impl1_twr.html"
+    "./fw/project/lcmxo2/impl1/sc64_impl1.twr"
     "./sw/pc/sc64.py"
     "./sw/update/sc64.upd"
     "./LICENSE"

@@ -27,8 +27,6 @@ docker run \
 
 BUILD_ERROR=$?
 
-ls -R -lah $(pwd)/fw/project
-
 popd > /dev/null
 
 if [ $BUILD_ERROR -ne 0 ]; then
