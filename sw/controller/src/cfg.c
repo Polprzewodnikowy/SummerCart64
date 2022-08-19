@@ -285,7 +285,7 @@ void cfg_set_time (uint32_t *args) {
 }
 
 void cfg_init (void) {
-    fpga_reg_set(REG_CFG_SCR, 0);
+    fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
     cfg_set_save_type(SAVE_TYPE_NONE);
 
     p.cic_seed = CIC_SEED_UNKNOWN;
