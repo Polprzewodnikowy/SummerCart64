@@ -75,12 +75,13 @@ build_update () {
     if [ "$FORCE_CLEAN" = true ]; then
         rm -f ./sc64.upd
     fi
-    INFO=""
-    if [ ! -z "${GIT_BRANCH+x}" ]; then INFO+=" $GIT_BRANCH"; fi
-    if [ ! -z "${GIT_TAG+x}" ]; then INFO+=" $GIT_TAG"; fi
-    if [ ! -z "${GIT_SHA+x}" ]; then INFO+=" $GIT_SHA"; fi
+    GIT_INFO=""
+    if [ ! -z "${GIT_BRANCH+x}" ]; then GIT_INFO+="branch: $GIT_BRANCH "; fi
+    if [ ! -z "${GIT_TAG+x}" ]; then GIT_INFO+="tag: $GIT_TAG "; fi
+    if [ ! -z "${GIT_SHA+x}" ]; then GIT_INFO+="sha: $GIT_SHA "; fi
+    GIT_INFO=$(echo "$GIT_INFO" | xargs)
     python3 update.py \
-        --info "$INFO" \
+        --git "$GIT_INFO" \
         --mcu ../controller/build/app/app.bin \
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \

@@ -19,6 +19,7 @@ docker run \
     --mac-address ${MAC_ADDRESS:-F8:12:34:56:78:90} \
     --mount type=bind,src="$(pwd)/flexlm",target="/flexlm" \
     --mount type=bind,src="$(pwd)",target="/workdir" \
+    -h=`hostname` \
     -e GIT_BRANCH="$GIT_BRANCH" \
     -e GIT_TAG="$GIT_TAG" \
     -e GIT_SHA="$GIT_SHA" \
