@@ -3,6 +3,7 @@
 import argparse
 import math
 import os
+import platform
 import sys
 from binascii import crc32
 from datetime import datetime
@@ -176,7 +177,7 @@ class SC64UpdateData:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SC64 update file generator')
-    parser.add_argument('--info', metavar='info_text', required=False, help='text to embed as update info')
+    parser.add_argument('--git', metavar='git', required=False, help='git text to embed in update info')
     parser.add_argument('--mcu', metavar='mcu_path', required=False, help='path to MCU update data')
     parser.add_argument('--fpga', metavar='fpga_path', required=False, help='path to FPGA update data')
     parser.add_argument('--boot', metavar='bootloader_path', required=False, help='path to N64 bootloader update data')
@@ -192,10 +193,16 @@ if __name__ == "__main__":
         update = SC64UpdateData()
         update.create_update_data()
 
-        creation_time = datetime.now().strftime('%d.%m.%Y %H:%M:%S')
-        info_text = args.info or ''
-        update_info = f'{creation_time}{info_text}'
-        print(f'Update info text: {update_info}')
+        hostname = platform.node()
+        creation_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        info = [
+            f'build system: [{hostname}]',
+            f'creation time: [{creation_time}]',
+        ]
+        if (args.git):
+            info.append(f'git: [{args.git}]')
+        update_info = '\n'.join(info)
+        print(f'Update info:\n{update_info}')
         update.add_update_info(update_info.encode())
 
         if (args.mcu):
