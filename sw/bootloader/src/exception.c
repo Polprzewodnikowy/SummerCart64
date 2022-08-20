@@ -189,7 +189,8 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
 
     exception_print("branch: %s\n", version->git_branch);
     exception_print("tag: %s\n", version->git_tag);
-    exception_print("sha: %s\n\n", version->git_sha);
+    exception_print("sha: %s\n", version->git_sha);
+    exception_print("message: %s\n\n", version->git_message);
     exception_print("%s\n\n", exception_get_description(exception_code));
     exception_print("pc: 0x%08lX  sr: 0x%08lX  cr: 0x%08lX  hw: 0x%08lX  [%.4s]\n", e->epc.u32, e->sr, e->cr, sc64_version, (char *) (&sc64_version));
     exception_print("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);

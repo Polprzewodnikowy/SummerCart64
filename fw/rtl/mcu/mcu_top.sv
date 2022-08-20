@@ -375,15 +375,10 @@ module mcu_top (
             case (address)
                 REG_STATUS: begin
                     reg_rdata <= {
-                        24'd0,
-                        sd_det_ff[2],
-                        ~fifo_bus.tx_full,
-                        ~fifo_bus.rx_empty,
-                        n64_scb.flashram_pending,
+                        29'd0,
                         n64_scb.cfg_pending,
-                        usb_dma_scb.busy,
-                        usb_scb.reset_pending,
-                        button_ff[2]
+                        ~sd_det_ff[2],
+                        ~button_ff[2]
                     };
                 end
 

@@ -60,22 +60,18 @@ typedef enum {
 
 #define FPGA_MAX_MEM_TRANSFER       (1024)
 
+#define USB_STATUS_RXNE             (1 << 0)
+#define USB_STATUS_TXE              (1 << 1)
+
 #define MEM_SCR_START               (1 << 0)
 #define MEM_SCR_STOP                (1 << 1)
 #define MEM_SCR_DIRECTION           (1 << 2)
 #define MEM_SCR_BUSY                (1 << 3)
 #define MEM_SCR_LENGTH_BIT          (4)
 
-#define USB_STATUS_RXNE             (1 << 0)
-#define USB_STATUS_TXE              (1 << 1)
-
 #define STATUS_BUTTON               (1 << 0)
-#define STATUS_USB_RESET_PENDING    (1 << 1)
-#define STATUS_DMA_BUSY             (1 << 2)
-#define STATUS_CFG_PENDING          (1 << 3)
-#define STATUS_FLASHRAM_PENDING     (1 << 4)
-#define STATUS_USB_RXNE             (1 << 5)
-#define STATUS_USB_TXE              (1 << 6)
+#define STATUS_SD_INSERTED          (1 << 1)
+#define STATUS_CFG_PENDING          (1 << 2)
 
 #define USB_SCR_FIFO_FLUSH          (1 << 0)
 #define USB_SCR_RXNE                (1 << 1)

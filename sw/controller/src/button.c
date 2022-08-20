@@ -19,15 +19,15 @@ bool button_get_state (void) {
     return p.state;
 }
 
-button_mode_t button_get_mode (void) {
-    return p.mode;
-}
-
 void button_set_mode (button_mode_t mode) {
     p.mode = mode;
     if (p.mode == BUTTON_MODE_NONE) {
         p.trigger = false;
     }
+}
+
+button_mode_t button_get_mode (void) {
+    return p.mode;
 }
 
 void button_init (void) {
@@ -41,7 +41,7 @@ void button_process (void) {
     usb_tx_info_t packet_info;
     uint32_t status = fpga_reg_get(REG_STATUS);
     p.shift <<= 1;
-    if (!(status & STATUS_BUTTON)) {
+    if (status & STATUS_BUTTON) {
         p.shift |= (1 << 0);
     }
     if (!p.state && p.shift == 0xFFFFFFFFUL) {

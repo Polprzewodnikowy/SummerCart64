@@ -17,6 +17,11 @@ static version_t version = {
 #else
 #warning "No GIT_SHA provided"
 #endif
+#ifdef GIT_MESSAGE
+    .git_message = GIT_MESSAGE,
+#else
+#warning "No GIT_MESSAGE provided"
+#endif
 };
 
 

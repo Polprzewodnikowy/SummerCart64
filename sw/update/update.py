@@ -14,6 +14,7 @@ from io import BufferedRandom
 class JedecError(Exception):
     pass
 
+
 class JedecFile:
     __fuse_length: int = 0
     __fuse_offset: int = 0
@@ -175,6 +176,7 @@ class SC64UpdateData:
         return self.__data
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SC64 update file generator')
     parser.add_argument('--git', metavar='git', required=False, help='git text to embed in update info')
@@ -200,9 +202,9 @@ if __name__ == "__main__":
             f'creation time: [{creation_time}]',
         ]
         if (args.git):
-            info.append(f'git: [{args.git}]')
-        update_info = '\n'.join(info)
-        print(f'Update info:\n{update_info}')
+            info.append(args.git)
+        update_info = ' '.join(info)
+        print(update_info)
         update.add_update_info(update_info.encode())
 
         if (args.mcu):

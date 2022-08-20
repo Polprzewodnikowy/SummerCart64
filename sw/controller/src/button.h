@@ -14,8 +14,8 @@ typedef enum {
 
 
 bool button_get_state (void);
-button_mode_t button_get_mode (void);
 void button_set_mode (button_mode_t mode);
+button_mode_t button_get_mode (void);
 void button_init (void);
 void button_process (void);
 
