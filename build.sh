@@ -105,7 +105,7 @@ build_release () {
 }
 
 print_usage () {
-    echo "builder script for SummerCart64"
+    echo "builder script for SC64"
     echo "usage: ./build.sh [bootloader] [controller] [fpga] [update] [release] [-c] [--help]"
     echo "parameters:"
     echo "  bootloader  - compile N64 bootloader software"

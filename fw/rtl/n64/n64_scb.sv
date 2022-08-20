@@ -159,6 +159,8 @@ interface n64_scb ();
     );
 
     modport cfg (
+        input n64_reset,
+
         output cfg_pending,
         input cfg_done,
         input cfg_error,

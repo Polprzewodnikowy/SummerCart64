@@ -5,7 +5,7 @@
   (paper "A2")
 
   (title_block
-    (title "SummerCart64")
+    (title "SC64")
     (date "2022-05-15")
     (rev "2.0")
     (company "Polprzewodnikowy")

@@ -4,6 +4,7 @@ BUILD_DIR = build/app
 SRC_FILES = \
 	app.S \
 	app.c \
+	button.c \
 	cfg.c \
 	cic.c \
 	dd.c \

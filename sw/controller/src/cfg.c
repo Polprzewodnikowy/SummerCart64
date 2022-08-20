@@ -1,3 +1,4 @@
+#include "button.h"
 #include "cfg.h"
 #include "dd.h"
 #include "flash.h"
@@ -20,6 +21,8 @@ typedef enum {
     CFG_ID_FLASH_ERASE_BLOCK,
     CFG_ID_DD_DRIVE_TYPE,
     CFG_ID_DD_DISK_STATE,
+    CFG_ID_BUTTON_STATE,
+    CFG_ID_BUTTON_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -202,6 +205,12 @@ bool cfg_query (uint32_t *args) {
         case CFG_ID_DD_DISK_STATE:
             args[1] = dd_get_disk_state();
             break;
+        case CFG_ID_BUTTON_STATE:
+            args[1] = button_get_state();
+            break;
+        case CFG_ID_BUTTON_MODE:
+            args[1] = button_get_mode();
+            break;
         default:
             return true;
     }
@@ -257,6 +266,12 @@ bool cfg_update (uint32_t *args) {
             break;
         case CFG_ID_DD_DISK_STATE:
             dd_set_disk_state(args[1]);
+            break;
+        case CFG_ID_BUTTON_STATE:
+            return true;
+            break;
+        case CFG_ID_BUTTON_MODE:
+            button_set_mode(args[1]);
             break;
         default:
             return true;

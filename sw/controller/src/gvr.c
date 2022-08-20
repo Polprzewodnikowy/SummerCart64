@@ -1,3 +1,4 @@
+#include "button.h"
 #include "cfg.h"
 #include "dd.h"
 #include "flashram.h"
@@ -10,6 +11,7 @@
 void gvr_task (void) {
     while (fpga_id_get() != FPGA_ID);
 
+    button_init();
     cfg_init();
     dd_init();
     flashram_init();
@@ -17,6 +19,7 @@ void gvr_task (void) {
     usb_init();
 
     while (1) {
+        button_process();
         cfg_process();
         dd_process();
         flashram_process();
