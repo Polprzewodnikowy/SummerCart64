@@ -108,12 +108,12 @@ void display_init (uint32_t *background) {
 
     if (background == NULL) {
         for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 1) {
-            display_framebuffer[i] = BACKGROUND_COLOR;
+            io_write(&display_framebuffer[i], BACKGROUND_COLOR);
         }
     } else {
         for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 2) {
-            display_framebuffer[i] = *background;
-            display_framebuffer[i + 1] = *background;
+            io_write(&display_framebuffer[i], *background);
+            io_write(&display_framebuffer[i + 1], *background);
             background++;
         }
     }

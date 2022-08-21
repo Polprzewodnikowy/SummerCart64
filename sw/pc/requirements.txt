@@ -1,3 +1,0 @@
-progressbar2==3.55.0
-pyft232==0.12
-pywin32==303; sys_platform == 'win32'

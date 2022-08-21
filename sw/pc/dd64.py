@@ -3,11 +3,12 @@ from io import BufferedReader
 from typing import Optional
 
 
+
 class BadBlockError(Exception):
     pass
 
 
-class SixtyFourDiskDrive:
+class DD64Image:
     __DISK_HEADS = 2
     __DISK_TRACKS = 1175
     __DISK_BLOCKS_PER_TRACK = 2
@@ -42,12 +43,12 @@ class SixtyFourDiskDrive:
         [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
     ]
     __DISK_DRIVE_TYPES = [(
-        "development",
+        'development',
         192,
         [11, 10, 3, 2],
         [0, 1, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23],
     ), (
-        "retail",
+        'retail',
         232,
         [9, 8, 1, 0],
         [2, 3, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23],
@@ -56,6 +57,7 @@ class SixtyFourDiskDrive:
     __file: Optional[BufferedReader]
     __drive_type: Optional[str]
     __block_info_table: list[tuple[int, int]]
+    loaded: bool = False
 
     def __init__(self) -> None:
         self.__file = None
@@ -108,7 +110,7 @@ class SixtyFourDiskDrive:
                 disk_bad_lbas.append(id_lba)
 
         if not (disk_system_data and disk_id_data):
-            raise ValueError("Provided 64DD disk file is not valid")
+            raise ValueError('Provided 64DD disk file is not valid')
 
         disk_zone_bad_tracks = []
 
@@ -153,11 +155,11 @@ class SixtyFourDiskDrive:
 
     def __check_track_head_block(self, track: int, head: int, block: int) -> None:
         if (track < 0 or track >= self.__DISK_TRACKS):
-            raise ValueError("Track outside of possible range")
+            raise ValueError('Track outside of possible range')
         if (head < 0 or head >= self.__DISK_HEADS):
-            raise ValueError("Head outside of possible range")
+            raise ValueError('Head outside of possible range')
         if (block < 0 or block >= self.__DISK_BLOCKS_PER_TRACK):
-            raise ValueError("Block outside of possible range")
+            raise ValueError('Block outside of possible range')
 
     def __get_table_index(self, track: int, head: int, block: int) -> int:
         return (track << 2) | (head << 1) | (block)
@@ -173,8 +175,10 @@ class SixtyFourDiskDrive:
         self.unload()
         self.__file = open(path, 'rb+')
         self.__parse_disk()
+        self.loaded = True
 
     def unload(self) -> None:
+        self.loaded = False
         if (self.__file != None and not self.__file.closed):
             self.__file.close()
         self.__drive_type = None
@@ -196,25 +200,26 @@ class SixtyFourDiskDrive:
             raise BadBlockError
         (offset, block_size) = info
         if (len(data) != block_size):
-            raise ValueError(f"Provided data block size is different than expected ({len(data)} != {block_size})")
+            raise ValueError(f'Provided data block size is different than expected ({len(data)} != {block_size})')
         self.__file.seek(offset)
         self.__file.write(data)
 
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     id_lba_locations = [
         (7, 0, 1),
         (7, 0, 0)
     ]
     if (len(sys.argv) >= 2):
-        dd = SixtyFourDiskDrive()
+        dd = DD64Image()
         dd.load(sys.argv[1])
         print(dd.get_drive_type())
         for (track, head, block) in id_lba_locations:
             try:
                 print(dd.read_block(track, head, block)[:4])
             except BadBlockError:
-                print(f"Bad ID block [track: {track}, head: {head}, block: {block}]")
+                print(f'Bad ID block [track: {track}, head: {head}, block: {block}]')
         dd.unload()
     else:
-        print(f"[{sys.argv[0]}]: Expected disk image path as first argument")
+        print(f'[{sys.argv[0]}]: Expected disk image path as first argument')
