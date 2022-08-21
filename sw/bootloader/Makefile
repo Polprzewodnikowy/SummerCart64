@@ -19,6 +19,7 @@ SRC_FILES = \
 	startup.S \
 	boot.c \
 	crc32.c \
+	display.c \
 	error.c \
 	exception.c \
 	exception.S \
@@ -31,6 +32,7 @@ SRC_FILES = \
 	sc64.c \
 	storage.c \
 	syscalls.c \
+	test.c \
 	version.c \
 	fatfs/diskio.c \
 	fatfs/ff.c \

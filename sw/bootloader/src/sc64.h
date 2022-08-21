@@ -19,6 +19,8 @@ typedef enum {
     CFG_ID_FLASH_ERASE_BLOCK,
     CFG_ID_DD_DRIVE_TYPE,
     CFG_ID_DD_DISK_STATE,
+    CFG_ID_BUTTON_STATE,
+    CFG_ID_BUTTON_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -55,6 +57,13 @@ typedef enum {
     TV_TYPE_MPAL = 2,
     TV_TYPE_UNKNOWN = 3
 } tv_type_t;
+
+typedef enum {
+    BUTTON_MODE_NONE,
+    BUTTON_MODE_N64_IRQ,
+    BUTTON_MODE_USB_PACKET,
+    BUTTON_MODE_DD_DISK_SWAP,
+} button_mode_t;
 
 
 typedef struct {

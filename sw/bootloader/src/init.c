@@ -2,6 +2,7 @@
 #include "exception.h"
 #include "io.h"
 #include "sc64.h"
+#include "test.h"
 
 
 void init (void) {
@@ -18,6 +19,11 @@ void init (void) {
     exception_enable_interrupts();
 
     sc64_init();
+
+    if (test_check()) {
+        exception_disable_watchdog();
+        test_execute();
+    }
 }
 
 void deinit (void) {
