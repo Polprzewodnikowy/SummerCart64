@@ -10854,7 +10854,7 @@
     (property "Reference" "R8" (id 0) (at 196.85 383.5399 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "12k" (id 1) (at 196.85 386.0799 0)
+    (property "Value" "10k" (id 1) (at 196.85 386.0799 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (id 2) (at 196.088 384.81 90)
@@ -11649,7 +11649,7 @@
       (reference "R7") (unit 1) (value "12k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
     (path "/d1984805-4314-4f1c-9ab1-479802945b94"
-      (reference "R8") (unit 1) (value "12k") (footprint "Resistor_SMD:R_0603_1608Metric")
+      (reference "R8") (unit 1) (value "10k") (footprint "Resistor_SMD:R_0603_1608Metric")
     )
     (path "/38f041d3-336d-4c45-9e25-efeece1e2340"
       (reference "R9") (unit 1) (value "5.1k") (footprint "Resistor_SMD:R_0603_1608Metric")

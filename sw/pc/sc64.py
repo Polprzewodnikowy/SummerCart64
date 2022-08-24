@@ -1,8 +1,12 @@
+import argparse
+import os
 import queue
 import serial
+import sys
 import time
+from datetime import datetime
 from dd64 import BadBlockError, DD64Image
-from enum import IntEnum
+from enum import Enum, IntEnum
 from serial.tools import list_ports
 from threading import Thread
 from typing import Optional
@@ -15,12 +19,15 @@ class ConnectionException(Exception):
 
 class SC64Serial:
     __disconnect = False
-    __serial = None
+    __serial: Optional[serial.Serial] = None
     __thread_read = None
     __thread_write = None
     __queue_output = queue.Queue()
     __queue_input = queue.Queue()
     __queue_packet = queue.Queue()
+
+    __VID = 0x0403
+    __PID = 0x6014
 
     def __init__(self) -> None:
         ports = list_ports.comports()
@@ -30,7 +37,7 @@ class SC64Serial:
             raise ConnectionException('Serial port is already open')
 
         for p in ports:
-            if (p.vid == 0x0403 and p.pid == 0x6014 and p.serial_number.startswith('SC64')):
+            if (p.vid == self.__VID and p.pid == self.__PID and p.serial_number.startswith('SC64')):
                 try:
                     self.__serial = serial.Serial(p.device, timeout=0.1, write_timeout=5.0)
                     self.__reset_link()
@@ -180,22 +187,23 @@ class SC64Serial:
 
 class SC64:
     class __Address(IntEnum):
-        ROM = 0x0000_0000
+        SDRAM = 0x0000_0000
+        FLASH = 0x0400_0000
+        BUFFER = 0x0500_0000
+        EEPROM = 0x0500_2000
         FIRMWARE = 0x0200_0000
         DDIPL = 0x03BC_0000
         SAVE = 0x03FE_0000
         SHADOW = 0x04FE_0000
-        BUFFER = 0x0500_0000
-        EEPROM = 0x0500_2000
 
     class __Length(IntEnum):
-        ROM = (64 * 1024 * 1024)
-        FIRMWARE = (2 * 1024 * 1024)
+        SDRAM = (64 * 1024 * 1024)
+        FLASH = (16 * 1024 * 1024)
+        BUFFER = (8 * 1024)
+        EEPROM = (2 * 1024)
         DDIPL = (4 * 1024 * 1024)
         SAVE = (128 * 1024)
         SHADOW = (128 * 1024)
-        BUFFER = (8 * 1024)
-        EEPROM = (2 * 1024)
 
     class __SaveLength(IntEnum):
         NONE = 0
@@ -203,7 +211,7 @@ class SC64:
         EEPROM_16K = (2 * 1024)
         SRAM = (32 * 1024)
         FLASHRAM = (128 * 1024)
-        SRAM_X3 = (3 * 32 * 1024)
+        SRAM_3X = (3 * 32 * 1024)
 
     class __CfgId(IntEnum):
         BOOTLOADER_SWITCH = 0
@@ -306,13 +314,26 @@ class SC64:
         return self.__get_int(data)
 
     def __write_memory(self, address: int, data: bytes) -> None:
-        self.__link.execute_cmd(cmd=b'M', args=[address, len(data)], data=data)
+        if (len(data) > 0):
+            self.__link.execute_cmd(cmd=b'M', args=[address, len(data)], data=data, timeout=10.0)
 
     def __read_memory(self, address: int, length: int) -> bytes:
-        return self.__link.execute_cmd(cmd=b'm', args=[address, length])
+        if (length > 0):
+            return self.__link.execute_cmd(cmd=b'm', args=[address, length], timeout=10.0)
+        return bytes([])
+
+    def __erase_flash_region(self, address: int, length: int) -> None:
+        if (address < self.__Address.FLASH):
+            raise ValueError('Flash erase address or length outside of possible range')
+        if ((address + length) > (self.__Address.FLASH + self.__Length.FLASH)):
+            raise ValueError('Flash erase address or length outside of possible range')
+        erase_block_size = self.__get_config(self.__CfgId.FLASH_ERASE_BLOCK)
+        if ((address % erase_block_size != 0) or (length % erase_block_size != 0)):
+            raise ValueError('Flash erase address or length not aligned to block size')
+        for offset in range(address, address + length, erase_block_size):
+            self.__set_config(self.__CfgId.FLASH_ERASE_BLOCK, offset)
 
     def reset_state(self) -> None:
-        self.__set_config(self.__CfgId.BOOTLOADER_SWITCH, False)
         self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, False)
         self.__set_config(self.__CfgId.ROM_SHADOW_ENABLE, False)
         self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.NONE)
@@ -326,10 +347,22 @@ class SC64:
         self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.NONE)
         self.set_cic_parameters()
 
-    def upload_rom(self, data: bytes):
-        if (len(data) > self.__Length.ROM):
+    def upload_rom(self, data: bytes, use_shadow: bool=True):
+        rom_length = len(data)
+        if (rom_length > self.__Length.SDRAM):
             raise ValueError('ROM size too big')
-        self.__write_memory(self.__Address.ROM, data)
+        sdram_length = rom_length
+        shadow_enabled = use_shadow and rom_length > (self.__Length.SDRAM - self.__Length.SHADOW)
+        if (shadow_enabled):
+            sdram_length = (self.__Length.SDRAM - self.__Length.SHADOW)
+            shadow_length = rom_length - sdram_length
+            if (self.__read_memory(self.__Address.SHADOW, shadow_length) != data[sdram_length:]):
+                self.__erase_flash_region(self.__Address.SHADOW, self.__Length.SHADOW)
+                self.__write_memory(self.__Address.SHADOW, data[sdram_length:])
+                if (self.__read_memory(self.__Address.SHADOW, shadow_length) != data[sdram_length:]):
+                    raise ConnectionException('Shadow ROM program failure')
+        self.__write_memory(self.__Address.SDRAM, data[:sdram_length])
+        self.__set_config(self.__CfgId.ROM_SHADOW_ENABLE, shadow_enabled)
 
     def upload_ddipl(self, data: bytes) -> None:
         if (len(data) > self.__Length.DDIPL):
@@ -340,12 +373,40 @@ class SC64:
         save_type = self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE))
         if (save_type not in self.SaveType):
             raise ConnectionError('Unknown save type fetched from SC64 device')
+        if (save_type == self.SaveType.NONE):
+            raise ValueError('No save type set inside SC64 device')
         if (len(data) != self.__SaveLength[save_type.name]):
             raise ValueError('Wrong save data length')
         address = self.__Address.SAVE
         if (save_type == self.SaveType.EEPROM_4K or save_type == self.SaveType.EEPROM_16K):
             address = self.__Address.EEPROM
         self.__write_memory(address, data)
+
+    def download_save(self) -> bytes:
+        save_type = self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE))
+        if (save_type not in self.SaveType):
+            raise ConnectionError('Unknown save type fetched from SC64 device')
+        if (save_type == self.SaveType.NONE):
+            raise ValueError('No save type set inside SC64 device')
+        address = self.__Address.SAVE
+        length = self.__SaveLength[save_type.name]
+        if (save_type == self.SaveType.EEPROM_4K or save_type == self.SaveType.EEPROM_16K):
+            address = self.__Address.EEPROM
+        return self.__read_memory(address, length)
+
+    def set_rtc(self, t: datetime) -> None:
+        to_bcd = lambda v: ((int((v / 10) % 10) << 4) | int(int(v) % 10))
+        data = bytes([
+            to_bcd(t.weekday() + 1),
+            to_bcd(t.hour),
+            to_bcd(t.minute),
+            to_bcd(t.second),
+            0,
+            to_bcd(t.year),
+            to_bcd(t.month),
+            to_bcd(t.day),
+        ])
+        self.__link.execute_cmd(cmd=b'T', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
 
     def set_boot_mode(self, mode: BootMode) -> None:
         if (mode not in self.BootMode):
@@ -368,23 +429,14 @@ class SC64:
             raise ValueError('Save type outside of allowed values')
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
 
-    def set_cic_parameters(self, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=[0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59]) -> None:
+    def set_cic_parameters(self, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=bytes([0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59])) -> None:
         if (seed < 0 or seed > 0xFF):
             raise ValueError('CIC seed outside of allowed values')
         if (len(checksum) != 6):
             raise ValueError('CIC checksum length outside of allowed values')
-        args = [0, 0]
-        if (dd_mode):
-            args[0] |= (1 << 24)
-        args[0] |= (seed << 16)
-        args[0] |= (checksum[0] << 8) | checksum[1]
-        args[1] |= (
-            (checksum[2] << 24) |
-            (checksum[3] << 16) |
-            (checksum[4] << 8) |
-            (checksum[5])
-        )
-        self.__link.execute_cmd(cmd=b'B', args=args)
+        data = bytes([1 if dd_mode else 0, seed])
+        data = [*data, *checksum]
+        self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
 
     def update_firmware(self, data: bytes) -> None:
         address = self.__Address.FIRMWARE
@@ -399,9 +451,9 @@ class SC64:
             if (packet == None):
                 raise ConnectionException('Update timeout')
             (cmd, data) = packet
-            status = self.__UpdateStatus(self.__get_int(data))
             if (cmd != b'F'):
                 raise ConnectionException('Wrong update status packet')
+            status = self.__UpdateStatus(self.__get_int(data))
             print(f'Update status [{status.name}]')
             if (status == self.__UpdateStatus.ERROR):
                 raise ConnectionException('Update error, device is most likely bricked')
@@ -417,7 +469,7 @@ class SC64:
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
 
-    def __handle_dd_packet(self, dd: DD64Image, data: bytes) -> None:
+    def __handle_dd_packet(self, dd: Optional[DD64Image], data: bytes) -> None:
         CMD_READ_BLOCK = 1
         CMD_WRITE_BLOCK = 2
         cmd = self.__get_int(data[0:])
@@ -427,7 +479,7 @@ class SC64:
         head = (track_head_block >> 1) & 0x1
         block = track_head_block & 0x1
         try:
-            if (not dd.loaded):
+            if (not dd or not dd.loaded):
                 raise BadBlockError
             if (cmd == CMD_READ_BLOCK):
                 block_data = dd.read_block(track, head, block)
@@ -448,15 +500,19 @@ class SC64:
 
     def debug_loop(self, isv: bool=False, disks: Optional[list[str]]=None) -> None:
         dd = None
-        drive_type = None
         current_image = 0
         next_image = 0
 
         self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, isv)
         self.__set_config(self.__CfgId.ISV_ENABLE, isv)
+        if (isv):
+            print('IS-Viewer64 support set to [ENABLED]')
+            if (self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)):
+                print('ROM shadow enabled - ISV support will NOT work (use --no-shadow option to disable it)')
 
         if (disks):
             dd = DD64Image()
+            drive_type = None
             for path in disks:
                 try:
                     dd.load(path)
@@ -469,64 +525,158 @@ class SC64:
                     dd = None
                     print(f'64DD disabled, incorrect disk images provided: {e}')
                     break
+            if (dd):
+                self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.FULL)
+                self.__set_config(self.__CfgId.DD_DRIVE_TYPE, {
+                    'retail': self.__DDDriveType.RETAIL,
+                    'development': self.__DDDriveType.DEVELOPMENT
+                }[drive_type])
+                self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
+                self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.USB_PACKET)
+                print('64DD enabled, loaded disks:')
+                for disk in disks:
+                    print(f' - {os.path.basename(disk)}')
+                print('Press button on SC64 device to cycle through provided disks')
 
-        drive_type = self.__DDDriveType.RETAIL if drive_type == 'retail' else self.__DDDriveType.DEVELOPMENT
+        print('Debug loop started, use Ctrl-C to exit')
 
-        if (dd):
-            self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.FULL)
-            self.__set_config(self.__CfgId.DD_DRIVE_TYPE, drive_type)
-            self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
-            self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.USB_PACKET)
+        try:
+            while (True):
+                packet = self.__link.get_packet()
+                if (packet != None):
+                    (cmd, data) = packet
+                    if (cmd == b'D'):
+                        self.__handle_dd_packet(dd, data)
+                    if (cmd == b'I'):
+                        self.__handle_isv_packet(data)
+                    if (cmd == b'U'):
+                        self.__handle_usb_packet(data)
+                    if (cmd == b'B'):
+                        if (not dd.loaded):
+                            dd.load(disks[next_image])
+                            self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.INSERTED)
+                            current_image = next_image
+                            next_image += 1
+                            if (next_image >= len(disks)):
+                                next_image = 0
+                            print(f'64DD disk inserted - {os.path.basename(disks[current_image])}')
+                        else:
+                            self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
+                            dd.unload()
+                            print(f'64DD disk ejected - {os.path.basename(disks[current_image])}')
+        except KeyboardInterrupt:
+            if (dd and dd.loaded):
+                self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
 
-        while (True):
-            packet = self.__link.get_packet()
-            if (packet != None):
-                (cmd, data) = packet
-                if (cmd == b'D'):
-                    self.__handle_dd_packet(dd, data)
-                if (cmd == b'I'):
-                    self.__handle_isv_packet(data)
-                if (cmd == b'U'):
-                    self.__handle_usb_packet(data)
-                if (cmd == b'B'):
-                    if (dd.loaded):
-                        self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
-                        dd.unload()
-                        print(f'64DD disk ejected [{disks[current_image]}]')
-                    else:
-                        dd.load(disks[next_image])
-                        self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.INSERTED)
-                        current_image = next_image
-                        next_image += 1
-                        if (next_image >= len(disks)):
-                            next_image = 0
-                        print(f'64DD disk inserted [{disks[current_image]}]')
+
+class EnumAction(argparse.Action):
+    def __init__(self, **kwargs):
+        type = kwargs.pop('type', None)
+        if type is None:
+            raise ValueError('No type was provided')
+        if not issubclass(type, Enum):
+            raise TypeError('Provided type is not an Enum subclass')
+        items = (choice.lower().replace('_', '-') for (choice, _) in type.__members__.items())
+        kwargs.setdefault('choices', tuple(items))
+        super(EnumAction, self).__init__(**kwargs)
+        self.__enum = type
+
+    def __call__(self, parser, namespace, values, option_string):
+        key = str(values).upper().replace('-', '_')
+        value = self.__enum[key]
+        setattr(namespace, self.dest, value)
 
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='SC64 control software')
+    parser.add_argument('--backup', help='backup SC64 firmware and write it to specified file')
+    parser.add_argument('--update', help='update SC64 firmware from specified file')
+    parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
+    parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
+    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
+    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
+    parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
+    parser.add_argument('--rom', help='upload ROM from specified file')
+    parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
+    parser.add_argument('--save-type', type=SC64.SaveType, action=EnumAction, help='set save type')
+    parser.add_argument('--save', help='upload save from specified file')
+    parser.add_argument('--backup-save', help='download save and write it to specified file')
+    parser.add_argument('--ddipl', help='upload 64DD IPL from specified file')
+    parser.add_argument('--disk', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
+    parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
+    parser.add_argument('--debug', action='store_true', help='run debug loop (required for IS-Viewer64 and 64DD)')
+
+    if (len(sys.argv) <= 1):
+        parser.print_help()
+        parser.exit()
+
+    args = parser.parse_args()
+
     try:
         sc64 = SC64()
-        sc64.reset_state()
 
-        # sc64.set_save_type(SC64.SaveType.EEPROM_4K)
-        # with open('S:/n64/saves/SM64.eep', 'rb+') as f:
-        #     sc64.upload_save(f.read())
-        # with open('S:/n64/roms/baserom.us.z64', 'rb+') as f:
-        #     sc64.upload_rom(f.read())
-        # sc64.set_boot_mode(SC64.BootMode.ROM)
+        if (args.backup):
+            with open(args.backup, 'wb+') as f:
+                print('Generating backup, this might take a while... ', end='', flush=True)
+                f.write(sc64.backup_firmware())
+                print('done')
 
-        # with open('S:/n64/64dd/ipl/NDDJ2.n64', 'rb+') as f:
-        #     sc64.upload_ddipl(f.read())
-        # sc64.set_boot_mode(SC64.BootMode.DDIPL)
+        if (args.update):
+            with open(args.update, 'rb+') as f:
+                print('Updating firmware, this might take a while... ', end='', flush=True)
+                sc64.update_firmware(f.read())
+                print('done')
 
-        # try:
-        #     disks = [
-        #         'S:/n64/64dd/rtl/NUD-DMPJ-JPN (sealed).ndd',
-        #         'S:/n64/64dd/rtl/NUD-DMBJ-JPN.ndd'
-        #     ]
-        #     sc64.debug_loop(disks=disks)
-        # except KeyboardInterrupt:
-        #     pass
+        if (args.reset_state):
+            sc64.reset_state()
+
+        if (args.boot != None):
+            sc64.set_boot_mode(args.boot)
+            print(f'Boot mode set to [{args.boot.name}]')
+
+        if (args.tv != None):
+            sc64.set_tv_type(args.tv)
+            print(f'TV type set to [{args.tv.name}]')
+
+        if (args.cic != None):
+            sc64.set_cic_seed(args.cic)
+            print(f'CIC seed set to [0x{args.cic:X}]')
+
+        if (args.rtc):
+            sc64.set_rtc(datetime.now())
+
+        if (args.rom):
+            with open(args.rom, 'rb+') as f:
+                print('Uploading ROM... ', end='', flush=True)
+                sc64.upload_rom(f.read(), use_shadow=args.no_shadow)
+                print('done')
+
+        if (args.save_type != None):
+            sc64.set_save_type(args.save_type)
+            print(f'Save type set to [{args.save_type.name}]')
+        
+        if (args.save):
+            with open(args.save, 'rb+') as f:
+                print('Uploading save... ', end='', flush=True)
+                sc64.upload_save(f.read())
+                print('done')
+
+        if (args.ddipl):
+            with open(args.ddipl, 'rb+') as f:
+                print('Uploading 64DD IPL... ', end='', flush=True)
+                sc64.upload_ddipl(f.read())
+                print('done')
+
+        if (args.debug):
+            sc64.debug_loop(isv=args.isv, disks=args.disk)
+
+        if (args.backup_save):
+            with open(args.backup_save, 'wb+') as f:
+                print('Downloading save... ', end='', flush=True)
+                f.write(sc64.download_save())
+                print('done')
+    except ValueError as e:
+        print(f'\nValue error: {e}')
     except ConnectionException as e:
-        print(f'SC64 error: {e}')
+        print(f'\nSC64 error: {e}')
