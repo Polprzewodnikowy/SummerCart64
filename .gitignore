@@ -4,5 +4,4 @@
 **/*.zip
 /flexlm
 
-!**/.vscode/launch.json
 !**/.vscode/tasks.json
