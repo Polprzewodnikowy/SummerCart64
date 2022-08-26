@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import os
 import queue
@@ -59,9 +61,9 @@ class SC64Serial:
 
     def __del__(self) -> None:
         self.__disconnect = True
-        if (self.__thread_read.is_alive()):
+        if (self.__thread_read != None and self.__thread_read.is_alive()):
             self.__thread_read.join(1)
-        if (self.__thread_write.is_alive()):
+        if (self.__thread_write != None and self.__thread_write.is_alive()):
             self.__thread_write.join(6)
         if (self.__serial != None and self.__serial.is_open):
             self.__serial.close()
@@ -347,6 +349,24 @@ class SC64:
         self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.NONE)
         self.set_cic_parameters()
 
+    def get_state(self):
+        return {
+            'bootloader_switch': bool(self.__get_config(self.__CfgId.BOOTLOADER_SWITCH)),
+            'rom_write_enable': bool(self.__get_config(self.__CfgId.ROM_WRITE_ENABLE)),
+            'rom_shadow_enable': bool(self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)),
+            'dd_mode': self.__DDMode(self.__get_config(self.__CfgId.DD_MODE)),
+            'isv_enable': bool(self.__get_config(self.__CfgId.ISV_ENABLE)),
+            'boot_mode': self.BootMode(self.__get_config(self.__CfgId.BOOT_MODE)),
+            'save_type': self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE)),
+            'cic_seed': self.CICSeed(self.__get_config(self.__CfgId.CIC_SEED)),
+            'tv_type': self.TVType(self.__get_config(self.__CfgId.TV_TYPE)),
+            'flash_erase_block': self.__get_config(self.__CfgId.FLASH_ERASE_BLOCK),
+            'dd_drive_type': self.__DDDriveType(self.__get_config(self.__CfgId.DD_DRIVE_TYPE)),
+            'dd_disk_state': self.__DDDiskState(self.__get_config(self.__CfgId.DD_DISK_STATE)),
+            'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
+            'button_mode': self.__ButtonMode(self.__get_config(self.__CfgId.BUTTON_MODE)),
+        }
+
     def upload_rom(self, data: bytes, use_shadow: bool=True):
         rom_length = len(data)
         if (rom_length > self.__Length.SDRAM):
@@ -464,7 +484,6 @@ class SC64:
         info = self.__link.execute_cmd(cmd=b'f', args=[address, 0], timeout=60.0)
         error = self.__UpdateError(self.__get_int(info[0:4]))
         length = self.__get_int(info[4:8])
-        print(f'Backup info - error: {error.name}, length: {hex(length)}')
         if (error != self.__UpdateError.OK):
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
@@ -593,6 +612,7 @@ if __name__ == '__main__':
     parser.add_argument('--backup', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update', help='update SC64 firmware from specified file')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
+    parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
@@ -630,6 +650,15 @@ if __name__ == '__main__':
 
         if (args.reset_state):
             sc64.reset_state()
+            print('SC64 internal state reset')
+
+        if (args.print_state):
+            state = sc64.get_state()
+            print('Current SC64 internal state:')
+            for key, value in state.items():
+                if (hasattr(value, 'name')):
+                    value = getattr(value, 'name')
+                print(f'  {key}: {value}')
 
         if (args.boot != None):
             sc64.set_boot_mode(args.boot)

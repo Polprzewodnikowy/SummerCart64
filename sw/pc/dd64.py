@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 from io import BufferedReader
 from typing import Optional

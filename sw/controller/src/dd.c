@@ -169,7 +169,7 @@ void dd_set_disk_state (dd_disk_state_t state) {
 }
 
 void dd_init (void) {
-    fpga_reg_set(REG_DD_SCR, DD_SCR_DISK_INSERTED);
+    fpga_reg_set(REG_DD_SCR, 0);
     fpga_reg_set(REG_DD_HEAD_TRACK, 0);
     fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
     p.state = STATE_IDLE;
