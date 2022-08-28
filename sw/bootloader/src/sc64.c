@@ -6,15 +6,15 @@
 
 
 typedef enum {
-    SC64_CMD_GET_VERSION        = 'v',
-    SC64_CMD_CONFIG_QUERY       = 'c',
-    SC64_CMD_CONFIG_CHANGE      = 'C',
-    SC64_CMD_TIME_GET           = 't',
+    SC64_CMD_VERSION_GET        = 'v',
+    SC64_CMD_CONFIG_SET         = 'C',
+    SC64_CMD_CONFIG_GET         = 'c',
     SC64_CMD_TIME_SET           = 'T',
-    SC64_CMD_USB_READ           = 'm',
+    SC64_CMD_TIME_GET           = 't',
+    SC64_CMD_USB_WRITE_STATUS   = 'U',
     SC64_CMD_USB_WRITE          = 'M',
     SC64_CMD_USB_READ_STATUS    = 'u',
-    SC64_CMD_USB_WRITE_STATUS   = 'U',
+    SC64_CMD_USB_READ           = 'm',
 } cmd_id_t;
 
 
@@ -45,26 +45,37 @@ bool sc64_check_presence (void) {
     return (version == SC64_VERSION_2);
 }
 
-void sc64_init (void) {
-    sc64_change_config(CFG_ID_BOOTLOADER_SWITCH, false);
+cmd_error_t sc64_get_error (void) {
+    if (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_CMD_ERROR) {
+        return (cmd_error_t) pi_io_read(&SC64_REGS->DATA[0]);
+    }
+    return CMD_OK;
 }
 
-uint32_t sc64_query_config (cfg_id_t id) {
+void sc64_set_config (cfg_id_t id, uint32_t value) {
+    uint32_t args[2] = { id, value };
+    sc64_execute_cmd(SC64_CMD_CONFIG_SET, args, NULL);
+}
+
+uint32_t sc64_get_config (cfg_id_t id) {
     uint32_t args[2] = { id, 0 };
     uint32_t result[2];
-    sc64_execute_cmd(SC64_CMD_CONFIG_QUERY, args, result);
+    sc64_execute_cmd(SC64_CMD_CONFIG_GET, args, result);
     return result[1];
 }
 
-void sc64_change_config (cfg_id_t id, uint32_t value) {
-    uint32_t args[2] = { id, value };
-    sc64_execute_cmd(SC64_CMD_CONFIG_CHANGE, args, NULL);
+void sc64_get_boot_info (sc64_boot_info_t *info) {
+    info->cic_seed = (uint16_t) sc64_get_config(CFG_ID_CIC_SEED);
+    info->tv_type = (tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
+    info->boot_mode = (boot_mode_t) sc64_get_config(CFG_ID_BOOT_MODE);
 }
 
-void sc64_get_boot_info (sc64_boot_info_t *info) {
-    info->cic_seed = (uint16_t) sc64_query_config(CFG_ID_CIC_SEED);
-    info->tv_type = (tv_type_t) sc64_query_config(CFG_ID_TV_TYPE);
-    info->boot_mode = (boot_mode_t) sc64_query_config(CFG_ID_BOOT_MODE);
+void sc64_set_time (rtc_time_t *t) {
+    uint32_t args[2] = {
+        ((t->hour << 16) | (t->minute << 8) | t->second),
+        ((t->weekday << 24) | (t->year << 16) | (t->month << 8) | t->day),
+    };
+    sc64_execute_cmd(SC64_CMD_TIME_SET, args, NULL);
 }
 
 void sc64_get_time (rtc_time_t *t) {
@@ -77,14 +88,6 @@ void sc64_get_time (rtc_time_t *t) {
     t->day = (result[1] & 0xFF);
     t->month = ((result[1] >> 8) & 0xFF);
     t->year = ((result[1] >> 16) & 0xFF);
-}
-
-void sc64_set_time (rtc_time_t *t) {
-    uint32_t args[2] = {
-        ((t->hour << 16) | (t->minute << 8) | t->second),
-        ((t->weekday << 24) | (t->year << 16) | (t->month << 8) | t->day),
-    };
-    sc64_execute_cmd(SC64_CMD_TIME_SET, args, NULL);
 }
 
 bool sc64_usb_write_ready (void) {

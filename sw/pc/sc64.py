@@ -31,6 +31,8 @@ class SC64Serial:
     __VID = 0x0403
     __PID = 0x6014
 
+    __CHUNK_SIZE = (64 * 1024)
+
     def __init__(self) -> None:
         ports = list_ports.comports()
         device_found = False
@@ -41,7 +43,7 @@ class SC64Serial:
         for p in ports:
             if (p.vid == self.__VID and p.pid == self.__PID and p.serial_number.startswith('SC64')):
                 try:
-                    self.__serial = serial.Serial(p.device, timeout=0.1, write_timeout=5.0)
+                    self.__serial = serial.Serial(p.device, timeout=1.0, write_timeout=1.0)
                     self.__reset_link()
                 except (serial.SerialException, ConnectionException):
                     if (self.__serial):
@@ -64,7 +66,7 @@ class SC64Serial:
         if (self.__thread_read != None and self.__thread_read.is_alive()):
             self.__thread_read.join(1)
         if (self.__thread_write != None and self.__thread_write.is_alive()):
-            self.__thread_write.join(6)
+            self.__thread_write.join(1)
         if (self.__serial != None and self.__serial.is_open):
             self.__serial.close()
 
@@ -93,7 +95,8 @@ class SC64Serial:
         try:
             if (self.__disconnect):
                 raise ConnectionException
-            self.__serial.write(data)
+            for offset in range(0, len(data), self.__CHUNK_SIZE):
+                self.__serial.write(data[offset:offset + self.__CHUNK_SIZE])
             self.__serial.flush()
         except (serial.SerialException, serial.SerialTimeoutException):
             raise ConnectionException
@@ -141,7 +144,7 @@ class SC64Serial:
                         raise ConnectionException
             except ConnectionException:
                 break
-    
+
     def __check_threads(self) -> None:
         if (not (self.__thread_write.is_alive() and self.__thread_read.is_alive())):
             raise ConnectionException('Serial link is closed')
@@ -284,7 +287,7 @@ class SC64:
 
     class CICSeed(IntEnum):
         ALECK = 0xAC
-        X101 = 0x3F
+        X101 = 0x13F
         X102 = 0x3F
         X103 = 0x78
         X105 = 0x91
@@ -317,11 +320,11 @@ class SC64:
 
     def __write_memory(self, address: int, data: bytes) -> None:
         if (len(data) > 0):
-            self.__link.execute_cmd(cmd=b'M', args=[address, len(data)], data=data, timeout=10.0)
+            self.__link.execute_cmd(cmd=b'M', args=[address, len(data)], data=data, timeout=20.0)
 
     def __read_memory(self, address: int, length: int) -> bytes:
         if (length > 0):
-            return self.__link.execute_cmd(cmd=b'm', args=[address, length], timeout=10.0)
+            return self.__link.execute_cmd(cmd=b'm', args=[address, length], timeout=20.0)
         return bytes([])
 
     def __erase_flash_region(self, address: int, length: int) -> None:
@@ -435,7 +438,7 @@ class SC64:
 
     def set_cic_seed(self, seed: int) -> None:
         if (seed != self.CICSeed.AUTO):
-            if (seed < 0 or seed > 0xFF):
+            if (seed < 0 or seed > 0x1FF):
                 raise ValueError('CIC seed outside of allowed values')
         self.__set_config(self.__CfgId.CIC_SEED, seed)
 
@@ -684,7 +687,7 @@ if __name__ == '__main__':
         if (args.save_type != None):
             sc64.set_save_type(args.save_type)
             print(f'Save type set to [{args.save_type.name}]')
-        
+
         if (args.save):
             with open(args.save, 'rb+') as f:
                 print('Uploading save... ', end='', flush=True)

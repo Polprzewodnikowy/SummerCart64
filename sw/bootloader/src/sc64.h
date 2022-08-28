@@ -7,6 +7,14 @@
 
 
 typedef enum {
+    CMD_OK = 0,
+    CMD_ERROR_BAD_ADDRESS = 1,
+    CMD_ERROR_BAD_CONFIG_ID = 2,
+    CMD_ERROR_TIMEOUT = 3,
+    CMD_ERROR_UNKNOWN_CMD = -1,
+} cmd_error_t;
+
+typedef enum {
     CFG_ID_BOOTLOADER_SWITCH,
     CFG_ID_ROM_WRITE_ENABLE,
     CFG_ID_ROM_SHADOW_ENABLE,
@@ -84,14 +92,14 @@ typedef struct {
 
 
 bool sc64_check_presence (void);
-void sc64_init (void);
-uint32_t sc64_query_config (cfg_id_t id);
-void sc64_change_config (cfg_id_t id, uint32_t value);
+cmd_error_t sc64_get_error (void);
+void sc64_set_config (cfg_id_t id, uint32_t value);
+uint32_t sc64_get_config (cfg_id_t id);
 void sc64_get_boot_info (sc64_boot_info_t *info);
-void sc64_get_time (rtc_time_t *t);
 void sc64_set_time (rtc_time_t *t);
-bool sc64_write_usb_ready (void);
-bool sc64_write_usb (uint32_t *address, uint32_t length);
+void sc64_get_time (rtc_time_t *t);
+bool sc64_usb_write_ready (void);
+bool sc64_usb_write (uint32_t *address, uint32_t length);
 bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
 bool sc64_usb_read (uint32_t *address, uint32_t length);
 

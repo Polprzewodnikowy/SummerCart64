@@ -5,7 +5,7 @@
 
 
 bool test_check (void) {
-    if (sc64_query_config(CFG_ID_BUTTON_STATE)) {
+    if (sc64_get_config(CFG_ID_BUTTON_STATE)) {
         return true;
     }
     return false;

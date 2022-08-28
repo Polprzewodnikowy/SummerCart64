@@ -18,12 +18,12 @@ void init (void) {
     exception_enable_watchdog();
     exception_enable_interrupts();
 
-    sc64_init();
-
     if (test_check()) {
         exception_disable_watchdog();
         test_execute();
     }
+
+    sc64_set_config(CFG_ID_BOOTLOADER_SWITCH, false);
 }
 
 void deinit (void) {
