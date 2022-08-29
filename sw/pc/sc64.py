@@ -530,7 +530,7 @@ class SC64:
         if (isv):
             print('IS-Viewer64 support set to [ENABLED]')
             if (self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)):
-                print('ROM shadow enabled - ISV support will NOT work (use --no-shadow option to disable it)')
+                print('ROM shadow enabled - IS-Viewer64 will NOT work (use --no-shadow option to disable it)')
 
         if (disks):
             dd = DD64Image()
@@ -587,8 +587,12 @@ class SC64:
                             dd.unload()
                             print(f'64DD disk ejected - {os.path.basename(disks[current_image])}')
         except KeyboardInterrupt:
-            if (dd and dd.loaded):
-                self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
+            pass
+
+        if (dd and dd.loaded):
+            self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
+        if (isv):
+            self.__set_config(self.__CfgId.ISV_ENABLE, False)
 
 
 class EnumAction(argparse.Action):
@@ -676,7 +680,9 @@ if __name__ == '__main__':
             print(f'CIC seed set to [0x{args.cic:X}]')
 
         if (args.rtc):
-            sc64.set_rtc(datetime.now())
+            value = datetime.now()
+            sc64.set_rtc(value)
+            print(f'RTC set to [{value.strftime("%Y-%m-%d %H:%M:%S")}]')
 
         if (args.rom):
             with open(args.rom, 'rb+') as f:
