@@ -226,6 +226,14 @@ typedef struct {
 
 
 typedef struct {
+    io32_t KEY;
+} sc64_lock_t;
+
+#define SC64_LOCK_BASE              (0x1FFD0000UL)
+#define SC64_LOCK                   ((sc64_lock_t *) SC64_LOCK_BASE)
+
+
+typedef struct {
     io8_t BUFFER[8192];
     io8_t EEPROM[2048];
     io8_t DD_SECTOR[256];

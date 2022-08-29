@@ -40,6 +40,7 @@ interface n64_scb ();
     logic [41:0] rtc_rdata;
     logic [41:0] rtc_wdata;
 
+    logic cfg_unlock;
     logic cfg_pending;
     logic cfg_done;
     logic cfg_error;
@@ -99,7 +100,9 @@ interface n64_scb ();
         input dd_enabled,
         input ddipl_enabled,
 
-        input flashram_read_mode
+        input flashram_read_mode,
+
+        input cfg_unlock
     );
 
     modport flashram (
@@ -156,6 +159,13 @@ interface n64_scb ();
         input dd_address,
         output dd_rdata,
         input dd_wdata
+    );
+
+    modport lock (
+        input n64_reset,
+        input n64_nmi,
+
+        output cfg_unlock
     );
 
     modport cfg (

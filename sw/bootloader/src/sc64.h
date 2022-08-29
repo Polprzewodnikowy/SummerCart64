@@ -91,6 +91,8 @@ typedef struct {
 } rtc_time_t;
 
 
+void sc64_unlock (void);
+void sc64_lock (void);
 bool sc64_check_presence (void);
 cmd_error_t sc64_get_error (void);
 void sc64_set_config (cfg_id_t id, uint32_t value);

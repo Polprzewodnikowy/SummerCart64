@@ -11,6 +11,8 @@ void init (void) {
 
     exception_install();
 
+    sc64_unlock();
+
     if (!sc64_check_presence()) {
         error_display("SC64 hardware not detected");
     }
@@ -29,4 +31,5 @@ void init (void) {
 void deinit (void) {
     exception_disable_interrupts();
     exception_disable_watchdog();
+    sc64_lock();
 }

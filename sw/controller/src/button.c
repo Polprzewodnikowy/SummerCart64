@@ -54,7 +54,7 @@ void button_process (void) {
     if (p.trigger) {
         switch (p.mode) {
             case BUTTON_MODE_N64_IRQ:
-                fpga_reg_set(REG_CFG_CMD, fpga_reg_get(REG_CFG_CMD) | CFG_CMD_IRQ);
+                fpga_reg_set(REG_CFG_CMD, CFG_CMD_IRQ);
                 p.trigger = false;
                 break;
 

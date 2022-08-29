@@ -607,6 +607,7 @@ module mcu_top (
         sd_dma_scb.stop <= 1'b0;
 
         n64_scb.cfg_done <= 1'b0;
+        n64_scb.cfg_error <= 1'b0;
         n64_scb.cfg_irq <= 1'b0;
 
         n64_scb.flashram_done <= 1'b0;

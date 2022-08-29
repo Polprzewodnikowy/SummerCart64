@@ -11,7 +11,7 @@ from dd64 import BadBlockError, DD64Image
 from enum import Enum, IntEnum
 from serial.tools import list_ports
 from threading import Thread
-from typing import Optional
+from typing import Callable, Optional
 
 
 
@@ -394,8 +394,6 @@ class SC64:
 
     def upload_save(self, data: bytes) -> None:
         save_type = self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE))
-        if (save_type not in self.SaveType):
-            raise ConnectionError('Unknown save type fetched from SC64 device')
         if (save_type == self.SaveType.NONE):
             raise ValueError('No save type set inside SC64 device')
         if (len(data) != self.__SaveLength[save_type.name]):
@@ -407,8 +405,6 @@ class SC64:
 
     def download_save(self) -> bytes:
         save_type = self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE))
-        if (save_type not in self.SaveType):
-            raise ConnectionError('Unknown save type fetched from SC64 device')
         if (save_type == self.SaveType.NONE):
             raise ValueError('No save type set inside SC64 device')
         address = self.__Address.SAVE
@@ -432,8 +428,6 @@ class SC64:
         self.__link.execute_cmd(cmd=b'T', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
 
     def set_boot_mode(self, mode: BootMode) -> None:
-        if (mode not in self.BootMode):
-            raise ValueError('Boot mode outside of allowed values')
         self.__set_config(self.__CfgId.BOOT_MODE, mode)
 
     def set_cic_seed(self, seed: int) -> None:
@@ -443,13 +437,9 @@ class SC64:
         self.__set_config(self.__CfgId.CIC_SEED, seed)
 
     def set_tv_type(self, type: TVType) -> None:
-        if (type not in self.TVType):
-            raise ValueError('TV type outside of allowed values')
         self.__set_config(self.__CfgId.TV_TYPE, type)
 
     def set_save_type(self, type: SaveType) -> None:
-        if (type not in self.SaveType):
-            raise ValueError('Save type outside of allowed values')
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
 
     def set_cic_parameters(self, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=bytes([0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59])) -> None:
@@ -461,7 +451,7 @@ class SC64:
         data = [*data, *checksum]
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
 
-    def update_firmware(self, data: bytes) -> None:
+    def update_firmware(self, data: bytes, status_callback: Optional[Callable[[str], None]]=None) -> None:
         address = self.__Address.FIRMWARE
         self.__write_memory(address, data)
         response = self.__link.execute_cmd(cmd=b'F', args=[address, len(data)])
@@ -477,7 +467,8 @@ class SC64:
             if (cmd != b'F'):
                 raise ConnectionException('Wrong update status packet')
             status = self.__UpdateStatus(self.__get_int(data))
-            print(f'Update status [{status.name}]')
+            if (status_callback):
+                status_callback(status.name)
             if (status == self.__UpdateStatus.ERROR):
                 raise ConnectionException('Update error, device is most likely bricked')
         time.sleep(2)
@@ -616,8 +607,8 @@ class EnumAction(argparse.Action):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SC64 control software')
-    parser.add_argument('--backup', help='backup SC64 firmware and write it to specified file')
-    parser.add_argument('--update', help='update SC64 firmware from specified file')
+    parser.add_argument('--backup-firmware', help='backup SC64 firmware and write it to specified file')
+    parser.add_argument('--update-firmware', help='update SC64 firmware from specified file')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
@@ -632,7 +623,7 @@ if __name__ == '__main__':
     parser.add_argument('--ddipl', help='upload 64DD IPL from specified file')
     parser.add_argument('--disk', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
     parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
-    parser.add_argument('--debug', action='store_true', help='run debug loop (required for IS-Viewer64 and 64DD)')
+    parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
 
     if (len(sys.argv) <= 1):
         parser.print_help()
@@ -643,16 +634,17 @@ if __name__ == '__main__':
     try:
         sc64 = SC64()
 
-        if (args.backup):
-            with open(args.backup, 'wb+') as f:
+        if (args.backup_firmware):
+            with open(args.backup_firmware, 'wb+') as f:
                 print('Generating backup, this might take a while... ', end='', flush=True)
                 f.write(sc64.backup_firmware())
                 print('done')
 
-        if (args.update):
-            with open(args.update, 'rb+') as f:
+        if (args.update_firmware):
+            with open(args.update_firmware, 'rb+') as f:
                 print('Updating firmware, this might take a while... ', end='', flush=True)
-                sc64.update_firmware(f.read())
+                status_callback = lambda status: print(f'{status} ', end='', flush=True)
+                sc64.update_firmware(f.read(), status_callback)
                 print('done')
 
         if (args.reset_state):

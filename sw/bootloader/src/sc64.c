@@ -40,6 +40,16 @@ static bool sc64_execute_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
     return error;
 }
 
+void sc64_unlock (void) {
+    pi_io_write(&SC64_LOCK->KEY, 0x00000000);
+    pi_io_write(&SC64_LOCK->KEY, 0x5F554E4C);
+    pi_io_write(&SC64_LOCK->KEY, 0x4F434B5F);
+}
+
+void sc64_lock (void) {
+    pi_io_write(&SC64_LOCK->KEY, 0x00000000);
+}
+
 bool sc64_check_presence (void) {
     uint32_t version = pi_io_read(&SC64_REGS->VERSION);
     return (version == SC64_VERSION_2);
