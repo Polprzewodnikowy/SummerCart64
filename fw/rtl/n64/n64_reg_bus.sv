@@ -2,7 +2,6 @@ interface n64_reg_bus ();
 
     logic flashram_select;
     logic dd_select;
-    logic lock_select;
     logic cfg_select;
 
     logic read;
@@ -13,14 +12,12 @@ interface n64_reg_bus ();
 
     logic [15:0] flashram_rdata;
     logic [15:0] dd_rdata;
-    logic [15:0] lock_rdata;
     logic [15:0] cfg_rdata;
 
     modport controller (
         output flashram_select,
         output dd_select,
         output cfg_select,
-        output lock_select,
 
         output read,
         output write,
@@ -36,9 +33,6 @@ interface n64_reg_bus ();
         end
         if (dd_select) begin
             rdata = dd_rdata;
-        end
-        if (lock_select) begin
-            rdata = lock_rdata;
         end
         if (cfg_select) begin
             rdata = cfg_rdata;
@@ -58,14 +52,6 @@ interface n64_reg_bus ();
         input .write(write && dd_select),
         input address,
         output .rdata(dd_rdata),
-        input wdata
-    );
-
-    modport lock (
-        input .read(read && lock_select),
-        input .write(write && lock_select),
-        input address,
-        output .rdata(lock_rdata),
         input wdata
     );
 

@@ -67,15 +67,6 @@ module n64_top (
         .n64_scb(n64_scb)
     );
 
-    n64_lock n64_lock_inst (
-        .clk(clk),
-        .reset(reset),
-
-        .reg_bus(reg_bus),
-
-        .n64_scb(n64_scb)
-    );
-
     n64_cfg n64_cfg_inst (
         .clk(clk),
         .reset(reset),

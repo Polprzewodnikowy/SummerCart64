@@ -161,16 +161,11 @@ interface n64_scb ();
         input dd_wdata
     );
 
-    modport lock (
+    modport cfg (
         input n64_reset,
         input n64_nmi,
 
-        output cfg_unlock
-    );
-
-    modport cfg (
-        input n64_reset,
-
+        output cfg_unlock,
         output cfg_pending,
         input cfg_done,
         input cfg_error,

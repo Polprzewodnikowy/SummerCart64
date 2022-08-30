@@ -139,7 +139,6 @@ module n64_pi (
             write_port <= PORT_NONE;
             reg_bus.dd_select <= 1'b0;
             reg_bus.flashram_select <= 1'b0;
-            reg_bus.lock_select <= 1'b0;
             reg_bus.cfg_select <= 1'b0;
         end else if (aleh_op) begin
             read_port <= PORT_NONE;
@@ -147,7 +146,6 @@ module n64_pi (
             mem_offset <= 32'd0;
             reg_bus.dd_select <= 1'b0;
             reg_bus.flashram_select <= 1'b0;
-            reg_bus.lock_select <= 1'b0;
             reg_bus.cfg_select <= 1'b0;
 
             if (n64_scb.dd_enabled) begin
@@ -222,24 +220,18 @@ module n64_pi (
                 mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
             end
 
-            if (n64_pi_dq_in >= 16'h1FFD && n64_pi_dq_in < 16'h1FFE) begin
-                read_port <= PORT_NONE;
-                write_port <= PORT_REG;
-                reg_bus.lock_select <= 1'b1;
-            end
-
             if (n64_scb.cfg_unlock) begin
                 if (n64_pi_dq_in >= 16'h1FFE && n64_pi_dq_in < 16'h1FFF) begin
                     read_port <= PORT_MEM;
                     write_port <= PORT_MEM;
                     mem_offset <= (-32'h1FFE_0000) + BUFFER_OFFSET;
                 end
+            end
 
-                if (n64_pi_dq_in >= 16'h1FFF && n64_pi_dq_in < 16'h2000) begin
-                    read_port <= PORT_REG;
-                    write_port <= PORT_REG;
-                    reg_bus.cfg_select <= 1'b1;
-                end
+            if (n64_pi_dq_in >= 16'h1FFF && n64_pi_dq_in < 16'h2000) begin
+                read_port <= n64_scb.cfg_unlock ? PORT_REG : PORT_NONE;
+                write_port <= PORT_REG;
+                reg_bus.cfg_select <= 1'b1;
             end
         end
     end

@@ -41,13 +41,14 @@ static bool sc64_execute_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
 }
 
 void sc64_unlock (void) {
-    pi_io_write(&SC64_LOCK->KEY, 0x00000000);
-    pi_io_write(&SC64_LOCK->KEY, 0x5F554E4C);
-    pi_io_write(&SC64_LOCK->KEY, 0x4F434B5F);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_RESET);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_1);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_2);
 }
 
 void sc64_lock (void) {
-    pi_io_write(&SC64_LOCK->KEY, 0x00000000);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_RESET);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_LOCK);
 }
 
 bool sc64_check_presence (void) {

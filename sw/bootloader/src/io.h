@@ -226,14 +226,6 @@ typedef struct {
 
 
 typedef struct {
-    io32_t KEY;
-} sc64_lock_t;
-
-#define SC64_LOCK_BASE              (0x1FFD0000UL)
-#define SC64_LOCK                   ((sc64_lock_t *) SC64_LOCK_BASE)
-
-
-typedef struct {
     io8_t BUFFER[8192];
     io8_t EEPROM[2048];
     io8_t DD_SECTOR[256];
@@ -248,6 +240,7 @@ typedef struct {
     io32_t SR_CMD;
     io32_t DATA[2];
     io32_t VERSION;
+    io32_t KEY;
 } sc64_regs_t;
 
 #define SC64_REGS_BASE              (0x1FFF0000UL)
@@ -255,6 +248,11 @@ typedef struct {
 
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)
+
+#define SC64_KEY_RESET              (0x00000000UL)
+#define SC64_KEY_UNLOCK_1           (0x5F554E4CUL)
+#define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
+#define SC64_KEY_LOCK               (0xFFFFFFFFUL)
 
 
 typedef struct {
