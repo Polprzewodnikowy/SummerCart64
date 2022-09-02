@@ -214,10 +214,12 @@ module n64_pi (
                 end
             end
 
-            if (n64_pi_dq_in >= 16'h1400 && n64_pi_dq_in < 16'h14E0) begin
-                read_port <= PORT_MEM;
-                write_port <= PORT_NONE;
-                mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
+            if (n64_scb.rom_extended_enabled) begin
+                if (n64_pi_dq_in >= 16'h1400 && n64_pi_dq_in < 16'h14E0) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
+                end
             end
 
             if (n64_scb.cfg_unlock) begin

@@ -6,6 +6,7 @@ interface n64_scb ();
     logic bootloader_enabled;
     logic rom_write_enabled;
     logic rom_shadow_enabled;
+    logic rom_extended_enabled;
     logic sram_enabled;
     logic sram_banked;
     logic flashram_enabled;
@@ -57,6 +58,7 @@ interface n64_scb ();
         output bootloader_enabled,
         output rom_write_enabled,
         output rom_shadow_enabled,
+        output rom_extended_enabled,
         output sram_enabled,
         output sram_banked,
         output flashram_enabled,
@@ -94,6 +96,7 @@ interface n64_scb ();
         input bootloader_enabled,
         input rom_write_enabled,
         input rom_shadow_enabled,
+        input rom_extended_enabled,
         input sram_enabled,
         input sram_banked,
         input flashram_enabled,

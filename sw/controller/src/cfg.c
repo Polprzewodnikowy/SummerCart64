@@ -23,6 +23,7 @@ typedef enum {
     CFG_ID_DD_DISK_STATE,
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
+    CFG_ID_ROM_EXTENDED_ENABLE,
 } cfg_id_t;
 
 typedef enum {
@@ -211,6 +212,9 @@ bool cfg_query (uint32_t *args) {
         case CFG_ID_BUTTON_MODE:
             args[1] = button_get_mode();
             break;
+        case CFG_ID_ROM_EXTENDED_ENABLE:
+            args[1] = (scr & CFG_SCR_ROM_EXTENDED_ENABLED);
+            break;
         default:
             return true;
     }
@@ -272,6 +276,9 @@ bool cfg_update (uint32_t *args) {
             break;
         case CFG_ID_BUTTON_MODE:
             button_set_mode(args[1]);
+            break;
+        case CFG_ID_ROM_EXTENDED_ENABLE:
+            cfg_change_scr_bits(CFG_SCR_ROM_EXTENDED_ENABLED, args[1]);
             break;
         default:
             return true;

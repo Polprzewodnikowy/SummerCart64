@@ -199,6 +199,8 @@ class SC64:
         FIRMWARE = 0x0200_0000
         DDIPL = 0x03BC_0000
         SAVE = 0x03FE_0000
+        EXTENDED = 0x0400_0000
+        BOOTLOADER = 0x04E0_0000
         SHADOW = 0x04FE_0000
 
     class __Length(IntEnum):
@@ -208,6 +210,8 @@ class SC64:
         EEPROM = (2 * 1024)
         DDIPL = (4 * 1024 * 1024)
         SAVE = (128 * 1024)
+        EXTENDED = (14 * 1024 * 1024)
+        BOOTLOADER = (1920 * 1024)
         SHADOW = (128 * 1024)
 
     class __SaveLength(IntEnum):
@@ -233,6 +237,7 @@ class SC64:
         DD_DISK_STATE = 11
         BUTTON_STATE = 12
         BUTTON_MODE = 13
+        ROM_EXTENDED_ENABLE = 14
 
     class __UpdateError(IntEnum):
         OK = 0
@@ -283,7 +288,7 @@ class SC64:
         EEPROM_16K = 2
         SRAM = 3
         FLASHRAM = 4
-        SRAM_X3 = 5
+        SRAM_3X = 5
 
     class CICSeed(IntEnum):
         ALECK = 0xAC
@@ -333,10 +338,19 @@ class SC64:
         if ((address + length) > (self.__Address.FLASH + self.__Length.FLASH)):
             raise ValueError('Flash erase address or length outside of possible range')
         erase_block_size = self.__get_config(self.__CfgId.FLASH_ERASE_BLOCK)
-        if ((address % erase_block_size != 0) or (length % erase_block_size != 0)):
-            raise ValueError('Flash erase address or length not aligned to block size')
+        if (address % erase_block_size != 0):
+            raise ValueError('Flash erase address not aligned to block size')
         for offset in range(address, address + length, erase_block_size):
             self.__set_config(self.__CfgId.FLASH_ERASE_BLOCK, offset)
+
+    def __program_flash(self, address: int, data: bytes):
+        program_chunk_size = (128 * 1024)
+        if (self.__read_memory(address, len(data)) != data):
+            self.__erase_flash_region(address, len(data))
+            for offset in range(0, len(data), program_chunk_size):
+                self.__write_memory(address + offset, data[offset:offset + program_chunk_size])
+            if (self.__read_memory(address, len(data)) != data):
+                raise ConnectionException('Flash memory program failure')
 
     def reset_state(self) -> None:
         self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, False)
@@ -350,6 +364,7 @@ class SC64:
         self.__set_config(self.__CfgId.DD_DRIVE_TYPE, self.__DDDriveType.RETAIL)
         self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
         self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.NONE)
+        self.__set_config(self.__CfgId.ROM_EXTENDED_ENABLE, False)
         self.set_cic_parameters()
 
     def get_state(self):
@@ -368,24 +383,29 @@ class SC64:
             'dd_disk_state': self.__DDDiskState(self.__get_config(self.__CfgId.DD_DISK_STATE)),
             'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
             'button_mode': self.__ButtonMode(self.__get_config(self.__CfgId.BUTTON_MODE)),
+            'rom_extended_enable': bool(self.__get_config(self.__CfgId.ROM_EXTENDED_ENABLE)),
         }
 
-    def upload_rom(self, data: bytes, use_shadow: bool=True):
+    def download_memory(self) -> bytes:
+        return self.__read_memory(self.__Address.SDRAM, self.__Length.SDRAM + self.__Length.FLASH)
+
+    def upload_rom(self, data: bytes, use_shadow: bool=True) -> None:
         rom_length = len(data)
-        if (rom_length > self.__Length.SDRAM):
+        if (rom_length > (self.__Length.SDRAM + self.__Length.EXTENDED)):
             raise ValueError('ROM size too big')
-        sdram_length = rom_length
+        sdram_length = self.__Length.SDRAM
         shadow_enabled = use_shadow and rom_length > (self.__Length.SDRAM - self.__Length.SHADOW)
+        extended_enabled = rom_length > self.__Length.SDRAM
         if (shadow_enabled):
             sdram_length = (self.__Length.SDRAM - self.__Length.SHADOW)
-            shadow_length = rom_length - sdram_length
-            if (self.__read_memory(self.__Address.SHADOW, shadow_length) != data[sdram_length:]):
-                self.__erase_flash_region(self.__Address.SHADOW, self.__Length.SHADOW)
-                self.__write_memory(self.__Address.SHADOW, data[sdram_length:])
-                if (self.__read_memory(self.__Address.SHADOW, shadow_length) != data[sdram_length:]):
-                    raise ConnectionException('Shadow ROM program failure')
-        self.__write_memory(self.__Address.SDRAM, data[:sdram_length])
+            shadow_data = data[sdram_length:sdram_length + self.__Length.SHADOW]
+            self.__program_flash(self.__Address.SHADOW, shadow_data)
         self.__set_config(self.__CfgId.ROM_SHADOW_ENABLE, shadow_enabled)
+        if (extended_enabled):
+            extended_data = data[self.__Length.SDRAM:]
+            self.__program_flash(self.__Address.EXTENDED, extended_data)
+        self.__set_config(self.__CfgId.ROM_EXTENDED_ENABLE, extended_enabled)
+        self.__write_memory(self.__Address.SDRAM, data[:sdram_length])
 
     def upload_ddipl(self, data: bytes) -> None:
         if (len(data) > self.__Length.DDIPL):
@@ -615,8 +635,8 @@ if __name__ == '__main__':
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
-    parser.add_argument('--rom', help='upload ROM from specified file')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
+    parser.add_argument('--rom', help='upload ROM from specified file')
     parser.add_argument('--save-type', type=SC64.SaveType, action=EnumAction, help='set save type')
     parser.add_argument('--save', help='upload save from specified file')
     parser.add_argument('--backup-save', help='download save and write it to specified file')
@@ -624,6 +644,7 @@ if __name__ == '__main__':
     parser.add_argument('--disk', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
     parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
     parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
+    parser.add_argument('--download-memory', help='download whole memory space and write it to specified file')
 
     if (len(sys.argv) <= 1):
         parser.print_help()
@@ -705,6 +726,12 @@ if __name__ == '__main__':
             with open(args.backup_save, 'wb+') as f:
                 print('Downloading save... ', end='', flush=True)
                 f.write(sc64.download_save())
+                print('done')
+
+        if (args.download_memory):
+            with open(args.download_memory, 'wb+') as f:
+                print('Downloading memory... ', end='', flush=True)
+                f.write(sc64.download_memory())
                 print('done')
     except ValueError as e:
         print(f'\nValue error: {e}')
