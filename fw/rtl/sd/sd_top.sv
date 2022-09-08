@@ -11,8 +11,6 @@ module sd_top (
     inout [3:0] sd_dat
 );
 
-    assign sd_dat = 4'hZ;
-
     logic sd_clk_rising;
     logic sd_clk_falling;
 
@@ -38,6 +36,20 @@ module sd_top (
         .sd_clk_falling(sd_clk_falling),
 
         .sd_cmd(sd_cmd)
+    );
+
+    sd_dat sd_dat_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .sd_scb(sd_scb),
+
+        .fifo_bus(fifo_bus),
+
+        .sd_clk_rising(sd_clk_rising),
+        .sd_clk_falling(sd_clk_falling),
+
+        .sd_dat(sd_dat)
     );
 
 endmodule

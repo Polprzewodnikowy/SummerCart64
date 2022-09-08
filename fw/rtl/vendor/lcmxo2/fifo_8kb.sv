@@ -10,7 +10,9 @@ module fifo_8kb (
     output full,
     output almost_full,
     input write,
-    input [7:0] wdata
+    input [7:0] wdata,
+    
+    output logic [10:0] count
 );
 
     fifo_8kb_lattice_generated fifo_8kb_lattice_generated_inst (
@@ -27,5 +29,19 @@ module fifo_8kb (
         .AlmostEmpty(almost_empty),
         .AlmostFull(almost_full)
     );
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            count <= 11'd0;
+        end else begin
+            if (write && read) begin
+                count <= count;
+            end else if (write) begin
+                count <= count + 1'd1;
+            end else if (read) begin
+                count <= count - 1'd1;
+            end
+        end
+    end
 
 endmodule

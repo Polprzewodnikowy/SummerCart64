@@ -15,6 +15,10 @@ typedef enum {
     SC64_CMD_USB_WRITE          = 'M',
     SC64_CMD_USB_READ_STATUS    = 'u',
     SC64_CMD_USB_READ           = 'm',
+    SC64_CMD_SD_CARD_INITIALIZE = 'i',
+    SC64_CMD_SD_SECTOR_SET      = 'I',
+    SC64_CMD_SD_READ            = 's',
+    SC64_CMD_SD_WRITE           = 'S',
 } cmd_id_t;
 
 
@@ -135,4 +139,20 @@ bool sc64_usb_read (uint32_t *address, uint32_t length) {
         sc64_execute_cmd(SC64_CMD_USB_READ_STATUS, NULL, result);
     } while(result[0] & (1 << 24));
     return false;
+}
+
+bool sc64_sd_card_initialize (void) {
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INITIALIZE, NULL, NULL)) {
+        return true;
+    }
+    return false;
+}
+
+bool sc64_sd_read_sectors (uint32_t starting_sector, uint32_t address, uint32_t length) {
+    uint32_t sector_set_args[2] = { starting_sector, 0 };
+    uint32_t read_args[2] = { address, length };
+    if (sc64_execute_cmd(SC64_CMD_SD_SECTOR_SET, sector_set_args, NULL)) {
+        return true;
+    }
+    return sc64_execute_cmd(SC64_CMD_SD_READ, read_args, NULL);
 }

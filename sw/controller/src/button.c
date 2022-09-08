@@ -39,9 +39,9 @@ void button_init (void) {
 
 void button_process (void) {
     usb_tx_info_t packet_info;
-    uint32_t status = fpga_reg_get(REG_STATUS);
+    uint32_t status = fpga_reg_get(REG_CFG_SCR);
     p.shift <<= 1;
-    if (status & STATUS_BUTTON) {
+    if (status & CFG_SCR_BUTTON_STATE) {
         p.shift |= (1 << 0);
     }
     if (!p.state && p.shift == 0xFFFFFFFFUL) {

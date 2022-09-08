@@ -5,6 +5,7 @@
 #include "fpga.h"
 #include "isv.h"
 #include "rtc.h"
+#include "sd.h"
 #include "usb.h"
 
 
@@ -16,6 +17,7 @@ void gvr_task (void) {
     dd_init();
     flashram_init();
     isv_init();
+    sd_init();
     usb_init();
 
     while (1) {
@@ -25,6 +27,7 @@ void gvr_task (void) {
         flashram_process();
         isv_process();
         rtc_process();
+        sd_process();
         usb_process();
     }
 }

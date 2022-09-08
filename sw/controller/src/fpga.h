@@ -18,7 +18,6 @@ typedef enum {
 } fpga_cmd_t;
 
 typedef enum {
-    REG_STATUS,
     REG_MEM_ADDRESS,
     REG_MEM_SCR,
     REG_USB_SCR,
@@ -69,16 +68,16 @@ typedef enum {
 #define MEM_SCR_BUSY                    (1 << 3)
 #define MEM_SCR_LENGTH_BIT              (4)
 
-#define STATUS_BUTTON                   (1 << 0)
-#define STATUS_SD_INSERTED              (1 << 1)
-#define STATUS_CFG_PENDING              (1 << 2)
-
 #define USB_SCR_FIFO_FLUSH              (1 << 0)
 #define USB_SCR_RXNE                    (1 << 1)
 #define USB_SCR_TXE                     (1 << 2)
 #define USB_SCR_RESET_PENDING           (1 << 3)
 #define USB_SCR_RESET_ACK               (1 << 4)
 #define USB_SCR_WRITE_FLUSH             (1 << 5)
+#define USB_SCR_RX_COUNT_BIT            (6)
+#define USB_SCR_RX_COUNT_MASK           (0x7FF << USB_SCR_RX_COUNT_BIT)
+#define USB_SCR_TX_COUNT_BIT            (17)
+#define USB_SCR_TX_COUNT_MASK           (0x7FF << USB_SCR_TX_COUNT_BIT)
 
 #define DMA_SCR_START                   (1 << 0)
 #define DMA_SCR_STOP                    (1 << 1)
@@ -97,10 +96,14 @@ typedef enum {
 #define CFG_SCR_EEPROM_ENABLED          (1 << 9)
 #define CFG_SCR_EEPROM_16K              (1 << 10)
 #define CFG_SCR_ROM_EXTENDED_ENABLED    (1 << 11)
+#define CFG_SCR_BUTTON_STATE            (1 << 31)
 
-#define CFG_CMD_DONE                    (1 << 0)
-#define CFG_CMD_ERROR                   (1 << 1)
-#define CFG_CMD_IRQ                     (1 << 2)
+#define CFG_CMD_BIT                     (0)
+#define CFG_CMD_MASK                    (0xFF << CFG_CMD_BIT)
+#define CFG_CMD_PENDING                 (1 << 8)
+#define CFG_CMD_DONE                    (1 << 9)
+#define CFG_CMD_ERROR                   (1 << 10)
+#define CFG_CMD_IRQ                     (1 << 11)
 
 #define FLASHRAM_SCR_DONE               (1 << 0)
 #define FLASHRAM_SCR_PENDING            (1 << 1)
@@ -120,6 +123,30 @@ typedef enum {
 #define SD_SCR_CLOCK_MODE_400KHZ        (1 << 0)
 #define SD_SCR_CLOCK_MODE_25MHZ         (2 << 0)
 #define SD_SCR_CLOCK_MODE_50MHZ         (3 << 0)
+#define SD_SCR_CMD_BUSY                 (1 << 2)
+#define SD_SCR_CMD_ERROR                (1 << 3)
+#define SD_SCR_CARD_BUSY                (1 << 4)
+#define SD_SCR_CARD_INSERTED            (1 << 5)
+#define SD_SCR_RX_COUNT_BIT             (6)
+#define SD_SCR_RX_COUNT_MASK            (0x7FF << SD_SCR_RX_COUNT_BIT)
+#define SD_SCR_TX_COUNT_BIT             (17)
+#define SD_SCR_TX_COUNT_MASK            (0x7FF << SD_SCR_TX_COUNT_BIT)
+
+#define SD_CMD_INDEX_BIT                (0)
+#define SD_CMD_INDEX_MASK               (0x3F)
+#define SD_CMD_SKIP_RESPONSE            (1 << 6)
+#define SD_CMD_RESERVED_RESPONSE        (1 << 7)
+#define SD_CMD_LONG_RESPONSE            (1 << 8)
+#define SD_CMD_IGNORE_CRC               (1 << 9)
+
+#define SD_DAT_FIFO_FLUSH               (1 << 0)
+#define SD_DAT_START_WRITE              (1 << 1)
+#define SD_DAT_START_READ               (1 << 2)
+#define SD_DAT_STOP                     (1 << 3)
+#define SD_DAT_BLOCKS_BIT               (4)
+#define SD_DAT_BLOCKS_MASK              (0xFF << SD_DAT_BLOCKS_BIT)
+#define SD_DAT_BUSY                     (1 << 12)
+#define SD_DAT_ERROR                    (1 << 13)
 
 #define DD_SCR_HARD_RESET               (1 << 0)
 #define DD_SCR_HARD_RESET_CLEAR         (1 << 1)

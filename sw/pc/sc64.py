@@ -433,6 +433,11 @@ class SC64:
             address = self.__Address.EEPROM
         return self.__read_memory(address, length)
 
+    def upload_bootloader(self, data: bytes) -> None:
+        if (len(data) > self.__Length.BOOTLOADER):
+            raise ValueError('Bootloader size too big')
+        self.__program_flash(self.__Address.BOOTLOADER, data)
+
     def set_rtc(self, t: datetime) -> None:
         to_bcd = lambda v: ((int((v / 10) % 10) << 4) | int(int(v) % 10))
         data = bytes([
@@ -645,6 +650,7 @@ if __name__ == '__main__':
     parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
     parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
     parser.add_argument('--download-memory', help='download whole memory space and write it to specified file')
+    parser.add_argument('--bootloader', help='bootloader')
 
     if (len(sys.argv) <= 1):
         parser.print_help()
@@ -666,6 +672,12 @@ if __name__ == '__main__':
                 print('Updating firmware, this might take a while... ', end='', flush=True)
                 status_callback = lambda status: print(f'{status} ', end='', flush=True)
                 sc64.update_firmware(f.read(), status_callback)
+                print('done')
+        
+        if (args.bootloader):
+            with open(args.bootloader, 'rb+') as f:
+                print('Uploading Bootloader... ', end='', flush=True)
+                sc64.upload_bootloader(f.read())
                 print('done')
 
         if (args.reset_state):

@@ -5,6 +5,7 @@
 #include "fpga.h"
 #include "isv.h"
 #include "rtc.h"
+#include "sd.h"
 #include "usb.h"
 
 
@@ -66,6 +67,7 @@ typedef enum {
     CFG_ERROR_BAD_ADDRESS = 1,
     CFG_ERROR_BAD_CONFIG_ID = 2,
     CFG_ERROR_TIMEOUT = 3,
+    CFG_ERROR_SD = 4,
     CFG_ERROR_UNKNOWN_CMD = -1,
 } cfg_error_t;
 
@@ -76,6 +78,7 @@ struct process {
     cic_seed_t cic_seed;
     tv_type_t tv_type;
     bool usb_output_ready;
+    uint32_t sd_card_sector;
 };
 
 
@@ -317,13 +320,16 @@ void cfg_init (void) {
 }
 
 void cfg_process (void) {
+    uint32_t reg;
     uint32_t args[2];
     usb_tx_info_t packet_info;
 
-    if (fpga_reg_get(REG_STATUS) & STATUS_CFG_PENDING) {
+    reg = fpga_reg_get(REG_CFG_CMD);
+
+    if (reg & CFG_CMD_PENDING) {
         args[0] = fpga_reg_get(REG_CFG_DATA_0);
         args[1] = fpga_reg_get(REG_CFG_DATA_1);
-        char cmd = (char) fpga_reg_get(REG_CFG_CMD);
+        char cmd = (char) ((reg & CFG_CMD_MASK) >> CFG_CMD_BIT);
 
         switch (cmd) {
             case 'v':
@@ -384,6 +390,26 @@ void cfg_process (void) {
 
             case 'U':
                 args[0] = p.usb_output_ready ? 1 : 0;
+                break;
+
+            case 'i':
+                if (sd_card_initialize()) {
+                    cfg_set_error(CFG_ERROR_SD);
+                }
+                break;
+
+            case 'I':
+                p.sd_card_sector = args[0];
+                break;
+
+            case 's':
+                if (cfg_translate_address(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                if (sd_read_sectors(p.sd_card_sector, args[0], args[1])) {
+                    cfg_set_error(CFG_ERROR_SD);
+                }
                 break;
 
             default:

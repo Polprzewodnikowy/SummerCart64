@@ -8,7 +8,7 @@
 
 #define CIC_STACK_SIZE  (256)
 #define RTC_STACK_SIZE  (256)
-#define GVR_STACK_SIZE  (1536)
+#define GVR_STACK_SIZE  (2048)
 
 
 uint8_t cic_stack[CIC_STACK_SIZE] __attribute__((aligned(8)));

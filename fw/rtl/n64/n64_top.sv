@@ -23,8 +23,13 @@ module n64_top (
 
     logic n64_dd_irq;
     logic n64_cfg_irq;
+    logic n64_irq_oe;
 
-    assign n64_irq = (n64_dd_irq || n64_cfg_irq) ? 1'b0 : 1'bZ;
+    always @(posedge clk) begin
+        n64_irq_oe <= (n64_dd_irq || n64_cfg_irq);
+    end
+
+    assign n64_irq = n64_irq_oe ? 1'b0 : 1'bZ;
 
     n64_reg_bus reg_bus ();
 

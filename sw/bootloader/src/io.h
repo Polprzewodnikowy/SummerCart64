@@ -246,6 +246,7 @@ typedef struct {
 #define SC64_REGS_BASE              (0x1FFF0000UL)
 #define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
 
+#define SC64_SR_IRQ_PENDING         (1 << 29)
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)
 

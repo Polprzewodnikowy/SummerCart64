@@ -66,7 +66,13 @@
         <Source name="../../rtl/sd/sd_cmd.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
-        <Source name="../../rtl/sd/sd_crc_7.sv" type="Verilog" type_short="Verilog" excluded="TRUE">
+        <Source name="../../rtl/sd/sd_crc_7.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_crc_16.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/sd/sd_dat.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
         <Source name="../../rtl/sd/sd_scb.sv" type="Verilog" type_short="Verilog">

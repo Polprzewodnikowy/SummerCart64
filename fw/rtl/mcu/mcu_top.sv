@@ -322,7 +322,6 @@ module mcu_top (
     // Register list
 
     typedef enum bit [7:0] {
-        REG_STATUS,
         REG_MEM_ADDRESS,
         REG_MEM_SCR,
         REG_USB_SCR,
@@ -373,15 +372,6 @@ module mcu_top (
             reg_rdata <= 32'd0;
 
             case (address)
-                REG_STATUS: begin
-                    reg_rdata <= {
-                        29'd0,
-                        n64_scb.cfg_pending,
-                        ~sd_det_ff[2],
-                        ~button_ff[2]
-                    };
-                end
-
                 REG_MEM_ADDRESS: begin
                     reg_rdata <= mem_address;
                 end
@@ -396,7 +386,10 @@ module mcu_top (
 
                 REG_USB_SCR: begin
                     reg_rdata <= {
-                        28'd0,
+                        4'd0,
+                        usb_scb.tx_count,
+                        usb_scb.rx_count,
+                        2'b00,
                         usb_scb.reset_pending,
                         ~fifo_bus.tx_full,
                         ~fifo_bus.rx_empty,
@@ -429,7 +422,8 @@ module mcu_top (
 
                 REG_CFG_SCR: begin
                     reg_rdata <= {
-                        20'd0,
+                        ~button_ff[2],
+                        19'd0,
                         n64_scb.rom_extended_enabled,
                         n64_scb.eeprom_16k_mode,
                         n64_scb.eeprom_enabled,
@@ -455,7 +449,8 @@ module mcu_top (
 
                 REG_CFG_CMD: begin
                     reg_rdata <= {
-                        24'd0,
+                        23'd0,
+                        n64_scb.cfg_pending,
                         n64_scb.cfg_cmd
                     };
                 end
@@ -510,8 +505,54 @@ module mcu_top (
 
                 REG_SD_SCR: begin
                     reg_rdata <= {
-                        30'd0,
+                        4'd0,
+                        sd_scb.tx_count,
+                        sd_scb.rx_count,
+                        ~sd_det_ff[2],
+                        sd_scb.card_busy,
+                        sd_scb.cmd_error,
+                        sd_scb.cmd_busy,
                         sd_scb.clock_mode
+                    };
+                end
+
+                REG_SD_ARG: begin
+                    reg_rdata <= sd_scb.cmd_arg;
+                end
+
+                REG_SD_CMD: begin
+                    reg_rdata <= {
+                        22'd0,
+                        sd_scb.cmd_ignore_crc,
+                        sd_scb.cmd_long_response,
+                        sd_scb.cmd_reserved_response,
+                        sd_scb.cmd_skip_response,
+                        sd_scb.cmd_index
+                    };
+                end
+
+                REG_SD_RSP_0: begin
+                    reg_rdata <= sd_scb.cmd_rsp[31:0];
+                end
+
+                REG_SD_RSP_1: begin
+                    reg_rdata <= sd_scb.cmd_rsp[63:32];
+                end
+
+                REG_SD_RSP_2: begin
+                    reg_rdata <= sd_scb.cmd_rsp[95:64];
+                end
+
+                REG_SD_RSP_3: begin
+                    reg_rdata <= sd_scb.cmd_rsp[127:96];
+                end
+
+                REG_SD_DAT: begin
+                    reg_rdata <= {
+                        18'd0,
+                        sd_scb.dat_error,
+                        sd_scb.dat_busy,
+                        12'd0
                     };
                 end
 
@@ -604,6 +645,12 @@ module mcu_top (
         usb_dma_scb.start <= 1'b0;
         usb_dma_scb.stop <= 1'b0;
 
+        sd_scb.cmd_start <= 1'b0;
+        sd_scb.dat_fifo_flush <= 1'b0;
+        sd_scb.dat_start_write <= 1'b0;
+        sd_scb.dat_start_read <= 1'b0;
+        sd_scb.dat_stop <= 1'b0;
+
         sd_dma_scb.start <= 1'b0;
         sd_dma_scb.stop <= 1'b0;
 
@@ -656,8 +703,6 @@ module mcu_top (
             n64_scb.rtc_wdata_valid <= 1'b0;
         end else if (reg_write) begin
             case (address)
-                REG_STATUS: begin end
-
                 REG_MEM_ADDRESS: begin
                     mem_address <= reg_wdata;
                 end
@@ -725,7 +770,7 @@ module mcu_top (
                         n64_scb.cfg_irq,
                         n64_scb.cfg_error,
                         n64_scb.cfg_done
-                    } <= reg_wdata[2:0];
+                    } <= reg_wdata[11:9];
                 end
 
                 REG_FLASHRAM_SCR: begin
@@ -758,6 +803,27 @@ module mcu_top (
 
                 REG_SD_SCR: begin
                     sd_scb.clock_mode <= reg_wdata[1:0];
+                end
+
+                REG_SD_ARG: begin
+                    sd_scb.cmd_arg <= reg_wdata;
+                end
+
+                REG_SD_CMD: begin
+                    sd_scb.cmd_start <= 1'b1;
+                    sd_scb.cmd_ignore_crc <= reg_wdata[9];
+                    sd_scb.cmd_long_response <= reg_wdata[8];
+                    sd_scb.cmd_reserved_response <= reg_wdata[7];
+                    sd_scb.cmd_skip_response <= reg_wdata[6];
+                    sd_scb.cmd_index <= reg_wdata[5:0];
+                end
+
+                REG_SD_DAT: begin
+                    sd_scb.dat_blocks <= reg_wdata[11:4];
+                    sd_scb.dat_stop <= reg_wdata[3];
+                    sd_scb.dat_start_read <= reg_wdata[2];
+                    sd_scb.dat_start_write <= reg_wdata[1];
+                    sd_scb.dat_fifo_flush <= reg_wdata[0];
                 end
 
                 REG_SD_DMA_ADDRESS: begin

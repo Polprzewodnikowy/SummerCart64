@@ -4,19 +4,25 @@ interface usb_scb ();
     logic reset_pending;
     logic reset_ack;
     logic write_buffer_flush;
+    logic [10:0] rx_count;
+    logic [10:0] tx_count;
 
     modport controller (
         output fifo_flush,
         input reset_pending,
         output reset_ack,
-        output write_buffer_flush
+        output write_buffer_flush,
+        input rx_count,
+        input tx_count
     );
 
     modport usb (
         input fifo_flush,
         output reset_pending,
         input reset_ack,
-        input write_buffer_flush
+        input write_buffer_flush,
+        output rx_count,
+        output tx_count
     );
 
 endinterface
@@ -59,7 +65,9 @@ module usb_ft1248 (
         .full(rx_full),
         .almost_full(rx_almost_full),
         .write(rx_write),
-        .wdata(rx_wdata)
+        .wdata(rx_wdata),
+
+        .count(usb_scb.rx_count)
     );
 
     fifo_8kb fifo_8kb_tx_inst (
@@ -74,7 +82,9 @@ module usb_ft1248 (
         .full(fifo_bus.tx_full),
         .almost_full(fifo_bus.tx_almost_full),
         .write(fifo_bus.tx_write),
-        .wdata(fifo_bus.tx_wdata)
+        .wdata(fifo_bus.tx_wdata),
+
+        .count(usb_scb.tx_count)
     );
 
     logic [1:0] usb_pwrsav_ff;

@@ -31,7 +31,8 @@ module n64_cfg (
                 REG_STATUS: reg_bus.rdata = {
                     n64_scb.cfg_pending,
                     cfg_error,
-                    14'd0
+                    irq,
+                    13'd0
                 };
                 REG_COMMAND: reg_bus.rdata = {8'd0, n64_scb.cfg_cmd};
                 REG_DATA_0_H: reg_bus.rdata = n64_scb.cfg_wdata[0][31:16];

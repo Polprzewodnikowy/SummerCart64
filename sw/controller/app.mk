@@ -17,6 +17,7 @@ SRC_FILES = \
 	isv.c \
 	lcmxo2.c \
 	rtc.c \
+	sd.c \
 	task.c \
 	update.c \
 	usb.c

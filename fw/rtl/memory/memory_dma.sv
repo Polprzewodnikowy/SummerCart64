@@ -76,6 +76,7 @@ module memory_dma (
     always_ff @(posedge clk) begin
         rx_rdata_pop <= (
             !rx_rdata_pop &&
+            !fifo_bus.rx_read &&
             trx_enabled &&
             rx_buffer_counter < 2'd2 &&
             !fifo_bus.rx_empty &&

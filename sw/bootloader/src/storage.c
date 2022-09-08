@@ -61,6 +61,8 @@ void storage_run_menu (storage_backend_t storage_backend) {
     FF_CHECK(f_mount(&fs, path, 1), "Couldn't mount drive");
     FF_CHECK(f_chdrive(path), "Couldn't chdrive");
     FF_CHECK(f_open(&fil, "sc64menu.n64", FA_READ), "Couldn't open menu file");
+    FF_CHECK(f_lseek(&fil, 0), "debug 1");
+    FF_CHECK(f_read(&fil, (void *) (0x10000000UL), f_size(&fil), &br), "debug 2");
     FF_CHECK(f_lseek(&fil, ROM_ENTRY_OFFSET), "Couldn't seek to entry point offset");
     FF_CHECK(f_read(&fil, &menu, sizeof(menu), &br), "Couldn't read entry point");
     FF_CHECK(f_lseek(&fil, ROM_CODE_OFFSET), "Couldn't seek to code start offset");
