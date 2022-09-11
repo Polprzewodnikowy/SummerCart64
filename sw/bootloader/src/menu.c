@@ -1,6 +1,7 @@
 #include "error.h"
 #include "fatfs/ff.h"
 #include "init.h"
+#include "io.h"
 #include "menu.h"
 
 
@@ -65,6 +66,8 @@ void menu_load_and_run (void) {
     // TODO: ^
     FF_CHECK(f_close(&fil), "Couldn't close menu file");
     FF_CHECK(f_unmount(""), "Couldn't unmount drive");
+
+    cache_inst_hit_invalidate(menu, size);
 
     deinit();
 

@@ -65,9 +65,13 @@ static void cache_operation (uint8_t operation, uint8_t line_size, void *address
 }
 
 void cache_data_hit_invalidate (void *address, size_t length) {
-    cache_operation (0x11, 16, address, length);
+    cache_operation(0x11, 16, address, length);
 }
 
 void cache_data_hit_writeback (void *address, size_t length) {
-    cache_operation (0x19, 16, address, length);
+    cache_operation(0x19, 16, address, length);
+}
+
+void cache_inst_hit_invalidate (void *address, size_t length) {
+    cache_operation(0x10, 32, address, length);
 }
