@@ -1,7 +1,7 @@
 #include "vr4300.h"
 
 
-#define WATCHDOG_TIMEOUT            (3 * (93750000UL / 2))
+#define WATCHDOG_TIMEOUT            (5 * (93750000UL / 2))
 
 #define VECTOR_LOCATION             (0xA0000000UL)
 #define VECTOR_SIZE                 (0x80)

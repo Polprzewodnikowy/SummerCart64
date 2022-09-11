@@ -66,7 +66,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
     if (exception_code == EXCEPTION_INTERRUPT) {
         if (interrupt_mask & INTERRUPT_MASK_TIMER) {
             exception_disable_watchdog();
-            display_printf("Still loading after 3 second limit...\n\n");
+            display_printf("Still loading after 5 second limit...\n\n");
             return;
         }
     } else if (exception_code == EXCEPTION_SYSCALL) {
