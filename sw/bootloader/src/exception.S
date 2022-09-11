@@ -41,7 +41,8 @@
 #define C0_STATUS_OFFSET            (256)
 #define C0_CAUSE_OFFSET             (260)
 #define C0_EPC_OFFSET               (264)
-#define SAVE_REGISTERS_SIZE         (272)
+#define C0_BADVADDR_OFFSET          (272)
+#define SAVE_REGISTERS_SIZE         (280)
 
 
 .section .text.exception_handler
@@ -101,6 +102,8 @@ exception_fatal:
     sw $t0, C0_STATUS_OFFSET($k0)
     dmfc0 $t0, C0_EPC
     sd $t0, C0_EPC_OFFSET($k0)
+    dmfc0 $t0, C0_BADVADDR
+    sd $t0, C0_BADVADDR_OFFSET($k0)
     move $a2, $k0
     la $t1, exception_fatal_handler
     jalr $t1

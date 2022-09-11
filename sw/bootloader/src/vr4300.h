@@ -6,6 +6,7 @@
 #define HIT_WRITE_BACK_D            ((6 << 2) | 1)
 
 
+#define C0_BADVADDR                 $8
 #define C0_COUNT                    $9
 #define C0_COMPARE                  $11
 #define C0_STATUS                   $12

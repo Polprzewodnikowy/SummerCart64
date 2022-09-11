@@ -59,9 +59,10 @@ void menu_load_and_run (void) {
     }
     FF_CHECK(f_read(&fil, menu, size, &br), "Couldn't read menu file");
     FF_CHECK(br != size, "Read size is different than expected");
-    
+    // TODO: delete this
     FF_CHECK(f_lseek(&fil, 0), "Couldn't seek to the beginning of file");
-    FF_CHECK(f_read(&fil, (void *) (0x10000000UL), f_size(&fil), &br), "Couldn't read file contents to SDRAM");
+    FF_CHECK(f_read(&fil, (void *) (0xB0000000UL), f_size(&fil), &br), "Couldn't read file contents to SDRAM");
+    // TODO: ^
     FF_CHECK(f_close(&fil), "Couldn't close menu file");
     FF_CHECK(f_unmount(""), "Couldn't unmount drive");
 

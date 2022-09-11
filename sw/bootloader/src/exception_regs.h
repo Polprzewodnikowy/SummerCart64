@@ -49,6 +49,7 @@ typedef struct {
     uint32_t sr;
     uint32_t cr;
     uint64_32_t epc;
+    uint64_32_t badvaddr;
 } exception_t;
 
 

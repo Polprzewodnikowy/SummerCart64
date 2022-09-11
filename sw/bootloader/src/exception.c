@@ -3,7 +3,6 @@
 #include "exception_regs.h"
 #include "exception.h"
 #include "io.h"
-#include "sc64.h"
 #include "version.h"
 #include "vr4300.h"
 #include "../assets/assets.h"
@@ -44,7 +43,6 @@ static const char *exception_get_description (uint8_t exception_code) {
 
 void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, exception_t *e) {
     version_t *version = version_get();
-    uint32_t sc64_version = pi_io_read(&SC64_REGS->VERSION);
     uint32_t *instruction_address = (((uint32_t *) (e->epc.u32)) + ((e->cr & C0_CR_BD) ? 1 : 0));
 
     display_init((uint32_t *) (&assets_exception_background));
@@ -55,7 +53,7 @@ void exception_fatal_handler (uint32_t exception_code, uint32_t interrupt_mask, 
 
     display_printf("%s\n\n", exception_get_description(exception_code));
 
-    display_printf("pc: 0x%08lX  sr: 0x%08lX  cr: 0x%08lX  hw: 0x%08lX\n", e->epc.u32, e->sr, e->cr, sc64_version);
+    display_printf("pc: 0x%08lX  sr: 0x%08lX  cr: 0x%08lX  va: 0x%08lX\n", e->epc.u32, e->sr, e->cr, e->badvaddr.u32);
     display_printf("zr: 0x%08lX  at: 0x%08lX  v0: 0x%08lX  v1: 0x%08lX\n", e->zr.u32, e->at.u32, e->v0.u32, e->v1.u32);
     display_printf("a0: 0x%08lX  a1: 0x%08lX  a2: 0x%08lX  a3: 0x%08lX\n", e->a0.u32, e->a1.u32, e->a2.u32, e->a3.u32);
     display_printf("t0: 0x%08lX  t1: 0x%08lX  t2: 0x%08lX  t3: 0x%08lX\n", e->t0.u32, e->t1.u32, e->t2.u32, e->t3.u32);
