@@ -32,8 +32,9 @@ typedef enum {
 typedef enum {
     TIM_ID_CIC          = 0,
     TIM_ID_RTC          = 1,
-    TIM_ID_GVR          = 2,
+    TIM_ID_SD           = 2,
     TIM_ID_DD           = 3,
+    TIM_ID_LED          = 4,
 } tim_id_t;
 
 typedef enum {

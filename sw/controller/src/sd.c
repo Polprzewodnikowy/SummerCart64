@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "fpga.h"
 #include "hw.h"
+#include "led.h"
 #include "sd.h"
 
 
@@ -71,7 +72,7 @@ static void sd_trigger_timeout (void) {
 
 static void sd_prepare_timeout (uint16_t value) {
     p.timeout = false;
-    hw_tim_setup(TIM_ID_GVR, value, sd_trigger_timeout);
+    hw_tim_setup(TIM_ID_SD, value, sd_trigger_timeout);
 }
 
 static bool sd_did_timeout (void) {
@@ -79,7 +80,7 @@ static bool sd_did_timeout (void) {
 }
 
 static void sd_clear_timeout (void) {
-    hw_tim_stop(TIM_ID_GVR);
+    hw_tim_stop(TIM_ID_SD);
     p.timeout = false;
 }
 
@@ -210,6 +211,7 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
     while (count > 0) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
+        led_blink_act();
         sd_dat_prepare(address, blocks, DAT_READ);
         if (sd_cmd(23, blocks, RSP_R1, NULL)) {
             sd_dat_abort();
@@ -244,6 +246,8 @@ bool sd_card_init (void) {
 
     p.card_initialized = true;
     p.rca = 0;
+
+    led_blink_act();
 
     sd_set_clock(CLOCK_400KHZ);
 

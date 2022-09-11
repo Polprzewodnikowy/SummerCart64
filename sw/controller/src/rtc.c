@@ -1,5 +1,6 @@
 #include "fpga.h"
 #include "hw.h"
+#include "led.h"
 #include "rtc.h"
 #include "task.h"
 
@@ -55,7 +56,7 @@ static void rtc_task_resume (void) {
 
 static void rtc_on_error (void) {
     rtc_time_valid = false;
-    // TODO: blink some error code
+    led_blink_error(LED_ERROR_RTC);
     task_yield();
 }
 

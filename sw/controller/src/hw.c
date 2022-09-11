@@ -51,8 +51,8 @@ static volatile uint8_t *i2c_data_txptr;
 static volatile uint8_t *i2c_data_rxptr;
 static volatile uint32_t i2c_next_cr2;
 static void (*volatile i2c_callback)(void);
-static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17, TIM3 };
-static void (*volatile tim_callbacks[4])(void);
+static const TIM_TypeDef *tims[] = { TIM14, TIM16, TIM17, TIM3, TIM1 };
+static void (*volatile tim_callbacks[5])(void);
 
 
 static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_ospeed_t ospeed, gpio_pupd_t pupd, gpio_af_t af, int value) {
@@ -202,7 +202,7 @@ void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void)) {
     TIM_TypeDef *tim = ((TIM_TypeDef *) (tims[id]));
     tim->CR1 = (TIM_CR1_OPM | TIM_CR1_URS);
     tim->PSC = (64000 - 1);
-    tim->ARR = (delay - 1);
+    tim->ARR = delay;
     tim->DIER = TIM_DIER_UIE;
     tim->EGR = TIM_EGR_UG;
     tim->SR = 0;
@@ -224,11 +224,14 @@ void hw_tim_disable_irq (tim_id_t id) {
         case TIM_ID_RTC:
             NVIC_DisableIRQ(TIM16_IRQn);
             break;
-        case TIM_ID_GVR:
+        case TIM_ID_SD:
             NVIC_DisableIRQ(TIM17_IRQn);
             break;
         case TIM_ID_DD:
             NVIC_DisableIRQ(TIM3_IRQn);
+            break;
+        case TIM_ID_LED:
+            NVIC_DisableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
             break;
         default:
             break;
@@ -243,11 +246,14 @@ void hw_tim_enable_irq (tim_id_t id) {
         case TIM_ID_RTC:
             NVIC_EnableIRQ(TIM16_IRQn);
             break;
-        case TIM_ID_GVR:
+        case TIM_ID_SD:
             NVIC_EnableIRQ(TIM17_IRQn);
             break;
         case TIM_ID_DD:
             NVIC_EnableIRQ(TIM3_IRQn);
+            break;
+        case TIM_ID_LED:
+            NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
             break;
         default:
             break;
@@ -430,13 +436,16 @@ static void hw_init_tim (void) {
         RCC_APBENR2_TIM17EN |
         RCC_APBENR2_TIM16EN |
         RCC_APBENR2_TIM14EN |
-        RCC_APBENR2_USART1EN
+        RCC_APBENR2_USART1EN |
+        RCC_APBENR2_TIM1EN
     );
 
+    DBG->APBFZ1 |= DBG_APB_FZ1_DBG_TIM3_STOP;
     DBG->APBFZ2 |= (
         DBG_APB_FZ2_DBG_TIM17_STOP |
         DBG_APB_FZ2_DBG_TIM16_STOP |
-        DBG_APB_FZ2_DBG_TIM14_STOP
+        DBG_APB_FZ2_DBG_TIM14_STOP |
+        DBG_APB_FZ2_DBG_TIM1_STOP
     );
 }
 
@@ -465,6 +474,8 @@ void hw_init (void) {
     NVIC_SetPriority(TIM14_IRQn, 0);
     NVIC_SetPriority(TIM16_IRQn, 1);
     NVIC_SetPriority(TIM17_IRQn, 2);
+    NVIC_SetPriority(TIM3_IRQn, 2);
+    NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 1);
 
     NVIC_EnableIRQ(EXTI0_1_IRQn);
     NVIC_EnableIRQ(EXTI2_3_IRQn);
@@ -474,6 +485,7 @@ void hw_init (void) {
     NVIC_EnableIRQ(TIM16_IRQn);
     NVIC_EnableIRQ(TIM17_IRQn);
     NVIC_EnableIRQ(TIM3_IRQn);
+    NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
 }
 
 void hw_loader_init (void) {
@@ -584,5 +596,13 @@ void TIM3_IRQHandler (void) {
     if (tim_callbacks[3]) {
         tim_callbacks[3]();
         tim_callbacks[3] = 0;
+    }
+}
+
+void TIM1_BRK_UP_TRG_COM_IRQHandler (void) {
+    TIM1->SR &= ~(TIM_SR_UIF);
+    if (tim_callbacks[4]) {
+        tim_callbacks[4]();
+        tim_callbacks[4] = 0;
     }
 }

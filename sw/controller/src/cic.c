@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "cic.h"
 #include "hw.h"
+#include "led.h"
 #include "rtc.h"
 #include "task.h"
 
@@ -39,6 +40,7 @@ static const uint8_t cic_ram_init[2][32] = {{
 static void cic_irq_reset_falling (void) {
     cic_enabled = false;
     hw_gpio_set(GPIO_ID_N64_CIC_DQ);
+    led_clear_error(LED_ERROR_CIC);
 }
 
 static void cic_irq_reset_rising (void) {
@@ -122,7 +124,7 @@ static void cic_write_id_failed (void) {
     uint8_t current_region = rtc_get_region();
     uint8_t next_region = (current_region == REGION_NTSC) ? REGION_PAL : REGION_NTSC;
     rtc_set_region(next_region);
-    // TODO: blink some error code
+    led_blink_error(LED_ERROR_CIC);
 }
 
 static void cic_write_seed (void) {

@@ -8,6 +8,7 @@
 typedef enum {
     TASK_ID_CIC,
     TASK_ID_RTC,
+    TASK_ID_LED,
     TASK_ID_GVR,
     __TASK_ID_MAX
 } task_id_t;

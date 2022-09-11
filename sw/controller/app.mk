@@ -16,6 +16,7 @@ SRC_FILES = \
 	hw.c \
 	isv.c \
 	lcmxo2.c \
+	led.c \
 	rtc.c \
 	sd.c \
 	task.c \
