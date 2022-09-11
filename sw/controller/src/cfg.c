@@ -35,11 +35,10 @@ typedef enum {
 } dd_mode_t;
 
 typedef enum {
-    BOOT_MODE_MENU_SD = 0,
-    BOOT_MODE_MENU_USB = 1,
-    BOOT_MODE_ROM = 2,
-    BOOT_MODE_DD = 3,
-    BOOT_MODE_DIRECT = 4
+    BOOT_MODE_MENU = 0,
+    BOOT_MODE_ROM = 1,
+    BOOT_MODE_DD = 2,
+    BOOT_MODE_DIRECT = 3
 } boot_mode_t;
 
 typedef enum {
@@ -315,7 +314,7 @@ void cfg_init (void) {
 
     p.cic_seed = CIC_SEED_UNKNOWN;
     p.tv_type = TV_TYPE_UNKNOWN;
-    p.boot_mode = BOOT_MODE_MENU_SD;
+    p.boot_mode = BOOT_MODE_MENU;
     p.usb_output_ready = true;
 }
 
@@ -393,8 +392,12 @@ void cfg_process (void) {
                 break;
 
             case 'i':
-                if (sd_card_initialize()) {
-                    cfg_set_error(CFG_ERROR_SD);
+                if (args[1]) {
+                    if (sd_card_init()) {
+                        cfg_set_error(CFG_ERROR_SD);
+                    }
+                } else {
+                    sd_card_deinit();
                 }
                 break;
 
@@ -407,7 +410,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                if (sd_read_sectors(p.sd_card_sector, args[0], args[1])) {
+                if (sd_read_sectors(args[0], p.sd_card_sector, args[1])) {
                     cfg_set_error(CFG_ERROR_SD);
                 }
                 break;

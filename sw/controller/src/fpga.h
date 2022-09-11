@@ -55,6 +55,9 @@ typedef enum {
 } fpga_reg_t;
 
 
+#define SWAP16(x)                       (((x & 0xFF) << 8) | ((x & 0xFF00) >> 8))
+#define SWAP32(x)                       ((x & 0xFF) << 24 | (x & 0xFF00) << 8 | (x & 0xFF0000) >> 8 | (x & 0xFF000000) >> 24)
+
 #define FPGA_ID                         (0x64)
 
 #define FPGA_MAX_MEM_TRANSFER           (1024)
@@ -173,8 +176,6 @@ typedef enum {
 #define DD_HEAD_MASK                    (0x1000)
 #define DD_HEAD_TRACK_MASK              (DD_HEAD_MASK | DD_TRACK_MASK)
 #define DD_HEAD_TRACK_INDEX_LOCK        (1 << 13)
-
-#define SWAP32(x)                       ((x & 0xFF) << 24 | (x & 0xFF00) << 8 | (x & 0xFF0000) >> 8 | (x & 0xFF000000) >> 24)
 
 
 uint8_t fpga_id_get (void);

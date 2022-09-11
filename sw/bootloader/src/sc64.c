@@ -15,7 +15,7 @@ typedef enum {
     SC64_CMD_USB_WRITE          = 'M',
     SC64_CMD_USB_READ_STATUS    = 'u',
     SC64_CMD_USB_READ           = 'm',
-    SC64_CMD_SD_CARD_INITIALIZE = 'i',
+    SC64_CMD_SD_CARD_INIT       = 'i',
     SC64_CMD_SD_SECTOR_SET      = 'I',
     SC64_CMD_SD_READ            = 's',
     SC64_CMD_SD_WRITE           = 'S',
@@ -27,7 +27,7 @@ static bool sc64_wait_cpu_busy (void) {
     do {
         sr = pi_io_read(&SC64_REGS->SR_CMD);
     } while (sr & SC64_SR_CPU_BUSY);
-    return sr & SC64_SR_CMD_ERROR;
+    return (sr & SC64_SR_CMD_ERROR);
 }
 
 static bool sc64_execute_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
@@ -126,7 +126,7 @@ bool sc64_usb_read_ready (uint8_t *type, uint32_t *length) {
     if (length != NULL) {
         *length = result[1];
     }
-    return result[1] > 0;
+    return (result[1] > 0);
 }
 
 bool sc64_usb_read (uint32_t *address, uint32_t length) {
@@ -141,16 +141,25 @@ bool sc64_usb_read (uint32_t *address, uint32_t length) {
     return false;
 }
 
-bool sc64_sd_card_initialize (void) {
-    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INITIALIZE, NULL, NULL)) {
+bool sc64_sd_card_init (void) {
+    uint32_t args[2] = { 0, true };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INIT, args, NULL)) {
         return true;
     }
     return false;
 }
 
-bool sc64_sd_read_sectors (uint32_t starting_sector, uint32_t address, uint32_t length) {
-    uint32_t sector_set_args[2] = { starting_sector, 0 };
-    uint32_t read_args[2] = { address, length };
+bool sc64_sd_card_deinit (void) {
+    uint32_t args[2] = { 0, false };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INIT, args, NULL)) {
+        return true;
+    }
+    return false;
+}
+
+bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count) {
+    uint32_t sector_set_args[2] = { sector, 0 };
+    uint32_t read_args[2] = { (uint32_t) (address), count };
     if (sc64_execute_cmd(SC64_CMD_SD_SECTOR_SET, sector_set_args, NULL)) {
         return true;
     }

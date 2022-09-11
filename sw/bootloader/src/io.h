@@ -12,7 +12,10 @@ typedef volatile uint32_t io32_t;
 
 #define	ALIGN(value, align)         (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
 
+#define PHYSICAL(address)           ((typeof(address)) (((io32_t) (address)) & (0x1FFFFFFFUL)))
 #define UNCACHED(address)           ((typeof(address)) (((io32_t) (address)) | (0xA0000000UL)))
+
+#define N64_RAM_SIZE                (0x00800000UL)
 
 
 typedef struct {

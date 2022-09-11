@@ -276,11 +276,10 @@ class SC64:
         DD_DISK_SWAP = 3
 
     class BootMode(IntEnum):
-        SD = 0
-        USB = 1
-        ROM = 2
-        DDIPL = 3
-        DIRECT = 4
+        MENU = 0
+        ROM = 1
+        DDIPL = 2
+        DIRECT = 3
 
     class SaveType(IntEnum):
         NONE = 0
@@ -357,7 +356,7 @@ class SC64:
         self.__set_config(self.__CfgId.ROM_SHADOW_ENABLE, False)
         self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.NONE)
         self.__set_config(self.__CfgId.ISV_ENABLE, False)
-        self.__set_config(self.__CfgId.BOOT_MODE, self.BootMode.USB)
+        self.__set_config(self.__CfgId.BOOT_MODE, self.BootMode.MENU)
         self.__set_config(self.__CfgId.SAVE_TYPE, self.SaveType.NONE)
         self.__set_config(self.__CfgId.CIC_SEED, self.CICSeed.AUTO)
         self.__set_config(self.__CfgId.TV_TYPE, self.TVType.AUTO)

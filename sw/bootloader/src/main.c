@@ -2,8 +2,8 @@
 #include "error.h"
 #include "init.h"
 #include "io.h"
+#include "menu.h"
 #include "sc64.h"
-#include "storage.h"
 
 
 void main (void) {
@@ -13,12 +13,8 @@ void main (void) {
     sc64_get_boot_info(&sc64_boot_info);
 
     switch (sc64_boot_info.boot_mode) {
-        case BOOT_MODE_MENU_SD:
-            storage_run_menu(STORAGE_BACKEND_SD);
-            break;
-
-        case BOOT_MODE_MENU_USB:
-            storage_run_menu(STORAGE_BACKEND_USB);
+        case BOOT_MODE_MENU:
+            menu_load_and_run();
             break;
 
         case BOOT_MODE_ROM:

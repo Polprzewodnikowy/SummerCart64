@@ -1,7 +1,7 @@
 #include "error.h"
-#include "init.h"
-#include "storage.h"
 #include "fatfs/ff.h"
+#include "init.h"
+#include "menu.h"
 
 
 #define ROM_ENTRY_OFFSET    (8)
@@ -41,28 +41,16 @@ static const char *fatfs_error_codes[] = {
 }
 
 
-void storage_run_menu (storage_backend_t storage_backend) {
+void menu_load_and_run (void) {
     void (* menu)(void);
     FRESULT fresult;
     FATFS fs;
     FIL fil;
     UINT br;
     FSIZE_t size = ROM_MAX_LOAD_SIZE;
-    const TCHAR *path = "";
 
-    if (storage_backend == STORAGE_BACKEND_SD) {
-        path = "0:";
-    } else if (storage_backend == STORAGE_BACKEND_USB) {
-        path = "1:";
-    } else {
-        error_display("Unknown storage backend [%d]\n", storage_backend);
-    }
-
-    FF_CHECK(f_mount(&fs, path, 1), "Couldn't mount drive");
-    FF_CHECK(f_chdrive(path), "Couldn't chdrive");
+    FF_CHECK(f_mount(&fs, "", 1), "Couldn't mount drive");
     FF_CHECK(f_open(&fil, "sc64menu.n64", FA_READ), "Couldn't open menu file");
-    FF_CHECK(f_lseek(&fil, 0), "debug 1");
-    FF_CHECK(f_read(&fil, (void *) (0x10000000UL), f_size(&fil), &br), "debug 2");
     FF_CHECK(f_lseek(&fil, ROM_ENTRY_OFFSET), "Couldn't seek to entry point offset");
     FF_CHECK(f_read(&fil, &menu, sizeof(menu), &br), "Couldn't read entry point");
     FF_CHECK(f_lseek(&fil, ROM_CODE_OFFSET), "Couldn't seek to code start offset");
@@ -71,8 +59,11 @@ void storage_run_menu (storage_backend_t storage_backend) {
     }
     FF_CHECK(f_read(&fil, menu, size, &br), "Couldn't read menu file");
     FF_CHECK(br != size, "Read size is different than expected");
+    
+    FF_CHECK(f_lseek(&fil, 0), "Couldn't seek to the beginning of file");
+    FF_CHECK(f_read(&fil, (void *) (0x10000000UL), f_size(&fil), &br), "Couldn't read file contents to SDRAM");
     FF_CHECK(f_close(&fil), "Couldn't close menu file");
-    FF_CHECK(f_unmount(path), "Couldn't unmount drive");
+    FF_CHECK(f_unmount(""), "Couldn't unmount drive");
 
     deinit();
 

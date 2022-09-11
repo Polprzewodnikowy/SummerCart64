@@ -29,8 +29,8 @@ SRC_FILES = \
 	io.c \
 	ipl2.S \
 	main.c \
+	menu.c \
 	sc64.c \
-	storage.c \
 	syscalls.c \
 	test.c \
 	version.c \
