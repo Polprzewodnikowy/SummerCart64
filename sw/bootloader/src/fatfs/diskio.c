@@ -1,3 +1,4 @@
+#include <string.h>
 #include "ff.h"
 #include "diskio.h"
 #include "../io.h"
@@ -5,7 +6,9 @@
 #include "../error.h"
 
 
-#define FROM_BCD(x)     ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
+#define SD_BLOCK_SIZE       (512)
+#define BUFFER_BLOCKS_MAX   (sizeof(SC64_BUFFERS->BUFFER) / SD_BLOCK_SIZE)
+#define FROM_BCD(x)         ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
 
 
 static DSTATUS status = STA_NOINIT;
@@ -34,21 +37,24 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     }
     uint32_t *physical_address = (uint32_t *) (PHYSICAL(buff));
     if (physical_address < (uint32_t *) (N64_RAM_SIZE)) {
+        uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_BLOCK_SIZE] __attribute__((aligned(8)));
         while (count > 0) {
-            uint32_t block = ((count > 16) ? 16 : count);
-            if (sc64_sd_read_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, block)) {
+            uint32_t blocks = ((count > BUFFER_BLOCKS_MAX) ? BUFFER_BLOCKS_MAX : count);
+            size_t length = (blocks * SD_BLOCK_SIZE);
+            if (sc64_sd_read_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks)) {
                 return RES_ERROR;
             }
-            for (uint32_t i = 0; i < (block * 512); i += 4) {
-                // TODO: use dma
-                uint32_t data = pi_io_read((uint32_t *) (&SC64_BUFFERS->BUFFER[i]));
-                uint8_t *ptr = (uint8_t *) (&data);
-                for (int j = 0; j < 4; j++) {
-                    *buff++ = *ptr++;
-                }
+            if (((uint32_t) (buff) % 8) == 0) {
+                pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), buff, length);
+                cache_data_hit_invalidate(buff, length);
+            } else {
+                pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), aligned_buffer, length);
+                cache_data_hit_invalidate(aligned_buffer, length);
+                memcpy(buff, aligned_buffer, length);
             }
-            count -= block;
-            sector += block;
+            buff += length;
+            sector += blocks;
+            count -= blocks;
         }
     } else {
         if (sc64_sd_read_sectors(physical_address, sector, count)) {
