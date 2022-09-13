@@ -38,6 +38,7 @@ static bool sc64_wait_cpu_busy (void) {
 }
 
 static bool sc64_execute_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
+    sc64_wait_cpu_busy();
     if (args != NULL) {
         pi_io_write(&SC64_REGS->DATA[0], args[0]);
         pi_io_write(&SC64_REGS->DATA[1], args[1]);
