@@ -105,6 +105,7 @@ bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
 bool sc64_usb_read (uint32_t *address, uint32_t length);
 bool sc64_sd_card_init (void);
 bool sc64_sd_card_deinit (void);
+bool sc64_sd_write_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 
 

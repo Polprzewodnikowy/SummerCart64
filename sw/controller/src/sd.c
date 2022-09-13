@@ -235,6 +235,39 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     return false;
 }
 
+bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
+    if (!p.card_initialized || (count == 0)) {
+        return true;
+    }
+
+    if (!p.card_type_block) {
+        sector *= SD_BLOCK_SIZE;
+    }
+
+    while (count > 0) {
+        uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
+        led_blink_act();
+        if (sd_cmd(23, blocks, RSP_R1, NULL)) {
+            return true;
+        }
+        if (sd_cmd(25, sector, RSP_R1, NULL)) {
+            return true;
+        }
+        sd_dat_prepare(address, blocks, DAT_WRITE);
+        bool error = sd_dat_wait(1000);
+        sd_cmd(12, 0, RSP_R1b, NULL);
+        if (error) {
+            sd_dat_abort();
+            return true;
+        }
+        address += (blocks * SD_BLOCK_SIZE);
+        sector += (blocks * (p.card_type_block ? 1 : SD_BLOCK_SIZE));
+        count -= blocks;
+    }
+
+    return false;
+}
+
 bool sd_card_init (void) {
     uint32_t arg;
     uint32_t rsp;

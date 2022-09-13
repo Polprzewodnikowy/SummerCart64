@@ -415,6 +415,16 @@ void cfg_process (void) {
                 }
                 break;
 
+            case 'S':
+                if (cfg_translate_address(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                if (sd_write_sectors(args[0], p.sd_card_sector, args[1])) {
+                    cfg_set_error(CFG_ERROR_SD);
+                }
+                break;
+
             default:
                 cfg_set_error(CFG_ERROR_UNKNOWN_CMD);
                 return;
