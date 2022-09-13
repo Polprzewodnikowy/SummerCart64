@@ -46,10 +46,8 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
             }
             if (((uint32_t) (buff) % 8) == 0) {
                 pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), buff, length);
-                cache_data_hit_invalidate(buff, length);
             } else {
                 pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), aligned_buffer, length);
-                cache_data_hit_invalidate(aligned_buffer, length);
                 memcpy(buff, aligned_buffer, length);
             }
             buff += length;
@@ -76,11 +74,9 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
             uint32_t blocks = ((count > BUFFER_BLOCKS_MAX) ? BUFFER_BLOCKS_MAX : count);
             size_t length = (blocks * SD_BLOCK_SIZE);
             if (((uint32_t) (buff) % 8) == 0) {
-                cache_data_hit_writeback((void *) (buff), length);
                 pi_dma_write((io32_t *) (SC64_BUFFERS->BUFFER), (void *) (buff), length);
             } else {
                 memcpy(aligned_buffer, buff, length);
-                cache_data_hit_writeback(aligned_buffer, length);
                 pi_dma_write((io32_t *) (SC64_BUFFERS->BUFFER), aligned_buffer, length);
             }
             if (sc64_sd_write_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks)) {

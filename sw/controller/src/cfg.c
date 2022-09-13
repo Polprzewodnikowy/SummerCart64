@@ -63,10 +63,11 @@ typedef enum {
 
 typedef enum {
     CFG_ERROR_OK = 0,
-    CFG_ERROR_BAD_ADDRESS = 1,
-    CFG_ERROR_BAD_CONFIG_ID = 2,
-    CFG_ERROR_TIMEOUT = 3,
-    CFG_ERROR_SD = 4,
+    CFG_ERROR_BAD_ARGUMENT = 1,
+    CFG_ERROR_BAD_ADDRESS = 2,
+    CFG_ERROR_BAD_CONFIG_ID = 3,
+    CFG_ERROR_TIMEOUT = 4,
+    CFG_ERROR_SD_CARD = 5,
     CFG_ERROR_UNKNOWN_CMD = -1,
 } cfg_error_t;
 
@@ -392,12 +393,33 @@ void cfg_process (void) {
                 break;
 
             case 'i':
-                if (args[1]) {
-                    if (sd_card_init()) {
-                        cfg_set_error(CFG_ERROR_SD);
-                    }
-                } else {
-                    sd_card_deinit();
+                switch (args[1]) {
+                    case 0:
+                        sd_card_deinit();
+                        break;
+                    case 1:
+                        if (sd_card_init()) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    case 2:
+                        args[1] = sd_card_get_status();
+                        break;
+                    case 3:
+                        args[1] = 32;
+                        if (cfg_translate_address(args)) {
+                            cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                            return;
+                        }
+                        if (sd_card_get_info(args[0])) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    default:
+                        cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                        return;
                 }
                 break;
 
@@ -411,7 +433,8 @@ void cfg_process (void) {
                     return;
                 }
                 if (sd_read_sectors(args[0], p.sd_card_sector, args[1])) {
-                    cfg_set_error(CFG_ERROR_SD);
+                    cfg_set_error(CFG_ERROR_SD_CARD);
+                    return;
                 }
                 break;
 
@@ -421,7 +444,8 @@ void cfg_process (void) {
                     return;
                 }
                 if (sd_write_sectors(args[0], p.sd_card_sector, args[1])) {
-                    cfg_set_error(CFG_ERROR_SD);
+                    cfg_set_error(CFG_ERROR_SD_CARD);
+                    return;
                 }
                 break;
 

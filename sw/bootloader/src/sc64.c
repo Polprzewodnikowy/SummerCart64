@@ -15,11 +15,18 @@ typedef enum {
     SC64_CMD_USB_WRITE          = 'M',
     SC64_CMD_USB_READ_STATUS    = 'u',
     SC64_CMD_USB_READ           = 'm',
-    SC64_CMD_SD_CARD_INIT       = 'i',
+    SC64_CMD_SD_CARD_OP         = 'i',
     SC64_CMD_SD_SECTOR_SET      = 'I',
     SC64_CMD_SD_WRITE           = 'S',
     SC64_CMD_SD_READ            = 's',
 } cmd_id_t;
+
+typedef enum {
+    SD_CARD_OP_DEINIT = 0,
+    SD_CARD_OP_INIT = 1,
+    SD_CARD_OP_GET_STATUS = 2,
+    SD_CARD_OP_GET_INFO = 3,
+} sd_card_op_t;
 
 
 static bool sc64_wait_cpu_busy (void) {
@@ -142,16 +149,33 @@ bool sc64_usb_read (uint32_t *address, uint32_t length) {
 }
 
 bool sc64_sd_card_init (void) {
-    uint32_t args[2] = { 0, true };
-    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INIT, args, NULL)) {
+    uint32_t args[2] = { 0, SD_CARD_OP_INIT };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
         return true;
     }
     return false;
 }
 
 bool sc64_sd_card_deinit (void) {
-    uint32_t args[2] = { 0, false };
-    if (sc64_execute_cmd(SC64_CMD_SD_CARD_INIT, args, NULL)) {
+    uint32_t args[2] = { 0, SD_CARD_OP_DEINIT };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
+        return true;
+    }
+    return false;
+}
+
+bool sc64_sd_card_get_status (void) {
+    uint32_t args[2] = { 0, SD_CARD_OP_GET_STATUS };
+    uint32_t result[2];
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, result)) {
+        return false;
+    }
+    return result[1];
+}
+
+bool sc64_sd_card_get_info (uint32_t *address) {
+    uint32_t args[2] = { (uint32_t) (address), SD_CARD_OP_GET_INFO };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
         return true;
     }
     return false;
