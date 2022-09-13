@@ -89,18 +89,20 @@ static void cfg_set_usb_output_ready (void) {
     p.usb_output_ready = true;
 }
 
-static bool cfg_translate_address (uint32_t *args) {
-    uint32_t address = args[0];
-    uint32_t length = args[1];
-    if (address >= 0x10000000 && address < 0x14000000) {
-        if ((address + length) <= 0x14000000) {
-            args[0] = address - 0x10000000 + 0x00000000;
+static bool cfg_translate_address (uint32_t *address, uint32_t length, bool with_flash) {
+    if (length == 0) {
+        return true;
+    }
+    uint32_t rom_end = (with_flash ? 0x15000000 : 0x14000000);
+    if (*address >= 0x10000000 && *address < rom_end) {
+        if ((*address + length) <= rom_end) {
+            *address = *address - 0x10000000 + 0x00000000;
             return false;
         }
     }
-    if (address >= 0x1FFE0000 && address < 0x1FFE2000) {
-        if ((address + length) <= 0x1FFE2000) {
-            args[0] = address - 0x1FFE0000 + 0x05000000;
+    if (*address >= 0x1FFE0000 && *address < 0x1FFE2000) {
+        if ((*address + length) <= 0x1FFE2000) {
+            *address = *address - 0x1FFE0000 + 0x05000000;
             return false;
         }
     }
@@ -359,7 +361,7 @@ void cfg_process (void) {
                 break;
 
             case 'm':
-                if (cfg_translate_address(args)) {
+                if (cfg_translate_address(&args[0], args[1], false)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -369,7 +371,7 @@ void cfg_process (void) {
                 break;
 
             case 'M':
-                if (cfg_translate_address(args)) {
+                if (cfg_translate_address(&args[0], args[1], false)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -407,8 +409,7 @@ void cfg_process (void) {
                         args[1] = sd_card_get_status();
                         break;
                     case 3:
-                        args[1] = 32;
-                        if (cfg_translate_address(args)) {
+                        if (cfg_translate_address(&args[0], 32, false)) {
                             cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                             return;
                         }
@@ -428,7 +429,11 @@ void cfg_process (void) {
                 break;
 
             case 's':
-                if (cfg_translate_address(args)) {
+                if (args[1] >= 0x800000) {
+                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
+                if (cfg_translate_address(&args[0], args[1] * 512, true)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -439,7 +444,11 @@ void cfg_process (void) {
                 break;
 
             case 'S':
-                if (cfg_translate_address(args)) {
+                if (args[1] >= 0x800000) {
+                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
+                if (cfg_translate_address(&args[0], args[1] * 512, true)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
