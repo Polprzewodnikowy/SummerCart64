@@ -13,6 +13,8 @@ bool test_check (void) {
 }
 
 void test_execute (void) {
+    uint8_t card_info[32] __attribute__((aligned(8)));
+
     display_init(NULL);
 
     display_printf("SC64 Test suite\n\n");
@@ -27,17 +29,24 @@ void test_execute (void) {
         while (1);
     }
 
-    uint8_t card_info[32] __attribute__((aligned(8)));
-
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), card_info, sizeof(card_info));
 
-    display_printf("CSD: 0x");
+    display_printf("SD Card registers:\n    CSD: 0x");
     for (int i = 0; i < 16; i++) {
         display_printf("%02X", card_info[i]);
     }
-    display_printf("\nCID: 0x");
+    display_printf("\n    CID: 0x");
     for (int i = 16; i < 32; i++) {
         display_printf("%02X", card_info[i]);
+    }
+    display_printf("\n           ");
+    for (int i = 16; i < 32; i++) {
+        display_printf("%c ", card_info[i] >= ' ' ? card_info[i] : 0xFF);
+    }
+
+    if (sc64_sd_card_deinit()) {
+        display_printf("SD card deinit error!\n");
+        while (1);
     }
 
     while (1);

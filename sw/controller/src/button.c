@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "button.h"
+#include "dd.h"
 #include "fpga.h"
 #include "usb.h"
 
@@ -66,7 +67,7 @@ void button_process (void) {
                 break;
 
             case BUTTON_MODE_DD_DISK_SWAP:
-                // TODO: implement 64DD disk swapping
+                dd_handle_button();
                 p.trigger = false;
                 break;
 

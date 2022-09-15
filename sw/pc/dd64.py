@@ -185,6 +185,9 @@ class DD64Image:
             self.__file.close()
         self.__drive_type = None
 
+    def get_block_info_table(self) -> list[tuple[int, int]]:
+        return self.__block_info_table
+
     def get_drive_type(self) -> str:
         return self.__drive_type
 
@@ -222,6 +225,12 @@ if __name__ == '__main__':
                 print(dd.read_block(track, head, block)[:4])
             except BadBlockError:
                 print(f'Bad ID block [track: {track}, head: {head}, block: {block}]')
+        if (len(sys.argv) >= 3):
+            with open(sys.argv[2], 'wb+') as f:
+                block_info_table = dd.get_block_info_table()
+                for block in block_info_table:
+                    offset = 0xFFFFFFFF if block == None else block[0]
+                    f.write(offset.to_bytes(4, byteorder='big'))
         dd.unload()
     else:
         print(f'[{sys.argv[0]}]: Expected disk image path as first argument')

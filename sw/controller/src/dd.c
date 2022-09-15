@@ -3,13 +3,17 @@
 #include "fpga.h"
 #include "hw.h"
 #include "rtc.h"
+#include "sd.h"
 #include "usb.h"
 
 
 #define DD_SECTOR_MAX_SIZE          (232)
 #define DD_BLOCK_DATA_SECTORS_NUM   (85)
-#define DD_BLOCK_BUFFER_ADDRESS     (0x03BC0000UL - (DD_SECTOR_MAX_SIZE * DD_BLOCK_DATA_SECTORS_NUM))
+#define DD_BLOCK_BUFFER_SIZE        (ALIGN(DD_SECTOR_MAX_SIZE * DD_BLOCK_DATA_SECTORS_NUM, SD_SECTOR_SIZE) + SD_SECTOR_SIZE)
+#define DD_BLOCK_BUFFER_ADDRESS     (0x03BC0000UL - DD_BLOCK_BUFFER_SIZE)
 #define DD_SECTOR_BUFFER_ADDRESS    (0x05002800UL)
+#define DD_SD_SECTOR_TABLE_SIZE     (DD_BLOCK_BUFFER_SIZE / SD_SECTOR_SIZE)
+#define DD_SD_MAX_DISKS             (4)
 
 #define DD_DRIVE_ID_RETAIL          (0x0003)
 #define DD_DRIVE_ID_DEVELOPMENT     (0x0004)
@@ -47,8 +51,7 @@ enum state {
     STATE_NEXT_BLOCK,
 };
 
-
-typedef union sector_info {
+typedef union {
     uint32_t full;
     struct {
         uint8_t sector_num;
@@ -57,6 +60,11 @@ typedef union sector_info {
         uint8_t sectors_in_block;
     };
 } sector_info_t;
+
+typedef struct {
+    uint32_t thb_table_address;
+    uint32_t sector_table_address;
+} sd_disk_info_t;
 
 struct process {
     enum state state;
@@ -73,7 +81,12 @@ struct process {
     sector_info_t sector_info;
     bool block_ready;
     bool block_valid;
+    uint32_t block_offset;
     dd_drive_type_t drive_type;
+    bool sd_mode;
+    uint8_t sd_current_disk;
+    sd_disk_info_t sd_disk_info[DD_SD_MAX_DISKS];
+    uint32_t sd_sector_table[DD_SD_SECTOR_TABLE_SIZE];
 };
 
 
@@ -87,28 +100,88 @@ static uint16_t dd_track_head_block (void) {
     return (track | head | block);
 }
 
+static uint32_t dd_fill_sd_sector_table (uint32_t index) {
+    uint32_t tmp;
+    sd_disk_info_t info = p.sd_disk_info[p.sd_current_disk];
+    uint32_t thb_entry_address = (info.thb_table_address + (index * sizeof(uint32_t)));
+    fpga_mem_read(thb_entry_address, sizeof(uint32_t), (uint8_t *) (&tmp));
+    uint32_t start_offset = SWAP32(tmp);
+    if (start_offset == 0xFFFFFFFF) {
+        return 0;
+    }
+    p.block_offset = (start_offset % SD_SECTOR_SIZE);
+    uint32_t block_length = ((p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM);
+    uint32_t end_offset = ((start_offset + block_length) - 1); // CHECK THIS
+    uint32_t starting_sector = (start_offset / SD_SECTOR_SIZE);
+    uint32_t sectors = (1 + ((end_offset / SD_SECTOR_SIZE) - starting_sector));
+    for (int i = 0; i < sectors; i++) {
+        uint32_t sector_entry_address = info.sector_table_address + ((starting_sector + i) * sizeof(uint32_t));
+        fpga_mem_read(sector_entry_address, sizeof(uint32_t), (uint8_t *) (&tmp));
+        p.sd_sector_table[i] = SWAP32(tmp);
+    }
+    return sectors;
+}
+
 static bool dd_block_read_request (void) {
-    usb_tx_info_t packet_info;
-    usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
-    packet_info.data_length = 12;
-    packet_info.data[0] = 1;
-    packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
-    packet_info.data[2] = dd_track_head_block();
-    p.block_ready = false;
-    return usb_enqueue_packet(&packet_info);
+    uint16_t index = dd_track_head_block();
+    uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
+
+    if (p.sd_mode) {
+        dd_set_block_ready(false);
+        uint32_t sectors = dd_fill_sd_sector_table(index);
+        if (sectors > 0) {
+            for (int i = 0; i < sectors; i++) {
+                if (sd_read_sectors(buffer_address, p.sd_sector_table[i], 1)) {
+                    return true;
+                }
+                buffer_address += SD_SECTOR_SIZE;
+            }
+            dd_set_block_ready(true);
+        }
+        return true;
+    } else {
+        usb_tx_info_t packet_info;
+        usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
+        packet_info.data_length = 12;
+        packet_info.data[0] = 1;
+        packet_info.data[1] = buffer_address;
+        packet_info.data[2] = index;
+        p.block_ready = false;
+        p.block_offset = 0;
+        return usb_enqueue_packet(&packet_info);
+    }
 }
 
 static bool dd_block_write_request (void) {
-    usb_tx_info_t packet_info;
-    usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
-    packet_info.data_length = 12;
-    packet_info.data[0] = 2;
-    packet_info.data[1] = DD_BLOCK_BUFFER_ADDRESS;
-    packet_info.data[2] = dd_track_head_block();
-    packet_info.dma_length = (p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM;
-    packet_info.dma_address = DD_BLOCK_BUFFER_ADDRESS;
-    p.block_ready = false;
-    return usb_enqueue_packet(&packet_info);
+    uint32_t index = dd_track_head_block();
+    uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
+
+    if (p.sd_mode) {
+        dd_set_block_ready(false);
+        uint32_t sectors = dd_fill_sd_sector_table(index);
+        if (sectors > 0) {
+            for (int i = 0; i < sectors; i++) {
+                if (sd_write_sectors(buffer_address, p.sd_sector_table[i], 1)) {
+                    return true;
+                }
+                buffer_address += SD_SECTOR_SIZE;
+            }
+            dd_set_block_ready(true);
+        }
+        return true;
+    } else {
+        usb_tx_info_t packet_info;
+        usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
+        packet_info.data_length = 12;
+        packet_info.data[0] = 2;
+        packet_info.data[1] = buffer_address;
+        packet_info.data[2] = index;
+        packet_info.dma_length = (p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM;
+        packet_info.dma_address = buffer_address;
+        p.block_ready = false;
+        p.block_offset = 0;
+        return usb_enqueue_packet(&packet_info);
+    }
 }
 
 static void dd_set_cmd_response_ready (void) {
@@ -168,6 +241,29 @@ void dd_set_disk_state (dd_disk_state_t state) {
     fpga_reg_set(REG_DD_SCR, scr);
 }
 
+bool dd_get_sd_mode (void) {
+    return p.sd_mode;
+}
+
+void dd_set_sd_mode (bool value) {
+    p.sd_mode = value;
+}
+
+void dd_set_sd_disk_info (uint32_t address, uint32_t length) {
+    uint32_t tmp[2];
+    p.sd_current_disk = 0;
+    for (int i = 0; i < 4; i++) {
+        fpga_mem_read(address, sizeof(tmp), (uint8_t *) (tmp));
+        p.sd_disk_info[i].thb_table_address = SWAP32(tmp[0]);
+        p.sd_disk_info[i].sector_table_address = SWAP32(tmp[1]);
+        address += sizeof(tmp);
+    }
+}
+
+void dd_handle_button (void) {
+    // TODO: disk swap
+}
+
 void dd_init (void) {
     fpga_reg_set(REG_DD_SCR, 0);
     fpga_reg_set(REG_DD_HEAD_TRACK, 0);
@@ -178,6 +274,8 @@ void dd_init (void) {
     p.disk_spinning = false;
     p.bm_running = false;
     p.drive_type = DD_DRIVE_TYPE_RETAIL;
+    p.sd_mode = false;
+    p.sd_current_disk = 0;
 }
 
 void dd_process (void) {
@@ -365,7 +463,7 @@ void dd_process (void) {
 
             case STATE_SECTOR_READ:
                 fpga_mem_copy(
-                    DD_BLOCK_BUFFER_ADDRESS + (p.current_sector * (p.sector_info.sector_size + 1)),
+                    DD_BLOCK_BUFFER_ADDRESS + p.block_offset + (p.current_sector * (p.sector_info.sector_size + 1)),
                     DD_SECTOR_BUFFER_ADDRESS,
                     p.sector_info.sector_size + 1
                 );
@@ -377,7 +475,7 @@ void dd_process (void) {
             case STATE_SECTOR_WRITE:
                 fpga_mem_copy(
                     DD_SECTOR_BUFFER_ADDRESS,
-                    DD_BLOCK_BUFFER_ADDRESS + (p.current_sector * (p.sector_info.sector_size + 1)),
+                    DD_BLOCK_BUFFER_ADDRESS + p.block_offset + (p.current_sector * (p.sector_info.sector_size + 1)),
                     p.sector_info.sector_size + 1
                 );
                 p.current_sector += 1;

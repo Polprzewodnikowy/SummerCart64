@@ -19,6 +19,7 @@ typedef enum {
     SC64_CMD_SD_SECTOR_SET      = 'I',
     SC64_CMD_SD_WRITE           = 'S',
     SC64_CMD_SD_READ            = 's',
+    SC64_CMD_DD_SD_DISK_INFO    = 'D',
 } cmd_id_t;
 
 typedef enum {
@@ -198,4 +199,12 @@ bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count) {
         return true;
     }
     return sc64_execute_cmd(SC64_CMD_SD_READ, read_args, NULL);
+}
+
+bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t count) {
+    uint32_t args[2] = { (uint32_t) (address), count };
+    if (sc64_execute_cmd(SC64_CMD_DD_SD_DISK_INFO, args, NULL)) {
+        return true;
+    }
+    return false;
 }

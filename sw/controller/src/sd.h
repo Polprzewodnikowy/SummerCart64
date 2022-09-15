@@ -5,6 +5,9 @@
 #include <stdbool.h>
 
 
+#define SD_SECTOR_SIZE      (512)
+
+
 bool sd_card_init (void);
 void sd_card_deinit (void);
 bool sd_card_get_status (void);

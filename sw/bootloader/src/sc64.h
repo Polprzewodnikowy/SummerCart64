@@ -29,6 +29,8 @@ typedef enum {
     CFG_ID_DD_DISK_STATE,
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
+    CFG_ID_ROM_EXTENDED_ENABLE,
+    CFG_ID_DD_SD_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -109,6 +111,7 @@ bool sc64_sd_card_get_status (void);
 bool sc64_sd_card_get_info (uint32_t *address);
 bool sc64_sd_write_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count);
+bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t count);
 
 
 #endif

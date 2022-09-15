@@ -238,6 +238,7 @@ class SC64:
         BUTTON_STATE = 12
         BUTTON_MODE = 13
         ROM_EXTENDED_ENABLE = 14
+        DD_SD_MODE = 15
 
     class __UpdateError(IntEnum):
         OK = 0
@@ -364,6 +365,7 @@ class SC64:
         self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
         self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.NONE)
         self.__set_config(self.__CfgId.ROM_EXTENDED_ENABLE, False)
+        self.__set_config(self.__CfgId.DD_SD_MODE, False)
         self.set_cic_parameters()
 
     def get_state(self):
@@ -383,6 +385,7 @@ class SC64:
             'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
             'button_mode': self.__ButtonMode(self.__get_config(self.__CfgId.BUTTON_MODE)),
             'rom_extended_enable': bool(self.__get_config(self.__CfgId.ROM_EXTENDED_ENABLE)),
+            'dd_sd_mode': bool(self.__get_config(self.__CfgId.DD_SD_MODE)),
         }
 
     def download_memory(self) -> bytes:
@@ -564,6 +567,7 @@ class SC64:
                     break
             if (dd):
                 self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.FULL)
+                self.__set_config(self.__CfgId.DD_SD_MODE, False)
                 self.__set_config(self.__CfgId.DD_DRIVE_TYPE, {
                     'retail': self.__DDDriveType.RETAIL,
                     'development': self.__DDDriveType.DEVELOPMENT

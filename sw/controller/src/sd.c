@@ -6,7 +6,7 @@
 #include "sd.h"
 
 
-#define SD_BUFFER_ADDRESS               (0x05000000UL)
+#define SD_INIT_BUFFER_ADDRESS          (0x05002800UL)
 
 #define CMD6_ARG_CHECK_HS               (0x00FFFFF1UL)
 #define CMD6_ARG_SWITCH_HS              (0x80FFFFF1UL)
@@ -28,7 +28,10 @@
 #define R7_SUPPLY_VOLTAGE_27_36_V       (1 << 8)
 #define R7_CHECK_PATTERN                (0xAA << 0)
 
-#define SD_BLOCK_SIZE                   (512)
+#define SWITCH_FUNCTION_CURRENT_LIMIT   (SD_INIT_BUFFER_ADDRESS + 0)
+#define SWITCH_FUNCTION_GROUP_1         (SD_INIT_BUFFER_ADDRESS + 12)
+#define SWITCH_FUNCTION_GROUP_1_HS      (1 << 1)
+
 #define DAT_BLOCK_MAX_COUNT             (256)
 
 
@@ -166,7 +169,7 @@ static bool sd_acmd (uint8_t acmd, uint32_t arg, rsp_type_t rsp_type, void *rsp)
 }
 
 static void sd_dat_prepare (uint32_t address, uint32_t count, dat_mode_t mode) {
-    uint32_t length = (count * SD_BLOCK_SIZE);
+    uint32_t length = (count * SD_SECTOR_SIZE);
     uint32_t sd_dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_FIFO_FLUSH);
     uint32_t sd_dma_scr = DMA_SCR_START;
 
@@ -209,7 +212,7 @@ static bool sd_dat_wait (uint16_t timeout) {
 bool sd_card_init (void) {
     uint32_t arg;
     uint32_t rsp;
-    uint16_t sd_function;
+    uint16_t tmp;
 
     if (p.card_initialized) {
         return false;
@@ -289,7 +292,7 @@ bool sd_card_init (void) {
         return true;
     }
 
-    sd_dat_prepare(SD_BUFFER_ADDRESS, 1, DAT_READ);
+    sd_dat_prepare(SD_INIT_BUFFER_ADDRESS, 1, DAT_READ);
     if (sd_cmd(6, CMD6_ARG_CHECK_HS, RSP_R1, NULL)) {
         sd_dat_abort();
         sd_card_deinit();
@@ -300,9 +303,14 @@ bool sd_card_init (void) {
         sd_card_deinit();
         return true;
     }
-    fpga_mem_read(SD_BUFFER_ADDRESS + 12, 2, (uint8_t *) (&sd_function));
-    if (SWAP16(sd_function) & (1 << 1)) {
-        sd_dat_prepare(SD_BUFFER_ADDRESS, 1, DAT_READ);
+    fpga_mem_read(SWITCH_FUNCTION_CURRENT_LIMIT, 2, (uint8_t *) (&tmp));
+    if (SWAP16(tmp) == 0) {
+        sd_card_deinit();
+        return true;
+    }
+    fpga_mem_read(SWITCH_FUNCTION_GROUP_1, 2, (uint8_t *) (&tmp));
+    if (SWAP16(tmp) & SWITCH_FUNCTION_GROUP_1_HS) {
+        sd_dat_prepare(SD_INIT_BUFFER_ADDRESS, 1, DAT_READ);
         if (sd_cmd(6, CMD6_ARG_SWITCH_HS, RSP_R1, NULL)) {
             sd_dat_abort();
             sd_card_deinit();
@@ -313,8 +321,8 @@ bool sd_card_init (void) {
             sd_card_deinit();
             return true;
         }
-        fpga_mem_read(SD_BUFFER_ADDRESS + 12, 2, (uint8_t *) (&sd_function));
-        if (SWAP16(sd_function) & (1 << 1)) {
+        fpga_mem_read(SWITCH_FUNCTION_GROUP_1, 2, (uint8_t *) (&tmp));
+        if (SWAP16(tmp) & SWITCH_FUNCTION_GROUP_1_HS) {
             sd_set_clock(CLOCK_50MHZ);
         }
     }
@@ -352,7 +360,7 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     }
 
     if (!p.card_type_block) {
-        sector *= SD_BLOCK_SIZE;
+        sector *= SD_SECTOR_SIZE;
     }
 
     while (count > 0) {
@@ -365,14 +373,14 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             return true;
         }
         sd_dat_prepare(address, blocks, DAT_WRITE);
-        bool error = sd_dat_wait(1000);
-        sd_cmd(12, 0, RSP_R1b, NULL);
-        if (error) {
+        if (sd_dat_wait(1000)) {
             sd_dat_abort();
+            sd_cmd(12, 0, RSP_R1b, NULL);
             return true;
         }
-        address += (blocks * SD_BLOCK_SIZE);
-        sector += (blocks * (p.card_type_block ? 1 : SD_BLOCK_SIZE));
+        sd_cmd(12, 0, RSP_R1b, NULL);
+        address += (blocks * SD_SECTOR_SIZE);
+        sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;
     }
 
@@ -385,7 +393,7 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     }
 
     if (!p.card_type_block) {
-        sector *= SD_BLOCK_SIZE;
+        sector *= SD_SECTOR_SIZE;
     }
 
     while (count > 0) {
@@ -406,8 +414,8 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             }
             return true;
         }
-        address += (blocks * SD_BLOCK_SIZE);
-        sector += (blocks * (p.card_type_block ? 1 : SD_BLOCK_SIZE));
+        address += (blocks * SD_SECTOR_SIZE);
+        sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;
     }
 

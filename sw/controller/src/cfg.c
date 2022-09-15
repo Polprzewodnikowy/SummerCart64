@@ -25,6 +25,7 @@ typedef enum {
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
     CFG_ID_ROM_EXTENDED_ENABLE,
+    CFG_ID_DD_SD_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -103,6 +104,12 @@ static bool cfg_translate_address (uint32_t *address, uint32_t length, bool with
     if (*address >= 0x1FFE0000 && *address < 0x1FFE2000) {
         if ((*address + length) <= 0x1FFE2000) {
             *address = *address - 0x1FFE0000 + 0x05000000;
+            return false;
+        }
+    }
+    if (*address >= 0x1FFE2000 && *address < 0x1FFE2800) {
+        if ((*address + length) <= 0x1FFE2800) {
+            *address = *address - 0x1FFE2000 + 0x05002000;
             return false;
         }
     }
@@ -220,6 +227,9 @@ bool cfg_query (uint32_t *args) {
         case CFG_ID_ROM_EXTENDED_ENABLE:
             args[1] = (scr & CFG_SCR_ROM_EXTENDED_ENABLED);
             break;
+        case CFG_ID_DD_SD_MODE:
+            args[1] = dd_get_sd_mode();
+            break;
         default:
             return true;
     }
@@ -284,6 +294,9 @@ bool cfg_update (uint32_t *args) {
             break;
         case CFG_ID_ROM_EXTENDED_ENABLE:
             cfg_change_scr_bits(CFG_SCR_ROM_EXTENDED_ENABLED, args[1]);
+            break;
+        case CFG_ID_DD_SD_MODE:
+            dd_set_sd_mode(args[1]);
             break;
         default:
             return true;
@@ -456,6 +469,14 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
+                break;
+            
+            case 'D':
+                if (cfg_translate_address(&args[0], args[1], false)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                dd_set_sd_disk_info(args[0], args[1]);
                 break;
 
             default:
