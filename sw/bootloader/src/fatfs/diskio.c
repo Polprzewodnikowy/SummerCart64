@@ -6,8 +6,8 @@
 #include "../error.h"
 
 
-#define SD_BLOCK_SIZE       (512)
-#define BUFFER_BLOCKS_MAX   (sizeof(SC64_BUFFERS->BUFFER) / SD_BLOCK_SIZE)
+#define SD_SECTOR_SIZE      (512)
+#define BUFFER_BLOCKS_MAX   (sizeof(SC64_BUFFERS->BUFFER) / SD_SECTOR_SIZE)
 #define FROM_BCD(x)         ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
 
 
@@ -37,10 +37,10 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     }
     uint32_t *physical_address = (uint32_t *) (PHYSICAL(buff));
     if (physical_address < (uint32_t *) (N64_RAM_SIZE)) {
-        uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_BLOCK_SIZE] __attribute__((aligned(8)));
+        uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_SECTOR_SIZE] __attribute__((aligned(8)));
         while (count > 0) {
             uint32_t blocks = ((count > BUFFER_BLOCKS_MAX) ? BUFFER_BLOCKS_MAX : count);
-            size_t length = (blocks * SD_BLOCK_SIZE);
+            size_t length = (blocks * SD_SECTOR_SIZE);
             if (sc64_sd_read_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks)) {
                 return RES_ERROR;
             }
@@ -69,10 +69,10 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     }
     uint32_t *physical_address = (uint32_t *) (PHYSICAL(buff));
     if (physical_address < (uint32_t *) (N64_RAM_SIZE)) {
-        uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_BLOCK_SIZE] __attribute__((aligned(8)));
+        uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_SECTOR_SIZE] __attribute__((aligned(8)));
         while (count > 0) {
             uint32_t blocks = ((count > BUFFER_BLOCKS_MAX) ? BUFFER_BLOCKS_MAX : count);
-            size_t length = (blocks * SD_BLOCK_SIZE);
+            size_t length = (blocks * SD_SECTOR_SIZE);
             if (((uint32_t) (buff) % 8) == 0) {
                 pi_dma_write((io32_t *) (SC64_BUFFERS->BUFFER), (void *) (buff), length);
             } else {

@@ -94,10 +94,28 @@ static bool cfg_translate_address (uint32_t *address, uint32_t length, bool with
     if (length == 0) {
         return true;
     }
-    uint32_t rom_end = (with_flash ? 0x15000000 : 0x14000000);
-    if (*address >= 0x10000000 && *address < rom_end) {
-        if ((*address + length) <= rom_end) {
+    *address &= 0x1FFFFFFF;
+    if (*address >= 0x06000000 && *address < 0x06400000) {
+        if ((*address + length) <= 0x06400000) {
+            *address = *address - 0x06000000 + 0x03BC0000;
+            return false;
+        }
+    }
+    if (*address >= 0x08000000 && *address < 0x08020000) {
+        if ((*address + length) <= 0x08020000) {
+            *address = *address - 0x08000000 + 0x03FE0000;
+            return false;
+        }
+    }
+    if (*address >= 0x10000000 && *address < 0x14000000) {
+        if ((*address + length) <= 0x14000000) {
             *address = *address - 0x10000000 + 0x00000000;
+            return false;
+        }
+    }
+    if (with_flash && *address >= 0x14000000 && *address < 0x15000000) {
+        if ((*address + length) <= 0x15000000) {
+            *address = *address - 0x14000000 + 0x04000000;
             return false;
         }
     }
@@ -446,7 +464,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * 512, true)) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, true)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -461,7 +479,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * 512, true)) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, true)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }

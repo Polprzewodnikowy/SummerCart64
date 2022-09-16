@@ -2,6 +2,7 @@
 #include "dd.h"
 #include "fpga.h"
 #include "hw.h"
+#include "led.h"
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
@@ -86,7 +87,6 @@ struct process {
     bool sd_mode;
     uint8_t sd_current_disk;
     sd_disk_info_t sd_disk_info[DD_SD_MAX_DISKS];
-    uint32_t sd_sector_table[DD_SD_SECTOR_TABLE_SIZE];
 };
 
 
@@ -100,9 +100,12 @@ static uint16_t dd_track_head_block (void) {
     return (track | head | block);
 }
 
-static uint32_t dd_fill_sd_sector_table (uint32_t index) {
+static uint32_t dd_fill_sd_sector_table (uint32_t index, uint32_t *sector_table) {
     uint32_t tmp;
     sd_disk_info_t info = p.sd_disk_info[p.sd_current_disk];
+    if (info.thb_table_address == 0xFFFFFFFF) {
+        return 0;
+    }
     uint32_t thb_entry_address = (info.thb_table_address + (index * sizeof(uint32_t)));
     fpga_mem_read(thb_entry_address, sizeof(uint32_t), (uint8_t *) (&tmp));
     uint32_t start_offset = SWAP32(tmp);
@@ -111,34 +114,52 @@ static uint32_t dd_fill_sd_sector_table (uint32_t index) {
     }
     p.block_offset = (start_offset % SD_SECTOR_SIZE);
     uint32_t block_length = ((p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM);
-    uint32_t end_offset = ((start_offset + block_length) - 1); // CHECK THIS
+    uint32_t end_offset = ((start_offset + block_length) - 1);
     uint32_t starting_sector = (start_offset / SD_SECTOR_SIZE);
     uint32_t sectors = (1 + ((end_offset / SD_SECTOR_SIZE) - starting_sector));
     for (int i = 0; i < sectors; i++) {
         uint32_t sector_entry_address = info.sector_table_address + ((starting_sector + i) * sizeof(uint32_t));
         fpga_mem_read(sector_entry_address, sizeof(uint32_t), (uint8_t *) (&tmp));
-        p.sd_sector_table[i] = SWAP32(tmp);
+        sector_table[i] = SWAP32(tmp);
     }
     return sectors;
+}
+
+static void dd_process_sd_request (uint16_t index, uint32_t buffer_address, bool write) {
+    uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
+    uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
+    dd_set_block_ready(false);
+    if (sectors == 0) {
+        return;
+    }
+    uint32_t starting_sector = 0;
+    uint32_t sectors_to_process = 0;
+    for (uint32_t i = 0; i < sectors; i++) {
+        sectors_to_process += 1;
+        if ((i < (sectors - 1)) && ((sector_table[i] + 1) == sector_table[i + 1])) {
+            continue;
+        }
+        if (write) {
+            if (sd_write_sectors(buffer_address, sector_table[starting_sector], sectors_to_process)) {
+                return;
+            }
+        } else {
+            if (sd_read_sectors(buffer_address, sector_table[starting_sector], sectors_to_process)) {
+                return;
+            }
+        }
+        buffer_address += (sectors_to_process * SD_SECTOR_SIZE);
+        starting_sector += sectors_to_process;
+        sectors_to_process = 0;
+    }
+    dd_set_block_ready(true);
 }
 
 static bool dd_block_read_request (void) {
     uint16_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
-
     if (p.sd_mode) {
-        dd_set_block_ready(false);
-        uint32_t sectors = dd_fill_sd_sector_table(index);
-        if (sectors > 0) {
-            for (int i = 0; i < sectors; i++) {
-                if (sd_read_sectors(buffer_address, p.sd_sector_table[i], 1)) {
-                    return true;
-                }
-                buffer_address += SD_SECTOR_SIZE;
-            }
-            dd_set_block_ready(true);
-        }
-        return true;
+        dd_process_sd_request(index, buffer_address, false);
     } else {
         usb_tx_info_t packet_info;
         usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
@@ -150,25 +171,14 @@ static bool dd_block_read_request (void) {
         p.block_offset = 0;
         return usb_enqueue_packet(&packet_info);
     }
+    return true;
 }
 
 static bool dd_block_write_request (void) {
     uint32_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
-
     if (p.sd_mode) {
-        dd_set_block_ready(false);
-        uint32_t sectors = dd_fill_sd_sector_table(index);
-        if (sectors > 0) {
-            for (int i = 0; i < sectors; i++) {
-                if (sd_write_sectors(buffer_address, p.sd_sector_table[i], 1)) {
-                    return true;
-                }
-                buffer_address += SD_SECTOR_SIZE;
-            }
-            dd_set_block_ready(true);
-        }
-        return true;
+        dd_process_sd_request(index, buffer_address, true);
     } else {
         usb_tx_info_t packet_info;
         usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
@@ -182,6 +192,7 @@ static bool dd_block_write_request (void) {
         p.block_offset = 0;
         return usb_enqueue_packet(&packet_info);
     }
+    return true;
 }
 
 static void dd_set_cmd_response_ready (void) {
@@ -250,18 +261,36 @@ void dd_set_sd_mode (bool value) {
 }
 
 void dd_set_sd_disk_info (uint32_t address, uint32_t length) {
-    uint32_t tmp[2];
+    sd_disk_info_t info;
+    length /= sizeof(info);
     p.sd_current_disk = 0;
-    for (int i = 0; i < 4; i++) {
-        fpga_mem_read(address, sizeof(tmp), (uint8_t *) (tmp));
-        p.sd_disk_info[i].thb_table_address = SWAP32(tmp[0]);
-        p.sd_disk_info[i].sector_table_address = SWAP32(tmp[1]);
-        address += sizeof(tmp);
+    for (int i = 0; i < DD_SD_MAX_DISKS; i++) {
+        if (i < length) {
+            fpga_mem_read(address, sizeof(info), (uint8_t *) (&info));
+            p.sd_disk_info[i].thb_table_address = (SWAP32(info.thb_table_address) & 0x1FFFFFFF);
+            p.sd_disk_info[i].sector_table_address = (SWAP32(info.sector_table_address) & 0x1FFFFFFF);
+            address += sizeof(info);
+        } else {
+            p.sd_disk_info[i].thb_table_address = 0xFFFFFFFF;
+            p.sd_disk_info[i].sector_table_address = 0xFFFFFFFF;
+        }
     }
 }
 
 void dd_handle_button (void) {
-    // TODO: disk swap
+    led_blink_act();
+    if (dd_get_disk_state() == DD_DISK_STATE_EJECTED) {
+        dd_set_disk_state(DD_DISK_STATE_INSERTED);
+    } else {
+        dd_set_disk_state(DD_DISK_STATE_EJECTED);
+        for (uint8_t i = 0; i < DD_SD_MAX_DISKS; i++) {
+            uint8_t sd_next_disk = ((p.sd_current_disk + i + 1) % DD_SD_MAX_DISKS);
+            if (p.sd_disk_info[sd_next_disk].thb_table_address != 0xFFFFFFFF) {
+                p.sd_current_disk = sd_next_disk;
+                break;
+            }
+        }
+    }
 }
 
 void dd_init (void) {
@@ -276,6 +305,7 @@ void dd_init (void) {
     p.drive_type = DD_DRIVE_TYPE_RETAIL;
     p.sd_mode = false;
     p.sd_current_disk = 0;
+    dd_set_sd_disk_info(0, 0);
 }
 
 void dd_process (void) {
