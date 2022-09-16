@@ -20,16 +20,16 @@ module n64_pi (
 
     logic [1:0] n64_reset_ff;
     logic [1:0] n64_nmi_ff;
-    logic [2:0] n64_pi_alel_ff;
-    logic [2:0] n64_pi_aleh_ff;
+    logic [3:0] n64_pi_alel_ff;
+    logic [3:0] n64_pi_aleh_ff;
     logic [1:0] n64_pi_read_ff;
     logic [2:0] n64_pi_write_ff;
 
     always_ff @(posedge clk) begin
         n64_reset_ff <= {n64_reset_ff[0], n64_reset};
         n64_nmi_ff <= {n64_nmi_ff[0], n64_nmi};
-        n64_pi_aleh_ff <= {n64_pi_aleh_ff[1:0], n64_pi_aleh};
-        n64_pi_alel_ff <= {n64_pi_alel_ff[1:0], n64_pi_alel};
+        n64_pi_aleh_ff <= {n64_pi_aleh_ff[2:0], n64_pi_aleh};
+        n64_pi_alel_ff <= {n64_pi_alel_ff[2:0], n64_pi_alel};
         n64_pi_read_ff <= {n64_pi_read_ff[0], n64_pi_read};
         n64_pi_write_ff <= {n64_pi_write_ff[1:0], n64_pi_write};
     end
@@ -44,8 +44,8 @@ module n64_pi (
     always_comb begin
         pi_reset = n64_reset_ff[1];
         pi_nmi = n64_nmi_ff[1];
-        pi_aleh = n64_pi_aleh_ff[2];
-        pi_alel = n64_pi_alel_ff[2];
+        pi_aleh = n64_pi_aleh_ff[3];
+        pi_alel = n64_pi_alel_ff[3];
         pi_read = n64_pi_read_ff[1];
         pi_write = n64_pi_write_ff[2];
     end
@@ -250,6 +250,7 @@ module n64_pi (
     logic [15:0] read_fifo_rdata;
 
     logic read_fifo_wait;
+    logic [15:0] read_fifo_buffer;
 
     n64_pi_fifo read_fifo_inst (
         .clk(clk),
@@ -268,6 +269,7 @@ module n64_pi (
 
     always_ff @(posedge clk) begin
         read_fifo_read <= 1'b0;
+        read_fifo_buffer <= read_fifo_rdata;
 
         if (reset || !pi_reset || alel_op) begin
             read_fifo_wait <= 1'b0;
@@ -279,14 +281,14 @@ module n64_pi (
                     read_fifo_wait <= 1'b1;
                 end else begin
                     read_fifo_read <= 1'b1;
-                    n64_pi_dq_out <= read_fifo_rdata;
+                    n64_pi_dq_out <= read_fifo_buffer;
                 end
             end
 
             if (!read_fifo_empty && read_fifo_wait) begin
                 read_fifo_read <= 1'b1;
                 read_fifo_wait <= 1'b0;
-                n64_pi_dq_out <= read_fifo_rdata;
+                n64_pi_dq_out <= read_fifo_buffer;
             end
         end
 
