@@ -6,15 +6,15 @@
 
 #define SCREEN_WIDTH            (640)
 #define SCREEN_HEIGHT           (240)
-#define BORDER_WIDTH            (32)
-#define BORDER_HEIGHT           (16)
+#define BORDER_WIDTH            (64)
+#define BORDER_HEIGHT           (24)
 
 #define BACKGROUND_COLOR        (0x00000000UL)
 #define TEXT_COLOR              (0xFFFFFFFFUL)
-#define LINE_HEIGHT             (10)
+#define LINE_SPACING            (2)
 
 
-static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((aligned(64)));
+static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((section(".framebuffer")));
 static int char_x;
 static int char_y;
 static const vi_regs_t vi_config[] = {{
@@ -63,13 +63,13 @@ static const vi_regs_t vi_config[] = {{
 static void display_draw_character (char c) {
     if (c == '\n') {
         char_x = BORDER_WIDTH;
-        char_y += LINE_HEIGHT;
+        char_y += FONT_HEIGHT + LINE_SPACING;
         return;
     }
 
     if ((char_x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
         char_x = BORDER_WIDTH;
-        char_y += LINE_HEIGHT;
+        char_y += FONT_HEIGHT + LINE_SPACING;
     }
 
     if ((c < ' ') || (c > '~')) {
@@ -107,14 +107,12 @@ void display_init (uint32_t *background) {
     char_y = BORDER_HEIGHT;
 
     if (background == NULL) {
-        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 1) {
+        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
             io_write(&display_framebuffer[i], BACKGROUND_COLOR);
         }
     } else {
-        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i += 2) {
-            io_write(&display_framebuffer[i], *background);
-            io_write(&display_framebuffer[i + 1], *background);
-            background++;
+        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
+            io_write(&display_framebuffer[i], *background++);
         }
     }
 

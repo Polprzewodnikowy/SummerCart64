@@ -66,14 +66,9 @@ bool boot_get_tv_type (boot_info_t *info) {
 bool boot_get_cic_seed_version (boot_info_t *info) {
     io32_t *base = boot_get_device_base(info);
 
-    uint32_t ipl3[1008];
+    uint32_t ipl3[1008] __attribute__((aligned(8)));
 
-    io32_t *ipl3_src = &base[16];
-    uint32_t *ipl3_dst = ipl3;
-
-    for (int i = 0; i < sizeof(ipl3); i += sizeof(uint32_t)) {
-        *ipl3_dst++ = pi_io_read(ipl3_src++);
-    }
+    pi_dma_read(&base[16], ipl3, sizeof(ipl3));
 
     uint32_t crc32 = crc32_calculate(ipl3, sizeof(ipl3));
 

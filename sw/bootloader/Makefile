@@ -40,7 +40,7 @@ SRC_FILES = \
 	fatfs/ffunicode.c
 
 ASSET_FILES = \
-	exception_background.png
+	sc64_logo_640_240_dimmed.png
 
 SRCS = $(SRC_FILES) $(ASSET_FILES)
 SRC_OBJS = $(patsubst %,%.o,$(SRC_FILES))

@@ -201,8 +201,8 @@ bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count) {
     return sc64_execute_cmd(SC64_CMD_SD_READ, read_args, NULL);
 }
 
-bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t count) {
-    uint32_t args[2] = { (uint32_t) (address), count };
+bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t length) {
+    uint32_t args[2] = { (uint32_t) (address), length };
     if (sc64_execute_cmd(SC64_CMD_DD_SD_DISK_INFO, args, NULL)) {
         return true;
     }
