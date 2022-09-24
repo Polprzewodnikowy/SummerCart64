@@ -355,6 +355,7 @@ void cfg_init (void) {
 void cfg_process (void) {
     uint32_t reg;
     uint32_t args[2];
+    uint32_t prev_cfg[2];
     usb_tx_info_t packet_info;
 
     reg = fpga_reg_get(REG_CFG_CMD);
@@ -377,10 +378,13 @@ void cfg_process (void) {
                 break;
 
             case 'C':
+                prev_cfg[0] = args[0];
+                cfg_query(prev_cfg);
                 if (cfg_update(args)) {
                     cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
                     return;
                 }
+                args[1] = prev_cfg[1];
                 break;
 
             case 't':
