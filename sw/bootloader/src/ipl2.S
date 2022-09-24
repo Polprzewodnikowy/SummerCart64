@@ -1,7 +1,7 @@
 .set noat
 .set noreorder
 
-.section .text.ipl2
+.section .data.ipl2
 ipl2:
     .global ipl2
     lui $t5, 0xBFC0

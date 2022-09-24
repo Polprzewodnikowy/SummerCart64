@@ -7,7 +7,7 @@ SIZE = $(TOOLCHAIN)size
 PYTHON = python3
 
 FLAGS = -march=vr4300 -mtune=vr4300 $(USER_FLAGS)
-CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -G 0 -MMD -MP
+CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 ASFLAGS = -Wa,-I$(N64_INST)/mips64-elf/lib
 LDFLAGS = -lc -nostartfiles -Wl,--gc-sections
 

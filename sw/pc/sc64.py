@@ -536,7 +536,14 @@ class SC64:
         print(data.decode('EUC-JP', errors='backslashreplace'), end='')
 
     def __handle_usb_packet(self, data: bytes) -> None:
-        print(data)
+        header = self.__get_int(data[0:4])
+        datatype = ((header >> 24) & 0xFF)
+        length = (header & 0xFFFFFF)
+        packet = data[4:]
+        if (datatype == 0x01):
+            print(packet.decode('UTF-8', errors='backslashreplace'), end='')
+        else:
+            print(f'Unhandled USB packet - datatype: [{datatype}], length: [{length}]')
 
     def debug_loop(self, isv: bool=False, disks: Optional[list[str]]=None) -> None:
         dd = None

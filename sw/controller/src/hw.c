@@ -286,16 +286,15 @@ static void hw_flash_unlock (void) {
     while (FLASH->SR & FLASH_SR_BSY1);
     if (FLASH->CR & FLASH_CR_LOCK) {
         FLASH->KEYR = 0x45670123;
+        __ISB();
         FLASH->KEYR = 0xCDEF89AB;
     }
 }
 
 void hw_flash_erase (void) {
     hw_flash_unlock();
-    FLASH->CR |= FLASH_CR_MER1;
-    FLASH->CR |= FLASH_CR_STRT;
+    FLASH->CR |= (FLASH_CR_STRT | FLASH_CR_MER1);
     while (FLASH->SR & FLASH_SR_BSY1);
-    FLASH->CR &= ~(FLASH_CR_MER1);
 }
 
 void hw_flash_program (uint32_t offset, hw_flash_t value) {
@@ -305,9 +304,6 @@ void hw_flash_program (uint32_t offset, hw_flash_t value) {
     __ISB();
     *(__IO uint32_t *) (FLASH_BASE + offset + 4) = ((value >> 32) & 0xFFFFFFFF);
     while (FLASH->SR & FLASH_SR_BSY1);
-    if (FLASH->SR & FLASH_SR_EOP) {
-        FLASH->SR |= FLASH_SR_EOP;
-    }
     FLASH->CR &= ~(FLASH_CR_PG);
 }
 

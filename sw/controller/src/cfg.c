@@ -402,12 +402,14 @@ void cfg_process (void) {
                 break;
 
             case 'M':
-                if (cfg_translate_address(&args[0], args[1], false)) {
+                if (cfg_translate_address(&args[0], args[1] & 0xFFFFFF, false)) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
                 usb_create_packet(&packet_info, PACKET_CMD_DEBUG_OUTPUT);
-                packet_info.dma_length = args[1];
+                packet_info.data_length = 4;
+                packet_info.data[0] = args[1];
+                packet_info.dma_length = args[1] & 0xFFFFFF;
                 packet_info.dma_address = args[0];
                 packet_info.done_callback = cfg_set_usb_output_ready;
                 if (usb_enqueue_packet(&packet_info)) {
@@ -422,7 +424,7 @@ void cfg_process (void) {
                 break;
 
             case 'U':
-                args[0] = p.usb_output_ready ? 1 : 0;
+                args[0] = p.usb_output_ready ? 0 : (1 << 31);
                 break;
 
             case 'i':

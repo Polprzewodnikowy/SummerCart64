@@ -390,7 +390,7 @@ void usb_get_read_info (uint32_t *args) {
         args[0] = p.rx_args[0] & 0xFF;
         args[1] = p.rx_args[1];
     }
-    args[0] |= (p.read_length > 0) ? (1 << 24) : 0;
+    args[0] |= (p.read_length > 0) ? (1 << 31) : 0;
 }
 
 void usb_init (void) {

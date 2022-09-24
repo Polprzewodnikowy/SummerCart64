@@ -117,12 +117,12 @@ void sc64_get_time (rtc_time_t *t) {
 bool sc64_usb_write_ready (void) {
     uint32_t result[2];
     sc64_execute_cmd(SC64_CMD_USB_WRITE_STATUS, NULL, result);
-    return result[0];
+    return (!(result[0] & (1 << 31)));
 }
 
-bool sc64_usb_write (uint32_t *address, uint32_t length) {
+bool sc64_usb_write (uint32_t *address, uint8_t type, uint32_t length) {
     while (!sc64_usb_write_ready());
-    uint32_t args[2] = { (uint32_t) (address), length };
+    uint32_t args[2] = { (uint32_t) (address), ((type << 24) | (length & 0xFFFFFF)) };
     return sc64_execute_cmd(SC64_CMD_USB_WRITE, args, NULL);
 }
 
@@ -146,7 +146,7 @@ bool sc64_usb_read (uint32_t *address, uint32_t length) {
     }
     do {
         sc64_execute_cmd(SC64_CMD_USB_READ_STATUS, NULL, result);
-    } while(result[0] & (1 << 24));
+    } while(result[0] & (1 << 31));
     return false;
 }
 

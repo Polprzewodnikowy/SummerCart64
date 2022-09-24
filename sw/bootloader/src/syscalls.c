@@ -2,8 +2,8 @@
 #include <sys/types.h>
 
 
-extern char _sheap;
-extern char _eheap;
+extern char _sheap __attribute__((section(".data")));
+extern char _eheap __attribute__((section(".data")));
 
 
 caddr_t _sbrk_r (struct _reent *prt, ptrdiff_t incr) {

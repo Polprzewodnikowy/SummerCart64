@@ -6,7 +6,7 @@ OBJDUMP = $(TOOLCHAIN)objdump
 SIZE = $(TOOLCHAIN)size
 
 FLAGS = -mcpu=cortex-m0plus -mthumb -DSTM32G030xx $(USER_FLAGS) -g -ggdb3
-CFLAGS = -Og -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP -I./lib
+CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP -I./lib
 LDFLAGS = -nostartfiles -Wl,--gc-sections
 
 SRC_DIR = src

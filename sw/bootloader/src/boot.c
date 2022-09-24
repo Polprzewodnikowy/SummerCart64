@@ -3,7 +3,7 @@
 #include "io.h"
 
 
-extern uint32_t ipl2;
+extern uint32_t ipl2 __attribute__((section(".data")));
 
 
 typedef struct {
