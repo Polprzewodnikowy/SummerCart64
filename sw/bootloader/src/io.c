@@ -1,4 +1,5 @@
 #include "io.h"
+#include "vr4300.h"
 
 
 static void cache_operation (uint8_t operation, uint8_t line_size, void *address, size_t length) {
@@ -13,16 +14,16 @@ static void cache_operation (uint8_t operation, uint8_t line_size, void *address
     }    
 }
 
-void cache_data_hit_invalidate (void *address, size_t length) {
-    cache_operation(0x11, 16, address, length);
+void cache_data_hit_writeback_invalidate (void *address, size_t length) {
+    cache_operation(HIT_WRITE_BACK_INVALIDATE_D, CACHE_LINE_SIZE_D, address, length);
 }
 
 void cache_data_hit_writeback (void *address, size_t length) {
-    cache_operation(0x19, 16, address, length);
+    cache_operation(HIT_WRITE_BACK_D, CACHE_LINE_SIZE_D, address, length);
 }
 
 void cache_inst_hit_invalidate (void *address, size_t length) {
-    cache_operation(0x10, 32, address, length);
+    cache_operation(HIT_INVALIDATE_I, CACHE_LINE_SIZE_I, address, length);
 }
 
 uint32_t io_read (io32_t *address) {
@@ -50,11 +51,11 @@ void pi_io_write (io32_t *address, uint32_t value) {
 }
 
 void pi_dma_read (io32_t *address, void *buffer, size_t length) {
+    cache_data_hit_writeback_invalidate(buffer, length);
     io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
     io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
     io_write(&PI->WDMA, length - 1);
     while (pi_busy());
-    cache_data_hit_invalidate(buffer, length);
 }
 
 void pi_dma_write (io32_t *address, void *buffer, size_t length) {

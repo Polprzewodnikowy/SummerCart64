@@ -175,13 +175,19 @@ exception_install:
     add $t5, $t5, $t4
 2:
     lw $t6, 0($t3)
-    sw $t6, 0($t4)
-    cache HIT_INVALIDATE_I, 0($t4)
     addiu $t3, 4
+    sw $t6, 0($t4)
     addiu $t4, 4
     bne $t4, $t5, 2b
     addiu $t1, VECTOR_SIZE
     bne $t1, $t2, 1b
+    li $t0, VECTOR_LOCATION
+    li $t1, (VECTOR_SIZE * VECTOR_NUM)
+    add $t1, $t0, $t1
+3:
+    cache HIT_INVALIDATE_I, 0($t0)
+    addiu $t0, CACHE_LINE_SIZE_I
+    bne $t0, $t1, 3b
     jr $ra
 
 

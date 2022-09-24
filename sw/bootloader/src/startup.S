@@ -40,7 +40,6 @@ bss_init:
 	la $a1, _ebss
 1:
 	sd $zero, 0($a0)
-    cache HIT_WRITE_BACK_D, 0($a0)
 	addiu $a0, 8
 	bltu $a0, $a1, 1b
 

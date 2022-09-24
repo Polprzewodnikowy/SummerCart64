@@ -3,8 +3,11 @@
 
 
 #define HIT_INVALIDATE_I            ((4 << 2) | 0)
+#define HIT_WRITE_BACK_INVALIDATE_D ((5 << 2) | 1)
 #define HIT_WRITE_BACK_D            ((6 << 2) | 1)
 
+#define CACHE_LINE_SIZE_I           (32)
+#define CACHE_LINE_SIZE_D           (16)
 
 #define C0_BADVADDR                 $8
 #define C0_COUNT                    $9

@@ -286,7 +286,7 @@ void pi_dma_write (io32_t *address, void *buffer, size_t length);
 uint32_t si_busy (void);
 uint32_t si_io_read (io32_t *address);
 void si_io_write (io32_t *address, uint32_t value);
-void cache_data_hit_invalidate (void *address, size_t length);
+void cache_data_hit_writeback_invalidate (void *address, size_t length);
 void cache_data_hit_writeback (void *address, size_t length);
 void cache_inst_hit_invalidate (void *address, size_t length);
 
