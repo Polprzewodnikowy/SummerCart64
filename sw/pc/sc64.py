@@ -12,6 +12,7 @@ from enum import Enum, IntEnum
 from serial.tools import list_ports
 from threading import Thread
 from typing import Callable, Optional
+from PIL import Image
 
 
 
@@ -307,6 +308,8 @@ class SC64:
         MPAL = 2
         AUTO = 3
 
+    __debug_header: Optional[bytes] = None
+
     def __init__(self) -> None:
         self.__link = SC64Serial()
         version = self.__link.execute_cmd(cmd=b'v')
@@ -509,6 +512,9 @@ class SC64:
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
 
+    def __generate_filename(self, prefix: str, extension: str) -> str:
+        return f'{prefix}-{datetime.now().strftime("%y%m%d%H%M%S.%f")}.{extension}'
+
     def __handle_dd_packet(self, dd: Optional[DD64Image], data: bytes) -> None:
         CMD_READ_BLOCK = 1
         CMD_WRITE_BLOCK = 2
@@ -542,6 +548,32 @@ class SC64:
         packet = data[4:]
         if (datatype == 0x01):
             print(packet.decode('UTF-8', errors='backslashreplace'), end='')
+        elif (datatype == 0x02):
+            filename = self.__generate_filename('binaryout', 'bin')
+            with open(filename, 'wb+') as f:
+                f.write(packet)
+                print(f'Wrote {len(packet)} bytes to {filename}')
+        elif (datatype == 0x03):
+            if (len(packet) == 16):
+                self.__debug_header = packet
+            else:
+                print(f'Size of header packet is invalid: {len(packet)}')
+        elif (datatype == 0x04):
+            filename = self.__generate_filename('screenshot', 'png')
+            if (self.__debug_header != None):
+                header_datatype = self.__get_int(self.__debug_header[0:4])
+                pixel_format = self.__get_int(self.__debug_header[4:8])
+                image_w = self.__get_int(self.__debug_header[8:12])
+                image_h = self.__get_int(self.__debug_header[12:16])
+                if (header_datatype == 0x04 and pixel_format != 0 and image_w != 0 and image_h != 0):
+                    mode = 'RGBA' if pixel_format == 4 else 'I;16'
+                    screenshot = Image.frombytes(mode, (image_w, image_h), packet)
+                    screenshot.save(filename)
+                    print(f'Wrote {image_w}x{image_h} pixels to {filename}')
+                else:
+                    print('Screenshot header data is invalid')
+            else:
+                print('Got screenshot packet without header data')
         else:
             print(f'Unhandled USB packet - datatype: [{datatype}], length: [{length}]')
 
@@ -586,7 +618,7 @@ class SC64:
                     print(f' - {os.path.basename(disk)}')
                 print('Press button on SC64 device to cycle through provided disks')
 
-        print('Debug loop started, use Ctrl-C to exit')
+        print('Debug loop started, press Ctrl-C to exit')
 
         try:
             while (True):
