@@ -308,6 +308,12 @@ class SC64:
         MPAL = 2
         AUTO = 3
 
+    class __DebugDatatype(IntEnum):
+        TEXT = 1
+        RAWBINARY = 2
+        HEADER = 3
+        SCREENSHOT = 4
+
     __debug_header: Optional[bytes] = None
 
     def __init__(self) -> None:
@@ -390,6 +396,11 @@ class SC64:
             'rom_extended_enable': bool(self.__get_config(self.__CfgId.ROM_EXTENDED_ENABLE)),
             'dd_sd_mode': bool(self.__get_config(self.__CfgId.DD_SD_MODE)),
         }
+
+    def debug_send(self, datatype: __DebugDatatype, data: bytes) -> None:
+        if (len(data) > (8 * 1024 * 1024)):
+            raise ValueError('Debug data size too big')
+        self.__link.execute_cmd(cmd=b'U', args=[datatype, len(data)], data=data, response=False)
 
     def download_memory(self) -> bytes:
         return self.__read_memory(self.__Address.SDRAM, self.__Length.SDRAM + self.__Length.FLASH)
@@ -543,22 +554,24 @@ class SC64:
 
     def __handle_usb_packet(self, data: bytes) -> None:
         header = self.__get_int(data[0:4])
-        datatype = ((header >> 24) & 0xFF)
+        datatype = self.__DebugDatatype((header >> 24) & 0xFF)
         length = (header & 0xFFFFFF)
         packet = data[4:]
-        if (datatype == 0x01):
+        if (len(packet) != length):
+            print(f'Debug packet length and data length did not match')
+        elif (datatype == self.__DebugDatatype.TEXT):
             print(packet.decode('UTF-8', errors='backslashreplace'), end='')
-        elif (datatype == 0x02):
+        elif (datatype == self.__DebugDatatype.RAWBINARY):
             filename = self.__generate_filename('binaryout', 'bin')
             with open(filename, 'wb+') as f:
                 f.write(packet)
                 print(f'Wrote {len(packet)} bytes to {filename}')
-        elif (datatype == 0x03):
+        elif (datatype == self.__DebugDatatype.HEADER):
             if (len(packet) == 16):
                 self.__debug_header = packet
             else:
                 print(f'Size of header packet is invalid: {len(packet)}')
-        elif (datatype == 0x04):
+        elif (datatype == self.__DebugDatatype.SCREENSHOT):
             filename = self.__generate_filename('screenshot', 'png')
             if (self.__debug_header != None):
                 header_datatype = self.__get_int(self.__debug_header[0:4])
@@ -574,8 +587,39 @@ class SC64:
                     print('Screenshot header data is invalid')
             else:
                 print('Got screenshot packet without header data')
-        else:
-            print(f'Unhandled USB packet - datatype: [{datatype}], length: [{length}]')
+
+    def __handle_debug_input(self) -> None:
+        running = True
+        while (running):
+            try:
+                command = input()
+                if (len(command) > 0):
+                    data = b''
+                    datatype = self.__DebugDatatype.TEXT
+                    if (command.count('@') != 2):
+                        data += f'{command}\0'.encode()
+                    else:
+                        start = command.index('@')
+                        end = command.rindex('@')
+                        filename = command[(start + 1):end]
+                        if (len(filename) == 0):
+                            raise FileNotFoundError
+                        with open(filename, 'rb') as f:
+                            file_data = f.read()
+                        if (command.startswith('@') and command.endswith('@')):
+                            datatype = self.__DebugDatatype.RAWBINARY
+                            data += file_data
+                        else:
+                            data += f'{command[:start]}@{len(file_data)}@'.encode()
+                            data += file_data
+                            data += b'\0'
+                    self.debug_send(datatype, data)
+            except ValueError as e:
+                print(f'Error: {e}')
+            except FileNotFoundError as e:
+                print(f'Error: Cannot open file {e.filename}')
+            except EOFError:
+                running = False
 
     def debug_loop(self, isv: bool=False, disks: Optional[list[str]]=None) -> None:
         dd = None
@@ -618,10 +662,12 @@ class SC64:
                     print(f' - {os.path.basename(disk)}')
                 print('Press button on SC64 device to cycle through provided disks')
 
-        print('Debug loop started, press Ctrl-C to exit')
+        print('\nDebug loop started, press Ctrl-C to exit\n')
 
         try:
-            while (True):
+            thread_input = Thread(target=self.__handle_debug_input, daemon=True)
+            thread_input.start()
+            while (thread_input.is_alive()):
                 packet = self.__link.get_packet()
                 if (packet != None):
                     (cmd, data) = packet
@@ -646,6 +692,8 @@ class SC64:
                             print(f'64DD disk ejected - {os.path.basename(disks[current_image])}')
         except KeyboardInterrupt:
             pass
+        finally:
+            print('\nDebug loop stopped\n')
 
         if (dd and dd.loaded):
             self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)

@@ -413,7 +413,7 @@ void cfg_process (void) {
                 usb_create_packet(&packet_info, PACKET_CMD_DEBUG_OUTPUT);
                 packet_info.data_length = 4;
                 packet_info.data[0] = args[1];
-                packet_info.dma_length = args[1] & 0xFFFFFF;
+                packet_info.dma_length = (args[1] & 0xFFFFFF);
                 packet_info.dma_address = args[0];
                 packet_info.done_callback = cfg_set_usb_output_ready;
                 if (usb_enqueue_packet(&packet_info)) {
