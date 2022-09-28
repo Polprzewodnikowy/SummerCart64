@@ -250,7 +250,6 @@ module n64_pi (
     logic [15:0] read_fifo_rdata;
 
     logic read_fifo_wait;
-    logic [15:0] read_fifo_buffer;
 
     n64_pi_fifo read_fifo_inst (
         .clk(clk),
@@ -269,7 +268,10 @@ module n64_pi (
 
     always_ff @(posedge clk) begin
         read_fifo_read <= 1'b0;
-        read_fifo_buffer <= read_fifo_rdata;
+
+        if (reset) begin
+            n64_scb.pi_debug[1:0] <= 2'b00;
+        end
 
         if (reset || !pi_reset || alel_op) begin
             read_fifo_wait <= 1'b0;
@@ -279,16 +281,20 @@ module n64_pi (
             if (read_op) begin
                 if (read_fifo_empty) begin
                     read_fifo_wait <= 1'b1;
+                    n64_scb.pi_debug[0] <= 1'b1;
+                    if (read_fifo_wait) begin
+                        n64_scb.pi_debug[1] <= 1'b1;
+                    end
                 end else begin
                     read_fifo_read <= 1'b1;
-                    n64_pi_dq_out <= read_fifo_buffer;
+                    n64_pi_dq_out <= read_fifo_rdata;
                 end
             end
 
             if (!read_fifo_empty && read_fifo_wait) begin
                 read_fifo_read <= 1'b1;
                 read_fifo_wait <= 1'b0;
-                n64_pi_dq_out <= read_fifo_buffer;
+                n64_pi_dq_out <= read_fifo_rdata;
             end
         end
 
@@ -331,6 +337,10 @@ module n64_pi (
         write_fifo_write <= 1'b0;
 
         if (reset) begin
+            n64_scb.pi_debug[3:2] <= 2'b00;
+        end
+
+        if (reset) begin
             write_fifo_wait <= 1'b0;
         end
 
@@ -338,6 +348,10 @@ module n64_pi (
             if (write_op) begin
                 if (write_fifo_full) begin
                     write_fifo_wait <= 1'b1;
+                    n64_scb.pi_debug[2] <= 1'b1;
+                    if (write_fifo_wait) begin
+                        n64_scb.pi_debug[3] <= 1'b1;
+                    end
                 end else begin
                     write_fifo_write <= 1'b1;
                     write_fifo_wdata <= n64_pi_dq_in;

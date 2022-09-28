@@ -519,6 +519,10 @@ void cfg_process (void) {
                 dd_set_sd_disk_info(args[0], args[1]);
                 break;
 
+            case '?':
+                args[0] = fpga_reg_get(REG_DEBUG);
+                break;
+
             default:
                 cfg_set_error(CFG_ERROR_UNKNOWN_CMD);
                 return;

@@ -51,6 +51,8 @@ interface n64_scb ();
     logic [31:0] cfg_wdata [0:1];
     logic [31:0] cfg_version;
 
+    logic [3:0] pi_debug;
+
     modport controller (
         input n64_reset,
         input n64_nmi,
@@ -86,7 +88,9 @@ interface n64_scb ();
         input cfg_cmd,
         input cfg_rdata,
         output cfg_wdata,
-        output cfg_version
+        output cfg_version,
+
+        input pi_debug
     );
 
     modport pi (
@@ -105,7 +109,9 @@ interface n64_scb ();
 
         input flashram_read_mode,
 
-        input cfg_unlock
+        input cfg_unlock,
+
+        output pi_debug
     );
 
     modport flashram (

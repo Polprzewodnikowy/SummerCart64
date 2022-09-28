@@ -193,6 +193,7 @@ class SC64Serial:
 
 class SC64:
     class __Address(IntEnum):
+        MEMORY = 0x0000_0000
         SDRAM = 0x0000_0000
         FLASH = 0x0400_0000
         BUFFER = 0x0500_0000
@@ -205,6 +206,7 @@ class SC64:
         SHADOW = 0x04FE_0000
 
     class __Length(IntEnum):
+        MEMORY = 0x0500_2980
         SDRAM = (64 * 1024 * 1024)
         FLASH = (16 * 1024 * 1024)
         BUFFER = (8 * 1024)
@@ -390,7 +392,7 @@ class SC64:
         self.__link.execute_cmd(cmd=b'U', args=[datatype, len(data)], data=data, response=False)
 
     def download_memory(self) -> bytes:
-        return self.__read_memory(self.__Address.SDRAM, self.__Length.SDRAM + self.__Length.FLASH)
+        return self.__read_memory(self.__Address.MEMORY, self.__Length.MEMORY)
 
     def upload_rom(self, data: bytes, use_shadow: bool=True) -> None:
         rom_length = len(data)
@@ -711,8 +713,9 @@ class EnumAction(argparse.Action):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SC64 control software')
-    parser.add_argument('--backup-firmware', help='backup SC64 firmware and write it to specified file')
-    parser.add_argument('--update-firmware', help='update SC64 firmware from specified file')
+    parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
+    parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
+    parser.add_argument('--bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
@@ -720,16 +723,15 @@ if __name__ == '__main__':
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
-    parser.add_argument('--rom', help='upload ROM from specified file')
+    parser.add_argument('--rom', metavar='file', help='upload ROM from specified file')
     parser.add_argument('--save-type', type=SC64.SaveType, action=EnumAction, help='set save type')
-    parser.add_argument('--save', help='upload save from specified file')
-    parser.add_argument('--backup-save', help='download save and write it to specified file')
-    parser.add_argument('--ddipl', help='upload 64DD IPL from specified file')
-    parser.add_argument('--disk', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
+    parser.add_argument('--save', metavar='file', help='upload save from specified file')
+    parser.add_argument('--backup-save', metavar='file', help='download save and write it to specified file')
+    parser.add_argument('--ddipl', metavar='file', help='upload 64DD IPL from specified file')
+    parser.add_argument('--disk', metavar='file', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
     parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
     parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
-    parser.add_argument('--download-memory', help='download whole memory space and write it to specified file')
-    parser.add_argument('--bootloader', help='bootloader')
+    parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
 
     if (len(sys.argv) <= 1):
         parser.print_help()

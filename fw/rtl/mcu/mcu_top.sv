@@ -355,7 +355,8 @@ module mcu_top (
         REG_DD_SECTOR_INFO,
         REG_DD_DRIVE_ID,
         REG_VENDOR_SCR,
-        REG_VENDOR_DATA
+        REG_VENDOR_DATA,
+        REG_DEBUG
     } reg_address_e;
 
     logic bootloader_skip;
@@ -626,6 +627,13 @@ module mcu_top (
 
                 REG_VENDOR_DATA: begin
                     reg_rdata <= vendor_scb.data_rdata;
+                end
+
+                REG_DEBUG: begin
+                    reg_rdata <= {
+                        28'd0,
+                        n64_scb.pi_debug
+                    };
                 end
             endcase
         end

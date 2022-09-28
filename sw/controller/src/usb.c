@@ -275,6 +275,13 @@ static void usb_rx_process (void) {
                 }
                 break;
 
+            case '?':
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = fpga_reg_get(REG_DEBUG);
+                break;
+
             default:
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
