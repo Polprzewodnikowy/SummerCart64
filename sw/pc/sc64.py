@@ -362,20 +362,7 @@ class SC64:
                 raise ConnectionException('Flash memory program failure')
 
     def reset_state(self) -> None:
-        self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, False)
-        self.__set_config(self.__CfgId.ROM_SHADOW_ENABLE, False)
-        self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.NONE)
-        self.__set_config(self.__CfgId.ISV_ENABLE, False)
-        self.__set_config(self.__CfgId.BOOT_MODE, self.BootMode.MENU)
-        self.__set_config(self.__CfgId.SAVE_TYPE, self.SaveType.NONE)
-        self.__set_config(self.__CfgId.CIC_SEED, self.CICSeed.AUTO)
-        self.__set_config(self.__CfgId.TV_TYPE, self.TVType.AUTO)
-        self.__set_config(self.__CfgId.DD_DRIVE_TYPE, self.__DDDriveType.RETAIL)
-        self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
-        self.__set_config(self.__CfgId.BUTTON_MODE, self.__ButtonMode.NONE)
-        self.__set_config(self.__CfgId.ROM_EXTENDED_ENABLE, False)
-        self.__set_config(self.__CfgId.DD_SD_MODE, False)
-        self.set_cic_parameters()
+        self.__link.execute_cmd(cmd=b'R')
 
     def get_state(self):
         return {
@@ -483,12 +470,14 @@ class SC64:
     def set_save_type(self, type: SaveType) -> None:
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
 
-    def set_cic_parameters(self, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=bytes([0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59])) -> None:
+    def set_cic_parameters(self, disabled=False, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=bytes([0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59])) -> None:
         if (seed < 0 or seed > 0xFF):
             raise ValueError('CIC seed outside of allowed values')
         if (len(checksum) != 6):
             raise ValueError('CIC checksum length outside of allowed values')
-        data = bytes([1 if dd_mode else 0, seed])
+        mode = (1 << 1) if disabled else 0
+        mode |= (1 << 0) if dd_mode else 0
+        data = bytes([mode, seed])
         data = [*data, *checksum]
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
 

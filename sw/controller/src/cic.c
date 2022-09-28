@@ -21,6 +21,7 @@ static volatile bool cic_detect_enabled;
 static volatile uint8_t cic_next_rd;
 static volatile uint8_t cic_next_wr;
 
+static volatile bool cic_disabled = false;
 static volatile bool cic_dd_mode = false;
 static volatile uint8_t cic_seed = 0x3F;
 static volatile uint8_t cic_checksum[6] = { 0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59 };
@@ -44,8 +45,10 @@ static void cic_irq_reset_falling (void) {
 }
 
 static void cic_irq_reset_rising (void) {
-    cic_enabled = true;
-    task_set_ready_and_reset(TASK_ID_CIC);
+    if (!cic_disabled) {
+        cic_enabled = true;
+        task_set_ready_and_reset(TASK_ID_CIC);
+    }
 }
 
 static void cic_irq_clk_falling (void) {
@@ -296,8 +299,21 @@ static void cic_soft_reset (void) {
 }
 
 
+void cic_reset_parameters (void) {
+    cic_disabled = false;
+    cic_dd_mode = false;
+    cic_seed = 0x3F;
+    cic_checksum[0] = 0xA5;
+    cic_checksum[1] = 0x36;
+    cic_checksum[2] = 0xC0;
+    cic_checksum[3] = 0xF1;
+    cic_checksum[4] = 0xD8;
+    cic_checksum[5] = 0x59;
+}
+
 void cic_set_parameters (uint32_t *args) {
-    cic_dd_mode = (args[0] >> 24) & 0x01;
+    cic_disabled = (args[0 >> 24]) & (1 << 1);
+    cic_dd_mode = (args[0] >> 24) & (1 << 0);
     cic_seed = (args[0] >> 16) & 0xFF;
     cic_checksum[0] = (args[0] >> 8) & 0xFF;
     cic_checksum[1] = args[0] & 0xFF;

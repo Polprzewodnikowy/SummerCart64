@@ -161,6 +161,13 @@ static void usb_rx_process (void) {
                 p.response_info.data[0] = cfg_get_version();
                 break;
 
+            case 'R':
+                cfg_reset();
+                cic_reset_parameters();
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
             case 'B':
                 cic_set_parameters(p.rx_args);
                 p.rx_state = RX_STATE_IDLE;

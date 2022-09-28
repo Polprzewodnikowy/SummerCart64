@@ -306,7 +306,6 @@ bool cfg_update (uint32_t *args) {
             break;
         case CFG_ID_BUTTON_STATE:
             return true;
-            break;
         case CFG_ID_BUTTON_MODE:
             button_set_mode(args[1]);
             break;
@@ -342,13 +341,30 @@ void cfg_set_time (uint32_t *args) {
     rtc_set_time(&t);
 }
 
-void cfg_init (void) {
-    fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
+void cfg_reset (void) {
+    uint32_t mask = (
+        CFG_SCR_BOOTLOADER_SKIP |
+        CFG_SCR_ROM_WRITE_ENABLED |
+        CFG_SCR_ROM_SHADOW_ENABLED |
+        CFG_SCR_DD_ENABLED |
+        CFG_SCR_DDIPL_ENABLED |
+        CFG_SCR_ROM_EXTENDED_ENABLED
+    );
+    cfg_change_scr_bits(mask, false);
     cfg_set_save_type(SAVE_TYPE_NONE);
-
+    button_set_mode(BUTTON_MODE_NONE);
+    dd_set_drive_type(DD_DRIVE_TYPE_RETAIL);
+    dd_set_disk_state(DD_DISK_STATE_EJECTED);
+    dd_set_sd_mode(false);
+    isv_set_enabled(false);
     p.cic_seed = CIC_SEED_UNKNOWN;
     p.tv_type = TV_TYPE_UNKNOWN;
     p.boot_mode = BOOT_MODE_MENU;
+}
+
+void cfg_init (void) {
+    fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
+    cfg_reset();
     p.usb_output_ready = true;
 }
 

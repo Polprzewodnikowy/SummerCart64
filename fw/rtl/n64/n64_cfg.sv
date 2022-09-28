@@ -64,7 +64,8 @@ module n64_cfg (
             n64_scb.cfg_unlock <= 1'b1;
         end
 
-        if (reset || n64_scb.n64_reset) begin
+        if (reset || n64_scb.n64_reset || n64_scb.n64_nmi) begin
+            n64_scb.cfg_unlock <= 1'b0;
             n64_scb.cfg_pending <= 1'b0;
             n64_scb.cfg_cmd <= 8'h00;
             irq <= 1'b0;
