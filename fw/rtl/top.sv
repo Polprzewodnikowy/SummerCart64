@@ -202,6 +202,8 @@ module top (
         .clk(clk),
         .reset(reset),
 
+        .n64_scb(n64_scb),
+
         .n64_bus(n64_mem_bus),
         .cfg_bus(cfg_mem_bus),
         .usb_dma_bus(usb_dma_mem_bus),

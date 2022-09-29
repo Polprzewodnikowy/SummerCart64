@@ -51,6 +51,8 @@ interface n64_scb ();
     logic [31:0] cfg_wdata [0:1];
     logic [31:0] cfg_version;
 
+    logic pi_sdram_active;
+    logic pi_flash_active;
     logic [3:0] pi_debug;
 
     modport controller (
@@ -111,6 +113,8 @@ interface n64_scb ();
 
         input cfg_unlock,
 
+        output pi_sdram_active,
+        output pi_flash_active,
         output pi_debug
     );
 
@@ -183,6 +187,11 @@ interface n64_scb ();
         output cfg_rdata,
         input cfg_wdata,
         input cfg_version
+    );
+
+    modport arbiter (
+        input pi_sdram_active,
+        input pi_flash_active
     );
 
 endinterface

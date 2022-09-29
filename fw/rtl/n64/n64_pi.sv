@@ -134,6 +134,11 @@ module n64_pi (
     logic [31:0] mem_offset;
 
     always_ff @(posedge clk) begin
+        if (reset || !pi_reset || end_op) begin
+            n64_scb.pi_sdram_active <= 1'b0;
+            n64_scb.pi_flash_active <= 1'b0;
+        end
+
         if (reset) begin
             read_port <= PORT_NONE;
             write_port <= PORT_NONE;
@@ -161,6 +166,7 @@ module n64_pi (
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
                     mem_offset <= (-32'h0600_0000) + DDIPL_OFFSET;
+                    n64_scb.pi_sdram_active <= 1'b1;
                 end
             end
 
@@ -172,6 +178,7 @@ module n64_pi (
                     reg_bus.flashram_select <= 1'b1;
                     if (n64_scb.flashram_read_mode) begin
                         read_port <= PORT_MEM;
+                        n64_scb.pi_sdram_active <= 1'b1;
                     end
                 end
             end else if (n64_scb.sram_enabled) begin
@@ -181,6 +188,7 @@ module n64_pi (
                             read_port <= PORT_MEM;
                             write_port <= PORT_MEM;
                             mem_offset <= (-32'h0800_0000) - {n64_pi_dq_in[3:2], 18'd0} + {n64_pi_dq_in[3:2], 15'd0} + SAVE_OFFSET;
+                            n64_scb.pi_sdram_active <= 1'b1;
                         end
                     end
                 end else begin
@@ -188,6 +196,7 @@ module n64_pi (
                         read_port <= PORT_MEM;
                         write_port <= PORT_MEM;
                         mem_offset <= (-32'h0800_0000) + SAVE_OFFSET;
+                        n64_scb.pi_sdram_active <= 1'b1;
                     end
                 end
             end
@@ -197,12 +206,14 @@ module n64_pi (
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
                     mem_offset <= (-32'h1000_0000) + BOOTLOADER_OFFSET;
+                    n64_scb.pi_flash_active <= 1'b1;
                 end
             end else begin
                 if (n64_pi_dq_in >= 16'h1000 && n64_pi_dq_in < 16'h1400) begin
                     read_port <= PORT_MEM;
                     write_port <= n64_scb.rom_write_enabled ? PORT_MEM : PORT_NONE;
                     mem_offset <= (-32'h1000_0000);
+                    n64_scb.pi_sdram_active <= 1'b1;
                 end
             end
 
@@ -211,6 +222,7 @@ module n64_pi (
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
                     mem_offset <= (-32'h13FE_0000) + SHADOW_OFFSET;
+                    n64_scb.pi_flash_active <= 1'b1;
                 end
             end
 
@@ -219,6 +231,7 @@ module n64_pi (
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
                     mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
+                    n64_scb.pi_flash_active <= 1'b1;
                 end
             end
 

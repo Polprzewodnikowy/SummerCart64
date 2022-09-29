@@ -2,6 +2,8 @@ module memory_arbiter (
     input clk,
     input reset,
 
+    n64_scb.arbiter n64_scb,
+
     mem_bus.memory n64_bus,
     mem_bus.memory cfg_bus,
     mem_bus.memory usb_dma_bus,
@@ -35,14 +37,14 @@ module memory_arbiter (
     logic sd_dma_bram_request;
 
     assign n64_sdram_request = n64_bus.request && !n64_bus.address[26];
-    assign cfg_sdram_request = cfg_bus.request && !cfg_bus.address[26];
-    assign usb_dma_sdram_request = usb_dma_bus.request && !usb_dma_bus.address[26];
-    assign sd_dma_sdram_request = sd_dma_bus.request && !sd_dma_bus.address[26];
+    assign cfg_sdram_request = !n64_scb.pi_sdram_active && cfg_bus.request && !cfg_bus.address[26];
+    assign usb_dma_sdram_request = !n64_scb.pi_sdram_active && usb_dma_bus.request && !usb_dma_bus.address[26];
+    assign sd_dma_sdram_request = !n64_scb.pi_sdram_active && sd_dma_bus.request && !sd_dma_bus.address[26];
 
     assign n64_flash_request = n64_bus.request && (n64_bus.address[26:24] == 3'b100);
-    assign cfg_flash_request = cfg_bus.request && (cfg_bus.address[26:24] == 3'b100);
-    assign usb_dma_flash_request = usb_dma_bus.request && (usb_dma_bus.address[26:24] == 3'b100);
-    assign sd_dma_flash_request = sd_dma_bus.request && (sd_dma_bus.address[26:24] == 3'b100);
+    assign cfg_flash_request = !n64_scb.pi_flash_active && cfg_bus.request && (cfg_bus.address[26:24] == 3'b100);
+    assign usb_dma_flash_request = !n64_scb.pi_flash_active && usb_dma_bus.request && (usb_dma_bus.address[26:24] == 3'b100);
+    assign sd_dma_flash_request = !n64_scb.pi_flash_active && sd_dma_bus.request && (sd_dma_bus.address[26:24] == 3'b100);
 
     assign n64_bram_request = n64_bus.request && (n64_bus.address[26:24] >= 3'b101);
     assign cfg_bram_request = cfg_bus.request && (cfg_bus.address[26:24] >= 3'b101);
