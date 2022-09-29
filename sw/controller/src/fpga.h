@@ -128,6 +128,8 @@ typedef enum {
 #define SD_SCR_CLOCK_MODE_400KHZ        (1 << 0)
 #define SD_SCR_CLOCK_MODE_25MHZ         (2 << 0)
 #define SD_SCR_CLOCK_MODE_50MHZ         (3 << 0)
+#define SD_SCR_CLOCK_MODE_BIT           (0)
+#define SD_SCR_CLOCK_MODE_MASK          (0x3 << SD_SCR_CLOCK_MODE_BIT)
 #define SD_SCR_CMD_BUSY                 (1 << 2)
 #define SD_SCR_CMD_ERROR                (1 << 3)
 #define SD_SCR_CARD_BUSY                (1 << 4)

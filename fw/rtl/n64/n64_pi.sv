@@ -236,6 +236,13 @@ module n64_pi (
             end
 
             if (n64_scb.cfg_unlock) begin
+                if (n64_pi_dq_in >= 16'h1FFC && n64_pi_dq_in < 16'h1FFE) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h1FFC_0000) + SHADOW_OFFSET;
+                    n64_scb.pi_flash_active <= 1'b1;
+                end
+
                 if (n64_pi_dq_in >= 16'h1FFE && n64_pi_dq_in < 16'h1FFF) begin
                     read_port <= PORT_MEM;
                     write_port <= PORT_MEM;

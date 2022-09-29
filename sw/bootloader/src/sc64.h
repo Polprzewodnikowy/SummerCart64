@@ -24,13 +24,12 @@ typedef enum {
     CFG_ID_SAVE_TYPE,
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
-    CFG_ID_FLASH_ERASE_BLOCK,
+    CFG_ID_DD_SD_MODE,
     CFG_ID_DD_DRIVE_TYPE,
     CFG_ID_DD_DISK_STATE,
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
     CFG_ID_ROM_EXTENDED_ENABLE,
-    CFG_ID_DD_SD_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -74,6 +73,12 @@ typedef enum {
     BUTTON_MODE_DD_DISK_SWAP,
 } button_mode_t;
 
+typedef enum {
+    SD_CARD_STATUS_INITIALIZED = (1 << 0),
+    SD_CARD_STATUS_TYPE_BLOCK = (1 << 1),
+    SD_CARD_STATUS_50MHZ_MODE = (1 << 2),
+} sd_card_status_t;
+
 
 typedef struct {
     boot_mode_t boot_mode;
@@ -107,7 +112,7 @@ bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
 bool sc64_usb_read (uint32_t *address, uint32_t length);
 bool sc64_sd_card_init (void);
 bool sc64_sd_card_deinit (void);
-bool sc64_sd_card_get_status (void);
+sd_card_status_t sc64_sd_card_get_status (void);
 bool sc64_sd_card_get_info (uint32_t *address);
 bool sc64_sd_write_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count);

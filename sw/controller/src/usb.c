@@ -162,7 +162,7 @@ static void usb_rx_process (void) {
                 break;
 
             case 'R':
-                cfg_reset();
+                cfg_reset_state();
                 cic_reset_parameters();
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
@@ -273,6 +273,20 @@ static void usb_rx_process (void) {
                 } else {
                     p.response_error = true;
                 }
+                break;
+
+            case 'p':
+                flash_wait_busy();
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = FLASH_ERASE_BLOCK_SIZE;
+                break;
+
+            case 'P':
+                flash_erase_block(p.rx_args[0]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
                 break;
 
             case '?':

@@ -20,6 +20,8 @@ typedef enum {
     SC64_CMD_SD_WRITE           = 'S',
     SC64_CMD_SD_READ            = 's',
     SC64_CMD_DD_SD_DISK_INFO    = 'D',
+    SC64_CMD_FLASH_ERASE_BLOCK  = 'P',
+    SC64_CMD_FLASH_WAIT_BUSY    = 'p',
 } cmd_id_t;
 
 typedef enum {
@@ -166,13 +168,13 @@ bool sc64_sd_card_deinit (void) {
     return false;
 }
 
-bool sc64_sd_card_get_status (void) {
+sd_card_status_t sc64_sd_card_get_status (void) {
     uint32_t args[2] = { 0, SD_CARD_OP_GET_STATUS };
     uint32_t result[2];
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, result)) {
         return false;
     }
-    return result[1];
+    return (sd_card_status_t) (result[1]);
 }
 
 bool sc64_sd_card_get_info (uint32_t *address) {

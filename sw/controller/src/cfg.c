@@ -19,13 +19,12 @@ typedef enum {
     CFG_ID_SAVE_TYPE,
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
-    CFG_ID_FLASH_ERASE_BLOCK,
+    CFG_ID_DD_SD_MODE,
     CFG_ID_DD_DRIVE_TYPE,
     CFG_ID_DD_DISK_STATE,
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
     CFG_ID_ROM_EXTENDED_ENABLE,
-    CFG_ID_DD_SD_MODE,
 } cfg_id_t;
 
 typedef enum {
@@ -72,6 +71,19 @@ typedef enum {
     CFG_ERROR_UNKNOWN_CMD = -1,
 } cfg_error_t;
 
+typedef enum {
+    SD_CARD_OP_DEINIT = 0,
+    SD_CARD_OP_INIT = 1,
+    SD_CARD_OP_GET_STATUS = 2,
+    SD_CARD_OP_GET_INFO = 3,
+} sd_card_op_t;
+
+typedef enum {
+    SDRAM = (1 << 0),
+    FLASH = (1 << 1),
+    BRAM = (1 << 2),
+} translate_type_t;
+
 
 struct process {
     boot_mode_t boot_mode;
@@ -90,45 +102,57 @@ static void cfg_set_usb_output_ready (void) {
     p.usb_output_ready = true;
 }
 
-static bool cfg_translate_address (uint32_t *address, uint32_t length, bool with_flash) {
+static bool cfg_translate_address (uint32_t *address, uint32_t length, translate_type_t type) {
     if (length == 0) {
         return true;
     }
     *address &= 0x1FFFFFFF;
-    if (*address >= 0x06000000 && *address < 0x06400000) {
-        if ((*address + length) <= 0x06400000) {
-            *address = *address - 0x06000000 + 0x03BC0000;
-            return false;
+    if (type & SDRAM) {
+        if (*address >= 0x06000000 && *address < 0x06400000) {
+            if ((*address + length) <= 0x06400000) {
+                *address = *address - 0x06000000 + 0x03BC0000;
+                return false;
+            }
+        }
+        if (*address >= 0x08000000 && *address < 0x08020000) {
+            if ((*address + length) <= 0x08020000) {
+                *address = *address - 0x08000000 + 0x03FE0000;
+                return false;
+            }
+        }
+        if (*address >= 0x10000000 && *address < 0x14000000) {
+            if ((*address + length) <= 0x14000000) {
+                *address = *address - 0x10000000 + 0x00000000;
+                return false;
+            }
         }
     }
-    if (*address >= 0x08000000 && *address < 0x08020000) {
-        if ((*address + length) <= 0x08020000) {
-            *address = *address - 0x08000000 + 0x03FE0000;
-            return false;
+    if (type & FLASH) {
+        if (*address >= 0x14000000 && *address < 0x14E00000) {
+            if ((*address + length) <= 0x14E00000) {
+                *address = *address - 0x14000000 + 0x04000000;
+                return false;
+            }
+        }
+        if (*address >= 0x1FFC0000 && *address < 0x1FFE0000) {
+            if ((*address + length) <= 0x1FFE0000) {
+                *address = *address - 0x1FFC0000 + 0x04E00000;
+                return false;
+            }
         }
     }
-    if (*address >= 0x10000000 && *address < 0x14000000) {
-        if ((*address + length) <= 0x14000000) {
-            *address = *address - 0x10000000 + 0x00000000;
-            return false;
+    if (type & BRAM) {
+        if (*address >= 0x1FFE0000 && *address < 0x1FFE2000) {
+            if ((*address + length) <= 0x1FFE2000) {
+                *address = *address - 0x1FFE0000 + 0x05000000;
+                return false;
+            }
         }
-    }
-    if (with_flash && *address >= 0x14000000 && *address < 0x15000000) {
-        if ((*address + length) <= 0x15000000) {
-            *address = *address - 0x14000000 + 0x04000000;
-            return false;
-        }
-    }
-    if (*address >= 0x1FFE0000 && *address < 0x1FFE2000) {
-        if ((*address + length) <= 0x1FFE2000) {
-            *address = *address - 0x1FFE0000 + 0x05000000;
-            return false;
-        }
-    }
-    if (*address >= 0x1FFE2000 && *address < 0x1FFE2800) {
-        if ((*address + length) <= 0x1FFE2800) {
-            *address = *address - 0x1FFE2000 + 0x05002000;
-            return false;
+        if (*address >= 0x1FFE2000 && *address < 0x1FFE2800) {
+            if ((*address + length) <= 0x1FFE2800) {
+                *address = *address - 0x1FFE2000 + 0x05002000;
+                return false;
+            }
         }
     }
     return true;
@@ -227,9 +251,6 @@ bool cfg_query (uint32_t *args) {
         case CFG_ID_TV_TYPE:
             args[1] = p.tv_type;
             break;
-        case CFG_ID_FLASH_ERASE_BLOCK:
-            args[1] = FLASH_ERASE_BLOCK_SIZE;
-            break;
         case CFG_ID_DD_DRIVE_TYPE:
             args[1] = dd_get_drive_type();
             break;
@@ -295,9 +316,6 @@ bool cfg_update (uint32_t *args) {
         case CFG_ID_TV_TYPE:
             p.tv_type = (tv_type_t) (args[1] & 0x03);
             break;
-        case CFG_ID_FLASH_ERASE_BLOCK:
-            flash_erase_block(args[1]);
-            break;
         case CFG_ID_DD_DRIVE_TYPE:
             dd_set_drive_type(args[1]);
             break;
@@ -341,7 +359,7 @@ void cfg_set_time (uint32_t *args) {
     rtc_set_time(&t);
 }
 
-void cfg_reset (void) {
+void cfg_reset_state (void) {
     uint32_t mask = (
         CFG_SCR_BOOTLOADER_SKIP |
         CFG_SCR_ROM_WRITE_ENABLED |
@@ -364,7 +382,7 @@ void cfg_reset (void) {
 
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
-    cfg_reset();
+    cfg_reset_state();
     p.usb_output_ready = true;
 }
 
@@ -412,7 +430,7 @@ void cfg_process (void) {
                 break;
 
             case 'm':
-                if (cfg_translate_address(&args[0], args[1], false)) {
+                if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -422,7 +440,7 @@ void cfg_process (void) {
                 break;
 
             case 'M':
-                if (cfg_translate_address(&args[0], args[1] & 0xFFFFFF, false)) {
+                if (cfg_translate_address(&args[0], args[1] & 0xFFFFFF, (SDRAM | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -449,20 +467,20 @@ void cfg_process (void) {
 
             case 'i':
                 switch (args[1]) {
-                    case 0:
+                    case SD_CARD_OP_DEINIT:
                         sd_card_deinit();
                         break;
-                    case 1:
+                    case SD_CARD_OP_INIT:
                         if (sd_card_init()) {
                             cfg_set_error(CFG_ERROR_SD_CARD);
                             return;
                         }
                         break;
-                    case 2:
+                    case SD_CARD_OP_GET_STATUS:
                         args[1] = sd_card_get_status();
                         break;
-                    case 3:
-                        if (cfg_translate_address(&args[0], 32, false)) {
+                    case SD_CARD_OP_GET_INFO:
+                        if (cfg_translate_address(&args[0], 32, (SDRAM | BRAM))) {
                             cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                             return;
                         }
@@ -486,7 +504,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, true)) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | BRAM | FLASH))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -501,7 +519,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, true)) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | BRAM | FLASH))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -510,13 +528,26 @@ void cfg_process (void) {
                     return;
                 }
                 break;
-            
+
             case 'D':
-                if (cfg_translate_address(&args[0], args[1], false)) {
+                if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
                 dd_set_sd_disk_info(args[0], args[1]);
+                break;
+
+            case 'p':
+                flash_wait_busy();
+                args[0] = FLASH_ERASE_BLOCK_SIZE;
+                break;
+
+            case 'P':
+                if (cfg_translate_address(&args[0], FLASH_ERASE_BLOCK_SIZE, FLASH)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                flash_erase_block(args[0]);
                 break;
 
             case '?':

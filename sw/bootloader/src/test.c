@@ -13,6 +13,7 @@ bool test_check (void) {
 }
 
 void test_execute (void) {
+    sd_card_status_t card_status;
     uint8_t card_info[32] __attribute__((aligned(8)));
 
     display_init(NULL);
@@ -22,6 +23,18 @@ void test_execute (void) {
     if (sc64_sd_card_init()) {
         display_printf("SD card init error!\n");
         while (1);
+    }
+
+    card_status = sc64_sd_card_get_status();
+
+    if (card_status & SD_CARD_STATUS_INITIALIZED) {
+        display_printf("SD card initialized\n");
+    }
+    if (card_status & SD_CARD_STATUS_TYPE_BLOCK) {
+        display_printf("SD card type block\n");
+    }
+    if (card_status & SD_CARD_STATUS_50MHZ_MODE) {
+        display_printf("SD card 50 MHz clock mode\n");
     }
 
     if (sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) {

@@ -339,8 +339,16 @@ void sd_card_deinit (void) {
     }
 }
 
-bool sd_card_get_status (void) {
-    return p.card_initialized;
+uint32_t sd_card_get_status (void) {
+    uint32_t scr = fpga_reg_get(REG_SD_SCR);
+    uint32_t clock_mode_50mhz = ((scr & SD_SCR_CLOCK_MODE_MASK) == SD_SCR_CLOCK_MODE_50MHZ) ? 1 : 0;
+    uint32_t card_type_block = p.card_type_block ? 1 : 0;
+    uint32_t initialized = p.card_initialized ? 1 : 0;
+    return (
+        (clock_mode_50mhz << 2) |
+        (card_type_block << 1) |
+        (initialized << 0)
+    );
 }
 
 bool sd_card_get_info (uint32_t address) {

@@ -235,13 +235,12 @@ class SC64:
         SAVE_TYPE = 6
         CIC_SEED = 7
         TV_TYPE = 8
-        FLASH_ERASE_BLOCK = 9
+        DD_SD_MODE = 9
         DD_DRIVE_TYPE = 10
         DD_DISK_STATE = 11
         BUTTON_STATE = 12
         BUTTON_MODE = 13
         ROM_EXTENDED_ENABLE = 14
-        DD_SD_MODE = 15
 
     class __UpdateError(IntEnum):
         OK = 0
@@ -342,17 +341,25 @@ class SC64:
         if (length > 0):
             return self.__link.execute_cmd(cmd=b'm', args=[address, length], timeout=20.0)
         return bytes([])
+    
+    def __flash_wait_busy(self) -> int:
+        data = self.__link.execute_cmd(cmd=b'p')
+        return self.__get_int(data[0:4])
+
+    def __flash_erase_block(self, address: int) -> None:
+        self.__link.execute_cmd(cmd=b'P', args=[address, 0])
 
     def __erase_flash_region(self, address: int, length: int) -> None:
         if (address < self.__Address.FLASH):
             raise ValueError('Flash erase address or length outside of possible range')
         if ((address + length) > (self.__Address.FLASH + self.__Length.FLASH)):
             raise ValueError('Flash erase address or length outside of possible range')
-        erase_block_size = self.__get_config(self.__CfgId.FLASH_ERASE_BLOCK)
+        erase_block_size = self.__flash_wait_busy()
         if (address % erase_block_size != 0):
             raise ValueError('Flash erase address not aligned to block size')
         for offset in range(address, address + length, erase_block_size):
-            self.__set_config(self.__CfgId.FLASH_ERASE_BLOCK, offset)
+            self.__flash_erase_block(offset)
+        self.__flash_wait_busy()
 
     def __program_flash(self, address: int, data: bytes):
         program_chunk_size = (128 * 1024)
@@ -377,13 +384,12 @@ class SC64:
             'save_type': self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE)),
             'cic_seed': self.CICSeed(self.__get_config(self.__CfgId.CIC_SEED)),
             'tv_type': self.TVType(self.__get_config(self.__CfgId.TV_TYPE)),
-            'flash_erase_block': self.__get_config(self.__CfgId.FLASH_ERASE_BLOCK),
+            'dd_sd_mode': bool(self.__get_config(self.__CfgId.DD_SD_MODE)),
             'dd_drive_type': self.__DDDriveType(self.__get_config(self.__CfgId.DD_DRIVE_TYPE)),
             'dd_disk_state': self.__DDDiskState(self.__get_config(self.__CfgId.DD_DISK_STATE)),
             'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
             'button_mode': self.__ButtonMode(self.__get_config(self.__CfgId.BUTTON_MODE)),
             'rom_extended_enable': bool(self.__get_config(self.__CfgId.ROM_EXTENDED_ENABLE)),
-            'dd_sd_mode': bool(self.__get_config(self.__CfgId.DD_SD_MODE)),
         }
 
     def debug_send(self, datatype: __DebugDatatype, data: bytes) -> None:
