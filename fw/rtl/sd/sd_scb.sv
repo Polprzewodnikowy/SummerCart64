@@ -1,6 +1,7 @@
 interface sd_scb ();
 
     logic [1:0] clock_mode;
+    logic clock_stop;
 
     logic card_busy;
 
@@ -55,7 +56,8 @@ interface sd_scb ();
     );
 
     modport clk (
-        input clock_mode
+        input clock_mode,
+        input clock_stop
     );
 
     modport cmd (
@@ -72,6 +74,8 @@ interface sd_scb ();
     );
 
     modport dat (
+        output clock_stop,
+
         output card_busy,
 
         output rx_count,

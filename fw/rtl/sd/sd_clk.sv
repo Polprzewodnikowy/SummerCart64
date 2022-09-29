@@ -13,7 +13,9 @@ module sd_clk (
     logic [7:0] clock_divider;
 
     always_ff @(posedge clk) begin
-        clock_divider <= clock_divider + 1'd1;
+        if (!sd_scb.clock_stop) begin
+            clock_divider <= clock_divider + 1'd1;
+        end
     end
 
     logic selected_clock;

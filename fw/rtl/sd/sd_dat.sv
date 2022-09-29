@@ -248,6 +248,7 @@ module sd_dat (
         crc_shift <= 1'b0;
 
         if (reset || sd_scb.dat_stop) begin
+            sd_scb.clock_stop <= 1'b0;
             sd_dat_oe_data <= 1'b0;
             sd_dat_data <= 4'hF;
         end else begin
@@ -260,6 +261,9 @@ module sd_dat (
                 end
 
                 STATE_RX_WAIT: begin
+                    if (sd_scb.rx_count <= 11'd512) begin
+                        sd_scb.clock_stop <= 1'b0;
+                    end
                     if (sd_clk_rising) begin
                         if (!sd_dat_in[0]) begin
                             counter <= 11'd1;
@@ -288,6 +292,9 @@ module sd_dat (
                             end
                         end
                         if (counter == 11'd1041) begin
+                            if ((blocks_remaining > 8'd0) && (sd_scb.rx_count > 11'd512)) begin
+                                sd_scb.clock_stop <= 1'b1;
+                            end
                             blocks_remaining <= blocks_remaining - 1'd1;
                         end
                     end
