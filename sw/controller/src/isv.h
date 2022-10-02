@@ -3,10 +3,11 @@
 
 
 #include <stdbool.h>
+#include <stdint.h>
 
 
-void isv_set_enabled (bool enabled);
-bool isv_get_enabled (void);
+bool isv_set_address (uint32_t address);
+uint32_t isv_get_address (void);
 void isv_init (void);
 void isv_process (void);
 

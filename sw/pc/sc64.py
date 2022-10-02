@@ -230,12 +230,12 @@ class SC64:
         ROM_WRITE_ENABLE = 1
         ROM_SHADOW_ENABLE = 2
         DD_MODE = 3
-        ISV_ENABLE = 4
+        ISV_ADDRESS = 4
         BOOT_MODE = 5
         SAVE_TYPE = 6
         CIC_SEED = 7
         TV_TYPE = 8
-        DD_SD_MODE = 9
+        DD_SD_ENABLE = 9
         DD_DRIVE_TYPE = 10
         DD_DISK_STATE = 11
         BUTTON_STATE = 12
@@ -327,10 +327,16 @@ class SC64:
         return int.from_bytes(data[:4], byteorder='big')
 
     def __set_config(self, config: __CfgId, value: int) -> None:
-        self.__link.execute_cmd(cmd=b'C', args=[config, value])
+        try:
+            self.__link.execute_cmd(cmd=b'C', args=[config, value])
+        except ConnectionException:
+            raise ValueError(f'Could not set config {config.name} to {value:08X}')
 
     def __get_config(self, config: __CfgId) -> int:
-        data = self.__link.execute_cmd(cmd=b'c', args=[config, 0])
+        try:
+            data = self.__link.execute_cmd(cmd=b'c', args=[config, 0])
+        except ConnectionException:
+            raise ValueError(f'Could not get config {config.name}')
         return self.__get_int(data)
 
     def __write_memory(self, address: int, data: bytes) -> None:
@@ -341,7 +347,10 @@ class SC64:
         if (length > 0):
             return self.__link.execute_cmd(cmd=b'm', args=[address, length], timeout=20.0)
         return bytes([])
-    
+
+    def __dd_set_block_ready(self, error: int) -> None:
+        self.__link.execute_cmd(cmd=b'D', args=[error, 0])
+
     def __flash_wait_busy(self) -> int:
         data = self.__link.execute_cmd(cmd=b'p')
         return self.__get_int(data[0:4])
@@ -379,7 +388,7 @@ class SC64:
             'rom_write_enable': bool(self.__get_config(self.__CfgId.ROM_WRITE_ENABLE)),
             'rom_shadow_enable': bool(self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)),
             'dd_mode': self.__DDMode(self.__get_config(self.__CfgId.DD_MODE)),
-            'isv_enable': bool(self.__get_config(self.__CfgId.ISV_ENABLE)),
+            'isv_address': self.__get_config(self.__CfgId.ISV_ADDRESS),
             'boot_mode': self.BootMode(self.__get_config(self.__CfgId.BOOT_MODE)),
             'save_type': self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE)),
             'cic_seed': self.CICSeed(self.__get_config(self.__CfgId.CIC_SEED)),
@@ -537,14 +546,16 @@ class SC64:
                 raise BadBlockError
             if (cmd == CMD_READ_BLOCK):
                 block_data = dd.read_block(track, head, block)
-                self.__link.execute_cmd(cmd=b'D', args=[address, len(block_data)], data=block_data)
+                self.__write_memory(address, block_data)
+                self.__dd_set_block_ready(0)
             elif (cmd == CMD_WRITE_BLOCK):
-                dd.write_block(track, head, block, data[12:])
-                self.__link.execute_cmd(cmd=b'd', args=[0, 0])
+                block_data = data[12:]
+                dd.write_block(track, head, block, block_data)
+                self.__dd_set_block_ready(0)
             else:
-                self.__link.execute_cmd(cmd=b'd', args=[-1, 0])
+                self.__dd_set_block_ready(1)
         except BadBlockError:
-            self.__link.execute_cmd(cmd=b'd', args=[1, 0])
+            self.__dd_set_block_ready(1)
 
     def __handle_isv_packet(self, data: bytes) -> None:
         print(data.decode('EUC-JP', errors='backslashreplace'), end='')
@@ -618,15 +629,15 @@ class SC64:
             except EOFError:
                 running = False
 
-    def debug_loop(self, isv: bool=False, disks: Optional[list[str]]=None) -> None:
+    def debug_loop(self, isv: int=0, disks: Optional[list[str]]=None) -> None:
         dd = None
         current_image = 0
         next_image = 0
 
         self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, isv)
-        self.__set_config(self.__CfgId.ISV_ENABLE, isv)
-        if (isv):
-            print('IS-Viewer64 support set to [ENABLED]')
+        self.__set_config(self.__CfgId.ISV_ADDRESS, isv)
+        if (isv != 0):
+            print(f'IS-Viewer64 support set to [ENABLED] at ROM offset [0x{(isv):08X}]')
             if (self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)):
                 print('ROM shadow enabled - IS-Viewer64 will NOT work (use --no-shadow option to disable it)')
 
@@ -694,8 +705,8 @@ class SC64:
 
         if (dd and dd.loaded):
             self.__set_config(self.__CfgId.DD_DISK_STATE, self.__DDDiskState.EJECTED)
-        if (isv):
-            self.__set_config(self.__CfgId.ISV_ENABLE, False)
+        if (isv != 0):
+            self.__set_config(self.__CfgId.ISV_ADDRESS, 0)
 
 
 class EnumAction(argparse.Action):
@@ -735,7 +746,7 @@ if __name__ == '__main__':
     parser.add_argument('--backup-save', metavar='file', help='download save and write it to specified file')
     parser.add_argument('--ddipl', metavar='file', help='upload 64DD IPL from specified file')
     parser.add_argument('--disk', metavar='file', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
-    parser.add_argument('--isv', action='store_true', help='enable IS-Viewer64 support')
+    parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
     parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
     parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
 

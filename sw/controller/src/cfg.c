@@ -14,12 +14,12 @@ typedef enum {
     CFG_ID_ROM_WRITE_ENABLE,
     CFG_ID_ROM_SHADOW_ENABLE,
     CFG_ID_DD_MODE,
-    CFG_ID_ISV_ENABLE,
+    CFG_ID_ISV_ADDRESS,
     CFG_ID_BOOT_MODE,
     CFG_ID_SAVE_TYPE,
     CFG_ID_CIC_SEED,
     CFG_ID_TV_TYPE,
-    CFG_ID_DD_SD_MODE,
+    CFG_ID_DD_SD_ENABLE,
     CFG_ID_DD_DRIVE_TYPE,
     CFG_ID_DD_DISK_STATE,
     CFG_ID_BUTTON_STATE,
@@ -172,7 +172,11 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
     }
 }
 
-static void cfg_set_save_type (save_type_t save_type) {
+static bool cfg_set_save_type (save_type_t save_type) {
+    if (save_type > SAVE_TYPE_SRAM_BANKED) {
+        return true;
+    }
+
     uint32_t save_reset_mask = (
         CFG_SCR_EEPROM_16K |
         CFG_SCR_EEPROM_ENABLED |
@@ -207,6 +211,8 @@ static void cfg_set_save_type (save_type_t save_type) {
     }
 
     p.save_type = save_type;
+
+    return false;
 }
 
 
@@ -236,8 +242,8 @@ bool cfg_query (uint32_t *args) {
                 args[1] |= DD_MODE_REGS;
             }
             break;
-        case CFG_ID_ISV_ENABLE:
-            args[1] = isv_get_enabled();
+        case CFG_ID_ISV_ADDRESS:
+            args[1] = isv_get_address();
             break;
         case CFG_ID_BOOT_MODE:
             args[1] = p.boot_mode;
@@ -250,6 +256,9 @@ bool cfg_query (uint32_t *args) {
             break;
         case CFG_ID_TV_TYPE:
             args[1] = p.tv_type;
+            break;
+        case CFG_ID_DD_SD_ENABLE:
+            args[1] = dd_get_sd_mode();
             break;
         case CFG_ID_DD_DRIVE_TYPE:
             args[1] = dd_get_drive_type();
@@ -265,9 +274,6 @@ bool cfg_query (uint32_t *args) {
             break;
         case CFG_ID_ROM_EXTENDED_ENABLE:
             args[1] = (scr & CFG_SCR_ROM_EXTENDED_ENABLED);
-            break;
-        case CFG_ID_DD_SD_MODE:
-            args[1] = dd_get_sd_mode();
             break;
         default:
             return true;
@@ -296,42 +302,54 @@ bool cfg_update (uint32_t *args) {
             } else if (args[1] == DD_MODE_IPL) {
                 cfg_change_scr_bits(CFG_SCR_DD_ENABLED, false);
                 cfg_change_scr_bits(CFG_SCR_DDIPL_ENABLED, true);
-            } else {
+            } else if (args[1] == DD_MODE_FULL) {
                 cfg_change_scr_bits(CFG_SCR_DD_ENABLED | CFG_SCR_DDIPL_ENABLED, true);
+            } else {
+                return true;
             }
             break;
-        case CFG_ID_ISV_ENABLE:
-            isv_set_enabled(args[1]);
+        case CFG_ID_ISV_ADDRESS:
+            return isv_set_address(args[1]);
             break;
         case CFG_ID_BOOT_MODE:
+            if (args[1] > BOOT_MODE_DIRECT) {
+                return true;
+            }
             p.boot_mode = args[1];
             cfg_change_scr_bits(CFG_SCR_BOOTLOADER_SKIP, (args[1] == BOOT_MODE_DIRECT));
             break;
         case CFG_ID_SAVE_TYPE:
-            cfg_set_save_type((save_type_t) (args[1]));
+            return cfg_set_save_type((save_type_t) (args[1]));
             break;
         case CFG_ID_CIC_SEED:
+            if ((args[1] != 0xFFFF) && (args[1] > 0x1FF)) {
+                return true;
+            }
             p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);
             break;
         case CFG_ID_TV_TYPE:
+            if (args[1] > TV_TYPE_UNKNOWN) {
+                return true;
+            }
             p.tv_type = (tv_type_t) (args[1] & 0x03);
             break;
+        case CFG_ID_DD_SD_ENABLE:
+            dd_set_sd_mode(args[1]);
+            break;
         case CFG_ID_DD_DRIVE_TYPE:
-            dd_set_drive_type(args[1]);
+            return dd_set_drive_type(args[1]);
             break;
         case CFG_ID_DD_DISK_STATE:
-            dd_set_disk_state(args[1]);
+            return dd_set_disk_state(args[1]);
             break;
         case CFG_ID_BUTTON_STATE:
             return true;
+            break;
         case CFG_ID_BUTTON_MODE:
-            button_set_mode(args[1]);
+            return button_set_mode(args[1]);
             break;
         case CFG_ID_ROM_EXTENDED_ENABLE:
             cfg_change_scr_bits(CFG_SCR_ROM_EXTENDED_ENABLED, args[1]);
-            break;
-        case CFG_ID_DD_SD_MODE:
-            dd_set_sd_mode(args[1]);
             break;
         default:
             return true;
@@ -374,7 +392,7 @@ void cfg_reset_state (void) {
     dd_set_drive_type(DD_DRIVE_TYPE_RETAIL);
     dd_set_disk_state(DD_DISK_STATE_EJECTED);
     dd_set_sd_mode(false);
-    isv_set_enabled(false);
+    isv_set_address(0);
     p.cic_seed = CIC_SEED_UNKNOWN;
     p.tv_type = TV_TYPE_UNKNOWN;
     p.boot_mode = BOOT_MODE_MENU;

@@ -20,11 +20,15 @@ bool button_get_state (void) {
     return p.state;
 }
 
-void button_set_mode (button_mode_t mode) {
+bool button_set_mode (button_mode_t mode) {
+    if (mode > BUTTON_MODE_DD_DISK_SWAP) {
+        return true;
+    }
     p.mode = mode;
     if (p.mode == BUTTON_MODE_NONE) {
         p.trigger = false;
     }
+    return false;
 }
 
 button_mode_t button_get_mode (void) {

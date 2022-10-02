@@ -203,12 +203,6 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 break;
 
-            case 'd':
-                dd_set_block_ready(p.rx_args[0] == 0);
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                break;
-
             case 'm':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
@@ -216,7 +210,6 @@ static void usb_rx_process (void) {
                 p.response_info.dma_length = p.rx_args[1];
                 break;
 
-            case 'D':
             case 'M':
                 if (usb_dma_ready()) {
                     if (!p.rx_dma_running) {
@@ -227,11 +220,14 @@ static void usb_rx_process (void) {
                     } else {
                         p.rx_state = RX_STATE_IDLE;
                         p.response_pending = true;
-                        if (p.rx_cmd == 'D') {
-                            dd_set_block_ready(true);
-                        }
                     }
                 }
+                break;
+
+            case 'D':
+                dd_set_block_ready(p.rx_args[0] == 0);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
                 break;
 
             case 'U':

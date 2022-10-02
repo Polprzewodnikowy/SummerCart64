@@ -209,7 +209,7 @@ dd_drive_type_t dd_get_drive_type (void) {
     return p.drive_type;
 }
 
-void dd_set_drive_type (dd_drive_type_t type) {
+bool dd_set_drive_type (dd_drive_type_t type) {
     switch (type) {
         case DD_DRIVE_TYPE_RETAIL:
             fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
@@ -220,7 +220,11 @@ void dd_set_drive_type (dd_drive_type_t type) {
             fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_DEVELOPMENT);
             p.drive_type = type;
             break;
+
+        default:
+            return true;
     }
+    return false;
 }
 
 dd_disk_state_t dd_get_disk_state (void) {
@@ -234,7 +238,10 @@ dd_disk_state_t dd_get_disk_state (void) {
     return DD_DISK_STATE_EJECTED;
 }
 
-void dd_set_disk_state (dd_disk_state_t state) {
+bool dd_set_disk_state (dd_disk_state_t state) {
+    if (state > DD_DISK_STATE_CHANGED) {
+        return true;
+    }
     uint32_t scr = fpga_reg_get(REG_DD_SCR);
     scr &= ~(DD_SCR_DISK_CHANGED | DD_SCR_DISK_INSERTED);
     switch (state) {
@@ -250,6 +257,7 @@ void dd_set_disk_state (dd_disk_state_t state) {
             break;
     }
     fpga_reg_set(REG_DD_SCR, scr);
+    return false;
 }
 
 bool dd_get_sd_mode (void) {

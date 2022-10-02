@@ -3,6 +3,7 @@
 
 
 #include <stdbool.h>
+#include <stdint.h>
 
 
 typedef enum {
@@ -19,9 +20,9 @@ typedef enum {
 
 void dd_set_block_ready (bool valid);
 dd_drive_type_t dd_get_drive_type (void);
-void dd_set_drive_type (dd_drive_type_t type);
+bool dd_set_drive_type (dd_drive_type_t type);
 dd_disk_state_t dd_get_disk_state (void);
-void dd_set_disk_state (dd_disk_state_t state);
+bool dd_set_disk_state (dd_disk_state_t state);
 bool dd_get_sd_mode (void);
 void dd_set_sd_mode (bool value);
 void dd_set_sd_disk_info (uint32_t address, uint32_t length);
