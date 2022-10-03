@@ -393,7 +393,7 @@ class SC64:
             'save_type': self.SaveType(self.__get_config(self.__CfgId.SAVE_TYPE)),
             'cic_seed': self.CICSeed(self.__get_config(self.__CfgId.CIC_SEED)),
             'tv_type': self.TVType(self.__get_config(self.__CfgId.TV_TYPE)),
-            'dd_sd_mode': bool(self.__get_config(self.__CfgId.DD_SD_MODE)),
+            'dd_sd_enable': bool(self.__get_config(self.__CfgId.DD_SD_ENABLE)),
             'dd_drive_type': self.__DDDriveType(self.__get_config(self.__CfgId.DD_DRIVE_TYPE)),
             'dd_disk_state': self.__DDDiskState(self.__get_config(self.__CfgId.DD_DISK_STATE)),
             'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
@@ -571,7 +571,7 @@ class SC64:
             print(packet.decode('UTF-8', errors='backslashreplace'), end='')
         elif (datatype == self.__DebugDatatype.RAWBINARY):
             filename = self.__generate_filename('binaryout', 'bin')
-            with open(filename, 'wb+') as f:
+            with open(filename, 'wb') as f:
                 f.write(packet)
                 print(f'Wrote {len(packet)} bytes to {filename}')
         elif (datatype == self.__DebugDatatype.HEADER):
@@ -658,7 +658,7 @@ class SC64:
                     break
             if (dd):
                 self.__set_config(self.__CfgId.DD_MODE, self.__DDMode.FULL)
-                self.__set_config(self.__CfgId.DD_SD_MODE, False)
+                self.__set_config(self.__CfgId.DD_SD_ENABLE, False)
                 self.__set_config(self.__CfgId.DD_DRIVE_TYPE, {
                     'retail': self.__DDDriveType.RETAIL,
                     'development': self.__DDDriveType.DEVELOPMENT
@@ -760,20 +760,20 @@ if __name__ == '__main__':
         sc64 = SC64()
 
         if (args.backup_firmware):
-            with open(args.backup_firmware, 'wb+') as f:
+            with open(args.backup_firmware, 'wb') as f:
                 print('Generating backup, this might take a while... ', end='', flush=True)
                 f.write(sc64.backup_firmware())
                 print('done')
 
         if (args.update_firmware):
-            with open(args.update_firmware, 'rb+') as f:
+            with open(args.update_firmware, 'rb') as f:
                 print('Updating firmware, this might take a while... ', end='', flush=True)
                 status_callback = lambda status: print(f'{status} ', end='', flush=True)
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
         
         if (args.bootloader):
-            with open(args.bootloader, 'rb+') as f:
+            with open(args.bootloader, 'rb') as f:
                 print('Uploading Bootloader... ', end='', flush=True)
                 sc64.upload_bootloader(f.read())
                 print('done')
@@ -808,7 +808,7 @@ if __name__ == '__main__':
             print(f'RTC set to [{value.strftime("%Y-%m-%d %H:%M:%S")}]')
 
         if (args.rom):
-            with open(args.rom, 'rb+') as f:
+            with open(args.rom, 'rb') as f:
                 print('Uploading ROM... ', end='', flush=True)
                 sc64.upload_rom(f.read(), use_shadow=args.no_shadow)
                 print('done')
@@ -818,13 +818,13 @@ if __name__ == '__main__':
             print(f'Save type set to [{args.save_type.name}]')
 
         if (args.save):
-            with open(args.save, 'rb+') as f:
+            with open(args.save, 'rb') as f:
                 print('Uploading save... ', end='', flush=True)
                 sc64.upload_save(f.read())
                 print('done')
 
         if (args.ddipl):
-            with open(args.ddipl, 'rb+') as f:
+            with open(args.ddipl, 'rb') as f:
                 print('Uploading 64DD IPL... ', end='', flush=True)
                 sc64.upload_ddipl(f.read())
                 print('done')
@@ -833,13 +833,13 @@ if __name__ == '__main__':
             sc64.debug_loop(isv=args.isv, disks=args.disk)
 
         if (args.backup_save):
-            with open(args.backup_save, 'wb+') as f:
+            with open(args.backup_save, 'wb') as f:
                 print('Downloading save... ', end='', flush=True)
                 f.write(sc64.download_save())
                 print('done')
 
         if (args.download_memory):
-            with open(args.download_memory, 'wb+') as f:
+            with open(args.download_memory, 'wb') as f:
                 print('Downloading memory... ', end='', flush=True)
                 f.write(sc64.download_memory())
                 print('done')

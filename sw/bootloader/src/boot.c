@@ -20,6 +20,7 @@ static const ipl3_crc32_t ipl3_crc32[] = {
     { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // x103
     { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // x105
     { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // x106
+    { .crc32 = 0x0E018159, .seed = 0xDD, .version = 0 },   // 5167
     { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // NDXJ0
     { .crc32 = 0xBC605D0A, .seed = 0xDD, .version = 0 },   // NDDJ0
     { .crc32 = 0x502C4466, .seed = 0xDD, .version = 0 },   // NDDJ1

@@ -226,7 +226,7 @@ if __name__ == '__main__':
             except BadBlockError:
                 print(f'Bad ID block [track: {track}, head: {head}, block: {block}]')
         if (len(sys.argv) >= 3):
-            with open(sys.argv[2], 'wb+') as f:
+            with open(sys.argv[2], 'wb') as f:
                 block_info_table = dd.get_block_info_table()
                 for block in block_info_table:
                     offset = 0xFFFFFFFF if block == None else block[0]
