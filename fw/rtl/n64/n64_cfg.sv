@@ -83,7 +83,7 @@ module n64_cfg (
                     REG_DATA_0_L: n64_scb.cfg_rdata[0][15:0] <= reg_bus.wdata;
                     REG_DATA_1_H: n64_scb.cfg_rdata[1][31:16] <= reg_bus.wdata;
                     REG_DATA_1_L: n64_scb.cfg_rdata[1][15:0] <= reg_bus.wdata;
-                    REG_VERSION_L: irq <= 1'b0;
+                    REG_VERSION_H: irq <= 1'b0;
                     REG_KEY_H, REG_KEY_L: begin
                         lock_sequence_counter <= lock_sequence_counter + 1'd1;
                         if (reg_bus.wdata != 16'hFFFF) begin

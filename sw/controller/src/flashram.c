@@ -44,8 +44,8 @@ void flashram_process (void) {
     uint8_t buffer[FLASHRAM_PAGE_SIZE];
     uint32_t address = FLASHRAM_ADDRESS;
     uint32_t erase_size = (op == OP_ERASE_SECTOR) ? FLASHRAM_SECTOR_SIZE : FLASHRAM_SIZE;
-    uint32_t sector = (op != OP_ERASE_ALL) ? ((scr & FLASHRAM_SCR_PAGE_MASK) >> FLASHRAM_SCR_PAGE_BIT) : 0;
-    address += sector * FLASHRAM_PAGE_SIZE;
+    uint32_t page = (op != OP_ERASE_ALL) ? ((scr & FLASHRAM_SCR_PAGE_MASK) >> FLASHRAM_SCR_PAGE_BIT) : 0;
+    address += page * FLASHRAM_PAGE_SIZE;
 
     switch (op) {
         case OP_ERASE_ALL:

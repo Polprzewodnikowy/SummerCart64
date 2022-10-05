@@ -4,89 +4,85 @@
 #include "task.h"
 
 
-#define LED_TICKRATE_MS         (10)
-#define LED_CYCLE_TICKS_PERIOD  (10)
-#define LED_CYCLE_TICKS_ON      (3)
+#define LED_MS_PER_TICK         (10)
+#define LED_ERROR_TICKS_PERIOD  (50)
+#define LED_ERROR_TICKS_ON      (25)
+#define LED_ACT_TICKS_PERIOD    (15)
+#define LED_ACT_TICKS_ON        (6)
 
 
-typedef enum {
-    ON,
-    OFF
-} led_state_e;
-
-typedef struct {
-    uint32_t timer;
-    led_state_e state;
-} error_cycle_t;
-
-
-static uint32_t timer = 0;
-static uint8_t error_cycle = 0;
-static uint32_t current_act_counter = 0;
-static volatile uint32_t next_act_counter = 0;
+static bool error_mode = false;
+static uint32_t error_timer = 0;
 static volatile bool cic_error = false;
 static volatile bool rtc_error = false;
-static const error_cycle_t error_codes[2][8] = {
-    { { 50, ON }, { 50, OFF }, { 5, ON }, { 0, OFF }, { 0, OFF }, { 0, OFF }, { 0, OFF }, { 100, OFF } },
-    { { 50, ON }, { 50, OFF }, { 5, ON }, { 20, OFF }, { 5, ON }, { 0, OFF }, { 0, OFF }, { 100, OFF } },
-};
+
+static uint32_t act_timer = 0;
+static uint32_t current_act_counter = 0;
+static volatile uint32_t next_act_counter = 0;
 
 
 static void led_task_resume (void) {
     task_set_ready(TASK_ID_LED);
 }
 
-static bool led_has_errors (void) {
-    return (cic_error | rtc_error);
-}
-
-static void led_process_act (void) {
-    if (timer > 0) {
-        timer -= 1;
-        uint32_t cycle = ((LED_CYCLE_TICKS_PERIOD - 1) - (timer % LED_CYCLE_TICKS_PERIOD));
-        if (cycle < LED_CYCLE_TICKS_ON) {
-            hw_gpio_set(GPIO_ID_LED);
-        } else {
-            hw_gpio_reset(GPIO_ID_LED);
+static void led_update_error_mode (void) {
+    if (error_mode) {
+        if (!(cic_error || rtc_error)) {
+            error_mode = false;
+            act_timer = 0;
         }
     } else {
-        if (current_act_counter != next_act_counter) {
-            current_act_counter = next_act_counter;
-            timer = LED_CYCLE_TICKS_PERIOD;
-        } else {
-            hw_gpio_reset(GPIO_ID_LED);
+        if (cic_error || rtc_error) {
+            error_mode = true;
+            error_timer = 0;
         }
     }
 }
 
 static void led_process_errors (void) {
-    if (timer > 0) {
-        timer -= 1;
-    } else {
-        uint8_t error_code = 0;
+    if (error_timer == 0) {
+        error_timer = LED_ERROR_TICKS_PERIOD;
         if (cic_error) {
-            error_code = 0;
+            error_timer *= 1;
         } else if (rtc_error) {
-            error_code = 1;
+            error_timer *= 2;
         }
-        error_cycle_t error = error_codes[error_code][error_cycle];
-        timer = error.timer;
-        if (error.state == ON) {
-            hw_gpio_set(GPIO_ID_LED);
-        } else {
-            hw_gpio_reset(GPIO_ID_LED);
-        }
-        error_cycle += 1;
-        if (error_cycle >= 8) {
-            error_cycle = 0;
+        error_timer += LED_ERROR_TICKS_PERIOD;
+    }
+
+    if (error_timer > 0) {
+        error_timer -= 1;
+        if (error_timer >= LED_ERROR_TICKS_PERIOD) {
+            uint32_t error_cycle = (error_timer % LED_ERROR_TICKS_PERIOD);
+            if (error_cycle == LED_ERROR_TICKS_ON) {
+                hw_gpio_set(GPIO_ID_LED);
+            }
+            if (error_cycle == 0) {
+                hw_gpio_reset(GPIO_ID_LED);
+            }
         }
     }
 }
 
+static void led_process_act (void) {
+    if (act_timer == 0) {
+        if (current_act_counter != next_act_counter) {
+            current_act_counter = next_act_counter;
+            act_timer = LED_ACT_TICKS_PERIOD;
+        }
+    }
 
-void led_blink_act (void) {
-    next_act_counter += 1;
+    if (act_timer > 0) {
+        act_timer -= 1;
+        if (act_timer == LED_ACT_TICKS_ON) {
+            hw_gpio_set(GPIO_ID_LED);
+        }
+        if (act_timer == 0) {
+            hw_gpio_reset(GPIO_ID_LED);
+        }
+    }
 }
+
 
 void led_blink_error (led_error_t error) {
     switch (error) {
@@ -110,14 +106,19 @@ void led_clear_error (led_error_t error) {
     }
 }
 
+void led_blink_act (void) {
+    next_act_counter += 1;
+}
+
 void led_task (void) {
     while (1) {
-        hw_tim_setup(TIM_ID_LED, LED_TICKRATE_MS, led_task_resume);
+        hw_tim_setup(TIM_ID_LED, LED_MS_PER_TICK, led_task_resume);
 
-        if (led_has_errors()) {
+        led_update_error_mode();
+
+        if (error_mode) {
             led_process_errors();
         } else {
-            error_cycle = 0;
             led_process_act();
         }
 

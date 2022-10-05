@@ -8,9 +8,9 @@ typedef enum {
 } led_error_t;
 
 
-void led_blink_act (void);
 void led_blink_error (led_error_t error);
 void led_clear_error (led_error_t error);
+void led_blink_act (void);
 void led_task (void);
 
 

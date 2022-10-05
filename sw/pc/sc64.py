@@ -315,6 +315,7 @@ class SC64:
         HEADER = 3
         SCREENSHOT = 4
 
+    __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
 
     def __init__(self) -> None:
@@ -558,7 +559,10 @@ class SC64:
             self.__dd_set_block_ready(1)
 
     def __handle_isv_packet(self, data: bytes) -> None:
-        print(data.decode('EUC-JP', errors='backslashreplace'), end='')
+        self.__isv_line_buffer += data
+        while (b'\n' in self.__isv_line_buffer):
+            (line, self.__isv_line_buffer) = self.__isv_line_buffer.split(b'\n', 1)
+            print(line.decode('EUC-JP', errors='backslashreplace'))
 
     def __handle_usb_packet(self, data: bytes) -> None:
         header = self.__get_int(data[0:4])

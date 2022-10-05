@@ -312,7 +312,7 @@ void cic_reset_parameters (void) {
 }
 
 void cic_set_parameters (uint32_t *args) {
-    cic_disabled = (args[0 >> 24]) & (1 << 1);
+    cic_disabled = (args[0] >> 24) & (1 << 1);
     cic_dd_mode = (args[0] >> 24) & (1 << 0);
     cic_seed = (args[0] >> 16) & 0xFF;
     cic_checksum[0] = (args[0] >> 8) & 0xFF;
@@ -350,7 +350,7 @@ void cic_task (void) {
     cic_write_checksum();
     cic_init_ram(region);
 
-    while(1) {
+    while (1) {
         uint8_t cmd = 0;
         cmd |= (cic_read() << 1);
         cmd |= cic_read();

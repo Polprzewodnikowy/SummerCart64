@@ -5,8 +5,12 @@
 #include "usb.h"
 
 
+#define BUTTON_COUNTER_TRIGGER_ON   (64)
+#define BUTTON_COUNTER_TRIGGER_OFF  (0)
+
+
 struct process {
-    uint32_t shift;
+    uint8_t counter;
     bool state;
     button_mode_t mode;
     bool trigger;
@@ -36,7 +40,7 @@ button_mode_t button_get_mode (void) {
 }
 
 void button_init (void) {
-    p.shift = 0x00000000UL;
+    p.counter = 0;
     p.state = false;
     p.mode = BUTTON_MODE_NONE;
     p.trigger = false;
@@ -45,15 +49,20 @@ void button_init (void) {
 void button_process (void) {
     usb_tx_info_t packet_info;
     uint32_t status = fpga_reg_get(REG_CFG_SCR);
-    p.shift <<= 1;
     if (status & CFG_SCR_BUTTON_STATE) {
-        p.shift |= (1 << 0);
+        if (p.counter < BUTTON_COUNTER_TRIGGER_ON) {
+            p.counter += 1;
+        }
+    } else {
+        if (p.counter > BUTTON_COUNTER_TRIGGER_OFF) {
+            p.counter -= 1;
+        }
     }
-    if (!p.state && p.shift == 0xFFFFFFFFUL) {
+    if (!p.state && p.counter == BUTTON_COUNTER_TRIGGER_ON) {
         p.state = true;
         p.trigger = true;
     }
-    if (p.state && p.shift == 0x00000000UL) {
+    if (p.state && p.counter == BUTTON_COUNTER_TRIGGER_OFF) {
         p.state = false;
     }
     if (p.trigger) {
