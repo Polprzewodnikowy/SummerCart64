@@ -408,6 +408,7 @@ bool usb_prepare_read (uint32_t *args) {
 }
 
 void usb_get_read_info (uint32_t *args) {
+    uint32_t scr = fpga_reg_get(REG_USB_SCR);
     args[0] = 0;
     args[1] = 0;
     if (p.rx_state == RX_STATE_DATA && p.rx_cmd == 'U') {
@@ -415,6 +416,8 @@ void usb_get_read_info (uint32_t *args) {
         args[1] = p.rx_args[1];
     }
     args[0] |= (p.read_length > 0) ? (1 << 31) : 0;
+    args[0] |= (scr & USB_SCR_RESET_STATE) ? (1 << 30) : 0;
+    args[0] |= (scr & USB_SCR_PWRSAV) ? (1 << 29) : 0;
 }
 
 void usb_init (void) {
@@ -438,12 +441,19 @@ void usb_init (void) {
 }
 
 void usb_process (void) {
-    if (fpga_reg_get(REG_USB_SCR) & USB_SCR_RESET_PENDING) {
-        if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
-            p.tx_info.done_callback();
+    uint32_t scr = fpga_reg_get(REG_USB_SCR);
+    if (scr & (USB_SCR_PWRSAV | USB_SCR_RESET_STATE | USB_SCR_RESET_PENDING)) {
+        if (p.packet_pending && p.packet_info.done_callback) {
+            p.packet_pending = false;
+            p.packet_info.done_callback();
         }
-        usb_init();
-        fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
+        if (scr & USB_SCR_RESET_PENDING) {
+            if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
+                p.tx_info.done_callback();
+            }
+            usb_init();
+            fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
+        }
     } else {
         usb_rx_process();
         usb_tx_process();

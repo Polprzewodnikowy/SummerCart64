@@ -83,6 +83,8 @@ typedef enum {
 #define USB_SCR_RX_COUNT_MASK           (0x7FF << USB_SCR_RX_COUNT_BIT)
 #define USB_SCR_TX_COUNT_BIT            (17)
 #define USB_SCR_TX_COUNT_MASK           (0x7FF << USB_SCR_TX_COUNT_BIT)
+#define USB_SCR_RESET_STATE             (1 << 28)
+#define USB_SCR_PWRSAV                  (1 << 29)
 
 #define DMA_SCR_START                   (1 << 0)
 #define DMA_SCR_STOP                    (1 << 1)

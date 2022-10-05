@@ -6,6 +6,8 @@ interface usb_scb ();
     logic write_buffer_flush;
     logic [10:0] rx_count;
     logic [10:0] tx_count;
+    logic pwrsav;
+    logic reset_state;
 
     modport controller (
         output fifo_flush,
@@ -13,7 +15,9 @@ interface usb_scb ();
         output reset_ack,
         output write_buffer_flush,
         input rx_count,
-        input tx_count
+        input tx_count,
+        input pwrsav,
+        input reset_state
     );
 
     modport usb (
@@ -22,7 +26,9 @@ interface usb_scb ();
         input reset_ack,
         input write_buffer_flush,
         output rx_count,
-        output tx_count
+        output tx_count,
+        output pwrsav,
+        output reset_state
     );
 
 endinterface
@@ -144,7 +150,10 @@ module usb_ft1248 (
     always_ff @(posedge clk) begin
         state <= next_state;
         cmd <= next_cmd;
-        
+
+        usb_scb.pwrsav <= !ft_pwrsav;
+        usb_scb.reset_state <= last_reset_status;
+
         phase <= {phase[2:0], phase[3]};
         if (state == STATE_IDLE) begin
             phase <= 4'b0100;

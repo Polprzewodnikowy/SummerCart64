@@ -387,7 +387,9 @@ module mcu_top (
 
                 REG_USB_SCR: begin
                     reg_rdata <= {
-                        4'd0,
+                        2'd0,
+                        usb_scb.pwrsav,
+                        usb_scb.reset_state,
                         usb_scb.tx_count,
                         usb_scb.rx_count,
                         2'b00,
