@@ -28,11 +28,13 @@ static void led_task_resume (void) {
 static void led_update_error_mode (void) {
     if (error_mode) {
         if (!(cic_error || rtc_error)) {
+            hw_gpio_reset(GPIO_ID_LED);
             error_mode = false;
             act_timer = 0;
         }
     } else {
         if (cic_error || rtc_error) {
+            hw_gpio_reset(GPIO_ID_LED);
             error_mode = true;
             error_timer = 0;
         }
