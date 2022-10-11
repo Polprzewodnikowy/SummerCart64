@@ -343,7 +343,7 @@ module n64_si (
 
     logic rtc_backup_wp;
     logic rtc_time_wp;
-    logic rtc_stopped;
+    logic [1:0] rtc_stopped;
     logic [6:0] rtc_time_second;
     logic [6:0] rtc_time_minute;
     logic [5:0] rtc_time_hour;
@@ -356,7 +356,7 @@ module n64_si (
         if (reset) begin
             rtc_backup_wp <= 1'b1;
             rtc_time_wp <= 1'b1;
-            rtc_stopped <= 1'b0;
+            rtc_stopped <= 2'b00;
             n64_scb.rtc_pending <= 1'b0;
         end
 
@@ -364,7 +364,7 @@ module n64_si (
             n64_scb.rtc_pending <= 1'b0;
         end
 
-        if (!rtc_stopped && !n64_scb.rtc_pending && n64_scb.rtc_wdata_valid && (tx_state != TX_STATE_DATA)) begin
+        if (!(|rtc_stopped) && !n64_scb.rtc_pending && n64_scb.rtc_wdata_valid && (tx_state != TX_STATE_DATA)) begin
             {
                 rtc_time_year,
                 rtc_time_month,
@@ -381,8 +381,8 @@ module n64_si (
                 case (rx_byte_counter)
                     4'd1: {rtc_time_wp, rtc_backup_wp} <= rx_byte_data[1:0];
                     4'd2: begin
-                        rtc_stopped <= rx_byte_data[2];
-                        if (!rx_byte_data[2]) begin
+                        rtc_stopped <= rx_byte_data[2:1];
+                        if (rx_byte_data[2:1] == 2'b00) begin
                             n64_scb.rtc_pending <= 1'b1;
                         end
                     end
@@ -438,7 +438,7 @@ module n64_si (
                 tx_length = 4'd2;
                 case (tx_byte_counter)
                     4'd1: tx_byte_data = 8'h10;
-                    4'd2: tx_byte_data = {rtc_stopped, 7'd0};
+                    4'd2: tx_byte_data = {(|rtc_stopped), 7'd0};
                 endcase
             end
             CMD_RTC_READ: begin
@@ -446,8 +446,8 @@ module n64_si (
                 if (joybus_address[1:0] == 2'd0) begin
                     case (tx_byte_counter)
                         4'd0: tx_byte_data = {6'd0, rtc_time_wp, rtc_backup_wp};
-                        4'd1: tx_byte_data = {5'd0, rtc_stopped, 2'd0};
-                        4'd8: tx_byte_data = {rtc_stopped, 7'd0};
+                        4'd1: tx_byte_data = {5'd0, rtc_stopped, 1'b0};
+                        4'd8: tx_byte_data = {(|rtc_stopped), 7'd0};
                     endcase
                 end else if (joybus_address[1:0] == 2'd2) begin
                     case (tx_byte_counter)
@@ -459,13 +459,13 @@ module n64_si (
                         4'd5: tx_byte_data = {3'd0, rtc_time_month};
                         4'd6: tx_byte_data = rtc_time_year;
                         4'd7: tx_byte_data = 8'h01;
-                        4'd8: tx_byte_data = {rtc_stopped, 7'd0};
+                        4'd8: tx_byte_data = {(|rtc_stopped), 7'd0};
                     endcase
                 end
             end
             CMD_RTC_WRITE: begin
                 tx_length = 4'd0;
-                tx_byte_data = {rtc_stopped, 7'd0};
+                tx_byte_data = {(|rtc_stopped), 7'd0};
             end
         endcase
     end

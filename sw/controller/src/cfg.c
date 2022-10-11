@@ -370,7 +370,7 @@ void cfg_set_time (uint32_t *args) {
     t.second = (args[0] & 0xFF);
     t.minute = ((args[0] >> 8) & 0xFF);
     t.hour = ((args[0] >> 16) & 0xFF);
-    t.weekday = ((args[1] >> 24) & 0xFF);
+    t.weekday = ((args[0] >> 24) & 0xFF);
     t.day = (args[1] & 0xFF);
     t.month = ((args[1] >> 8) & 0xFF);
     t.year = ((args[1] >> 16) & 0xFF);
