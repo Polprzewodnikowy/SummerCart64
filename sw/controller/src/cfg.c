@@ -569,7 +569,8 @@ void cfg_process (void) {
                 break;
 
             case '?':
-                args[0] = fpga_reg_get(REG_DEBUG);
+                args[0] = fpga_reg_get(REG_DEBUG_0);
+                args[1] = fpga_reg_get(REG_DEBUG_1);
                 break;
 
             default:

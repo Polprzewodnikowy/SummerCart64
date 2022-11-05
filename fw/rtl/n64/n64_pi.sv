@@ -122,6 +122,18 @@ module n64_pi (
     end
 
 
+    // Debug: last accessed PI address
+
+    always_ff @(posedge clk) begin
+        if (aleh_op) begin
+            n64_scb.pi_debug[31:16] <= n64_pi_dq_in;
+        end
+        if (alel_op) begin
+            n64_scb.pi_debug[15:0] <= n64_pi_dq_in;
+        end
+    end
+
+
     // Address decoding
 
     const bit [31:0] DDIPL_OFFSET       = 32'h03BC_0000;
@@ -289,8 +301,8 @@ module n64_pi (
     always_ff @(posedge clk) begin
         read_fifo_read <= 1'b0;
 
-        if (reset) begin
-            n64_scb.pi_debug[1:0] <= 2'b00;
+        if (!pi_reset) begin
+            n64_scb.pi_debug[33:32] <= 2'b00;
         end
 
         if (reset || !pi_reset || alel_op) begin
@@ -301,9 +313,9 @@ module n64_pi (
             if (read_op) begin
                 if (read_fifo_empty) begin
                     read_fifo_wait <= 1'b1;
-                    n64_scb.pi_debug[0] <= 1'b1;
+                    n64_scb.pi_debug[32] <= 1'b1;
                     if (read_fifo_wait) begin
-                        n64_scb.pi_debug[1] <= 1'b1;
+                        n64_scb.pi_debug[33] <= 1'b1;
                     end
                 end else begin
                     read_fifo_read <= 1'b1;
@@ -356,8 +368,8 @@ module n64_pi (
     always_ff @(posedge clk) begin
         write_fifo_write <= 1'b0;
 
-        if (reset) begin
-            n64_scb.pi_debug[3:2] <= 2'b00;
+        if (!pi_reset) begin
+            n64_scb.pi_debug[35:34] <= 2'b00;
         end
 
         if (reset) begin
@@ -368,9 +380,9 @@ module n64_pi (
             if (write_op) begin
                 if (write_fifo_full) begin
                     write_fifo_wait <= 1'b1;
-                    n64_scb.pi_debug[2] <= 1'b1;
+                    n64_scb.pi_debug[34] <= 1'b1;
                     if (write_fifo_wait) begin
-                        n64_scb.pi_debug[3] <= 1'b1;
+                        n64_scb.pi_debug[35] <= 1'b1;
                     end
                 end else begin
                     write_fifo_write <= 1'b1;

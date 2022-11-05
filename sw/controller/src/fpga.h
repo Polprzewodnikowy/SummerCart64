@@ -52,7 +52,8 @@ typedef enum {
     REG_DD_DRIVE_ID,
     REG_VENDOR_SCR,
     REG_VENDOR_DATA,
-    REG_DEBUG
+    REG_DEBUG_0,
+    REG_DEBUG_1,
 } fpga_reg_t;
 
 

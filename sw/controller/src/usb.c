@@ -288,8 +288,9 @@ static void usb_rx_process (void) {
             case '?':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.data_length = 4;
-                p.response_info.data[0] = fpga_reg_get(REG_DEBUG);
+                p.response_info.data_length = 8;
+                p.response_info.data[0] = fpga_reg_get(REG_DEBUG_0);
+                p.response_info.data[1] = fpga_reg_get(REG_DEBUG_1);
                 break;
 
             default:

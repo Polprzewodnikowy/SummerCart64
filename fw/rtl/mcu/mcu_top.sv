@@ -356,7 +356,8 @@ module mcu_top (
         REG_DD_DRIVE_ID,
         REG_VENDOR_SCR,
         REG_VENDOR_DATA,
-        REG_DEBUG
+        REG_DEBUG_0,
+        REG_DEBUG_1
     } reg_address_e;
 
     logic bootloader_skip;
@@ -631,10 +632,14 @@ module mcu_top (
                     reg_rdata <= vendor_scb.data_rdata;
                 end
 
-                REG_DEBUG: begin
+                REG_DEBUG_0: begin
+                    reg_rdata <= n64_scb.pi_debug[31:0];
+                end
+
+                REG_DEBUG_1: begin
                     reg_rdata <= {
                         28'd0,
-                        n64_scb.pi_debug
+                        n64_scb.pi_debug[35:32]
                     };
                 end
             endcase

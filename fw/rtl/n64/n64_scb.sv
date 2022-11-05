@@ -53,7 +53,7 @@ interface n64_scb ();
 
     logic pi_sdram_active;
     logic pi_flash_active;
-    logic [3:0] pi_debug;
+    logic [35:0] pi_debug;
 
     modport controller (
         input n64_reset,
