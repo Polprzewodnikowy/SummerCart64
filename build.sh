@@ -2,80 +2,66 @@
 
 set -e
 
-PACKAGE_FILE_NAME="SummerCart64"
+PACKAGE_FILE_NAME="SC64"
 
 FILES=(
-    "./fw/output_files/SC64_firmware.pof"
-    "./fw/output_files/SC64_update.bin"
-    "./hw/ftdi-template.xml"
-    "./sw/cic/UltraCIC-III.hex"
+    "./fw/ftdi/ft232h_config.xml"
+    "./fw/project/lcmxo2/impl1/sc64_impl1.mrp"
+    "./fw/project/lcmxo2/impl1/sc64_impl1.twr"
+    "./sw/pc/dd64.py"
+    "./sw/pc/sc64.py"
+    "./sw/update/sc64.upd"
     "./LICENSE"
+    "./README.md"
 )
 
-BUILT_CIC=false
-BUILT_N64=false
-BUILT_RISCV=false
+BUILT_BOOTLOADER=false
+BUILT_CONTROLLER=false
 BUILT_FPGA=false
 BUILT_UPDATE=false
 BUILT_RELEASE=false
 
 FORCE_CLEAN=false
-SKIP_FPGA_REBUILD=false
-DEBUG_ENABLED=false
-USER_FLAGS+=" -D__SC64_VERSION=\"$__SC64_VERSION\""
 
-build_cic () {
-    if [ "$BUILT_CIC" = true ]; then return; fi
+build_bootloader () {
+    if [ "$BUILT_BOOTLOADER" = true ]; then return; fi
 
-    pushd sw/cic > /dev/null
-    avra UltraCIC-III.asm -D attiny45
-    popd > /dev/null
-
-    BUILT_CIC=true
-}
-
-build_n64 () {
-    if [ "$BUILT_N64" = true ]; then return; fi
-
-    pushd sw/n64 > /dev/null
+    pushd sw/bootloader > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    make all -j USER_FLAGS="$USER_FLAGS"
+    FLAGS="$USER_FLAGS"
+    if [ ! -z "${GIT_BRANCH+x}" ]; then FLAGS+=" -DGIT_BRANCH='\"$GIT_BRANCH\"'"; fi
+    if [ ! -z "${GIT_TAG+x}" ]; then FLAGS+=" -DGIT_TAG='\"$GIT_TAG\"'"; fi
+    if [ ! -z "${GIT_SHA+x}" ]; then FLAGS+=" -DGIT_SHA='\"$GIT_SHA\"'"; fi
+    if [ ! -z "${GIT_MESSAGE+x}" ]; then FLAGS+=" -DGIT_MESSAGE='\"$GIT_MESSAGE\"'"; fi
+    make all -j USER_FLAGS="$FLAGS"
     popd > /dev/null
 
-    BUILT_N64=true
+    BUILT_BOOTLOADER=true
 }
 
-build_riscv () {
-    if [ "$BUILT_RISCV" = true ]; then return; fi
+build_controller () {
+    if [ "$BUILT_CONTROLLER" = true ]; then return; fi
 
-    pushd sw/riscv > /dev/null
+    pushd sw/controller > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        make clean
+        ./build.sh clean
     fi
-    make all -j USER_FLAGS="$USER_FLAGS"
+    USER_FLAGS="$USER_FLAGS" ./build.sh all
     popd > /dev/null
 
-    BUILT_RISCV=true
+    BUILT_CONTROLLER=true
 }
 
 build_fpga () {
     if [ "$BUILT_FPGA" = true ]; then return; fi
 
-    build_n64
-    build_riscv
-
-    pushd fw > /dev/null
-    if [ "$SKIP_FPGA_REBUILD" = true ] && [ -f output_files/SummerCart64.sof ]; then
-        quartus_cpf -c SummerCart64.cof
-    else
-        if [ "$DEBUG_ENABLED" = true ]; then
-            quartus_sh --set VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
-        fi
-        quartus_sh --flow compile ./SummerCart64.qpf
-        quartus_sh --set -remove VERILOG_MACRO="DEBUG" ./SummerCart64.qpf
+    pushd fw/project/lcmxo2 > /dev/null
+    if [ "$FORCE_CLEAN" = true ]; then
+        rm -rf ./impl1/
     fi
+    ./build.sh
     popd > /dev/null
 
     BUILT_FPGA=true
@@ -84,12 +70,26 @@ build_fpga () {
 build_update () {
     if [ "$BUILT_UPDATE" = true ]; then return; fi
 
+    build_bootloader
+    build_controller
     build_fpga
 
-    pushd fw/output_files > /dev/null
-    cat sc64_firmware_ufm_auto.rpd sc64_firmware_cfm0_auto.rpd > SC64_update_tmp.bin
-    objcopy -I binary -O binary --reverse-bytes=4 SC64_update_tmp.bin SC64_update.bin
-    rm SC64_update_tmp.bin
+    pushd sw/update > /dev/null
+    if [ "$FORCE_CLEAN" = true ]; then
+        rm -f ./sc64.upd
+    fi
+    GIT_INFO=""
+    if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+="branch: [$GIT_BRANCH] "; fi
+    if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+="tag: [$GIT_TAG] "; fi
+    if [ ! -z "${GIT_SHA}" ]; then GIT_INFO+="sha: [$GIT_SHA] "; fi
+    if [ ! -z "${GIT_MESSAGE}" ]; then GIT_INFO+="message: [$GIT_MESSAGE] "; fi
+    GIT_INFO=$(echo "$GIT_INFO" | xargs)
+    python3 update.py \
+        --git "$GIT_INFO" \
+        --mcu ../controller/build/app/app.bin \
+        --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
+        --boot ../bootloader/build/bootloader.bin \
+        sc64.upd
     popd > /dev/null
 
     BUILT_UPDATE=true
@@ -98,7 +98,6 @@ build_update () {
 build_release () {
     if [ "$BUILT_RELEASE" = true ]; then return; fi
 
-    build_cic
     build_update
 
     if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
@@ -110,22 +109,17 @@ build_release () {
 }
 
 print_usage () {
-    echo "builder script for SummerCart64"
-    echo "usage: ./build.sh [cic] [n64] [riscv] [fpga] [update] [release] [-c] [-s] [-d] [--help]"
+    echo "builder script for SC64"
+    echo "usage: ./build.sh [bootloader] [controller] [fpga] [update] [release] [-c] [--help]"
     echo "parameters:"
-    echo "  cic       - assemble UltraCIC-III software"
-    echo "  n64       - compile N64 bootloader software"
-    echo "  riscv     - compile cart governor software"
-    echo "  fpga      - compile FPGA design (triggers 'n64' and 'riscv' build)"
-    echo "  update    - convert programming .pof file to raw binary for self-upgrade (triggers 'fpga' build)"
-    echo "  release   - collect and zip files for release (triggers 'cic' and 'update' build)"
+    echo "  bootloader  - compile N64 bootloader software"
+    echo "  controller  - compile ARM controller software"
+    echo "  fpga        - compile FPGA design"
+    echo "  update      - compile all software and designs"
+    echo "  release     - collect and zip files for release (triggers 'update' build)"
     echo "  -c | --force-clean"
-    echo "            - clean software compilation result directories before build"
-    echo "  -s | --skip-fpga-rebuild"
-    echo "            - do not recompile whole FPGA design if it's already done, just update software binaries"
-    echo "  -d | --debug"
-    echo "            - enable debug features"
-    echo "  --help    - print this guide"
+    echo "              - clean compilation result directories before build"
+    echo "  --help      - print this guide"
 }
 
 if test $# -eq 0; then
@@ -135,23 +129,19 @@ if test $# -eq 0; then
     exit 1
 fi
 
-TRIGGER_CIC=false
-TRIGGER_N64=false
-TRIGGER_RISCV=false
+TRIGGER_BOOTLOADER=false
+TRIGGER_CONTROLLER=false
 TRIGGER_FPGA=false
 TRIGGER_UPDATE=false
 TRIGGER_RELEASE=false
 
 while test $# -gt 0; do
     case "$1" in
-        cic)
-            TRIGGER_CIC=true
+        bootloader)
+            TRIGGER_BOOTLOADER=true
             ;;
-        n64)
-            TRIGGER_N64=true
-            ;;
-        riscv)
-            TRIGGER_RISCV=true
+        controller)
+            TRIGGER_CONTROLLER=true
             ;;
         fpga)
             TRIGGER_FPGA=true
@@ -164,12 +154,6 @@ while test $# -gt 0; do
             ;;
         -c|--force-clean)
             FORCE_CLEAN=true
-            ;;
-        -s|--skip-fpga-rebuild)
-            SKIP_FPGA_REBUILD=true
-            ;;
-        -d|--debug)
-            DEBUG_ENABLED=true
             ;;
         --help)
             print_usage
@@ -185,10 +169,8 @@ while test $# -gt 0; do
     shift
 done
 
-if [ "$DEBUG_ENABLED" = true ]; then USER_FLAGS+=" -DDEBUG"; fi
-if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
-if [ "$TRIGGER_N64" = true ]; then build_n64; fi
-if [ "$TRIGGER_RISCV" = true ]; then build_riscv; fi
+if [ "$TRIGGER_BOOTLOADER" = true ]; then build_bootloader; fi
+if [ "$TRIGGER_CONTROLLER" = true ]; then build_controller; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi

@@ -1,0 +1,73 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_bootloader",
+            "type": "shell",
+            "command": "./docker_build.sh bootloader",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh bootloader"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_controller",
+            "type": "shell",
+            "command": "./docker_build.sh controller",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh controller"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_fpga",
+            "type": "shell",
+            "command": "./docker_build.sh fpga",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh fpga"
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_update",
+            "type": "shell",
+            "command": "./docker_build.sh update",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows": {
+                "command": "wsl -- ./docker_build.sh update"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "build_release",
+            "type": "shell",
+            "command": "./docker_build.sh release --force-clean",
+            "presentation": {
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "windows":{
+                "command": "wsl -- ./docker_build.sh release --force-clean"
+            },
+            "group": "build"
+        },
+    ]
+}

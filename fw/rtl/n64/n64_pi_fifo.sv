@@ -1,5 +1,6 @@
 module n64_pi_fifo (
-    if_system.sys sys,
+    input clk,
+    input reset,
 
     input flush,
 
@@ -18,15 +19,13 @@ module n64_pi_fifo (
 
     logic empty_or_full;
 
-    always_comb begin
-        rdata = fifo_mem[fifo_rd_ptr[1:0]];
-        empty_or_full = fifo_wr_ptr[1:0] == fifo_rd_ptr[1:0];
-        empty = empty_or_full && fifo_wr_ptr[2] == fifo_rd_ptr[2];
-        full = empty_or_full && fifo_wr_ptr[2] != fifo_rd_ptr[2];
-    end
+    assign rdata = fifo_mem[fifo_rd_ptr[1:0]];
+    assign empty_or_full = fifo_wr_ptr[1:0] == fifo_rd_ptr[1:0];
+    assign empty = empty_or_full && fifo_wr_ptr[2] == fifo_rd_ptr[2];
+    assign full = empty_or_full && fifo_wr_ptr[2] != fifo_rd_ptr[2];
 
-    always_ff @(posedge sys.clk) begin
-        if (sys.reset || flush) begin
+    always_ff @(posedge clk) begin
+        if (reset || flush) begin
             fifo_wr_ptr <= 3'd0;
             fifo_rd_ptr <= 3'd0;
         end else begin

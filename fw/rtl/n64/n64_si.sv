@@ -1,164 +1,253 @@
-interface if_si ();
-
-    logic rx_reset;
-    logic rx_ready;
-    logic [6:0] rx_length;
-    logic [80:0] rx_data;
-
-    logic tx_reset;
-    logic tx_start;
-    logic tx_busy;
-    logic [2:0] tx_wmask;
-    logic [6:0] tx_length;
-    logic [31:0] tx_data;
-
-    modport si (
-        input rx_reset,
-        output rx_ready,
-        output rx_length,
-        output rx_data,
-        input tx_reset,
-        input tx_start,
-        output tx_busy,
-        input tx_wmask,
-        input tx_length,
-        input tx_data
-    );
-
-    modport cpu (
-        output rx_reset,
-        input rx_ready,
-        input rx_length,
-        input rx_data,
-        output tx_reset,
-        output tx_start,
-        input tx_busy,
-        output tx_wmask,
-        output tx_length,
-        output tx_data
-    );
-
-endinterface
-
 module n64_si (
-    if_system.sys sys,
-    if_si.si si,
+    input clk,
+    input reset,
 
+    n64_scb.si n64_scb,
+
+    input n64_reset,
     input n64_si_clk,
     inout n64_si_dq
 );
 
-    // Control signals and input synchronization
+    // Input/output synchronization
 
+    logic [1:0] n64_reset_ff;
     logic [1:0] n64_si_clk_ff;
 
-    always_ff @(posedge sys.clk) begin
+    always_ff @(posedge clk) begin
+        n64_reset_ff <= {n64_reset_ff[0], n64_reset};
         n64_si_clk_ff <= {n64_si_clk_ff[0], n64_si_clk};
     end
 
     logic si_reset;
     logic si_clk;
-    logic si_dq;
 
     always_comb begin
-        si_reset = sys.n64_hard_reset;
+        si_reset = n64_reset_ff[1];
         si_clk = n64_si_clk_ff[1];
-        si_dq = n64_si_dq;
     end
+
+    logic si_dq_oe;
+    logic si_dq_out;
+    logic si_dq_in;
+
+    assign n64_si_dq = si_dq_oe ? 1'b0 : 1'bZ;
+
+    always_ff @(posedge clk) begin
+        si_dq_oe <= ~si_dq_out;
+        si_dq_in <= n64_si_dq;
+    end
+
+
+    // Clock falling/rising event generator
 
     logic last_si_clk;
 
-    always_ff @(posedge sys.clk) begin
+    always_ff @(posedge clk) begin
         last_si_clk <= si_clk;
     end
 
-    logic si_clk_rising_edge;
     logic si_clk_falling_edge;
+    logic si_clk_rising_edge;
 
     always_comb begin
-        si_clk_rising_edge = !si_reset && !last_si_clk && si_clk;
-        si_clk_falling_edge = !si_reset && last_si_clk && !si_clk;
-    end
-
-    logic si_dq_output_enable;
-    logic si_dq_output_enable_data;
-
-    always_ff @(posedge sys.clk) begin
-        si_dq_output_enable <= si_dq_output_enable_data;
-    end
-
-    always_comb begin
-        n64_si_dq = si_dq_output_enable ? 1'b0 : 1'bZ;
+        si_clk_falling_edge = si_reset && last_si_clk && !si_clk;
+        si_clk_rising_edge = si_reset && !last_si_clk && si_clk;
     end
 
 
-    // Data register and shifter
+    // Data falling/rising event generator
 
-    logic [80:0] trx_data;
-    logic rx_shift;
-    logic tx_shift;
+    logic last_si_dq_in;
 
-    always_comb begin
-        si.rx_data = trx_data;
-    end
-
-    always_ff @(posedge sys.clk) begin
-        if (si.tx_wmask[0]) trx_data[80:49] <= si.tx_data;
-        if (si.tx_wmask[1]) trx_data[48:17] <= si.tx_data;
-        if (si.tx_wmask[2]) trx_data[16:0] <= si.tx_data[16:0];
-
-        if (rx_shift || tx_shift) begin
-            trx_data <= {trx_data[79:0], rx_sub_bit_counter < 2'd2};
+    always_ff @(posedge clk) begin
+        if (si_clk_rising_edge) begin
+            last_si_dq_in <= si_dq_in;
         end
     end
+
+    logic si_dq_falling_edge;
+    logic si_dq_rising_edge;
+
+    always_comb begin
+        si_dq_falling_edge = si_clk_rising_edge && last_si_dq_in && !si_dq_in;
+        si_dq_rising_edge = si_clk_rising_edge && !last_si_dq_in && si_dq_in;
+    end
+
+
+    // RX bit generator
+
+    logic [3:0] rx_sub_bit_counter;
+    logic rx_timeout;
+    logic rx_bit_valid;
+    logic rx_bit_data;
+
+    always_ff @(posedge clk) begin
+        if (si_clk_rising_edge && !(&rx_sub_bit_counter)) begin
+            rx_sub_bit_counter <= rx_sub_bit_counter + 1'd1;
+        end
+        if (si_dq_falling_edge) begin
+            rx_sub_bit_counter <= 4'd0;
+        end
+    end
+
+    always_comb begin
+        rx_timeout = si_clk_rising_edge && si_dq_in && (&rx_sub_bit_counter);
+        rx_bit_valid = si_dq_rising_edge;
+        rx_bit_data = (rx_sub_bit_counter >= 4'd3) ? 1'b0 : 1'b1;
+    end
+
+
+    // RX byte generator
+
+    logic [2:0] rx_bit_counter;
+    logic rx_byte_valid;
+    logic [7:0] rx_byte_data;
+
+    always_ff @(posedge clk) begin
+        rx_byte_valid <= 1'b0;
+        if (rx_timeout) begin
+            rx_bit_counter <= 3'd0;
+        end
+        if (rx_bit_valid) begin
+            rx_bit_counter <= rx_bit_counter + 1'd1;
+            rx_byte_data <= {rx_byte_data[6:0], rx_bit_data};
+            if (&rx_bit_counter) begin
+                rx_byte_valid <= 1'b1;
+            end
+        end
+    end
+
+
+    // RX stop generator
+
+    logic rx_stop;
+
+    always_comb begin
+        rx_stop = si_clk_rising_edge && si_dq_in && (rx_sub_bit_counter == 4'd7) && (rx_bit_counter == 3'd1);
+    end
+
+
+    // TX byte/stop generator
+
+    logic tx_busy;
+    logic [2:0] tx_sub_bit_counter;
+    logic [2:0] tx_bit_counter;
+    logic [7:0] tx_shift;
+    logic tx_start;
+    logic tx_stop;
+    logic tx_byte_valid;
+    logic [7:0] tx_byte_data;
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            si_dq_out <= 1'b1;
+            tx_busy <= 1'b0;
+        end else begin
+            if (tx_busy) begin
+                if (si_clk_falling_edge) begin
+                    tx_sub_bit_counter <= tx_sub_bit_counter + 1'd1;
+                    if (&tx_sub_bit_counter) begin
+                        tx_bit_counter <= tx_bit_counter + 1'd1;
+                        tx_shift <= {tx_shift[6:0], 1'bX};
+                        if (&tx_bit_counter) begin
+                            tx_busy <= 1'b0;
+                        end
+                    end
+                    if (tx_shift[7]) begin
+                        si_dq_out <= !(tx_sub_bit_counter < 3'd2);
+                    end else begin
+                        si_dq_out <= !(tx_sub_bit_counter < 3'd6);
+                    end
+                end
+            end else begin
+                if (tx_byte_valid) begin
+                    tx_busy <= 1'b1;
+                    tx_sub_bit_counter <= 3'd0;
+                    tx_bit_counter <= 3'd0;
+                    tx_shift <= tx_byte_data;
+                end else if (tx_stop) begin
+                    tx_busy <= 1'b1;
+                    tx_sub_bit_counter <= 3'd0;
+                    tx_bit_counter <= 3'd7;
+                    tx_shift <= 8'hFF;
+                end
+            end
+        end
+    end
+
+
+    // Joybus CMDs
+
+    typedef enum bit [7:0] {
+        CMD_EEPROM_STATUS    = 8'h00,
+        CMD_EEPROM_READ      = 8'h04,
+        CMD_EEPROM_WRITE     = 8'h05,
+        CMD_RTC_STATUS       = 8'h06,
+        CMD_RTC_READ         = 8'h07,
+        CMD_RTC_WRITE        = 8'h08
+    } e_cmd;
+
+    e_cmd cmd;
 
 
     // RX path
 
-    typedef enum bit [0:0] { 
-        S_RX_IDLE,
-        S_RX_WAITING
+    typedef enum bit [1:0] {
+        RX_STATE_IDLE,
+        RX_STATE_DATA,
+        RX_STATE_IGNORE
     } e_rx_state;
 
     e_rx_state rx_state;
+    logic [3:0] rx_byte_counter;
+    logic rx_data_valid;
 
-    logic [1:0] rx_sub_bit_counter;
-    logic [3:0] rx_timeout_counter;
+    always_comb begin
+        rx_data_valid = rx_byte_valid && (rx_state == RX_STATE_DATA);
+    end
 
-    always_ff @(posedge sys.clk) begin
-        rx_shift <= 1'b0;
+    always_ff @(posedge clk) begin
+        tx_start <= 1'b0;
 
-        if (si_clk_rising_edge) begin
-            if (rx_timeout_counter < 4'd8) begin
-                rx_timeout_counter <= rx_timeout_counter + 1'd1;
-            end else if (si.rx_length > 7'd0) begin
-                si.rx_ready <= 1'b1;
-            end
+        if (rx_byte_valid) begin
+            rx_byte_counter <= rx_byte_counter + 1'd1;
         end
 
-        if (sys.reset || si.rx_reset) begin
-            rx_state <= S_RX_IDLE;
-            si.rx_ready <= 1'b0;
-            si.rx_length <= 7'd0;
-        end else if (!si.tx_busy) begin
+        if (reset || rx_timeout) begin
+            rx_state <= RX_STATE_IDLE;
+        end else begin
             case (rx_state)
-                S_RX_IDLE: begin
-                    if (si_clk_rising_edge && !si_dq) begin
-                        rx_state <= S_RX_WAITING;
-                        rx_sub_bit_counter <= 2'd0;
-                        rx_timeout_counter <= 3'd0;
+                RX_STATE_IDLE: begin
+                    if (rx_byte_valid) begin
+                        cmd <= e_cmd'(rx_byte_data);
+                        rx_byte_counter <= 4'd0;
+                        rx_state <= RX_STATE_IGNORE;
+                        case (rx_byte_data)
+                            CMD_EEPROM_STATUS,
+                            CMD_EEPROM_READ,
+                            CMD_EEPROM_WRITE: begin
+                                rx_state <= n64_scb.eeprom_enabled ? RX_STATE_DATA : RX_STATE_IGNORE;
+                            end
+                            CMD_RTC_STATUS,
+                            CMD_RTC_READ,
+                            CMD_RTC_WRITE: begin
+                                rx_state <= RX_STATE_DATA;
+                            end
+                        endcase
                     end
                 end
 
-                S_RX_WAITING: begin
-                    if (si_clk_rising_edge) begin
-                        if (si_dq) begin
-                            rx_state <= S_RX_IDLE;
-                            rx_shift <= 1'b1;
-                            si.rx_length <= si.rx_length + 1'd1;
-                        end else if (rx_sub_bit_counter < 2'd3) begin
-                            rx_sub_bit_counter <= rx_sub_bit_counter + 1'd1;
-                        end
+                RX_STATE_DATA: begin
+                    if (rx_stop) begin
+                        tx_start <= 1'b1;
+                        rx_state <= RX_STATE_IGNORE;
+                    end
+                end
+
+                RX_STATE_IGNORE: begin
+                    if (rx_stop) begin
+                        rx_state <= RX_STATE_IDLE;
                     end
                 end
             endcase
@@ -168,57 +257,217 @@ module n64_si (
 
     // TX path
 
-    typedef enum bit [0:0] { 
-        S_TX_IDLE,
-        S_TX_SENDING
+    typedef enum bit [1:0] {
+        TX_STATE_IDLE,
+        TX_STATE_DATA,
+        TX_STATE_STOP
     } e_tx_state;
 
     e_tx_state tx_state;
 
-    logic [2:0] tx_sub_bit_counter;
-    logic [6:0] tx_bit_counter;
+    logic [3:0] tx_byte_counter;
+    logic [3:0] tx_length;
 
-    always_ff @(posedge sys.clk) begin
-        tx_shift <= 1'b0;
+    always_ff @(posedge clk) begin
+        tx_byte_valid <= 1'b0;
+        tx_stop <= 1'b0;
 
-        if (sys.reset || si.tx_reset) begin
-            tx_state <= S_TX_IDLE;
-            si_dq_output_enable_data <= 1'b0;
-            si.tx_busy <= 1'b0;
+        if (!tx_busy && tx_byte_valid) begin
+            tx_byte_counter <= tx_byte_counter + 1'd1;
+        end
+
+        if (reset) begin
+            tx_state <= TX_STATE_IDLE;
         end else begin
             case (tx_state)
-                S_TX_IDLE: begin
-                    if (si.tx_start) begin
-                        tx_state <= S_TX_SENDING;
-                        tx_sub_bit_counter <= 3'd0;
-                        tx_bit_counter <= si.tx_length;
-                        si.tx_busy <= 1'b1;
+                TX_STATE_IDLE: begin
+                    if (tx_start) begin
+                        tx_byte_counter <= 4'd0;
+                        tx_state <= TX_STATE_DATA;
                     end
                 end
 
-                S_TX_SENDING: begin
-                    if (si_clk_falling_edge) begin
-                        tx_sub_bit_counter <= tx_sub_bit_counter + 1'd1;
-                        if (tx_sub_bit_counter == 3'd7) begin
-                            tx_shift <= 1'b1;
-                            if (tx_bit_counter >= 7'd1) begin
-                                tx_bit_counter <= tx_bit_counter - 1'd1;
-                            end else begin
-                                tx_state <= S_TX_IDLE;
-                                si.tx_busy <= 1'b0;
-                            end
+                TX_STATE_DATA: begin
+                    tx_byte_valid <= 1'b1;
+                    if (!tx_busy && tx_byte_valid) begin
+                        if (tx_byte_counter == tx_length) begin
+                            tx_state <= TX_STATE_STOP;
                         end
-                        if (tx_bit_counter == 7'd0) begin
-                            si_dq_output_enable_data <= tx_sub_bit_counter < 3'd4;
-                        end else if (trx_data[80]) begin
-                            si_dq_output_enable_data <= tx_sub_bit_counter < 3'd2;
-                        end else begin
-                            si_dq_output_enable_data <= tx_sub_bit_counter < 3'd6;
-                        end
+                    end
+                end
+
+                TX_STATE_STOP: begin
+                    tx_stop <= 1'b1;
+                    if (!tx_busy && tx_stop) begin
+                        tx_state <= TX_STATE_IDLE;
                     end
                 end
             endcase
         end
+    end
+
+
+    // Joybus address latching
+
+    logic [7:0] joybus_address;
+    logic [2:0] joybus_subaddress;
+    logic [10:0] joybus_full_address;
+
+    always_comb begin
+        joybus_full_address = {joybus_address, joybus_subaddress};
+    end
+
+    always_ff @(posedge clk) begin
+        if (rx_data_valid || (!tx_busy && tx_byte_valid)) begin
+            joybus_subaddress <= joybus_subaddress + 1'd1;
+        end
+        if (rx_data_valid) begin
+            if (rx_byte_counter == 4'd0) begin
+                joybus_address <= rx_byte_data;
+                joybus_subaddress <= 3'd0;
+            end
+        end
+    end
+
+
+    // EEPROM controller
+
+    always_comb begin
+        n64_scb.eeprom_write = rx_data_valid && (cmd == CMD_EEPROM_WRITE) && rx_byte_counter > 4'd0;
+        n64_scb.eeprom_address = joybus_full_address;
+        n64_scb.eeprom_wdata = rx_byte_data;
+    end
+
+
+    // RTC controller
+
+    logic rtc_backup_wp;
+    logic rtc_time_wp;
+    logic [1:0] rtc_stopped;
+    logic [6:0] rtc_time_second;
+    logic [6:0] rtc_time_minute;
+    logic [5:0] rtc_time_hour;
+    logic [5:0] rtc_time_day;
+    logic [2:0] rtc_time_weekday;
+    logic [4:0] rtc_time_month;
+    logic [7:0] rtc_time_year;
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            rtc_backup_wp <= 1'b1;
+            rtc_time_wp <= 1'b1;
+            rtc_stopped <= 2'b00;
+            n64_scb.rtc_pending <= 1'b0;
+        end
+
+        if (n64_scb.rtc_done) begin
+            n64_scb.rtc_pending <= 1'b0;
+        end
+
+        if (!(|rtc_stopped) && !n64_scb.rtc_pending && n64_scb.rtc_wdata_valid && (tx_state != TX_STATE_DATA)) begin
+            {
+                rtc_time_year,
+                rtc_time_month,
+                rtc_time_weekday,
+                rtc_time_day,
+                rtc_time_hour,
+                rtc_time_minute,
+                rtc_time_second
+            } <= n64_scb.rtc_wdata;
+        end
+
+        if (rx_data_valid && (cmd == CMD_RTC_WRITE)) begin
+            if (joybus_address[1:0] == 2'd0) begin
+                case (rx_byte_counter)
+                    4'd1: {rtc_time_wp, rtc_backup_wp} <= rx_byte_data[1:0];
+                    4'd2: begin
+                        rtc_stopped <= rx_byte_data[2:1];
+                        if (rx_byte_data[2:1] == 2'b00) begin
+                            n64_scb.rtc_pending <= 1'b1;
+                        end
+                    end
+                endcase
+            end
+            if ((joybus_address[1:0] == 2'd2) && !rtc_time_wp) begin
+                case (rx_byte_counter)
+                    4'd1: rtc_time_second <= rx_byte_data[6:0];
+                    4'd2: rtc_time_minute <= rx_byte_data[6:0];
+                    4'd3: rtc_time_hour <= rx_byte_data[5:0];
+                    4'd4: rtc_time_day <= rx_byte_data[5:0];
+                    4'd5: rtc_time_weekday <= rx_byte_data[2:0];
+                    4'd6: rtc_time_month <= rx_byte_data[4:0];
+                    4'd7: rtc_time_year <= rx_byte_data;
+                endcase
+            end
+        end
+    end
+
+    always_comb begin
+        n64_scb.rtc_rdata = {
+            rtc_time_year,
+            rtc_time_month,
+            rtc_time_weekday,
+            rtc_time_day,
+            rtc_time_hour,
+            rtc_time_minute,
+            rtc_time_second
+        };
+    end
+
+
+    // TX data multiplexer
+
+    always_comb begin
+        tx_length = 4'd0;
+        tx_byte_data = 8'h00;
+        case (cmd)
+            CMD_EEPROM_STATUS: begin
+                tx_length = 4'd2;
+                case (tx_byte_counter)
+                    4'd1: tx_byte_data = {1'b1, n64_scb.eeprom_16k_mode, 6'd0};
+                endcase
+            end
+            CMD_EEPROM_READ: begin
+                tx_length = 4'd7;
+                tx_byte_data = n64_scb.eeprom_rdata;
+            end
+            CMD_EEPROM_WRITE: begin
+                tx_length = 4'd0;
+            end
+            CMD_RTC_STATUS: begin
+                tx_length = 4'd2;
+                case (tx_byte_counter)
+                    4'd1: tx_byte_data = 8'h10;
+                    4'd2: tx_byte_data = {(|rtc_stopped), 7'd0};
+                endcase
+            end
+            CMD_RTC_READ: begin
+                tx_length = 4'd8;
+                if (joybus_address[1:0] == 2'd0) begin
+                    case (tx_byte_counter)
+                        4'd0: tx_byte_data = {6'd0, rtc_time_wp, rtc_backup_wp};
+                        4'd1: tx_byte_data = {5'd0, rtc_stopped, 1'b0};
+                        4'd8: tx_byte_data = {(|rtc_stopped), 7'd0};
+                    endcase
+                end else if (joybus_address[1:0] == 2'd2) begin
+                    case (tx_byte_counter)
+                        4'd0: tx_byte_data = {1'd0, rtc_time_second};
+                        4'd1: tx_byte_data = {1'd0, rtc_time_minute};
+                        4'd2: tx_byte_data = {2'b10, rtc_time_hour};
+                        4'd3: tx_byte_data = {2'd0, rtc_time_day};
+                        4'd4: tx_byte_data = {5'd0, rtc_time_weekday};
+                        4'd5: tx_byte_data = {3'd0, rtc_time_month};
+                        4'd6: tx_byte_data = rtc_time_year;
+                        4'd7: tx_byte_data = 8'h01;
+                        4'd8: tx_byte_data = {(|rtc_stopped), 7'd0};
+                    endcase
+                end
+            end
+            CMD_RTC_WRITE: begin
+                tx_length = 4'd0;
+                tx_byte_data = {(|rtc_stopped), 7'd0};
+            end
+        endcase
     end
 
 endmodule

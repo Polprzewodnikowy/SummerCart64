@@ -1,261 +1,356 @@
+interface usb_scb ();
+
+    logic fifo_flush;
+    logic reset_pending;
+    logic reset_ack;
+    logic write_buffer_flush;
+    logic [10:0] rx_count;
+    logic [10:0] tx_count;
+    logic pwrsav;
+    logic reset_state;
+
+    modport controller (
+        output fifo_flush,
+        input reset_pending,
+        output reset_ack,
+        output write_buffer_flush,
+        input rx_count,
+        input tx_count,
+        input pwrsav,
+        input reset_state
+    );
+
+    modport usb (
+        input fifo_flush,
+        output reset_pending,
+        input reset_ack,
+        input write_buffer_flush,
+        output rx_count,
+        output tx_count,
+        output pwrsav,
+        output reset_state
+    );
+
+endinterface
+
+
 module usb_ft1248 (
-    if_system.sys sys,
+    input clk,
+    input reset,
 
-    input usb_enabled,
+    usb_scb.usb usb_scb,
 
-    output usb_clk,
-    output usb_cs,
+    fifo_bus.fifo fifo_bus,
+
+    input usb_pwrsav,
+    output logic usb_clk,
+    output logic usb_cs,
     input usb_miso,
-    inout [3:0] usb_miosi,
-
-    input rx_flush,
-    output rx_empty,
-    input rx_read,
-    output [7:0] rx_rdata,
-
-    input tx_flush,
-    output tx_full,
-    input tx_write,
-    input [7:0] tx_wdata,
-
-    output rx_escape_valid,
-    input rx_escape_ack,
-    output [7:0] rx_escape
+    inout [7:0] usb_miosi
 );
 
-    parameter bit [7:0] ESCAPE_CHARACTER    = 8'h1B;
-
-    // FIFOs
-
     logic rx_full;
+    logic rx_almost_full;
     logic rx_write;
     logic [7:0] rx_wdata;
 
     logic tx_empty;
+    logic tx_almost_empty;
     logic tx_read;
     logic [7:0] tx_rdata;
 
-    logic rx_wdata_valid;
-    logic rx_escape_active;
+    fifo_8kb fifo_8kb_rx_inst (
+        .clk(clk),
+        .reset(reset || usb_scb.fifo_flush),
 
-    intel_fifo_8 fifo_8_rx_inst (
-        .clock(sys.clk),
-        .sclr(rx_flush || !usb_enabled),
-
-        .empty(rx_empty),
-        .rdreq(rx_read),
-        .q(rx_rdata),
+        .empty(fifo_bus.rx_empty),
+        .almost_empty(fifo_bus.rx_almost_empty),
+        .read(fifo_bus.rx_read),
+        .rdata(fifo_bus.rx_rdata),
 
         .full(rx_full),
-        .wrreq(rx_write),
-        .data(rx_wdata)
+        .almost_full(rx_almost_full),
+        .write(rx_write),
+        .wdata(rx_wdata),
+
+        .count(usb_scb.rx_count)
     );
 
-    intel_fifo_8 fifo_8_tx_inst (
-        .clock(sys.clk),
-        .sclr(tx_flush || !usb_enabled),
+    fifo_8kb fifo_8kb_tx_inst (
+        .clk(clk),
+        .reset(reset || usb_scb.fifo_flush),
 
         .empty(tx_empty),
-        .rdreq(tx_read),
-        .q(tx_rdata),
+        .almost_empty(tx_almost_empty),
+        .read(tx_read),
+        .rdata(tx_rdata),
 
-        .full(tx_full),
-        .wrreq(tx_write),
-        .data(tx_wdata)
+        .full(fifo_bus.tx_full),
+        .almost_full(fifo_bus.tx_almost_full),
+        .write(fifo_bus.tx_write),
+        .wdata(fifo_bus.tx_wdata),
+
+        .count(usb_scb.tx_count)
     );
 
+    logic [1:0] usb_pwrsav_ff;
+    logic [7:0] usb_miosi_out;
+    logic usb_oe;
 
-    // Escape character detection
+    logic ft_pwrsav;
+    logic ft_clk;
+    logic ft_cs;
+    logic ft_miso;
+    logic [7:0] ft_miosi_in;
+    logic [7:0] ft_miosi_out;
+    logic ft_oe;
 
-    always_comb begin
-        rx_write = 1'b0;
-        if (rx_wdata_valid) begin
-            rx_write = rx_escape_active ? rx_wdata == ESCAPE_CHARACTER : rx_wdata != ESCAPE_CHARACTER;
-        end
+    always_ff @(posedge clk) begin
+        usb_pwrsav_ff <= {usb_pwrsav_ff[0], usb_pwrsav};
+        ft_pwrsav <= usb_pwrsav_ff[1];
+        usb_clk <= ft_clk;
+        usb_cs <= ft_cs;
+        ft_miso <= usb_miso;
+        ft_miosi_in <= usb_miosi;
+        usb_miosi_out <= ft_miosi_out;
+        usb_oe <= ft_oe;
     end
 
-    always_ff @(posedge sys.clk) begin
-        if (sys.reset || !usb_enabled) begin
-            rx_escape_valid <= 1'b0;
-            rx_escape_active <= 1'b0;
-        end else begin
-            if (rx_escape_ack) begin
-                rx_escape_valid <= 1'b0;
-            end
+    assign usb_miosi = usb_oe ? usb_miosi_out : 8'hZZ;
 
-            if (rx_wdata_valid) begin
-                if (!rx_escape_active) begin
-                    if (rx_wdata == ESCAPE_CHARACTER) begin
-                        rx_escape_active <= 1'b1;
-                    end
-                end else begin
-                    rx_escape_active <= 1'b0;
-                    rx_escape <= rx_wdata;
-                    if (rx_wdata != ESCAPE_CHARACTER) begin
-                        rx_escape_valid <= 1'b1;
-                    end
-                end
-            end
-        end
-    end
-
-
-    // FT1248 interface controller
-
-    typedef enum bit [1:0] {
-        S_TRY_RX,
-        S_TRY_TX,
-        S_COMMAND,
-        S_DATA
+    typedef enum bit [2:0] {
+        STATE_IDLE,
+        STATE_SELECT,
+        STATE_COMMAND,
+        STATE_STATUS,
+        STATE_DATA,
+        STATE_DESELECT
     } e_state;
 
     typedef enum bit [7:0] {
-        C_WRITE = 8'h00,
-        C_READ = 8'h04
-    } e_command;
-
-    typedef enum bit [1:0] {
-        P_PRE_RISING,
-        P_RISING,
-        P_PRE_FALLING,
-        P_FALLING
-    } e_clock_phase;
+        CMD_WRITE = 8'h00,
+        CMD_READ = 8'h40,
+        CMD_READ_MODEM_STATUS = 8'h20,
+        CMD_WRITE_MODEM_STATUS = 8'h60,
+        CMD_WRITE_BUFFER_FLUSH = 8'h08
+    } e_cmd;
 
     e_state state;
+    e_state next_state;
+    e_cmd cmd;
+    e_cmd next_cmd;
+    logic [3:0] phase;
+    logic last_tx_failed;
+    logic reset_reply;
+    logic last_reset_status;
+    logic [4:0] modem_status_counter;
+    logic write_modem_status_pending;
+    logic write_buffer_flush_pending;
 
-    logic [3:0] clock_phase;
+    always_ff @(posedge clk) begin
+        state <= next_state;
+        cmd <= next_cmd;
 
-    logic usb_clk_output;
-    logic usb_cs_output;
-    logic [3:0] usb_miosi_input;
-    logic [3:0] usb_miosi_output;
-    logic [3:0] usb_miosi_output_data;
-    logic usb_miosi_output_enable;
-    logic usb_miosi_output_enable_data;
-    logic usb_miso_input;
+        usb_scb.pwrsav <= !ft_pwrsav;
+        usb_scb.reset_state <= last_reset_status;
 
-    logic is_cmd_write;
-    logic [1:0] nibble_counter;
-    logic [7:0] tx_buffer;
+        phase <= {phase[2:0], phase[3]};
+        if (state == STATE_IDLE) begin
+            phase <= 4'b0100;
+        end
 
-    always_ff @(posedge sys.clk) begin
-        if (sys.reset || state == S_TRY_RX || state == S_TRY_TX) begin
-            clock_phase <= 4'b0001;
+        if (reset) begin
+            last_tx_failed <= 1'b0;
+            usb_scb.reset_pending <= 1'b0;
+            last_reset_status <= 1'b0;
+            modem_status_counter <= 5'd0;
+            write_modem_status_pending <= 1'b0;
+            write_buffer_flush_pending <= 1'b0;
         end else begin
-            clock_phase <= {clock_phase[2:0], clock_phase[3]};
-        end
-    end
+            if (usb_scb.reset_ack) begin
+                usb_scb.reset_pending <= 1'b0;
+                reset_reply <= 1'b1;
+                write_modem_status_pending <= 1'b1;
+            end
 
-    always_ff @(posedge sys.clk) begin
-        usb_clk <= usb_clk_output;
-        usb_cs <= usb_cs_output;
+            if (usb_scb.write_buffer_flush) begin
+                write_buffer_flush_pending <= 1'b1;
+            end
 
-        usb_miosi_input <= usb_miosi;
-        usb_miosi_output <= usb_miosi_output_data;
-        usb_miosi_output_enable <= usb_miosi_output_enable_data;
-        
-        usb_miso_input <= usb_miso;
+            if (state == STATE_IDLE) begin
+                modem_status_counter <= modem_status_counter + 1'd1;
+            end
 
-        tx_buffer <= tx_rdata;
-    end
+            if ((state == STATE_DATA) && (cmd == CMD_WRITE) && phase[3]) begin
+                last_tx_failed <= ft_miso;
+            end
 
-    always_comb begin
-        usb_miosi = usb_miosi_output_enable ? usb_miosi_output : 4'bZZZZ;
-    end
-
-    always_comb begin
-        case (state)
-            S_COMMAND: begin
-                usb_clk_output = clock_phase[P_PRE_FALLING] || clock_phase[P_FALLING];
-                usb_cs_output = 1'b0;
-                if (is_cmd_write) begin
-                    usb_miosi_output_data = nibble_counter[0] ? C_WRITE[3:0] : C_WRITE[7:4];
-                end else begin
-                    usb_miosi_output_data = nibble_counter[0] ? C_READ[3:0] : C_READ[7:4];
+            if (!ft_miso && (state == STATE_DATA) && phase[3]) begin
+                if (cmd == CMD_READ_MODEM_STATUS) begin
+                    last_reset_status <= ft_miosi_in[0];
+                    if (!last_reset_status && ft_miosi_in[0]) begin
+                        usb_scb.reset_pending <= 1'b1;
+                    end
+                    if (last_reset_status && !ft_miosi_in[0]) begin
+                        reset_reply <= 1'b0;
+                        write_modem_status_pending <= 1'b1;
+                    end
                 end
-                usb_miosi_output_enable_data = nibble_counter < 2'd2;
+                if (cmd == CMD_WRITE_MODEM_STATUS) begin
+                    write_modem_status_pending <= 1'b0;
+                end
+                if (cmd == CMD_WRITE_BUFFER_FLUSH) begin
+                    write_buffer_flush_pending <= 1'b0;
+                end
             end
-
-            S_DATA: begin
-                usb_clk_output = clock_phase[P_PRE_FALLING] || clock_phase[P_FALLING];
-                usb_cs_output = 1'b0;
-                usb_miosi_output_data = nibble_counter[0] ? tx_buffer[7:4] : tx_buffer[3:0];
-                usb_miosi_output_enable_data = is_cmd_write;
-            end
-
-            default: begin
-                usb_clk_output = 1'b0;
-                usb_cs_output = 1'b1;
-                usb_miosi_output_data = 4'hF;
-                usb_miosi_output_enable_data = 1'b0;
-            end
-        endcase
+        end
     end
 
-    always_ff @(posedge sys.clk) begin
-        rx_wdata_valid <= 1'b0;
-        tx_read <= 1'b0;
+    always_comb begin
+        ft_clk = 1'b0;
+        ft_cs = 1'b1;
+        ft_miosi_out = 8'hFF;
+        ft_oe = 1'b0;
 
-        if (clock_phase[P_RISING]) begin
-            nibble_counter <= nibble_counter + 1'd1;
+        if (state == STATE_SELECT) begin
+            ft_cs = 1'b0;
         end
 
-        if (sys.reset || !usb_enabled) begin
-            state <= S_TRY_RX;
+        if (state == STATE_COMMAND) begin
+            if (phase[0] || phase[1]) begin
+                ft_clk = 1'b1;
+            end
+            ft_cs = 1'b0;
+            ft_miosi_out = cmd;
+            ft_oe = 1'b1;
+        end
+
+        if (state == STATE_STATUS) begin
+            if (phase[0] || phase[1]) begin
+                ft_clk = 1'b1;
+            end
+            ft_cs = 1'b0;
+        end
+
+        if (state == STATE_DATA) begin
+            if (phase[0] || phase[1]) begin
+                ft_clk = 1'b1;
+            end
+            ft_cs = 1'b0;
+            if (cmd == CMD_WRITE) begin
+                ft_miosi_out = tx_rdata;
+                ft_oe = 1'b1;
+            end
+            if (cmd == CMD_WRITE_MODEM_STATUS) begin
+                ft_miosi_out = {2'b00, reset_reply, 5'b00000};
+                ft_oe = 1'b1;
+            end
+        end
+    end
+
+    always_comb begin
+        rx_write = 1'b0;
+        tx_read = 1'b0;
+
+        rx_wdata = ft_miosi_in;
+
+        if (!ft_miso && phase[3]) begin
+            case (state)
+                STATE_STATUS: begin
+                    if (cmd == CMD_WRITE && !last_tx_failed) begin
+                        tx_read = 1'b1;
+                    end
+                end
+
+                STATE_DATA: begin
+                    if (cmd == CMD_READ) begin
+                        rx_write = 1'b1;
+                    end
+                    if (cmd == CMD_WRITE && !tx_empty) begin
+                        tx_read = 1'b1;
+                    end
+                end
+            endcase
+        end
+    end
+
+    always_comb begin
+        next_state = state;
+        next_cmd = cmd;
+
+        if (reset) begin
+            next_state = STATE_IDLE;
         end else begin
             case (state)
-                S_TRY_RX: begin
-                    if (!rx_full && !rx_escape_valid) begin
-                        state <= S_COMMAND;
-                        is_cmd_write <= 1'b0;
-                        nibble_counter <= 2'b11;
-                    end else begin
-                        state <= S_TRY_TX;
+                STATE_IDLE: begin
+                    if (ft_pwrsav) begin
+                        if (write_modem_status_pending) begin
+                            next_state = STATE_SELECT;
+                            next_cmd = CMD_WRITE_MODEM_STATUS;
+                        end else if (&modem_status_counter) begin
+                            next_state = STATE_SELECT;
+                            next_cmd = CMD_READ_MODEM_STATUS;
+                        end else if (!tx_empty || last_tx_failed) begin
+                            next_state = STATE_SELECT;
+                            next_cmd = CMD_WRITE;
+                        end else if (write_buffer_flush_pending) begin
+                            next_state = STATE_SELECT;
+                            next_cmd = CMD_WRITE_BUFFER_FLUSH;
+                        end else if (!rx_full) begin
+                            next_state = STATE_SELECT;
+                            next_cmd = CMD_READ;
+                        end
                     end
                 end
 
-                S_TRY_TX: begin
-                    if (!tx_empty) begin
-                        state <= S_COMMAND;
-                        is_cmd_write <= 1'b1;
-                        nibble_counter <= 2'b11;
-                    end else begin
-                        state <= S_TRY_RX;
+                STATE_SELECT: begin
+                    if (phase[3]) begin
+                        next_state = STATE_COMMAND;
                     end
                 end
 
-                S_COMMAND: begin
-                    if (clock_phase[P_RISING]) begin
-                        if (nibble_counter == 2'd2) begin
-                            if (usb_miso_input) begin
-                                state <= is_cmd_write ? S_TRY_RX : S_TRY_TX;
-                            end else begin
-                                state <= S_DATA;
-                                nibble_counter <= 2'd0;
+                STATE_COMMAND: begin
+                    if (phase[3]) begin
+                        next_state = STATE_STATUS;
+                    end
+                end
+
+                STATE_STATUS: begin
+                    if (phase[3]) begin
+                        if (ft_miso) begin
+                            next_state = STATE_DESELECT;
+                        end else begin
+                            next_state = STATE_DATA;
+                        end
+                    end
+                end
+
+                STATE_DATA: begin
+                    if (phase[3]) begin
+                        if (ft_miso) begin
+                            next_state = STATE_DESELECT;
+                        end else if (cmd == CMD_READ) begin
+                            if (rx_almost_full) begin
+                                next_state = STATE_DESELECT;
                             end
+                        end else if (cmd == CMD_WRITE) begin
+                            if (tx_empty) begin
+                                next_state = STATE_DESELECT;
+                            end
+                        end else begin
+                            next_state = STATE_DESELECT;
                         end
                     end
                 end
 
-                S_DATA: begin
-                    if (clock_phase[P_FALLING]) begin
-                        if (nibble_counter[0]) begin
-                            tx_read <= is_cmd_write;
-                        end
-                    end
-                    if (clock_phase[P_RISING]) begin
-                        rx_wdata <= {usb_miosi_input, rx_wdata[7:4]};
-                        if (nibble_counter[0]) begin
-                            rx_wdata_valid <= !is_cmd_write;
-                        end
-                        if (usb_miso_input || (!is_cmd_write && (rx_full || rx_escape_valid)) || (is_cmd_write && tx_empty)) begin
-                            state <= is_cmd_write ? S_TRY_RX : S_TRY_TX;
-                        end
+                STATE_DESELECT: begin
+                    if (phase[1]) begin
+                        next_state = STATE_IDLE;
                     end
                 end
 
                 default: begin
-                    state <= S_TRY_RX;
+                    next_state = STATE_IDLE;
                 end
             endcase
         end
