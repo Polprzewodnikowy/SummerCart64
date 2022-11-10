@@ -1,1 +1,6 @@
+fw/project/lcmxo2/*.sty linguist-generated
+fw/rtl/vendor/** -linguist-vendored
+fw/rtl/vendor/lcmxo2/generated/* linguist-generated
+sw/bootloader/src/fatfs/* linguist-vendored
+sw/bootloader/src/fatfs/diskio.c -linguist-vendored
 sw/controller/inc/* linguist-vendored
