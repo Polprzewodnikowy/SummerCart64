@@ -94,4 +94,11 @@ module n64_top (
         .n64_si_dq(n64_si_dq)
     );
 
+    n64_save_counter n64_save_counter_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .n64_scb(n64_scb)
+    );
+
 endmodule

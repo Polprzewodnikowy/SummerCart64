@@ -354,6 +354,7 @@ module mcu_top (
         REG_DD_HEAD_TRACK,
         REG_DD_SECTOR_INFO,
         REG_DD_DRIVE_ID,
+        REG_SAVE_COUNT,
         REG_VENDOR_SCR,
         REG_VENDOR_DATA,
         REG_DEBUG_0,
@@ -622,6 +623,10 @@ module mcu_top (
                         dd_scb.sector_size,
                         dd_scb.sector_num
                     };
+                end
+
+                REG_SAVE_COUNT: begin
+                    reg_rdata <= {16'd0, n64_scb.save_count};
                 end
 
                 REG_VENDOR_SCR: begin

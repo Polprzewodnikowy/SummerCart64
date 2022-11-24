@@ -50,6 +50,7 @@ typedef enum {
     REG_DD_HEAD_TRACK,
     REG_DD_SECTOR_INFO,
     REG_DD_DRIVE_ID,
+    REG_SAVE_COUNT,
     REG_VENDOR_SCR,
     REG_VENDOR_DATA,
     REG_DEBUG_0,

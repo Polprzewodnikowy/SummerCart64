@@ -30,6 +30,8 @@ interface n64_scb ();
     logic [5:0] flashram_address;
     logic [15:0] flashram_wdata;
 
+    logic sram_done;
+
     logic eeprom_write;
     logic [10:0] eeprom_address;
     logic [7:0] eeprom_rdata;
@@ -50,6 +52,8 @@ interface n64_scb ();
     logic [31:0] cfg_rdata [0:1];
     logic [31:0] cfg_wdata [0:1];
     logic [31:0] cfg_version;
+
+    logic [15:0] save_count;
 
     logic pi_sdram_active;
     logic pi_flash_active;
@@ -92,6 +96,8 @@ interface n64_scb ();
         output cfg_wdata,
         output cfg_version,
 
+        input save_count,
+
         input pi_debug
     );
 
@@ -108,6 +114,8 @@ interface n64_scb ();
         input flashram_enabled,
         input dd_enabled,
         input ddipl_enabled,
+
+        output sram_done,
 
         input flashram_read_mode,
 
@@ -187,6 +195,14 @@ interface n64_scb ();
         output cfg_rdata,
         input cfg_wdata,
         input cfg_version
+    );
+
+    modport save_counter (
+        input eeprom_write,
+        input sram_done,
+        input flashram_done,
+
+        output save_count
     );
 
     modport arbiter (

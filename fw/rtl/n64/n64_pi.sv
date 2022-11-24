@@ -144,6 +144,7 @@ module n64_pi (
     const bit [31:0] BUFFER_OFFSET      = 32'h0500_0000;
 
     logic [31:0] mem_offset;
+    logic sram_selected;
 
     always_ff @(posedge clk) begin
         if (reset || !pi_reset || end_op) begin
@@ -154,6 +155,7 @@ module n64_pi (
         if (reset) begin
             read_port <= PORT_NONE;
             write_port <= PORT_NONE;
+            sram_selected <= 1'b0;
             reg_bus.dd_select <= 1'b0;
             reg_bus.flashram_select <= 1'b0;
             reg_bus.cfg_select <= 1'b0;
@@ -161,6 +163,7 @@ module n64_pi (
             read_port <= PORT_NONE;
             write_port <= PORT_NONE;
             mem_offset <= 32'd0;
+            sram_selected <= 1'b0;
             reg_bus.dd_select <= 1'b0;
             reg_bus.flashram_select <= 1'b0;
             reg_bus.cfg_select <= 1'b0;
@@ -200,6 +203,7 @@ module n64_pi (
                             read_port <= PORT_MEM;
                             write_port <= PORT_MEM;
                             mem_offset <= (-32'h0800_0000) - {n64_pi_dq_in[3:2], 18'd0} + {n64_pi_dq_in[3:2], 15'd0} + SAVE_OFFSET;
+                            sram_selected <= 1'b1;
                             n64_scb.pi_sdram_active <= 1'b1;
                         end
                     end
@@ -208,6 +212,7 @@ module n64_pi (
                         read_port <= PORT_MEM;
                         write_port <= PORT_MEM;
                         mem_offset <= (-32'h0800_0000) + SAVE_OFFSET;
+                        sram_selected <= 1'b1;
                         n64_scb.pi_sdram_active <= 1'b1;
                     end
                 end
@@ -409,6 +414,7 @@ module n64_pi (
     always_ff @(posedge clk) begin
         write_fifo_read <= 1'b0;
         load_starting_address <= 1'b0;
+        n64_scb.sram_done <= 1'b0;
 
         if (reset || !pi_reset) begin
             mem_bus.request <= 1'b0;
@@ -453,6 +459,7 @@ module n64_pi (
 
             if (end_op) begin
                 read_enabled <= 1'b0;
+                n64_scb.sram_done <= sram_selected && !first_write_op;
             end
         end
     end

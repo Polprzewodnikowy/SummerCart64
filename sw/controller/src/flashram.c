@@ -35,7 +35,9 @@ static enum operation flashram_operation_type (uint32_t scr) {
 
 
 void flashram_init (void) {
-    fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
+    if (fpga_reg_get(REG_FLASHRAM_SCR) & FLASHRAM_SCR_PENDING) {
+        fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
+    }
 }
 
 void flashram_process (void) {
