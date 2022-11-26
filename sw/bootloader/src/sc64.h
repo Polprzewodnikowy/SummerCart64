@@ -117,6 +117,7 @@ bool sc64_sd_card_get_info (uint32_t *address);
 bool sc64_sd_write_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count);
 bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t length);
+bool sc64_writeback_set_sd_info (uint32_t *address, bool enabled);
 
 
 #endif

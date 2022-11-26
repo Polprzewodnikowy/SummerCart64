@@ -7,7 +7,7 @@
  - 8 kB on-chip buffer for general use
  - 25 MB/s peak transfer rate USB interface for data upload/download and debug functionality
  - 25 MB/s peak transfer rate SD card interface
- - EEPROM, SRAM and FlashRAM save types ~~with automatic writeback to SD card~~ (_not implemented yet_)
+ - EEPROM, SRAM and FlashRAM save types with automatic writeback to SD card
  - Battery backed real time clock (RTC)
  - Status LED and button for general use
  - 64DD add-on emulation

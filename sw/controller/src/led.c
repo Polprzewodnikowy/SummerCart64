@@ -2,6 +2,7 @@
 #include "hw.h"
 #include "led.h"
 #include "task.h"
+#include "timer.h"
 
 
 #define LED_MS_PER_TICK         (10)
@@ -113,6 +114,8 @@ void led_blink_act (void) {
 }
 
 void led_task (void) {
+    timer_init();
+
     while (1) {
         hw_tim_setup(TIM_ID_LED, LED_MS_PER_TICK, led_task_resume);
 
@@ -123,6 +126,8 @@ void led_task (void) {
         } else {
             led_process_act();
         }
+
+        timer_update();
 
         task_yield();
     }

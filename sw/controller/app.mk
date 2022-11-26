@@ -20,8 +20,10 @@ SRC_FILES = \
 	rtc.c \
 	sd.c \
 	task.c \
+	timer.c \
 	update.c \
-	usb.c
+	usb.c \
+	writeback.c
 PAD_TO = 0x08008000
 
 include common.mk

@@ -7,6 +7,7 @@
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
+#include "writeback.h"
 
 
 typedef enum {
@@ -552,7 +553,15 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                dd_set_sd_disk_info(args[0], args[1]);
+                dd_set_sd_info(args[0], args[1]);
+                break;
+
+            case 'W':
+                if (cfg_translate_address(&args[0], 1024, (SDRAM | BRAM))) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                writeback_set_sd_info(args[0], args[1]);
                 break;
 
             case 'p':

@@ -268,7 +268,7 @@ void dd_set_sd_mode (bool value) {
     p.sd_mode = value;
 }
 
-void dd_set_sd_disk_info (uint32_t address, uint32_t length) {
+void dd_set_sd_info (uint32_t address, uint32_t length) {
     sd_disk_info_t info;
     length /= sizeof(info);
     p.sd_current_disk = 0;
@@ -313,7 +313,7 @@ void dd_init (void) {
     p.drive_type = DD_DRIVE_TYPE_RETAIL;
     p.sd_mode = false;
     p.sd_current_disk = 0;
-    dd_set_sd_disk_info(0, 0);
+    dd_set_sd_info(0, 0);
 }
 
 void dd_process (void) {

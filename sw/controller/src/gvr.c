@@ -7,6 +7,7 @@
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
+#include "writeback.h"
 
 
 void gvr_task (void) {
@@ -19,6 +20,7 @@ void gvr_task (void) {
     isv_init();
     sd_init();
     usb_init();
+    writeback_init();
 
     while (1) {
         button_process();
@@ -29,5 +31,6 @@ void gvr_task (void) {
         rtc_process();
         sd_process();
         usb_process();
+        writeback_process();
     }
 }
