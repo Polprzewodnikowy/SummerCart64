@@ -2,7 +2,6 @@
 #include "sd.h"
 #include "timer.h"
 #include "writeback.h"
-#include "led.h"
 
 
 #define SAVE_MAX_SECTOR_COUNT   (256)
@@ -33,6 +32,7 @@ static void writeback_save_to_sd (void) {
             break;
         }
         if (sd_write_sectors(save_address, sector, 1)) {
+            p.enabled = false;
             break;
         }
         save_address += SD_SECTOR_SIZE;
@@ -66,11 +66,15 @@ void writeback_init (void) {
 
 void writeback_process (void) {
     if (p.enabled) {
-        uint16_t save_count = fpga_reg_get(REG_SAVE_COUNT);
-        if (save_count != p.last_save_count) {
-            p.pending = true;
-            timer_set(TIMER_ID_WRITEBACK, WRITEBACK_DELAY_TICKS);
-            p.last_save_count = save_count;
+        if (fpga_reg_get(REG_SD_SCR) & SD_SCR_CARD_INSERTED) {
+            uint16_t save_count = fpga_reg_get(REG_SAVE_COUNT);
+            if (save_count != p.last_save_count) {
+                p.pending = true;
+                timer_set(TIMER_ID_WRITEBACK, WRITEBACK_DELAY_TICKS);
+                p.last_save_count = save_count;
+            }
+        } else {
+            writeback_init();
         }
     }
     if (p.pending) {
