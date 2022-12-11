@@ -229,37 +229,6 @@ typedef struct {
 
 
 typedef struct {
-    io8_t BUFFER[8192];
-    io8_t EEPROM[2048];
-    io8_t DD_SECTOR[256];
-    io8_t FLASHRAM[128];
-} sc64_buffers_t;
-
-#define SC64_BUFFERS_BASE           (0x1FFE0000UL)
-#define SC64_BUFFERS                ((sc64_buffers_t *) SC64_BUFFERS_BASE)
-
-
-typedef struct {
-    io32_t SR_CMD;
-    io32_t DATA[2];
-    io32_t VERSION;
-    io32_t KEY;
-} sc64_regs_t;
-
-#define SC64_REGS_BASE              (0x1FFF0000UL)
-#define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
-
-#define SC64_SR_IRQ_PENDING         (1 << 29)
-#define SC64_SR_CMD_ERROR           (1 << 30)
-#define SC64_SR_CPU_BUSY            (1 << 31)
-
-#define SC64_KEY_RESET              (0x00000000UL)
-#define SC64_KEY_UNLOCK_1           (0x5F554E4CUL)
-#define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
-#define SC64_KEY_LOCK               (0xFFFFFFFFUL)
-
-
-typedef struct {
     uint32_t tv_type;
     uint32_t device_type;
     uint32_t device_base;

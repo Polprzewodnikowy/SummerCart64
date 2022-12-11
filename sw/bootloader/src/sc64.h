@@ -7,12 +7,14 @@
 
 
 typedef enum {
-    CMD_OK = 0,
-    CMD_ERROR_BAD_ADDRESS = 1,
-    CMD_ERROR_BAD_CONFIG_ID = 2,
-    CMD_ERROR_TIMEOUT = 3,
-    CMD_ERROR_UNKNOWN_CMD = -1,
-} cmd_error_t;
+    SC64_OK,
+    SC64_ERROR_BAD_ARGUMENT,
+    SC64_ERROR_BAD_ADDRESS,
+    SC64_ERROR_BAD_CONFIG_ID,
+    SC64_ERROR_TIMEOUT,
+    SC64_ERROR_SD_CARD,
+    SC64_ERROR_UNKNOWN_CMD = -1
+} sc64_error_t;
 
 typedef enum {
     CFG_ID_BOOTLOADER_SWITCH,
@@ -79,7 +81,6 @@ typedef enum {
     SD_CARD_STATUS_50MHZ_MODE = (1 << 2),
 } sd_card_status_t;
 
-
 typedef struct {
     boot_mode_t boot_mode;
     uint16_t cic_seed;
@@ -97,27 +98,49 @@ typedef struct {
 } rtc_time_t;
 
 
+typedef struct {
+    volatile uint8_t BUFFER[8192];
+    volatile uint8_t EEPROM[2048];
+    volatile uint8_t DD_SECTOR[256];
+    volatile uint8_t FLASHRAM[128];
+} sc64_buffers_t;
+
+#define SC64_BUFFERS_BASE   (0x1FFE0000UL)
+#define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
+
+
+sc64_error_t sc64_get_error (void);
+
 void sc64_unlock (void);
 void sc64_lock (void);
 bool sc64_check_presence (void);
-cmd_error_t sc64_get_error (void);
-void sc64_set_config (cfg_id_t id, uint32_t value);
+
+bool sc64_irq_pending (void);
+void sc64_irq_clear (void);
+
 uint32_t sc64_get_config (cfg_id_t id);
+void sc64_set_config (cfg_id_t id, uint32_t value);
 void sc64_get_boot_info (sc64_boot_info_t *info);
-void sc64_set_time (rtc_time_t *t);
+
 void sc64_get_time (rtc_time_t *t);
-bool sc64_usb_write_ready (void);
-bool sc64_usb_write (uint32_t *address, uint8_t type, uint32_t length);
+void sc64_set_time (rtc_time_t *t);
+
 bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
-bool sc64_usb_read (uint32_t *address, uint32_t length);
+bool sc64_usb_read (void *address, uint32_t length);
+bool sc64_usb_write_ready (void);
+bool sc64_usb_write (void *address, uint8_t type, uint32_t length);
+
 bool sc64_sd_card_init (void);
 bool sc64_sd_card_deinit (void);
 sd_card_status_t sc64_sd_card_get_status (void);
-bool sc64_sd_card_get_info (uint32_t *address);
-bool sc64_sd_write_sectors (uint32_t *address, uint32_t sector, uint32_t count);
-bool sc64_sd_read_sectors (uint32_t *address, uint32_t sector, uint32_t count);
-bool sc64_dd_set_sd_disk_info (uint32_t *address, uint32_t length);
-bool sc64_writeback_set_sd_info (uint32_t *address, bool enabled);
+bool sc64_sd_card_get_info (void *address);
+bool sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
+bool sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
+bool sc64_dd_set_sd_disk_info (void *address, uint32_t length);
+bool sc64_writeback_set_sd_info (void *address, bool enabled);
+
+uint32_t sc64_flash_get_erase_block_size (void);
+bool sc64_flash_erase_block (void *address);
 
 
 #endif

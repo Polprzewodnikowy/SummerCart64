@@ -57,10 +57,5 @@ void test_execute (void) {
         display_printf("%c ", card_info[i] >= ' ' ? card_info[i] : 0xFF);
     }
 
-    if (sc64_sd_card_deinit()) {
-        display_printf("SD card deinit error!\n");
-        while (1);
-    }
-
     while (1);
 }

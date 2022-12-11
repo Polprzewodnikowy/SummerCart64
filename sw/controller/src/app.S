@@ -4,7 +4,7 @@
 .thumb
 
 .section .loader, "a", %progbits
-.type g_pfnVectors, %object
+.type loader, %object
 loader:
     .incbin "../build/loader/loader.bin"
 

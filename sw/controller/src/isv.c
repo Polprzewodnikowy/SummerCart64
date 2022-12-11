@@ -46,7 +46,7 @@ static void isv_update_read_pointer (void) {
 
 
 bool isv_set_address (uint32_t address) {
-    if ((address > 0x03FF0000) || (address % 4)) {
+    if ((address >= 0x04000000) || (address % 4)) {
         return true;
     }
     p.address = address;
