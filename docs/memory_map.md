@@ -47,9 +47,13 @@ This mapping is used when accessing flashcart from N64 side.
 
 ## SC64 registers
 
+SC64 contains small register region used for communication between N64 and controller code running on the μC.
+Protocol is command based with support for up to 256 diferrent commands and two 32-bit argument/result values per operation.
+Support for interrupts is provided but currently no command relies on it, 64DD IRQ is handled separately.
+
 | name               | address       | size    | access | usage                            |
 | ------------------ | ------------- | ------- | ------ | -------------------------------- |
-| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execute and status       |
+| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execution and status     |
 | **DATA0**          | `0x1FFF_0004` | 4 bytes | RW     | Command argument/result 0        |
 | **DATA1**          | `0x1FFF_0008` | 4 bytes | RW     | Command argument/result 1        |
 | **VERSION**        | `0x1FFF_000C` | 4 bytes | RW     | Hardware version and IRQ clear   |
@@ -104,3 +108,14 @@ Value `0x00000000` will reset sequencer state.
 Two consequentive writes of values `0x5F554E4C` and `0x4F434B5F` will unlock all SC64 registers if flashcart is in lock state.
 Value `0xFFFFFFFF` will lock all SC64 registers if flashcart is in unlock state.
 
+---
+
+### Command execution flow
+
+1. Check if command is already executing by reading `CMD_BUSY` bit in **STATUS/COMMAND** register (optional).
+2. Write command argument values to **DATA0** and **DATA1** registers, can be skipped if command doesn't require it.
+3. Write command ID to **STATUS/COMMAND** register.
+4. Wait for `CMD_BUSY` bit in **STATUS/COMMAND** register to go low.
+5. Check if `CMD_ERROR` bit in **STATUS/COMMAND** is set:
+   - If error is set then read **DATA0** register containing error code.
+   - If error is not set then read **DATA0** and **DATA1** registers containing command result values, can be skipped if command doesn't return any values.
