@@ -219,7 +219,7 @@ module n64_pi (
             end
 
             if (n64_scb.bootloader_enabled) begin
-                if (n64_pi_dq_in >= 16'h1000 && n64_pi_dq_in < 16'h101C) begin
+                if (n64_pi_dq_in >= 16'h1000 && n64_pi_dq_in < 16'h101E) begin
                     read_port <= PORT_MEM;
                     write_port <= PORT_NONE;
                     mem_offset <= (-32'h1000_0000) + BOOTLOADER_OFFSET;
