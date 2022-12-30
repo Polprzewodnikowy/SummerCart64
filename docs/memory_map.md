@@ -2,14 +2,18 @@
 
 This mapping is used internally by FPGA/μC and when accessing flashcart from USB side.
 
-| name            | base          | size      | access |
-| --------------- | ------------- | --------- | ------ |
-| SDRAM           | `0x0000_0000` | 64 MiB    | RW     |
-| Flash           | `0x0400_0000` | 16 MiB    | RW     |
-| Data buffer     | `0x0500_0000` | 8 kiB     | RW     |
-| EEPROM          | `0x0500_2000` | 2 kiB     | RW     |
-| 64DD buffer     | `0x0500_2800` | 256 bytes | RW     |
-| FlashRAM buffer | `0x0500_2900` | 128 bytes | R      |
+| section             | base          | size             | access | device   |
+| ------------------- | ------------- | ---------------- | ------ | -------- |
+| SDRAM               | `0x0000_0000` | 64 MiB           | RW     | SDRAM    |
+| Flash               | `0x0400_0000` | 16 MiB           | RW     | Flash    |
+| Data buffer         | `0x0500_0000` | 8 kiB            | RW     | BlockRAM |
+| EEPROM              | `0x0500_2000` | 2 kiB            | RW     | BlockRAM |
+| 64DD buffer         | `0x0500_2800` | 256 bytes        | RW     | BlockRAM |
+| FlashRAM buffer [1] | `0x0500_2900` | 128 bytes        | R      | BlockRAM |
+| N/A [2]             | `0x0500_2980` | to `0x07FF_FFFF` | R      | N/A      |
+
+ - Note [1]: Due to BlockRAM usage optimization this section is read only.
+ - Note [2]: Read returns `0`. Maximum accessibe address space is 128 MiB.
 
 ---
 
@@ -17,31 +21,50 @@ This mapping is used internally by FPGA/μC and when accessing flashcart from US
 
 This mapping is used when accessing flashcart from N64 side.
 
-| name                | base          | size      | access | mapped base   | device    | availability when                 |
-| ------------------- | ------------- | --------- | ------ | ------------- | --------- | --------------------------------- |
-| 64DD registers      | `0x0500_0000` | 2 kiB     | RW     | N/A           | N/A       | DD mode is set to REGS or FULL    |
-| 64DD IPL [1]        | `0x0600_0000` | 4 MiB     | R      | `0x03BC_0000` | SDRAM     | DD mode is set to IPL or FULL     |
-| SRAM [2]            | `0x0800_0000` | 128 kiB   | RW     | `0x03FE_0000` | SDRAM     | SRAM save type is selected        |
-| SRAM banked [2][3]  | `0x0800_0000` | 96 kiB    | RW     | `0x03FE_0000` | SDRAM     | SRAM banked save type is selected |
-| FlashRAM [2]        | `0x0800_0000` | 128 kiB   | RW     | `0x03FE_0000` | SDRAM     | FlashRAM save type is selected    |
-| Bootloader          | `0x1000_0000` | 1920 kiB  | R      | `0x04E0_0000` | Flash     | Bootloader switch is enabled      |
-| ROM [4]             | `0x1000_0000` | 64 MiB    | RW     | `0x0000_0000` | SDRAM     | Bootloader switch is disabled     |
-| ROM shadow [5]      | `0x13FE_0000` | 128 kiB   | R      | `0x04FE_0000` | Flash     | ROM shadow is enabled             |
-| ROM extended        | `0x1400_0000` | 14 MiB    | R      | `0x0400_0000` | Flash     | ROM extended is enabled           |
-| ROM shadow [6]      | `0x1FFC_0000` | 128 kiB   | R      | `0x04FE_0000` | Flash     | SC64 register access is enabled   |
-| Data buffer         | `0x1FFE_0000` | 8 kiB     | RW     | `0x0500_0000` | Block RAM | SC64 register access is enabled   |
-| EEPROM              | `0x1FFE_2000` | 2 kiB     | RW     | `0x0500_2000` | Block RAM | SC64 register access is enabled   |
-| 64DD buffer [7]     | `0x1FFE_2800` | 256 bytes | RW     | `0x0500_2800` | Block RAM | SC64 register access is enabled   |
-| FlashRAM buffer [7] | `0x1FFE_2900` | 128 bytes | R      | `0x0500_2900` | Block RAM | SC64 register access is enabled   |
-| SC64 registers      | `0x1FFF_0000` | 20 bytes  | RW     | N/A           | N/A       | SC64 register access is enabled   |
+| section             | base          | size      | access | mapped base   | mapped device         | mapped bus  | mapped when                       |
+| ------------------- | ------------- | --------- | ------ | ------------- | --------------------- | ----------- | --------------------------------- |
+| 64DD registers      | `0x0500_0000` | 2 kiB     | RW     | N/A           | 64DD Controller       | reg bus     | DD mode is set to REGS or FULL    |
+| 64DD IPL [1]        | `0x0600_0000` | 4 MiB     | R      | `0x03BC_0000` | SDRAM                 | mem bus     | DD mode is set to IPL or FULL     |
+| SRAM [2]            | `0x0800_0000` | 128 kiB   | RW     | `0x03FE_0000` | SDRAM                 | mem bus     | SRAM save type is selected        |
+| SRAM banked [2][3]  | `0x0800_0000` | 96 kiB    | RW     | `0x03FE_0000` | SDRAM                 | mem bus     | SRAM banked save type is selected |
+| FlashRAM [2][4]     | `0x0800_0000` | 128 kiB   | RW     | `0x03FE_0000` | FlashRAM Cntrl./SDRAM | reg/mem bus | FlashRAM save type is selected    |
+| Bootloader          | `0x1000_0000` | 1920 kiB  | R      | `0x04E0_0000` | Flash                 | mem bus     | Bootloader switch is enabled      |
+| ROM [5]             | `0x1000_0000` | 64 MiB    | RW     | `0x0000_0000` | SDRAM                 | mem bus     | Bootloader switch is disabled     |
+| ROM shadow [6]      | `0x13FE_0000` | 128 kiB   | R      | `0x04FE_0000` | Flash                 | mem bus     | ROM shadow is enabled             |
+| ROM extended        | `0x1400_0000` | 14 MiB    | R      | `0x0400_0000` | Flash                 | mem bus     | ROM extended is enabled           |
+| ROM shadow [7]      | `0x1FFC_0000` | 128 kiB   | R      | `0x04FE_0000` | Flash                 | mem bus     | SC64 register access is enabled   |
+| Data buffer         | `0x1FFE_0000` | 8 kiB     | RW     | `0x0500_0000` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| EEPROM              | `0x1FFE_2000` | 2 kiB     | RW     | `0x0500_2000` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| 64DD buffer [8]     | `0x1FFE_2800` | 256 bytes | RW     | `0x0500_2800` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| FlashRAM buffer [8] | `0x1FFE_2900` | 128 bytes | R      | `0x0500_2900` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| SC64 registers      | `0x1FFF_0000` | 20 bytes  | RW     | N/A           | Flashcart Interface   | reg bus     | SC64 register access is enabled   |
 
- - Note [1]: 64DD IPL share SDRAM memory space with ROM (last 4 MiB minus 128 kiB for saves)
- - Note [2]: SRAM and FlashRAM save types share SDRAM memory space with ROM (last 128 kiB)
- - Note [3]: 32 kiB chunks are accesed at `0x0800_0000`, `0x0804_0000` and `0x0808_0000`
- - Note [4]: Write access is available when `ROM_WRITE_ENABLE` config is enabled
- - Note [5]: This address overlaps last 128 kiB of ROM space allowing SRAM and FlashRAM save types to work with games occupying almost all of ROM space (for example Pokemon Stadium 2). Reads are redirected to last 128 kiB of flash.
- - Note [6]: Used internally for performing flash writes from SD card
- - Note [7]: Used internally and exposed only for debugging
+ - Note [1]: 64DD IPL share SDRAM memory space with ROM (last 4 MiB minus 128 kiB for saves). Write access is always disabled for this section.
+ - Note [2]: SRAM and FlashRAM save types share SDRAM memory space with ROM (last 128 kiB).
+ - Note [3]: 32 kiB chunks are accesed at `0x0800_0000`, `0x0804_0000` and `0x0808_0000`.
+ - Note [4]: FlashRAM read access is multiplexed between mem and reg bus, writes are always mapped to reg bus.
+ - Note [5]: Write access is available when `ROM_WRITE_ENABLE` config is enabled.
+ - Note [6]: This address overlaps last 128 kiB of ROM space allowing SRAM and FlashRAM save types to work with games occupying almost all of ROM space (for example Pokemon Stadium 2). Reads are redirected to last 128 kiB of flash.
+ - Note [7]: Always accessible regardless of ROM shadow switch.
+ - Note [8]: Used internally and exposed only for debugging.
+
+### Address decoding limitations
+
+Current implementation of PI interface checks only upper 16 bits of address. Bus and device are chosen only from value of starting address.
+In specific situations this could lead to unexpected behavior when performing R/W operations crossing 64 kiB boundaries.
+Page size (as called by N64 docs) is configurable by `PI_BSD_DOMn_PGS` register. Maximum page size can be set up to 128 kiB blocks.
+PI controller inside N64 will automatically reissue address at set boundary when performing R/W operation that crosses it.
+
+For example, setting largest page size then doing 128 kiB read starting from address `0x1FFE_0000` will select *mem bus* and start fetching data from mapped internal address `0x0500_0000`.
+SC64 registers are available at base address `0x1FFF_0000` (`0x1FFE_0000` + 64 kiB), but are connected to *reg bus*.
+As a consequence of this design data read by N64 in single transaction will not contain values of SC64 registers at 64 kiB offset.
+
+### Flash mapped sections are read only
+
+Due to flash memory timing requirements it's not possible to directly write data from N64 side.
+Special commands are provided for performing flash erase and program.
+During those operations avoid accessing flash mapped sections.
+Data read will be corrupted and erase/program operations slows down.
 
 ---
 
