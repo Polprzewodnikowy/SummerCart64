@@ -1,5 +1,8 @@
 # SC64 - an open source Nintendo 64 flashcart
 
+[<img src="assets/sc64_logo_256_160.png" />](assets/sc64_logo_256_160.png)
+
+---
 
 ## Features
  - 64 MB SDRAM memory for game and save data
@@ -18,11 +21,22 @@
  - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug console)
  - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
 
+---
+
+## Documentation
+
+- [Memory map](./docs/memory_map.md)
+- [Config options](./docs/config_options.md)
+- [N64 commands](./docs/n64_commands.md)
+- [USB commands](./docs/usb_commands.md)
+
+---
 
 ## High-level flashcart block diagram
 
 [<img src=".github/sc64_v2_block_diagram.svg" width="800" />](.github/sc64_v2_block_diagram.svg)
 
+---
 
 ## Finished sample
 
