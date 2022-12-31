@@ -1,4 +1,4 @@
-# SC64 documentation table of contents
+## SC64 documentation table of contents
 
 - [Memory map](./memory_map.md)
 - [Config options](./config_options.md)
