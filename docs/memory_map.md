@@ -1,3 +1,16 @@
+- [Internal memory map](#internal-memory-map)
+- [PI memory map](#pi-memory-map)
+  - [Address decoding limitations](#address-decoding-limitations)
+  - [Flash mapped sections](#flash-mapped-sections)
+- [SC64 registers](#sc64-registers)
+    - [**STATUS/COMMAND**](#statuscommand)
+    - [**DATA0** and **DATA1**](#data0-and-data1)
+    - [**VERSION**](#version)
+    - [**KEY**](#key)
+- [Command execution flow](#command-execution-flow)
+
+---
+
 ## Internal memory map
 
 This mapping is used internally by FPGA/μC and when accessing flashcart from USB side.
@@ -59,7 +72,7 @@ For example, setting largest page size then doing 128 kiB read starting from add
 SC64 registers are available at base address `0x1FFF_0000` (`0x1FFE_0000` + 64 kiB), but are connected to *reg bus*.
 As a consequence of this design data read by N64 in single transaction will not contain values of SC64 registers at 64 kiB offset.
 
-### Flash mapped sections are read only
+### Flash mapped sections
 
 Due to flash memory timing requirements it's not possible to directly write data from N64 side.
 Special commands are provided for performing flash erase and program.
@@ -133,7 +146,7 @@ Value `0xFFFFFFFF` will lock all SC64 registers if flashcart is in unlock state.
 
 ---
 
-### Command execution flow
+## Command execution flow
 
 1. Check if command is already executing by reading `CMD_BUSY` bit in **STATUS/COMMAND** register (optional).
 2. Write command argument values to **DATA0** and **DATA1** registers, can be skipped if command doesn't require it.
