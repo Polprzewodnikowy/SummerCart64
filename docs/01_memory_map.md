@@ -3,10 +3,10 @@
   - [Address decoding limitations](#address-decoding-limitations)
   - [Flash mapped sections](#flash-mapped-sections)
 - [SC64 registers](#sc64-registers)
-    - [**STATUS/COMMAND**](#statuscommand)
-    - [**DATA0** and **DATA1**](#data0-and-data1)
-    - [**VERSION**](#version)
-    - [**KEY**](#key)
+    - [`0x1FFF_0000`: **STATUS/COMMAND**](#0x1fff_0000-statuscommand)
+    - [`0x1FFF_0004`: **DATA0** and `0x1FFF_0008`: **DATA1**](#0x1fff_0004-data0-and-0x1fff_0008-data1)
+    - [`0x1FFF_000C`: **VERSION**](#0x1fff_000c-version)
+    - [`0x1FFF_0010`: **KEY**](#0x1fff_0010-key)
 - [Command execution flow](#command-execution-flow)
 
 ---
@@ -97,7 +97,7 @@ Support for interrupts is provided but currently no command relies on it, 64DD I
 
 ---
 
-#### **STATUS/COMMAND**
+#### `0x1FFF_0000`: **STATUS/COMMAND** 
 
 | name          | bits   | access | meaning                                               |
 | ------------- | ------ | ------ | ----------------------------------------------------- |
@@ -111,7 +111,7 @@ Note: Write to this register raises `CMD_BUSY` bit and clears `CMD_ERROR` bit. F
 
 ---
 
-#### **DATA0** and **DATA1**
+####  `0x1FFF_0004`: **DATA0** and `0x1FFF_0008`: **DATA1**
 
 | name      | bits   | access | meaning                            |
 | --------- | ------ | ------ | ---------------------------------- |
@@ -121,7 +121,7 @@ Note: Result is valid only when command has executed and `CMD_BUSY` bit is reset
 
 ---
 
-#### **VERSION**
+#### `0x1FFF_000C`: **VERSION**
 
 | name      | bits   | access | meaning                                       |
 | --------- | ------ | ------ | --------------------------------------------- |
@@ -131,7 +131,7 @@ Note: Writing any value to this register will clear pending flashcart interrupt.
 
 ---
 
-#### **KEY**
+#### `0x1FFF_0010`: **KEY**
 
 | name  | bits   | access | meaning                                    |
 | ----- | ------ | ------ | ------------------------------------------ |

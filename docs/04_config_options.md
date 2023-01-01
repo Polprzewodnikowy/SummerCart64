@@ -20,7 +20,7 @@
 ## Supported config options
 
 SC64 provides simple flashcart configuration by exposing various options settable by both USB and N64 side.
-All options other than **BOOTLOADER_SWITCH** are preserved on console reset or power cycle.
+All options other than **BOOTLOADER_SWITCH** are preserved on console reset or power cycle (only when powered from USB).
 
 | id   | name                    | type    | description                                                             |
 | ---- | ----------------------- | ------- | ----------------------------------------------------------------------- |
@@ -73,7 +73,7 @@ type: *bool* | default: `0`
 
 Last 128 kiB of SDRAM is shared between ROM data and SRAM/FlashRAM save data.
 Use this setting for applications requiring all of ROM section space including last 128 kiB.
-Check [PI memory map](./memory_map.md#pi-memory-map) for more information.
+Check [PI memory map](./01_memory_map.md#pi-memory-map) for more information.
 
 ---
 
@@ -143,6 +143,7 @@ type: *word* | default: `0xFFFF`
 Use this setting to force specific CIC seed/version.
 Lower 8 bits represents CIC seed and 9th bit represents CIC version.
 By setting value `0xFFFF` bootloader will try to guess needed values from loaded ROM IPL3.
+This setting is not used when **BOOT_MODE** is set to `3` (direct boot).
 
 ---
 
@@ -157,6 +158,7 @@ type: *enum* | default: `3`
 
 Use this setting to force specific TV type.
 By setting value `3` bootloader will try to guess TV type from loaded ROM header.
+This setting is not used when **BOOT_MODE** is set to `3` (direct boot).
 
 ---
 
