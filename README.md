@@ -37,10 +37,10 @@
 
 ## Help / Q&A
 
-For any questions related to this project please use [*Discussions*](./discussions) tab in GitHub repository.
+For any questions related to this project please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCollection/discussions) tab in GitHub repository.
 Do not use my e-mail for these questions as I want to have centralised knowledge base accessible for everyone interested in this project.
 
-I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux#5558` but keep in mind that [*Discussions*](./discussions) tab is a preffered option.
+I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux#5558` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCollection/discussions) tab is a preffered option.
 
 ---
 
