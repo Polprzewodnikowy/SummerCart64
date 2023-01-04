@@ -35,12 +35,35 @@
 
 ---
 
-## High-level flashcart block diagram
+## Help / Q&A
 
-[<img src="assets/sc64_v2_block_diagram.svg" width="800" />](assets/sc64_v2_block_diagram.svg)
+For any questions related to this project please use [*Discussions*](./discussions) tab in GitHub repository.
+Do not use my e-mail for these questions as I want to have centralised knowledge base accessible for everyone interested in this project.
+
+I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux#5558` but keep in mind that [*Discussions*](./discussions) tab is a preffered option.
 
 ---
 
-## Finished sample
+## High-level flashcart block diagram
 
-[<img src="assets/sc64_v2_example.jpg" alt="SC64 HW ver: 2.0" width="800" />](assets/sc64_v2_example.jpg)
+[<img src="assets/sc64_block_diagram.svg" alt="SC64 block diagram" width="800" />](assets/sc64_block_diagram.svg)
+
+---
+
+## Finished example
+
+[<img src="assets/sc64_finished_example.jpg" alt="SC64 finished example" width="800" />](assets/sc64_finished_example.jpg)
+
+---
+
+## Acknowledgement
+
+This project wouldn't be possible without these contributions:
+
+- [64drive](https://64drive.retroactive.be) orders being on permanent hold long before creating this repository.
+- [EverDrive-64 X7](https://krikzz.com/our-products/cartridges/ed64x7.html) being disappointment for homebrew development (slow USB upload, unjustified price and overcomplicated SD card access).
+- [Jan Goldacker (jago85)](https://github.com/jago85) and his projects:
+  - [Brutzelkarte](https://github.com/jago85/Brutzelkarte_FPGA) providing solid base for starting this project and sparking hope for true open source N64 flashcarts.
+  - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) reimplementation for easy integration in modern microcontrollers. Thanks also goes to everyone involved in N64 CIC reverse engineering.
+- [N64brew](https://discord.gg/WqFgNWf) Discord server community being very helpful during flashcart development.
+- [FatFs](http://elm-chan.org/fsw/ff/00index_e.html) FAT32/exFAT library being easiest to integrate in embedded environment.
