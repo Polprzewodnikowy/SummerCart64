@@ -68,4 +68,4 @@ This project wouldn't be possible without these contributions:
 - [N64brew](https://discord.gg/WqFgNWf) Discord server community being very helpful during flashcart development.
 - [FatFs](http://elm-chan.org/fsw/ff/00index_e.html) FAT32/exFAT library being easiest to integrate in embedded environment.
 - [Yakumono's (@LuigiBlood)](https://twitter.com/LuigiBlood) extensive [64DD documentation](https://github.com/LuigiBlood/64dd/wiki) and its implementation in various emulators.
-- [Libdragon](https://github.com/DragonMinded/libdragon) N64 open source SDK project and its developers.
+- [Libdragon](https://github.com/DragonMinded/libdragon) open source N64 SDK project and its developers.
