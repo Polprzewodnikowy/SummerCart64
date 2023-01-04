@@ -125,41 +125,14 @@ static uint32_t dd_fill_sd_sector_table (uint32_t index, uint32_t *sector_table)
     return sectors;
 }
 
-static void dd_process_sd_request (uint16_t index, uint32_t buffer_address, bool write) {
-    uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
-    uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
-    dd_set_block_ready(false);
-    if (sectors == 0) {
-        return;
-    }
-    uint32_t starting_sector = 0;
-    uint32_t sectors_to_process = 0;
-    for (uint32_t i = 0; i < sectors; i++) {
-        sectors_to_process += 1;
-        if ((i < (sectors - 1)) && ((sector_table[i] + 1) == sector_table[i + 1])) {
-            continue;
-        }
-        if (write) {
-            if (sd_write_sectors(buffer_address, sector_table[starting_sector], sectors_to_process)) {
-                return;
-            }
-        } else {
-            if (sd_read_sectors(buffer_address, sector_table[starting_sector], sectors_to_process)) {
-                return;
-            }
-        }
-        buffer_address += (sectors_to_process * SD_SECTOR_SIZE);
-        starting_sector += sectors_to_process;
-        sectors_to_process = 0;
-    }
-    dd_set_block_ready(true);
-}
-
 static bool dd_block_read_request (void) {
     uint16_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
-        dd_process_sd_request(index, buffer_address, false);
+        uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
+        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
+        bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_read_sectors);
+        dd_set_block_ready(!error);
     } else {
         usb_tx_info_t packet_info;
         usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);
@@ -178,7 +151,10 @@ static bool dd_block_write_request (void) {
     uint32_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
-        dd_process_sd_request(index, buffer_address, true);
+        uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
+        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
+        bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_write_sectors);
+        dd_set_block_ready(!error);
     } else {
         usb_tx_info_t packet_info;
         usb_create_packet(&packet_info, PACKET_CMD_DD_REQUEST);

@@ -1,13 +1,19 @@
+#include "cfg.h"
 #include "fpga.h"
 #include "sd.h"
 #include "timer.h"
 #include "writeback.h"
 
 
-#define SAVE_MAX_SECTOR_COUNT   (256)
-#define SRAM_FLASHRAM_ADDRESS   (0x03FE0000)
-#define EEPROM_ADDRESS          (0x05002000)
-#define WRITEBACK_DELAY_TICKS   (100)
+#define SAVE_MAX_SECTOR_COUNT       (256)
+#define SRAM_FLASHRAM_ADDRESS       (0x03FE0000)
+#define EEPROM_ADDRESS              (0x05002000)
+#define EEPROM_4K_SECTOR_COUNT      (1)
+#define EEPROM_16K_SECTOR_COUNT     (4)
+#define SRAM_SECTOR_COUNT           (64)
+#define FLASHRAM_SECTOR_COUNT       (256)
+#define SRAM_BANKED_SECTOR_COUNT    (192)
+#define WRITEBACK_DELAY_TICKS       (100)
 
 
 struct process {
@@ -22,20 +28,37 @@ static struct process p;
 
 
 static void writeback_save_to_sd (void) {
-    uint32_t save_address = SRAM_FLASHRAM_ADDRESS;
-    if (fpga_reg_get(REG_CFG_SCR) & CFG_SCR_EEPROM_ENABLED) {
-        save_address = EEPROM_ADDRESS;
-    }
-    for (int i = 0; i < SAVE_MAX_SECTOR_COUNT; i++) {
-        uint32_t sector = p.sectors[i];
-        if (sector == 0) {
+    uint32_t address;
+    uint32_t count;
+
+    switch (cfg_get_save_type()) {
+        case SAVE_TYPE_EEPROM_4K:
+            address = EEPROM_ADDRESS;
+            count = EEPROM_4K_SECTOR_COUNT;
             break;
-        }
-        if (sd_write_sectors(save_address, sector, 1)) {
+        case SAVE_TYPE_EEPROM_16K:
+            address = EEPROM_ADDRESS;
+            count = EEPROM_16K_SECTOR_COUNT;
+            break;
+        case SAVE_TYPE_SRAM:
+            address = SRAM_FLASHRAM_ADDRESS;
+            count = SRAM_SECTOR_COUNT;
+            break;
+        case SAVE_TYPE_FLASHRAM:
+            address = SRAM_FLASHRAM_ADDRESS;
+            count = FLASHRAM_SECTOR_COUNT;
+            break;
+        case SAVE_TYPE_SRAM_BANKED:
+            address = SRAM_FLASHRAM_ADDRESS;
+            count = SRAM_BANKED_SECTOR_COUNT;
+            break;
+        default:
             p.enabled = false;
-            break;
-        }
-        save_address += SD_SECTOR_SIZE;
+            return;
+    }
+
+    if(sd_optimize_sectors(address, p.sectors, count, sd_write_sectors)) {
+        p.enabled = false;
     }
 }
 

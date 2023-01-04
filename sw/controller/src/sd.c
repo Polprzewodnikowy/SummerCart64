@@ -197,6 +197,7 @@ static bool sd_dat_wait (uint16_t timeout) {
     do {
         uint32_t sd_dat = fpga_reg_get(REG_SD_DAT);
         uint32_t sd_dma_scr = fpga_reg_get(REG_SD_DMA_SCR);
+        led_blink_act();
         if ((!(sd_dat & SD_DAT_BUSY)) && (!(sd_dma_scr & DMA_SCR_BUSY))) {
             sd_clear_timeout();
             return (sd_dat & SD_DAT_ERROR);
@@ -425,6 +426,34 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
         address += (blocks * SD_SECTOR_SIZE);
         sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;
+    }
+
+    return false;
+}
+
+bool sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32_t count, sd_process_sectors_t sd_process_sectors) {
+    uint32_t starting_sector = 0;
+    uint32_t sectors_to_process = 0;
+
+    if (count == 0) {
+        return true;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        if (sector_table[i] == 0) {
+            return true;
+        }
+        sectors_to_process += 1;
+        if ((i < (count - 1)) && ((sector_table[i] + 1) == sector_table[i + 1])) {
+            continue;
+        }
+        bool error = sd_process_sectors(address, sector_table[starting_sector], sectors_to_process);
+        if (error) {
+            return true;
+        }
+        address += (sectors_to_process * SD_SECTOR_SIZE);
+        starting_sector += sectors_to_process;
+        sectors_to_process = 0;
     }
 
     return false;

@@ -43,15 +43,6 @@ typedef enum {
 } boot_mode_t;
 
 typedef enum {
-    SAVE_TYPE_NONE = 0,
-    SAVE_TYPE_EEPROM_4K = 1,
-    SAVE_TYPE_EEPROM_16K = 2,
-    SAVE_TYPE_SRAM = 3,
-    SAVE_TYPE_FLASHRAM = 4,
-    SAVE_TYPE_SRAM_BANKED = 5
-} save_type_t;
-
-typedef enum {
     CIC_SEED_UNKNOWN = 0xFFFF
 } cic_seed_t;
 
@@ -357,6 +348,10 @@ bool cfg_update (uint32_t *args) {
     }
 
     return false;
+}
+
+save_type_t cfg_get_save_type (void) {
+    return p.save_type;
 }
 
 void cfg_get_time (uint32_t *args) {
