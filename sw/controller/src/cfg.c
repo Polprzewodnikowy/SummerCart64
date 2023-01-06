@@ -10,6 +10,10 @@
 #include "writeback.h"
 
 
+#define DATA_BUFFER_ADDRESS     (0x05000000)
+#define DATA_BUFFER_SIZE        (8192)
+
+
 typedef enum {
     CFG_ID_BOOTLOADER_SWITCH,
     CFG_ID_ROM_WRITE_ENABLE,
@@ -168,6 +172,8 @@ static bool cfg_set_save_type (save_type_t save_type) {
     if (save_type > SAVE_TYPE_SRAM_BANKED) {
         return true;
     }
+
+    writeback_disable();
 
     uint32_t save_reset_mask = (
         CFG_SCR_EEPROM_16K |
@@ -494,7 +500,7 @@ void cfg_process (void) {
                         args[1] = sd_card_get_status();
                         break;
                     case SD_CARD_OP_GET_INFO:
-                        if (cfg_translate_address(&args[0], 32, (SDRAM | BRAM))) {
+                        if (cfg_translate_address(&args[0], SD_CARD_INFO_SIZE, (SDRAM | BRAM))) {
                             cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                             return;
                         }
@@ -518,7 +524,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | BRAM | FLASH))) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -526,6 +532,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
+                p.sd_card_sector += args[1];
                 break;
 
             case 'S':
@@ -533,7 +540,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | BRAM | FLASH))) {
+                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
@@ -541,6 +548,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
+                p.sd_card_sector += args[1];
                 break;
 
             case 'D':
@@ -552,15 +560,33 @@ void cfg_process (void) {
                 break;
 
             case 'W':
-                if (cfg_translate_address(&args[0], 1024, (SDRAM | BRAM))) {
+                if (cfg_translate_address(&args[0], WRITEBACK_SECTOR_TABLE_SIZE, (SDRAM | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                writeback_set_sd_info(args[0], args[1]);
+                writeback_load_sector_table(args[0]);
+                writeback_enable();
+                break;
+
+            case 'K':
+                if (args[1] >= DATA_BUFFER_SIZE) {
+                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
+                if (cfg_translate_address(&args[0], args[1], FLASH)) {
+                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
+                    return;
+                }
+                if (flash_program(DATA_BUFFER_ADDRESS, args[0], args[1])) {
+                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
                 break;
 
             case 'p':
-                flash_wait_busy();
+                if (args[0]) {
+                    flash_wait_busy();
+                }
                 args[0] = FLASH_ERASE_BLOCK_SIZE;
                 break;
 
@@ -569,7 +595,10 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                flash_erase_block(args[0]);
+                if (flash_erase_block(args[0])) {
+                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
                 break;
 
             case '?':

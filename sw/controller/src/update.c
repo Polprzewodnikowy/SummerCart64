@@ -162,15 +162,20 @@ static bool bootloader_update (uint32_t address, uint32_t length) {
     uint8_t update_buffer[FPGA_MAX_MEM_TRANSFER];
     uint8_t verify_buffer[FPGA_MAX_MEM_TRANSFER];
     for (uint32_t offset = 0; offset < BOOTLOADER_LENGTH; offset += FLASH_ERASE_BLOCK_SIZE) {
-        flash_erase_block(BOOTLOADER_ADDRESS + offset);
+        if (flash_erase_block(BOOTLOADER_ADDRESS + offset)) {
+            return true;
+        }
     }
-    for (uint32_t offset = 0; offset < length; offset += FPGA_MAX_MEM_TRANSFER) {
-        fpga_mem_copy(address + offset, BOOTLOADER_ADDRESS + offset, FPGA_MAX_MEM_TRANSFER);
+    if (flash_program(address, BOOTLOADER_ADDRESS, length)) {
+        return true;
     }
     for (uint32_t offset = 0; offset < length; offset += sizeof(verify_buffer)) {
         fpga_mem_read(address + offset, sizeof(update_buffer), update_buffer);
         fpga_mem_read(BOOTLOADER_ADDRESS + offset, sizeof(verify_buffer), verify_buffer);
         for (int i = 0; i < sizeof(verify_buffer); i++) {
+            if ((offset + i) >= length) {
+                break;
+            }
             if (update_buffer[i] != verify_buffer[i]) {
                 return true;
             }

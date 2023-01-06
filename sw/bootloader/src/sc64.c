@@ -39,6 +39,7 @@ typedef enum {
     SC64_CMD_SD_WRITE           = 'S',
     SC64_CMD_DD_SD_INFO         = 'D',
     SC64_CMD_WRITEBACK_SD_INFO  = 'W',
+    SC64_CMD_FLASH_PROGRAM      = 'K',
     SC64_CMD_FLASH_WAIT_BUSY    = 'p',
     SC64_CMD_FLASH_ERASE_BLOCK  = 'P',
     SC64_CMD_DEBUG_GET          = '?',
@@ -188,7 +189,7 @@ bool sc64_usb_write (void *address, uint8_t type, uint32_t length) {
 }
 
 bool sc64_sd_card_init (void) {
-    uint32_t args[2] = { 0, SD_CARD_OP_INIT };
+    uint32_t args[2] = { (uint32_t) (NULL), SD_CARD_OP_INIT };
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
         return true;
     }
@@ -196,7 +197,7 @@ bool sc64_sd_card_init (void) {
 }
 
 bool sc64_sd_card_deinit (void) {
-    uint32_t args[2] = { 0, SD_CARD_OP_DEINIT };
+    uint32_t args[2] = { (uint32_t) (NULL), SD_CARD_OP_DEINIT };
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
         return true;
     }
@@ -204,7 +205,7 @@ bool sc64_sd_card_deinit (void) {
 }
 
 sd_card_status_t sc64_sd_card_get_status (void) {
-    uint32_t args[2] = { 0, SD_CARD_OP_GET_STATUS };
+    uint32_t args[2] = { (uint32_t) (NULL), SD_CARD_OP_GET_STATUS };
     uint32_t result[2];
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, result)) {
         return false;
@@ -246,24 +247,32 @@ bool sc64_dd_set_sd_info (void *address, uint32_t length) {
     return false;
 }
 
-bool sc64_writeback_set_sd_info (void *address, bool enabled) {
-    uint32_t args[2] = { (uint32_t) (address), (uint32_t) (enabled) };
+bool sc64_writeback_enable (void *address) {
+    uint32_t args[2] = { (uint32_t) (address), 0 };
     if (sc64_execute_cmd(SC64_CMD_WRITEBACK_SD_INFO, args, NULL)) {
         return true;
     }
     return false;
 }
 
+bool sc64_flash_program (void *address, uint32_t length) {
+    uint32_t args[2] = { (uint32_t) (address), length };
+    return sc64_execute_cmd(SC64_CMD_FLASH_PROGRAM, args, NULL);
+}
+
+void sc64_flash_wait_busy (void) {
+    uint32_t args[2] = { true, 0 };
+    sc64_execute_cmd(SC64_CMD_FLASH_WAIT_BUSY, args, NULL);
+}
+
 uint32_t sc64_flash_get_erase_block_size (void) {
+    uint32_t args[2] = { false, 0 };
     uint32_t result[2];
-    sc64_execute_cmd(SC64_CMD_FLASH_WAIT_BUSY, NULL, result);
+    sc64_execute_cmd(SC64_CMD_FLASH_WAIT_BUSY, args, result);
     return result[0];
 }
 
 bool sc64_flash_erase_block (void *address) {
     uint32_t args[2] = { (uint32_t) (address), 0 };
-    if (sc64_execute_cmd(SC64_CMD_FLASH_ERASE_BLOCK, args, NULL)) {
-        return true;
-    }
-    return sc64_execute_cmd(SC64_CMD_FLASH_WAIT_BUSY, NULL, NULL);
+    return sc64_execute_cmd(SC64_CMD_FLASH_ERASE_BLOCK, args, NULL);
 }

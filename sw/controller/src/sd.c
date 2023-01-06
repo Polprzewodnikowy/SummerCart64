@@ -33,6 +33,7 @@
 #define SWITCH_FUNCTION_GROUP_1_HS      (1 << 1)
 
 #define DAT_BLOCK_MAX_COUNT             (256)
+#define DAT_TIMEOUT_MS                  (1000)
 
 
 typedef enum {
@@ -299,7 +300,7 @@ bool sd_card_init (void) {
         sd_card_deinit();
         return true;
     }
-    sd_dat_wait(1000);
+    sd_dat_wait(DAT_TIMEOUT_MS);
     if (sd_did_timeout()) {
         sd_card_deinit();
         return true;
@@ -317,7 +318,7 @@ bool sd_card_init (void) {
             sd_card_deinit();
             return true;
         }
-        sd_dat_wait(1000);
+        sd_dat_wait(DAT_TIMEOUT_MS);
         if (sd_did_timeout()) {
             sd_card_deinit();
             return true;
@@ -340,15 +341,21 @@ void sd_card_deinit (void) {
     }
 }
 
+bool sd_card_is_inserted (void) {
+    return (fpga_reg_get(REG_SD_SCR) & SD_SCR_CARD_INSERTED);
+}
+
 uint32_t sd_card_get_status (void) {
     uint32_t scr = fpga_reg_get(REG_SD_SCR);
     uint32_t clock_mode_50mhz = ((scr & SD_SCR_CLOCK_MODE_MASK) == SD_SCR_CLOCK_MODE_50MHZ) ? 1 : 0;
     uint32_t card_type_block = p.card_type_block ? 1 : 0;
-    uint32_t initialized = p.card_initialized ? 1 : 0;
+    uint32_t card_initialized = p.card_initialized ? 1 : 0;
+    uint32_t card_inserted = (scr & SD_SCR_CARD_INSERTED) ? 1 : 0;
     return (
-        (clock_mode_50mhz << 2) |
-        (card_type_block << 1) |
-        (initialized << 0)
+        (clock_mode_50mhz << 3) |
+        (card_type_block << 2) |
+        (card_initialized << 1) |
+        (card_inserted << 0)
     );
 }
 
@@ -382,7 +389,7 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             return true;
         }
         sd_dat_prepare(address, blocks, DAT_WRITE);
-        if (sd_dat_wait(1000)) {
+        if (sd_dat_wait(DAT_TIMEOUT_MS)) {
             sd_dat_abort();
             sd_cmd(12, 0, RSP_R1b, NULL);
             return true;
@@ -417,7 +424,7 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             sd_dat_abort();
             return true;
         }
-        if (sd_dat_wait(1000)) {
+        if (sd_dat_wait(DAT_TIMEOUT_MS)) {
             if (sd_did_timeout()) {
                 sd_cmd(12, 0, RSP_R1b, NULL);
             }
@@ -465,7 +472,7 @@ void sd_init (void) {
 }
 
 void sd_process (void) {
-    if (!(fpga_reg_get(REG_SD_SCR) & SD_SCR_CARD_INSERTED)) {
+    if (!sd_card_is_inserted()) {
         sd_card_deinit();
     }
 }

@@ -20,7 +20,8 @@
 | `s` | **SD_READ**           | pi_address | sector_count | ---              | ---            | Read sectors from SD card to flashcart             |
 | `S` | **SD_WRITE**          | pi_address | sector_count | ---              | ---            | Write sectors from flashcart to SD card            |
 | `D` | **DD_SD_INFO**        | pi_address | table_size   | ---              | ---            | Set 64DD disk SD sector info                       |
-| `W` | **WRITEBACK_SD_INFO** | pi_address | enabled      | ---              | ---            | Set save writeback SD sector info                  |
-| `p` | **FLASH_WAIT_BUSY**   | ---        | ---          | erase_block_size | ---            | Wait until flash ready / get block erase size      |
+| `W` | **WRITEBACK_SD_INFO** | pi_address | ---          | ---              | ---            | Load writeback SD sector table and enable it       |
+| `K` | **FLASH_PROGRAM**     | pi_address | length       | ---              | ---            | Program flash with bytes loaded into data buffer   |
+| `p` | **FLASH_WAIT_BUSY**   | wait       | ---          | erase_block_size | ---            | Wait until flash ready / get block erase size      |
 | `P` | **FLASH_ERASE_BLOCK** | pi_address | ---          | ---              | ---            | Start flash block erase                            |
 | `?` | **DEBUG_GET**         | ---        | ---          | debug_data_0     | debug_data_1   | Get internal FPGA debug info                       |

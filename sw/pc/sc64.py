@@ -352,8 +352,11 @@ class SC64:
     def __dd_set_block_ready(self, error: int) -> None:
         self.__link.execute_cmd(cmd=b'D', args=[error, 0])
 
-    def __flash_wait_busy(self) -> int:
-        data = self.__link.execute_cmd(cmd=b'p')
+    def __flash_wait_busy(self) -> None:
+        self.__link.execute_cmd(cmd=b'p', args=[True, 0])
+
+    def __flash_get_erase_block_size(self) -> int:
+        data = self.__link.execute_cmd(cmd=b'p', args=[False, 0])
         return self.__get_int(data[0:4])
 
     def __flash_erase_block(self, address: int) -> None:
@@ -364,12 +367,11 @@ class SC64:
             raise ValueError('Flash erase address or length outside of possible range')
         if ((address + length) > (self.__Address.FLASH + self.__Length.FLASH)):
             raise ValueError('Flash erase address or length outside of possible range')
-        erase_block_size = self.__flash_wait_busy()
+        erase_block_size = self.__flash_get_erase_block_size()
         if (address % erase_block_size != 0):
             raise ValueError('Flash erase address not aligned to block size')
         for offset in range(address, address + length, erase_block_size):
             self.__flash_erase_block(offset)
-        self.__flash_wait_busy()
 
     def __program_flash(self, address: int, data: bytes):
         program_chunk_size = (128 * 1024)
@@ -377,6 +379,7 @@ class SC64:
             self.__erase_flash_region(address, len(data))
             for offset in range(0, len(data), program_chunk_size):
                 self.__write_memory(address + offset, data[offset:offset + program_chunk_size])
+            self.__flash_wait_busy()
             if (self.__read_memory(address, len(data)) != data):
                 raise ConnectionException('Flash memory program failure')
 

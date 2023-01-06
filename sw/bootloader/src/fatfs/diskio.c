@@ -11,13 +11,21 @@
 #define FROM_BCD(x)         ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
 
 
-static DSTATUS status = STA_NOINIT;
-
-
 DSTATUS disk_status (BYTE pdrv) {
     if (pdrv > 0) {
         return STA_NODISK;
     }
+
+    DSTATUS status = 0;
+    sd_card_status_t sd_card_status = sc64_sd_card_get_status();
+
+    if (!(sd_card_status & SD_CARD_STATUS_INSERTED)) {
+        status |= STA_NODISK;
+    }
+    if (!(sd_card_status & SD_CARD_STATUS_INITIALIZED)) {
+        status |= STA_NOINIT;
+    }
+
     return status;
 }
 
@@ -25,10 +33,10 @@ DSTATUS disk_initialize (BYTE pdrv) {
     if (pdrv > 0) {
         return STA_NODISK;
     }
-    if (!sc64_sd_card_init()) {
-        status &= ~(STA_NOINIT);
-    }
-    return status;
+
+    sc64_sd_card_init();
+
+    return disk_status(pdrv);
 }
 
 DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {

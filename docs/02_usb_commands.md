@@ -13,12 +13,12 @@
 | `C` | **CONFIG_SET**         | config_id    | new_value    | ---  | ---              | Set config option                                   |
 | `t` | **TIME_GET**           | ---          | ---          | ---  | time             | Get current RTC value                               |
 | `T` | **TIME_SET**           | time_0       | time_1       | ---  | ---              | Set RTC value                                       |
-| `m` | **MEMORY_READ**        | address      | length       | data | ---              | Read data from specified memory address             |
-| `M` | **MEMORY_WRITE**       | address      | length       | ---  | data             | Write data to specified memory address              |
+| `m` | **MEMORY_READ**        | address      | length       | ---  | data             | Read data from specified memory address             |
+| `M` | **MEMORY_WRITE**       | address      | length       | data | ---              | Write data to specified memory address              |
 | `D` | **DD_SET_BLOCK_READY** | success      | ---          | ---  | ---              | Notify flashcart about 64DD block readiness         |
 | `U` | **USB_WRITE**          | type         | length       | data | N/A              | Send data to be received by app running on N64      |
 | `f` | **FIRMWARE_BACKUP**    | address      | ---          | ---  | status/length    | Backup firmware to specified memory address         |
 | `F` | **FIRMWARE_UPDATE**    | address      | length       | ---  | status           | Update firmware from specified memory address       |
-| `p` | **FLASH_WAIT_BUSY**    | ---          | ---          | ---  | erase_block_size | Wait until flash ready / get flash block erase size |
+| `p` | **FLASH_WAIT_BUSY**    | wait         | ---          | ---  | erase_block_size | Wait until flash ready / get flash block erase size |
 | `P` | **FLASH_ERASE_BLOCK**  | address      | ---          | ---  | ---              | Start flash block erase                             |
 | `?` | **DEBUG_GET**          | ---          | ---          | ---  | debug_data       | Get internal FPGA debug info                        |

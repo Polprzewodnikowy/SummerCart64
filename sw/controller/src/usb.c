@@ -272,7 +272,9 @@ static void usb_rx_process (void) {
                 break;
 
             case 'p':
-                flash_wait_busy();
+                if (p.rx_args[0]) {
+                    flash_wait_busy();
+                }
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 4;
@@ -280,7 +282,7 @@ static void usb_rx_process (void) {
                 break;
 
             case 'P':
-                flash_erase_block(p.rx_args[0]);
+                p.response_error = flash_erase_block(p.rx_args[0]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;

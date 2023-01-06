@@ -20,6 +20,14 @@ void test_execute (void) {
 
     display_printf("SC64 Test suite\n\n");
 
+    card_status = sc64_sd_card_get_status();
+
+    if (card_status & SD_CARD_STATUS_INSERTED) {
+        display_printf("SD card is inserted\n");
+    } else {
+        display_printf("SD card is not inserted\n");
+    }
+
     if (sc64_sd_card_init()) {
         display_printf("SD card init error!\n");
         while (1);
@@ -28,13 +36,13 @@ void test_execute (void) {
     card_status = sc64_sd_card_get_status();
 
     if (card_status & SD_CARD_STATUS_INITIALIZED) {
-        display_printf("SD card initialized\n");
+        display_printf("SD card is initialized\n");
     }
     if (card_status & SD_CARD_STATUS_TYPE_BLOCK) {
-        display_printf("SD card type block\n");
+        display_printf("SD card type is block\n");
     }
     if (card_status & SD_CARD_STATUS_50MHZ_MODE) {
-        display_printf("SD card 50 MHz clock mode\n");
+        display_printf("SD card runs at 50 MHz clock speed\n");
     }
 
     if (sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) {

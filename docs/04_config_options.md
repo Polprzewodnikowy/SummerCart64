@@ -130,6 +130,7 @@ type: *enum* | default: `0`
 - `5` - SRAM 768 kib save is enabled
 
 Use this setting for selecting save type that will be emulated. Only one save type can be enabled.
+Any successful write to this config will disable automatic save writeback to SD card when previously enabled.
 
 ---
 

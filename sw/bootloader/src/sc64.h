@@ -76,9 +76,10 @@ typedef enum {
 } button_mode_t;
 
 typedef enum {
-    SD_CARD_STATUS_INITIALIZED = (1 << 0),
-    SD_CARD_STATUS_TYPE_BLOCK = (1 << 1),
-    SD_CARD_STATUS_50MHZ_MODE = (1 << 2),
+    SD_CARD_STATUS_INSERTED = (1 << 0),
+    SD_CARD_STATUS_INITIALIZED = (1 << 1),
+    SD_CARD_STATUS_TYPE_BLOCK = (1 << 2),
+    SD_CARD_STATUS_50MHZ_MODE = (1 << 3),
 } sd_card_status_t;
 
 typedef struct {
@@ -137,8 +138,10 @@ bool sc64_sd_card_get_info (void *address);
 bool sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
 bool sc64_dd_set_sd_disk_info (void *address, uint32_t length);
-bool sc64_writeback_set_sd_info (void *address, bool enabled);
+bool sc64_writeback_enable (void *address);
 
+bool sc64_flash_program (void *address, uint32_t length);
+void sc64_flash_wait_busy (void);
 uint32_t sc64_flash_get_erase_block_size (void);
 bool sc64_flash_erase_block (void *address);
 
