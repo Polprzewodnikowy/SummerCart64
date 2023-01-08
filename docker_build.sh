@@ -13,6 +13,8 @@ if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
 
+SECONDS=0
+
 docker run \
     $DOCKER_OPTIONS \
     --rm \
@@ -29,6 +31,8 @@ docker run \
     ./build.sh $@
 
 BUILD_ERROR=$?
+
+echo "Build took $SECONDS seconds"
 
 popd > /dev/null
 
