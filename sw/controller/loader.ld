@@ -1,5 +1,5 @@
 MEMORY {
-    rom (rx)    : org = 0x08000000, len = 4k
+    code (rx)   : org = 0x08000000, len = 4k
     ram (rwx)   : org = 0x20000000, len = 8k
 }
 
@@ -10,13 +10,13 @@ SECTIONS {
         . = ALIGN(4);
         KEEP(*(.isr_vector))
         . = ALIGN(4);
-    } > rom
+    } > code
 
     .startup : {
         . = ALIGN(4);
         *(.text.Reset_Handler)
         . = ALIGN(4);
-    } > rom
+    } > code
 
     .text : {
         _sitext = LOADADDR(.text);
@@ -28,18 +28,16 @@ SECTIONS {
         *(.glue_7t)
         . = ALIGN(4);
         _etext = .;
-    } > ram AT > rom
+    } > ram AT > code
 
     .bss : {
         . = ALIGN(4);
         _sbss = .;
-        __bss_start__ = _sbss;
         *(.bss)
         *(.bss*)
         *(COMMON)
         . = ALIGN(4);
         _ebss = .;
-        __bss_end__ = _ebss;
     } > ram
 
     .data : {
@@ -50,7 +48,7 @@ SECTIONS {
         *(.data*)
         . = ALIGN(4);
         _edata = .;
-    } > ram AT > rom
+    } > ram AT > code
 
     .rodata : {
         _sirodata = LOADADDR(.rodata);
@@ -60,9 +58,9 @@ SECTIONS {
         *(.rodata*)
         . = ALIGN(4);
         _erodata = .;
-    } > ram AT > rom
+    } > ram AT > code
 
-    _app_header = ORIGIN(rom) + LENGTH(rom);
+    _app_header = ORIGIN(code) + LENGTH(code);
     _app_magic = _app_header + 16;
     _estack = ORIGIN(ram) + LENGTH(ram);
 }

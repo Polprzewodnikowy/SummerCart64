@@ -3,6 +3,7 @@
 .fpu softvfp
 .thumb
 
+
 .section .loader, "a", %progbits
 .type loader, %object
 loader:
@@ -13,7 +14,6 @@ loader:
 .type Reset_Handler, %function
 Reset_Handler:
     .global Reset_Handler
-    cpsid i
 
 init_data:
     ldr r0, =_sdata

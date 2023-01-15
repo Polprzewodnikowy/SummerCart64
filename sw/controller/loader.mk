@@ -1,6 +1,9 @@
 EXE_NAME = loader
-LD_SCRIPT = loader.ld
 BUILD_DIR = build/loader
+
+LD_SCRIPT = loader.ld
+PAD_TO = 0x08001000
+
 SRC_FILES = \
 	loader.S \
 	flash.c \
@@ -9,6 +12,5 @@ SRC_FILES = \
 	lcmxo2.c \
 	loader.c \
 	update.c
-PAD_TO = 0x08001000
 
 include common.mk

@@ -134,6 +134,7 @@ class SC64UpdateData:
     __CHUNK_ID_MCU_DATA = 2
     __CHUNK_ID_FPGA_DATA = 3
     __CHUNK_ID_BOOTLOADER_DATA = 4
+    __CHUNK_ID_PRIMER_DATA = 5
 
     __data = b''
 
@@ -172,6 +173,9 @@ class SC64UpdateData:
     def add_bootloader_data(self, data: bytes) -> None:
         self.__add_chunk(self.__CHUNK_ID_BOOTLOADER_DATA, data)
 
+    def add_primer_data(self, data: bytes) -> None:
+        self.__add_chunk(self.__CHUNK_ID_PRIMER_DATA, data)
+
     def get_update_data(self) -> bytes:
         return self.__data
 
@@ -183,6 +187,7 @@ if __name__ == "__main__":
     parser.add_argument('--mcu', metavar='mcu_path', required=False, help='path to MCU update data')
     parser.add_argument('--fpga', metavar='fpga_path', required=False, help='path to FPGA update data')
     parser.add_argument('--boot', metavar='bootloader_path', required=False, help='path to N64 bootloader update data')
+    parser.add_argument('--primer', metavar='primer_path', required=False, help='path to MCU board bring-up data')
     parser.add_argument('output', metavar='output_path', help='path to final update data')
 
     if (len(sys.argv) <= 1):
@@ -217,6 +222,10 @@ if __name__ == "__main__":
         if (args.boot):
             with open(args.boot, 'rb+') as f:
                 update.add_bootloader_data(f.read())
+
+        if (args.primer):
+            with open(args.primer, 'rb+') as f:
+                update.add_primer_data(f.read())
 
         with open(args.output, 'wb+') as f:
             f.write(update.get_update_data())

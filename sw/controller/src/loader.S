@@ -3,11 +3,11 @@
 .fpu softvfp
 .thumb
 
+
 .section .text.Reset_Handler
 .type Reset_Handler, %function
 Reset_Handler:
     .global Reset_Handler
-    cpsid i
 
 init_text:
     ldr r0, =_stext
@@ -51,8 +51,9 @@ boot:
 
     ldr r0, =_app_header
     push {r0}
-    bl set_vector_table_offset
+    bl hw_set_vector_table
     pop {r0}
+
     ldr r1, [r0, #0]
     msr MSP, r1
     ldr r1, [r0, #4]
