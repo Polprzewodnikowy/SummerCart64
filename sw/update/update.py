@@ -19,6 +19,7 @@ class JedecFile:
     __fuse_length: int = 0
     __fuse_offset: int = 0
     __fuse_data: bytes = b''
+    __fuse_ignore: bool = False
     __byte_buffer: int = 0
 
     def __handle_q_field(self, f: BufferedRandom) -> None:
@@ -77,6 +78,19 @@ class JedecFile:
             else:
                 raise JedecError('Unexpected byte inside L field fuse data')
 
+    def __handle_n_field(self, f: BufferedRandom) -> None:
+        data = b''
+        buffer = b''
+        while (buffer != b'*'):
+            buffer = f.read(1)
+            if (buffer == b''):
+                raise JedecError('Unexpected end of file')
+            if (buffer != b'*'):
+                data += buffer
+        if (data == b'OTE END CONFIG DATA'):
+            self.__fuse_length = self.__fuse_offset
+            self.__fuse_ignore = True
+
     def __ignore_field(self, f: BufferedRandom) -> None:
         data = None
         while (data != b'*'):
@@ -88,6 +102,7 @@ class JedecFile:
         self.__fuse_length = 0
         self.__fuse_offset = 0
         self.__fuse_data = b''
+        self.__fuse_ignore = False
         self.__byte_buffer = 0
 
         field = None
@@ -104,8 +119,10 @@ class JedecFile:
                 field = f.read(1)
                 if (field == b'Q'):
                     self.__handle_q_field(f)
-                elif (field == b'L'):
+                elif (field == b'L' and not self.__fuse_ignore):
                     self.__handle_l_field(f)
+                elif (field == b'N'):
+                    self.__handle_n_field(f)
                 elif (field == b'\r' or field == b'\n'):
                     pass
                 elif (field == b'\x03'):

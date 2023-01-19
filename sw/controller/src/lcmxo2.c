@@ -36,12 +36,14 @@
 #define LSC_READ_FEABITS        (0xFB)
 #define ISC_NOOP                (0xFF)
 
+#define ISC_ERASE_SRAM          (1 << 16)
 #define ISC_ERASE_FEATURE       (1 << 17)
 #define ISC_ERASE_CFG           (1 << 18)
 #define ISC_ERASE_UFM           (1 << 19)
 
-#define LSC_STATUS_1_BUSY       (1 << 4)
-#define LSC_STATUS_1_FAIL       (1 << 5)
+#define LSC_STATUS_CFG_ENABLE   (1 << 9)
+#define LSC_STATUS_BUSY         (1 << 12)
+#define LSC_STATUS_FAIL         (1 << 13)
 
 #define DEVICE_ID_SIZE          (4)
 
@@ -69,50 +71,8 @@ static void lcmxo2_reg_set (uint8_t reg, uint8_t value) {
     );
     while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
 }
-#endif
-
-static void lcmxo2_reset_bus (void) {
-#ifdef LCMXO2_I2C
-    uint8_t reset_data = 0;
-    hw_i2c_raw(LCMXO2_I2C_ADDR_RESET, &reset_data, sizeof(reset_data), I2C_START | I2C_AUTOEND | I2C_WRITE);
-#else
-    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
-    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
-#endif
-}
-
-static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type) {
-#ifdef LCMXO2_I2C
-    uint8_t data[4] = { cmd, ((arg >> 16) & 0xFF), ((arg >> 8) & 0xFF), (arg & 0xFF) };
-    int length = CMD_TWO_OP ? 3 : 4;
-    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, data, length, I2C_START | I2C_WRITE);
-#else
-    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
-    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
-    fpga_reg_set(REG_VENDOR_DATA, data);
-    fpga_reg_set(REG_VENDOR_SCR,
-        (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
-        (type == CMD_DELAYED ? VENDOR_SCR_DELAY : 0) |
-        ((type == CMD_TWO_OP ? 2 : 3) << VENDOR_SCR_LENGTH_BIT) |
-        VENDOR_SCR_WRITE |
-        VENDOR_SCR_START
-    );
-    while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
-#endif
-}
-
-static void lcmxo2_finish_cmd (void) {
-#ifdef LCMXO2_I2C
-    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, NULL, 0, I2C_STOP);
-#else
-    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
-#endif
-}
 
 static void lcmxo2_read_data (uint8_t *buffer, uint32_t length) {
-#ifdef LCMXO2_I2C
-    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, buffer, length, I2C_START | I2C_READ);
-#else
     while (length > 0) {
         uint32_t block_size = (length > 4) ? 4 : length;
         fpga_reg_set(REG_VENDOR_SCR,
@@ -129,13 +89,9 @@ static void lcmxo2_read_data (uint8_t *buffer, uint32_t length) {
             length -= 1;
         }
     }
-#endif
 }
 
 static void lcmxo2_write_data (uint8_t *buffer, uint32_t length) {
-#ifdef LCMXO2_I2C
-    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, buffer, length, I2C_WRITE);
-#else
     while (length > 0) {
         uint32_t block_size = (length > 4) ? 4 : length;
         uint32_t data = 0;
@@ -153,100 +109,135 @@ static void lcmxo2_write_data (uint8_t *buffer, uint32_t length) {
         );
         while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
     }
+}
+#endif
+
+static void lcmxo2_reset_bus (void) {
+#ifdef LCMXO2_I2C
+    uint8_t reset_data = 0;
+    hw_i2c_raw(LCMXO2_I2C_ADDR_RESET, &reset_data, sizeof(reset_data), NULL, 0);
+#else
+    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
+    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
+#endif
+}
+
+static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint8_t *buffer, uint8_t length, bool write) {
+#ifdef LCMXO2_I2C
+    uint8_t packet[20] = { cmd, ((arg >> 16) & 0xFF), ((arg >> 8) & 0xFF), (arg & 0xFF) };
+    int packet_length = ((type == CMD_TWO_OP) ? 3 : 4);
+    if (write) {
+        for (int i = 0; i < length; i++) {
+            packet[packet_length + i] = buffer[i];
+        }
+        packet_length += length;
+    }
+    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+#else
+    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
+    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
+    fpga_reg_set(REG_VENDOR_DATA, data);
+    fpga_reg_set(REG_VENDOR_SCR,
+        (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
+        (type == CMD_DELAYED ? VENDOR_SCR_DELAY : 0) |
+        ((type == CMD_TWO_OP ? 2 : 3) << VENDOR_SCR_LENGTH_BIT) |
+        VENDOR_SCR_WRITE |
+        VENDOR_SCR_START
+    );
+    while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
+    if (length > 0) {
+        if (write) {
+            lcmxo2_write_data(buffer, length);
+        } else {
+            lcmxo2_read_data(buffer, length);
+        }
+    }
+    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
 #endif
 }
 
 static void lcmxo2_read_device_id (uint8_t *id) {
-    lcmxo2_execute_cmd(IDCODE_PUB, 0, CMD_NORMAL);
-    lcmxo2_read_data(id, DEVICE_ID_SIZE);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(IDCODE_PUB, 0, CMD_NORMAL, id, DEVICE_ID_SIZE, false);
+}
+
+static uint32_t lcmxo2_read_status (void) {
+    uint32_t status = 0;
+    lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL, (uint8_t *) (&status), 4, false);
+    return SWAP32(status);
 }
 
 static bool lcmxo2_wait_busy (void) {
-    uint8_t status[4];
+    uint32_t status;
     do {
-        lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL);
-        lcmxo2_read_data(status, 4);
-        lcmxo2_finish_cmd();
-    } while(status[2] & LSC_STATUS_1_BUSY);
-    return status[2] & LSC_STATUS_1_FAIL;
+        status = lcmxo2_read_status();
+    } while(status & LSC_STATUS_BUSY);
+    return (status & LSC_STATUS_FAIL);
 }
 
 static bool lcmxo2_enable_flash (void) {
 #ifdef LCMXO2_I2C
-    lcmxo2_execute_cmd(ISC_ENABLE, 0x080000, CMD_NORMAL);
+    lcmxo2_execute_cmd(ISC_ENABLE, 0x080000, CMD_TWO_OP, NULL, 0, false);
 #else
-    lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL);
+    lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL, NULL, 0, false);
 #endif
-    lcmxo2_finish_cmd();
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_disable_flash (void) {
     lcmxo2_wait_busy();
-    lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP);
-    lcmxo2_finish_cmd();
-    lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP, NULL, 0, false);
+    lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL, NULL, 0, false);
 }
 
-static bool lcmxo2_erase_flash (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_UFM | ISC_ERASE_CFG, CMD_NORMAL);
-    lcmxo2_finish_cmd();
+static bool lcmxo2_erase_sram (void) {
+    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_SRAM, CMD_NORMAL, NULL, 0, false);
     return lcmxo2_wait_busy();
 }
 
-static bool lcmxo2_erase_all (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_UFM | ISC_ERASE_CFG | ISC_ERASE_FEATURE, CMD_NORMAL);
-    lcmxo2_finish_cmd();
+static bool lcmxo2_erase_featbits (void) {
+    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_FEATURE, CMD_NORMAL, NULL, 0, false);
+    return lcmxo2_wait_busy();
+}
+
+static bool lcmxo2_erase_flash (void) {
+    lcmxo2_execute_cmd(ISC_ERASE, (ISC_ERASE_UFM | ISC_ERASE_CFG), CMD_NORMAL, NULL, 0, false);
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_reset_flash_address (void) {
-    lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL, NULL, 0, false);
 }
 
 static bool lcmxo2_write_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL);
-    lcmxo2_write_data(buffer, FLASH_PAGE_SIZE);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL, buffer, FLASH_PAGE_SIZE, true);
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_read_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED);
-    lcmxo2_read_data(buffer, FLASH_PAGE_SIZE);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED, buffer, FLASH_PAGE_SIZE, false);
 }
 
 static void lcmxo2_program_done (void) {
-    lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL);
-    lcmxo2_finish_cmd();
-    lcmxo2_wait_busy();
+    lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL, NULL, 0, false);
 }
 
 static void lcmxo2_write_featbits (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL);
-    lcmxo2_write_data(buffer, FEATBITS_SIZE);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, true);
 }
 
 static void lcmxo2_read_featbits (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_READ_FEABITS, 0, CMD_NORMAL);
-    lcmxo2_read_data(buffer, FEATBITS_SIZE);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_READ_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, false);
 }
 
 static void lcmxo2_refresh (void) {
-    lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP);
-    lcmxo2_finish_cmd();
+    lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP, NULL, 0, false);
 }
 
 static vendor_error_t lcmxo2_fail (vendor_error_t error) {
     lcmxo2_disable_flash();
     return error;
 }
+
 
 uint32_t vendor_flash_size (void) {
     return (FLASH_PAGE_SIZE * FLASH_NUM_PAGES);
@@ -324,6 +315,10 @@ vendor_error_t vendor_reconfigure (void) {
 }
 
 
+#define FEATBITS_0_SPI_OFF      (1 << 1)
+#define FEATBITS_1_PROGRAMN_OFF (1 << 5)
+
+
 typedef enum {
     CMD_GET_PRIMER_ID   = '?',
     CMD_PROBE_FPGA      = '#',
@@ -331,13 +326,12 @@ typedef enum {
     CMD_GET_DEVICE_ID   = 'I',
     CMD_ENABLE_FLASH    = 'E',
     CMD_DISABLE_FLASH   = 'D',
-    CMD_ERASE_ALL       = 'X',
+    CMD_ERASE_FLASH     = 'X',
     CMD_RESET_ADDRESS   = 'A',
     CMD_WRITE_PAGE      = 'W',
     CMD_READ_PAGE       = 'R',
     CMD_PROGRAM_DONE    = 'F',
-    CMD_WRITE_FEATBITS  = 'Q',
-    CMD_READ_FEATBITS   = 'Y',
+    CMD_INIT_FEATBITS   = 'Q',
     CMD_REFRESH         = 'B',
 } primer_cmd_e;
 
@@ -346,13 +340,12 @@ static bool primer_check_rx_length (primer_cmd_e cmd, size_t rx_length) {
     switch (cmd) {
         case CMD_WRITE_PAGE:
             return (rx_length != FLASH_PAGE_SIZE);
-        case CMD_WRITE_FEATBITS:
-            return (rx_length != FEATBITS_SIZE);
         default:
             return (rx_length != 0);
     }
     return true;
 }
+
 
 void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_response_t send_response) {
     bool runninng = true;
@@ -386,7 +379,6 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
             case CMD_PROBE_FPGA:
                 buffer[0] = fpga_id_get();
                 tx_length = 1;
-                error = (buffer[0] != FPGA_ID);
                 break;
 
             case CMD_RESTART:
@@ -403,11 +395,14 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_DISABLE_FLASH:
-                lcmxo2_disable_flash();
+                if (lcmxo2_read_status() & LSC_STATUS_CFG_ENABLE) {
+                    error = lcmxo2_erase_sram();
+                    lcmxo2_disable_flash();
+                }
                 break;
-            
-            case CMD_ERASE_ALL:
-                error = lcmxo2_erase_all();
+
+            case CMD_ERASE_FLASH:
+                error = lcmxo2_erase_flash();
                 break;
 
             case CMD_RESET_ADDRESS:
@@ -427,18 +422,19 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 lcmxo2_program_done();
                 break;
 
-            case CMD_WRITE_FEATBITS:
-                lcmxo2_write_featbits(buffer);
-                break;
-
-            case CMD_READ_FEATBITS:
+            case CMD_INIT_FEATBITS:
                 lcmxo2_read_featbits(buffer);
-                tx_length = FEATBITS_SIZE;
+                if ((buffer[0] != FEATBITS_0_SPI_OFF) && (buffer[1] != FEATBITS_1_PROGRAMN_OFF)) {
+                    buffer[0] = FEATBITS_0_SPI_OFF;
+                    buffer[1] = FEATBITS_1_PROGRAMN_OFF;
+                    lcmxo2_erase_featbits();
+                    lcmxo2_write_featbits(buffer);
+                }
                 break;
 
             case CMD_REFRESH:
                 lcmxo2_refresh();
-                hw_delay_ms(1000);
+                hw_delay_ms(100);
                 break;
 
             default:

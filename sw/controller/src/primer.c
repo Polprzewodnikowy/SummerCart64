@@ -4,15 +4,10 @@
 #include "vendor.h"
 
 
-static const uint8_t primer_hello[] = "SC64 Primer\n";
 static const uint8_t cmd_token[3] = { 'C', 'M', 'D' };
 static const uint8_t rsp_token[3] = { 'R', 'S', 'P' };
 static const uint8_t err_token[3] = { 'E', 'R', 'R' };
 
-
-static void primer_send_hello (void) {
-    hw_uart_write((uint8_t *) (primer_hello), sizeof(primer_hello) - 1);
-}
 
 static void primer_get_and_calculate_crc32 (uint8_t *buffer, uint8_t rx_length, uint32_t *crc32) {
     hw_uart_read(buffer, rx_length);
@@ -74,10 +69,7 @@ static void primer_send_response (uint8_t cmd, uint8_t *buffer, uint8_t tx_lengt
 
 void primer (void) {
     hw_primer_init();
-
-    primer_send_hello();
-
     vendor_initial_configuration(primer_get_command, primer_send_response);
-
+    hw_uart_wait_busy();
     hw_reset(NULL);
 }

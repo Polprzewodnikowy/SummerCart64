@@ -70,7 +70,7 @@ $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 $(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf
 	@$(OBJCOPY) -O binary $< $@
 	@chksum64 $@ > /dev/null
-	@truncate --size=1028k $@
+	@$(PYTHON) tools/strip.py $@
 
 $(BUILD_DIR)/bootloader.hex: $(BUILD_DIR)/bootloader.bin
 	@$(OBJCOPY) -I binary -O ihex $< $@

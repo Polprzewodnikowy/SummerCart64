@@ -126,6 +126,10 @@ void hw_uart_write (uint8_t *data, int length) {
     }
 }
 
+void hw_uart_wait_busy (void) {
+    while (!(USART1->ISR & USART_ISR_TC));
+}
+
 void hw_spi_start (void) {
     hw_gpio_reset(GPIO_ID_SPI_CS);
 }
@@ -195,26 +199,42 @@ uint32_t hw_i2c_get_error (void) {
     return (I2C1->ISR & I2C_ISR_NACKF);
 }
 
-void hw_i2c_raw (uint8_t i2c_address, uint8_t *data, int length, i2c_type_t type) {
-    if (type & I2C_START) {
+void hw_i2c_raw (uint8_t i2c_address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length) {
+    while (I2C1->ISR & I2C_ISR_BUSY);
+
+    if (tx_length > 0) {
         I2C1->ICR = I2C_ICR_NACKCF;
-    }
-    I2C1->CR2 = (
-        ((type & I2C_AUTOEND) ? I2C_CR2_AUTOEND : 0) |
-        (length << I2C_CR2_NBYTES_Pos) |
-        ((type & I2C_STOP) ? I2C_CR2_STOP : 0) |
-        ((type & I2C_START) ? I2C_CR2_START : 0) |
-        ((type & I2C_READ) ? I2C_CR2_RD_WRN : 0) |
-        (i2c_address << I2C_CR2_SADD_Pos)
-    );
-    for (int i = 0; i < length; i++) {
-        if (type & I2C_READ) {
-            while (!(I2C1->ISR & I2C_ISR_RXNE));
-            *data++ = I2C1->RXDR;
-        } else if (type & I2C_WRITE) {
-            while (!(I2C1->ISR & I2C_ISR_TXE));
-            I2C1->TXDR = *data++;
+        I2C1->CR2 = (
+            ((rx_length == 0) ? I2C_CR2_AUTOEND : 0) |
+            (tx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
+            (i2c_address << I2C_CR2_SADD_Pos)
+        );
+        for (int i = 0; i < tx_length; i++) {
+            while (!(I2C1->ISR & I2C_ISR_TXIS));
+            I2C1->TXDR = *tx_data++;
         }
+        if (!(I2C1->CR2 & I2C_CR2_AUTOEND)) {
+            while (!(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TC)));
+        }
+    }
+
+    if (rx_length > 0) {
+        I2C1->CR2 = (
+            I2C_CR2_AUTOEND |
+            (rx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
+            I2C_CR2_RD_WRN |
+            (i2c_address << I2C_CR2_SADD_Pos)
+        );
+        for (int i = 0; i < rx_length; i++) {
+            while (!(I2C1->ISR & I2C_ISR_RXNE));
+            *rx_data++ = I2C1->RXDR;
+        }
+    }
+
+    if ((tx_length > 0) || (rx_length > 0)) {
+        while (!(I2C1->ISR & I2C_ISR_STOPF));
     }
 }
 
@@ -438,7 +458,7 @@ static void hw_init_spi (void) {
 static void hw_init_i2c (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
 
-    I2C1->TIMINGR = 0x10B17DB5UL;
+    I2C1->TIMINGR = 0x00C12166UL;
     I2C1->CR1 |= (I2C_CR1_TCIE | I2C_CR1_STOPIE | I2C_CR1_RXIE | I2C_CR1_TXIE | I2C_CR1_PE);
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
@@ -450,12 +470,12 @@ static void hw_init_uart (void) {
 
     SYSCFG->CFGR1 |= (SYSCFG_CFGR1_PA12_RMP | SYSCFG_CFGR1_PA11_RMP);
 
-    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
+    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
     hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
 
     USART1->BRR = (64000000UL) / UART_BAUD;
-    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_M0 | USART_CR1_PCE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
     USART1->RQR = USART_RQR_TXFRQ | USART_RQR_RXFRQ;
+    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_M0 | USART_CR1_PCE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
 }
 
 static void hw_init_tim (void) {
