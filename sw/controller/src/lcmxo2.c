@@ -217,12 +217,14 @@ static void lcmxo2_read_flash_page (uint8_t *buffer) {
     lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED, buffer, FLASH_PAGE_SIZE, false);
 }
 
-static void lcmxo2_program_done (void) {
+static bool lcmxo2_program_done (void) {
     lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL, NULL, 0, false);
+    return lcmxo2_wait_busy();
 }
 
-static void lcmxo2_write_featbits (uint8_t *buffer) {
+static bool lcmxo2_write_featbits (uint8_t *buffer) {
     lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, true);
+    return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_read_featbits (uint8_t *buffer) {
@@ -291,7 +293,9 @@ vendor_error_t vendor_update (uint32_t address, uint32_t length) {
             return lcmxo2_fail(VENDOR_ERROR_PROGRAM);
         }
     }
-    lcmxo2_program_done();
+    if (lcmxo2_program_done()) {
+        return lcmxo2_fail(VENDOR_ERROR_PROGRAM);
+    }
     lcmxo2_reset_flash_address();
     for (int i = 0; i < length; i += FLASH_PAGE_SIZE) {
         lcmxo2_read_flash_page(buffer);
@@ -344,6 +348,26 @@ static bool primer_check_rx_length (primer_cmd_e cmd, size_t rx_length) {
             return (rx_length != 0);
     }
     return true;
+}
+
+static bool lcmxo2_init_featbits (void) {
+    uint8_t programmed[2] = { 0x00, 0x00 };
+    uint8_t target[2] = { FEATBITS_0_SPI_OFF, FEATBITS_1_PROGRAMN_OFF };
+    lcmxo2_read_featbits(programmed);
+    if ((programmed[0] == target[0]) && (programmed[1] == target[1])) {
+        return false;
+    }
+    if (lcmxo2_erase_featbits()) {
+        return true;
+    }
+    if (lcmxo2_write_featbits(target)) {
+        return true;
+    }
+    lcmxo2_read_featbits(programmed);
+    if ((programmed[0] != target[0]) || (programmed[1] != target[1])) {
+        return true;
+    }
+    return false;
 }
 
 
@@ -419,17 +443,11 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_PROGRAM_DONE:
-                lcmxo2_program_done();
+                error = lcmxo2_program_done();
                 break;
 
             case CMD_INIT_FEATBITS:
-                lcmxo2_read_featbits(buffer);
-                if ((buffer[0] != FEATBITS_0_SPI_OFF) && (buffer[1] != FEATBITS_1_PROGRAMN_OFF)) {
-                    buffer[0] = FEATBITS_0_SPI_OFF;
-                    buffer[1] = FEATBITS_1_PROGRAMN_OFF;
-                    lcmxo2_erase_featbits();
-                    lcmxo2_write_featbits(buffer);
-                }
+                error = lcmxo2_init_featbits();
                 break;
 
             case CMD_REFRESH:

@@ -30,14 +30,6 @@ typedef enum {
 } gpio_irq_t;
 
 typedef enum {
-    I2C_START   = (1 << 0),
-    I2C_AUTOEND = (1 << 1),
-    I2C_STOP    = (1 << 2),
-    I2C_READ    = (1 << 3),
-    I2C_WRITE   = (1 << 4),
-} i2c_type_t;
-
-typedef enum {
     TIM_ID_CIC          = 0,
     TIM_ID_RTC          = 1,
     TIM_ID_SD           = 2,

@@ -56,9 +56,9 @@ SECTIONS {
     _sp = .;
 
     .fill : {
-        . = ALIGN(1024);
+        . = ALIGN(1024) - 4;
+        LONG(0xDEADBEEF);
         FILL(0xFFFFFFFF);
-        BYTE(0xFFFFFFFF);
         . = ORIGIN(rom) + LENGTH(rom);
     } > rom
 
