@@ -9,6 +9,7 @@ FILES=(
     "./fw/project/lcmxo2/impl1/sc64_impl1.mrp"
     "./fw/project/lcmxo2/impl1/sc64_impl1.twr"
     "./sw/pc/dd64.py"
+    "./sw/pc/primer.py"
     "./sw/pc/sc64.py"
     "./sw/update/sc64.upd"
     "./LICENSE"
