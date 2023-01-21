@@ -36,7 +36,6 @@
 #define LSC_READ_FEABITS        (0xFB)
 #define ISC_NOOP                (0xFF)
 
-#define ISC_ERASE_SRAM          (1 << 16)
 #define ISC_ERASE_FEATURE       (1 << 17)
 #define ISC_ERASE_CFG           (1 << 18)
 #define ISC_ERASE_UFM           (1 << 19)
@@ -189,11 +188,6 @@ static void lcmxo2_disable_flash (void) {
     lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL, NULL, 0, false);
 }
 
-static bool lcmxo2_erase_sram (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_SRAM, CMD_NORMAL, NULL, 0, false);
-    return lcmxo2_wait_busy();
-}
-
 static bool lcmxo2_erase_featbits (void) {
     lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_FEATURE, CMD_NORMAL, NULL, 0, false);
     return lcmxo2_wait_busy();
@@ -329,7 +323,6 @@ typedef enum {
     CMD_RESTART         = '$',
     CMD_GET_DEVICE_ID   = 'I',
     CMD_ENABLE_FLASH    = 'E',
-    CMD_DISABLE_FLASH   = 'D',
     CMD_ERASE_FLASH     = 'X',
     CMD_RESET_ADDRESS   = 'A',
     CMD_WRITE_PAGE      = 'W',
@@ -418,13 +411,6 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 error = lcmxo2_enable_flash();
                 break;
 
-            case CMD_DISABLE_FLASH:
-                if (lcmxo2_read_status() & LSC_STATUS_CFG_ENABLE) {
-                    error = lcmxo2_erase_sram();
-                    lcmxo2_disable_flash();
-                }
-                break;
-
             case CMD_ERASE_FLASH:
                 error = lcmxo2_erase_flash();
                 break;
@@ -452,7 +438,7 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
 
             case CMD_REFRESH:
                 lcmxo2_refresh();
-                hw_delay_ms(100);
+                hw_delay_ms(200);
                 break;
 
             default:

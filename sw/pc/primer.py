@@ -288,7 +288,6 @@ class LCMXO2Primer:
     __CMD_RESTART       = b'$'
     __CMD_GET_DEVICE_ID = b'I'
     __CMD_ENABLE_FLASH  = b'E'
-    __CMD_DISABLE_FLASH = b'D'
     __CMD_ERASE_FLASH   = b'X'
     __CMD_RESET_ADDRESS = b'A'
     __CMD_WRITE_PAGE    = b'W'
@@ -322,17 +321,19 @@ class LCMXO2Primer:
         self.__write(packet)
 
         response = self.__read(5)
+        if (len(response) != 5):
+            raise LCMXO2PrimerException(f'No response received [{cmd}]')
         length = int.from_bytes(response[4:5], byteorder='little')
         response += self.__read(length)
         calculated_checksum = crc32(response)
         received_checksum = int.from_bytes(self.__read(4), byteorder='little')
 
         if (response[0:3] != b'RSP'):
-            raise LCMXO2PrimerException('Invalid response token')
+            raise LCMXO2PrimerException(f'Invalid response token [{response[0:3]} / {cmd}]')
         if (response[3:4] != cmd):
-            raise LCMXO2PrimerException('Invalid response command')
+            raise LCMXO2PrimerException(f'Invalid response command [{cmd} / {response[3]}]')
         if (calculated_checksum != received_checksum):
-            raise LCMXO2PrimerException('Invalid response checksum')
+            raise LCMXO2PrimerException(f'Invalid response checksum [{cmd}]')
 
         return response[5:]
 
@@ -383,8 +384,6 @@ class LCMXO2Primer:
 
             self.__cmd_execute(self.__CMD_PROGRAM_DONE)
 
-            self.__cmd_execute(self.__CMD_DISABLE_FLASH)
-
             self.__cmd_execute(self.__CMD_REFRESH)
 
             if (self.__cmd_execute(self.__CMD_PROBE_FPGA) != self.__FPGA_PROBE_VALUE):
@@ -393,7 +392,7 @@ class LCMXO2Primer:
         except LCMXO2PrimerException as e:
             self.__cmd_execute(self.__CMD_ENABLE_FLASH)
             self.__cmd_execute(self.__CMD_ERASE_FLASH)
-            self.__cmd_execute(self.__CMD_DISABLE_FLASH)
+            self.__cmd_execute(self.__CMD_REFRESH)
             self.__cmd_execute(self.__CMD_RESTART)
             raise LCMXO2PrimerException(e)
 
@@ -402,7 +401,7 @@ class LCMXO2Primer:
 
 class SC64BringUp:
     __SERIAL_BAUD: int      = 115200
-    __SERIAL_TIMEOUT: float = 16.0
+    __SERIAL_TIMEOUT: float = 6.0
     __INTERVAL_TIME: float  = 0.5
 
     def __init__(self, progress: Callable[[int, int, str], None]) -> None:
