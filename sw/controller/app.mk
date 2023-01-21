@@ -1,6 +1,9 @@
 EXE_NAME = app
-LD_SCRIPT = app.ld
 BUILD_DIR = build/app
+
+LD_SCRIPT = app.ld
+PAD_TO = 0x08008000
+
 SRC_FILES = \
 	app.S \
 	app.c \
@@ -24,7 +27,6 @@ SRC_FILES = \
 	update.c \
 	usb.c \
 	writeback.c
-PAD_TO = 0x08008000
 
 include common.mk
 

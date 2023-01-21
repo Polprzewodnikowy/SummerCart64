@@ -24,6 +24,7 @@ typedef enum {
     CHUNK_ID_MCU_DATA = 2,
     CHUNK_ID_FPGA_DATA = 3,
     CHUNK_ID_BOOTLOADER_DATA = 4,
+    CHUNK_ID_PRIMER_DATA = 5,
 } chunk_id_t;
 
 
@@ -264,6 +265,9 @@ update_error_t update_prepare (uint32_t address, uint32_t length) {
                 parameters.bootloader_address = data_address;
                 break;
 
+            case CHUNK_ID_PRIMER_DATA:
+                break;
+
             default:
                 return UPDATE_ERROR_UNKNOWN_CHUNK;
         }
@@ -274,7 +278,7 @@ update_error_t update_prepare (uint32_t address, uint32_t length) {
 
 void update_start (void) {
     parameters.magic = UPDATE_MAGIC_START;
-    hw_loader_reset(&parameters);
+    hw_reset(&parameters);
 }
 
 bool update_check (void) {
@@ -317,5 +321,5 @@ void update_perform (void) {
     vendor_reconfigure();
 
     parameters.magic = 0;
-    hw_loader_reset(&parameters);
+    hw_reset(&parameters);
 }

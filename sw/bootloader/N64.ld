@@ -55,6 +55,13 @@ SECTIONS {
     . += __stack_size;
     _sp = .;
 
+    .fill : {
+        . = ALIGN(1024) - 4;
+        LONG(0xDEADBEEF);
+        FILL(0xFFFFFFFF);
+        . = ORIGIN(rom) + LENGTH(rom);
+    } > rom
+
     /DISCARD/ : {
         *(.MIPS.*)
     }

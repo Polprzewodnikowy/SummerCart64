@@ -63,13 +63,16 @@ void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void));
 uint32_t hw_gpio_get (gpio_id_t id);
 void hw_gpio_set (gpio_id_t id);
 void hw_gpio_reset (gpio_id_t id);
+void hw_uart_read (uint8_t *data, int length);
 void hw_uart_write (uint8_t *data, int length);
+void hw_uart_wait_busy (void);
 void hw_spi_start (void);
 void hw_spi_stop (void);
 void hw_spi_trx (uint8_t *data, int length, spi_direction_t direction);
 void hw_i2c_read (uint8_t i2c_address, uint8_t address, uint8_t *data, uint8_t length, void (*callback)(void));
 void hw_i2c_write (uint8_t i2c_address, uint8_t address, uint8_t *data, uint8_t length, void (*callback)(void));
 uint32_t hw_i2c_get_error (void);
+void hw_i2c_raw (uint8_t i2c_address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length);
 void hw_i2c_disable_irq (void);
 void hw_i2c_enable_irq (void);
 void hw_tim_setup (tim_id_t id, uint16_t delay, void (*callback)(void));
@@ -83,10 +86,12 @@ uint32_t hw_flash_size (void);
 void hw_flash_erase (void);
 void hw_flash_program (uint32_t offset, hw_flash_t value);
 hw_flash_t hw_flash_read (uint32_t offset);
-void hw_loader_reset (loader_parameters_t *parameters);
+void hw_reset (loader_parameters_t *parameters);
 void hw_loader_get_parameters (loader_parameters_t *parameters);
+void hw_set_vector_table (uint32_t offset);
 void hw_init (void);
 void hw_loader_init (void);
+void hw_primer_init (void);
 
 
 #endif

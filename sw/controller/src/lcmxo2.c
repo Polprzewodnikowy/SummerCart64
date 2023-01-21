@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include "fpga.h"
+#include "hw.h"
 #include "vendor.h"
 
 
@@ -9,6 +10,9 @@
 #define VENDOR_SCR_LENGTH_BIT   (2)
 #define VENDOR_SCR_DELAY        (1 << 4)
 #define VENDOR_SCR_ADDRESS_BIT  (8)
+
+#define LCMXO2_I2C_ADDR_CFG     (0x80)
+#define LCMXO2_I2C_ADDR_RESET   (0x86)
 
 #define LCMXO2_CFGCR            (0x70)
 #define LCMXO2_CFGTXDR          (0x71)
@@ -26,16 +30,26 @@
 #define LSC_READ_INCR_NV        (0x73)
 #define ISC_ENABLE_X            (0x74)
 #define LSC_REFRESH             (0x79)
+#define ISC_ENABLE              (0xC6)
+#define IDCODE_PUB              (0xE0)
+#define LSC_PROG_FEABITS        (0xF8)
+#define LSC_READ_FEABITS        (0xFB)
 #define ISC_NOOP                (0xFF)
 
+#define ISC_ERASE_FEATURE       (1 << 17)
 #define ISC_ERASE_CFG           (1 << 18)
 #define ISC_ERASE_UFM           (1 << 19)
 
-#define LSC_STATUS_1_BUSY       (1 << 4)
-#define LSC_STATUS_1_FAIL       (1 << 5)
+#define LSC_STATUS_CFG_ENABLE   (1 << 9)
+#define LSC_STATUS_BUSY         (1 << 12)
+#define LSC_STATUS_FAIL         (1 << 13)
+
+#define DEVICE_ID_SIZE          (4)
 
 #define FLASH_PAGE_SIZE         (16)
 #define FLASH_NUM_PAGES         (11260)
+
+#define FEATBITS_SIZE           (2)
 
 
 typedef enum {
@@ -45,6 +59,7 @@ typedef enum {
 } cmd_type_t;
 
 
+#ifndef LCMXO2_I2C
 static void lcmxo2_reg_set (uint8_t reg, uint8_t value) {
     fpga_reg_set(REG_VENDOR_DATA, value << 24);
     fpga_reg_set(REG_VENDOR_SCR,
@@ -54,30 +69,6 @@ static void lcmxo2_reg_set (uint8_t reg, uint8_t value) {
         VENDOR_SCR_START
     );
     while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
-}
-
-static void lcmxo2_reset_bus (void) {
-    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
-    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
-}
-
-static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type) {
-    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
-    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
-    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
-    fpga_reg_set(REG_VENDOR_DATA, data);
-    fpga_reg_set(REG_VENDOR_SCR,
-        (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
-        (type == CMD_DELAYED ? VENDOR_SCR_DELAY : 0) |
-        ((type == CMD_TWO_OP ? 2 : 3) << VENDOR_SCR_LENGTH_BIT) |
-        VENDOR_SCR_WRITE |
-        VENDOR_SCR_START
-    );
-    while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
-}
-
-static void lcmxo2_cleanup (void) {
-    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
 }
 
 static void lcmxo2_read_data (uint8_t *buffer, uint32_t length) {
@@ -118,61 +109,131 @@ static void lcmxo2_write_data (uint8_t *buffer, uint32_t length) {
         while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
     }
 }
+#endif
+
+static void lcmxo2_reset_bus (void) {
+#ifdef LCMXO2_I2C
+    uint8_t reset_data = 0;
+    hw_i2c_raw(LCMXO2_I2C_ADDR_RESET, &reset_data, sizeof(reset_data), NULL, 0);
+#else
+    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
+    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
+#endif
+}
+
+static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint8_t *buffer, uint8_t length, bool write) {
+#ifdef LCMXO2_I2C
+    uint8_t packet[20] = { cmd, ((arg >> 16) & 0xFF), ((arg >> 8) & 0xFF), (arg & 0xFF) };
+    int packet_length = ((type == CMD_TWO_OP) ? 3 : 4);
+    if (write) {
+        for (int i = 0; i < length; i++) {
+            packet[packet_length + i] = buffer[i];
+        }
+        packet_length += length;
+    }
+    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+#else
+    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
+    lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
+    fpga_reg_set(REG_VENDOR_DATA, data);
+    fpga_reg_set(REG_VENDOR_SCR,
+        (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
+        (type == CMD_DELAYED ? VENDOR_SCR_DELAY : 0) |
+        ((type == CMD_TWO_OP ? 2 : 3) << VENDOR_SCR_LENGTH_BIT) |
+        VENDOR_SCR_WRITE |
+        VENDOR_SCR_START
+    );
+    while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
+    if (length > 0) {
+        if (write) {
+            lcmxo2_write_data(buffer, length);
+        } else {
+            lcmxo2_read_data(buffer, length);
+        }
+    }
+    lcmxo2_reg_set(LCMXO2_CFGCR, 0);
+#endif
+}
+
+static void lcmxo2_read_device_id (uint8_t *id) {
+    lcmxo2_execute_cmd(IDCODE_PUB, 0, CMD_NORMAL, id, DEVICE_ID_SIZE, false);
+}
+
+static uint32_t lcmxo2_read_status (void) {
+    uint32_t status = 0;
+    lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL, (uint8_t *) (&status), 4, false);
+    return SWAP32(status);
+}
 
 static bool lcmxo2_wait_busy (void) {
-    uint8_t status[4];
+    uint32_t status;
     do {
-        lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL);
-        lcmxo2_read_data(status, 4);
-    } while(status[2] & LSC_STATUS_1_BUSY);
-    return status[2] & LSC_STATUS_1_FAIL;
+        status = lcmxo2_read_status();
+    } while(status & LSC_STATUS_BUSY);
+    return (status & LSC_STATUS_FAIL);
 }
 
 static bool lcmxo2_enable_flash (void) {
-    lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL);
+#ifdef LCMXO2_I2C
+    lcmxo2_execute_cmd(ISC_ENABLE, 0x080000, CMD_TWO_OP, NULL, 0, false);
+#else
+    lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL, NULL, 0, false);
+#endif
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_disable_flash (void) {
     lcmxo2_wait_busy();
-    lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP);
-    lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL);
+    lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP, NULL, 0, false);
+    lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL, NULL, 0, false);
+}
+
+static bool lcmxo2_erase_featbits (void) {
+    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_FEATURE, CMD_NORMAL, NULL, 0, false);
+    return lcmxo2_wait_busy();
 }
 
 static bool lcmxo2_erase_flash (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_UFM | ISC_ERASE_CFG, CMD_NORMAL);
+    lcmxo2_execute_cmd(ISC_ERASE, (ISC_ERASE_UFM | ISC_ERASE_CFG), CMD_NORMAL, NULL, 0, false);
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_reset_flash_address (void) {
-    lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL);
+    lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL, NULL, 0, false);
 }
 
 static bool lcmxo2_write_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL);
-    lcmxo2_write_data(buffer, FLASH_PAGE_SIZE);
+    lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL, buffer, FLASH_PAGE_SIZE, true);
     return lcmxo2_wait_busy();
 }
 
 static void lcmxo2_read_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED);
-    lcmxo2_read_data(buffer, FLASH_PAGE_SIZE);
+    lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED, buffer, FLASH_PAGE_SIZE, false);
 }
 
-static void lcmxo2_program_done (void) {
-    lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL);
-    lcmxo2_wait_busy();
+static bool lcmxo2_program_done (void) {
+    lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL, NULL, 0, false);
+    return lcmxo2_wait_busy();
+}
+
+static bool lcmxo2_write_featbits (uint8_t *buffer) {
+    lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, true);
+    return lcmxo2_wait_busy();
+}
+
+static void lcmxo2_read_featbits (uint8_t *buffer) {
+    lcmxo2_execute_cmd(LSC_READ_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, false);
 }
 
 static void lcmxo2_refresh (void) {
-    lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP);
+    lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP, NULL, 0, false);
 }
 
 static vendor_error_t lcmxo2_fail (vendor_error_t error) {
     lcmxo2_disable_flash();
-    lcmxo2_cleanup();
     return error;
 }
+
 
 uint32_t vendor_flash_size (void) {
     return (FLASH_PAGE_SIZE * FLASH_NUM_PAGES);
@@ -194,7 +255,6 @@ vendor_error_t vendor_backup (uint32_t address, uint32_t *length) {
         *length += FLASH_PAGE_SIZE;
     }
     lcmxo2_disable_flash();
-    lcmxo2_cleanup();
 
     return VENDOR_OK;
 }
@@ -227,7 +287,9 @@ vendor_error_t vendor_update (uint32_t address, uint32_t length) {
             return lcmxo2_fail(VENDOR_ERROR_PROGRAM);
         }
     }
-    lcmxo2_program_done();
+    if (lcmxo2_program_done()) {
+        return lcmxo2_fail(VENDOR_ERROR_PROGRAM);
+    }
     lcmxo2_reset_flash_address();
     for (int i = 0; i < length; i += FLASH_PAGE_SIZE) {
         lcmxo2_read_flash_page(buffer);
@@ -239,7 +301,6 @@ vendor_error_t vendor_update (uint32_t address, uint32_t length) {
         }
     }
     lcmxo2_disable_flash();
-    lcmxo2_cleanup();
 
     return VENDOR_OK;
 }
@@ -247,7 +308,144 @@ vendor_error_t vendor_update (uint32_t address, uint32_t length) {
 vendor_error_t vendor_reconfigure (void) {
     lcmxo2_reset_bus();
     lcmxo2_refresh();
-    lcmxo2_cleanup();
 
     return VENDOR_OK;
+}
+
+
+#define FEATBITS_0_SPI_OFF      (1 << 1)
+#define FEATBITS_1_PROGRAMN_OFF (1 << 5)
+
+
+typedef enum {
+    CMD_GET_PRIMER_ID   = '?',
+    CMD_PROBE_FPGA      = '#',
+    CMD_RESTART         = '$',
+    CMD_GET_DEVICE_ID   = 'I',
+    CMD_ENABLE_FLASH    = 'E',
+    CMD_ERASE_FLASH     = 'X',
+    CMD_RESET_ADDRESS   = 'A',
+    CMD_WRITE_PAGE      = 'W',
+    CMD_READ_PAGE       = 'R',
+    CMD_PROGRAM_DONE    = 'F',
+    CMD_INIT_FEATBITS   = 'Q',
+    CMD_REFRESH         = 'B',
+} primer_cmd_e;
+
+
+static bool primer_check_rx_length (primer_cmd_e cmd, size_t rx_length) {
+    switch (cmd) {
+        case CMD_WRITE_PAGE:
+            return (rx_length != FLASH_PAGE_SIZE);
+        default:
+            return (rx_length != 0);
+    }
+    return true;
+}
+
+static bool lcmxo2_init_featbits (void) {
+    uint8_t programmed[2] = { 0x00, 0x00 };
+    uint8_t target[2] = { FEATBITS_0_SPI_OFF, FEATBITS_1_PROGRAMN_OFF };
+    lcmxo2_read_featbits(programmed);
+    if ((programmed[0] == target[0]) && (programmed[1] == target[1])) {
+        return false;
+    }
+    if (lcmxo2_erase_featbits()) {
+        return true;
+    }
+    if (lcmxo2_write_featbits(target)) {
+        return true;
+    }
+    lcmxo2_read_featbits(programmed);
+    if ((programmed[0] != target[0]) || (programmed[1] != target[1])) {
+        return true;
+    }
+    return false;
+}
+
+
+void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_response_t send_response) {
+    bool runninng = true;
+    primer_cmd_e cmd;
+    uint8_t buffer[256];
+    uint8_t rx_length;
+    uint8_t tx_length;
+    bool error;
+
+    lcmxo2_reset_bus();
+
+    while (runninng) {
+        cmd = get_cmd(buffer, &rx_length);
+        tx_length = 0;
+        error = false;
+
+        if (primer_check_rx_length(cmd, rx_length)) {
+            send_response(cmd, NULL, 0, true);
+            continue;
+        }
+
+        switch (cmd) {
+            case CMD_GET_PRIMER_ID:
+                buffer[0] = 'M';
+                buffer[1] = 'X';
+                buffer[2] = 'O';
+                buffer[3] = '2';
+                tx_length = 4;
+                break;
+
+            case CMD_PROBE_FPGA:
+                buffer[0] = fpga_id_get();
+                tx_length = 1;
+                break;
+
+            case CMD_RESTART:
+                runninng = false;
+                break;
+
+            case CMD_GET_DEVICE_ID:
+                lcmxo2_read_device_id(buffer);
+                tx_length = 4;
+                break;
+
+            case CMD_ENABLE_FLASH:
+                error = lcmxo2_enable_flash();
+                break;
+
+            case CMD_ERASE_FLASH:
+                error = lcmxo2_erase_flash();
+                break;
+
+            case CMD_RESET_ADDRESS:
+                lcmxo2_reset_flash_address();
+                break;
+
+            case CMD_WRITE_PAGE:
+                error = lcmxo2_write_flash_page(buffer);
+                break;
+
+            case CMD_READ_PAGE:
+                lcmxo2_read_flash_page(buffer);
+                tx_length = FLASH_PAGE_SIZE;
+                break;
+
+            case CMD_PROGRAM_DONE:
+                error = lcmxo2_program_done();
+                break;
+
+            case CMD_INIT_FEATBITS:
+                error = lcmxo2_init_featbits();
+                break;
+
+            case CMD_REFRESH:
+                lcmxo2_refresh();
+                hw_delay_ms(200);
+                break;
+
+            default:
+                error = true;
+                break;
+        }
+
+        send_response(cmd, buffer, tx_length, error);
+    }
 }

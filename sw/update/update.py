@@ -19,6 +19,7 @@ class JedecFile:
     __fuse_length: int = 0
     __fuse_offset: int = 0
     __fuse_data: bytes = b''
+    __fuse_ignore: bool = False
     __byte_buffer: int = 0
 
     def __handle_q_field(self, f: BufferedRandom) -> None:
@@ -77,6 +78,19 @@ class JedecFile:
             else:
                 raise JedecError('Unexpected byte inside L field fuse data')
 
+    def __handle_n_field(self, f: BufferedRandom) -> None:
+        data = b''
+        buffer = b''
+        while (buffer != b'*'):
+            buffer = f.read(1)
+            if (buffer == b''):
+                raise JedecError('Unexpected end of file')
+            if (buffer != b'*'):
+                data += buffer
+        if (data == b'OTE END CONFIG DATA'):
+            self.__fuse_length = self.__fuse_offset
+            self.__fuse_ignore = True
+
     def __ignore_field(self, f: BufferedRandom) -> None:
         data = None
         while (data != b'*'):
@@ -88,6 +102,7 @@ class JedecFile:
         self.__fuse_length = 0
         self.__fuse_offset = 0
         self.__fuse_data = b''
+        self.__fuse_ignore = False
         self.__byte_buffer = 0
 
         field = None
@@ -104,8 +119,10 @@ class JedecFile:
                 field = f.read(1)
                 if (field == b'Q'):
                     self.__handle_q_field(f)
-                elif (field == b'L'):
+                elif (field == b'L' and not self.__fuse_ignore):
                     self.__handle_l_field(f)
+                elif (field == b'N'):
+                    self.__handle_n_field(f)
                 elif (field == b'\r' or field == b'\n'):
                     pass
                 elif (field == b'\x03'):
@@ -134,6 +151,7 @@ class SC64UpdateData:
     __CHUNK_ID_MCU_DATA = 2
     __CHUNK_ID_FPGA_DATA = 3
     __CHUNK_ID_BOOTLOADER_DATA = 4
+    __CHUNK_ID_PRIMER_DATA = 5
 
     __data = b''
 
@@ -172,6 +190,9 @@ class SC64UpdateData:
     def add_bootloader_data(self, data: bytes) -> None:
         self.__add_chunk(self.__CHUNK_ID_BOOTLOADER_DATA, data)
 
+    def add_primer_data(self, data: bytes) -> None:
+        self.__add_chunk(self.__CHUNK_ID_PRIMER_DATA, data)
+
     def get_update_data(self) -> bytes:
         return self.__data
 
@@ -183,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument('--mcu', metavar='mcu_path', required=False, help='path to MCU update data')
     parser.add_argument('--fpga', metavar='fpga_path', required=False, help='path to FPGA update data')
     parser.add_argument('--boot', metavar='bootloader_path', required=False, help='path to N64 bootloader update data')
+    parser.add_argument('--primer', metavar='primer_path', required=False, help='path to MCU board bring-up data')
     parser.add_argument('output', metavar='output_path', help='path to final update data')
 
     if (len(sys.argv) <= 1):
@@ -217,6 +239,10 @@ if __name__ == "__main__":
         if (args.boot):
             with open(args.boot, 'rb+') as f:
                 update.add_bootloader_data(f.read())
+
+        if (args.primer):
+            with open(args.primer, 'rb+') as f:
+                update.add_primer_data(f.read())
 
         with open(args.output, 'wb+') as f:
             f.write(update.get_update_data())

@@ -1,5 +1,9 @@
+#include <stddef.h>
 #include <stm32g0xx.h>
 #include "hw.h"
+
+
+#define UART_BAUD       (115200)
 
 
 typedef enum {
@@ -108,11 +112,22 @@ void hw_gpio_reset (gpio_id_t id) {
     gpio->BSRR = (GPIO_BSRR_BR0 << pin);
 }
 
+void hw_uart_read (uint8_t *data, int length) {
+    for (int i = 0; i < length; i++) {
+        while (!(USART1->ISR & USART_ISR_RXNE_RXFNE));
+        *data++ = (uint8_t) (USART1->RDR);
+    }
+}
+
 void hw_uart_write (uint8_t *data, int length) {
     for (int i = 0; i < length; i++) {
         while (!(USART1->ISR & USART_ISR_TXE_TXFNF));
         USART1->TDR = *data++;
     }
+}
+
+void hw_uart_wait_busy (void) {
+    while (!(USART1->ISR & USART_ISR_TC));
 }
 
 void hw_spi_start (void) {
@@ -181,7 +196,46 @@ void hw_i2c_write (uint8_t i2c_address, uint8_t address, uint8_t *data, uint8_t 
 }
 
 uint32_t hw_i2c_get_error (void) {
-    return I2C1->ISR & I2C_ISR_NACKF;
+    return (I2C1->ISR & I2C_ISR_NACKF);
+}
+
+void hw_i2c_raw (uint8_t i2c_address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length) {
+    while (I2C1->ISR & I2C_ISR_BUSY);
+
+    if (tx_length > 0) {
+        I2C1->ICR = I2C_ICR_NACKCF;
+        I2C1->CR2 = (
+            ((rx_length == 0) ? I2C_CR2_AUTOEND : 0) |
+            (tx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
+            (i2c_address << I2C_CR2_SADD_Pos)
+        );
+        for (int i = 0; i < tx_length; i++) {
+            while (!(I2C1->ISR & I2C_ISR_TXIS));
+            I2C1->TXDR = *tx_data++;
+        }
+        if (!(I2C1->CR2 & I2C_CR2_AUTOEND)) {
+            while (!(I2C1->ISR & (I2C_ISR_NACKF | I2C_ISR_TC)));
+        }
+    }
+
+    if (rx_length > 0) {
+        I2C1->CR2 = (
+            I2C_CR2_AUTOEND |
+            (rx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
+            I2C_CR2_RD_WRN |
+            (i2c_address << I2C_CR2_SADD_Pos)
+        );
+        for (int i = 0; i < rx_length; i++) {
+            while (!(I2C1->ISR & I2C_ISR_RXNE));
+            *rx_data++ = I2C1->RXDR;
+        }
+    }
+
+    if ((tx_length > 0) || (rx_length > 0)) {
+        while (!(I2C1->ISR & I2C_ISR_STOPF));
+    }
 }
 
 void hw_i2c_disable_irq (void) {
@@ -311,16 +365,18 @@ hw_flash_t hw_flash_read (uint32_t offset) {
     return *(uint64_t *) (FLASH_BASE + offset);
 }
 
-void hw_loader_reset (loader_parameters_t *parameters) {
-    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
-    PWR->CR1 |= PWR_CR1_DBP;
-    TAMP->BKP0R = parameters->magic;
-    TAMP->BKP1R = parameters->flags;
-    TAMP->BKP2R = parameters->mcu_address;
-    TAMP->BKP3R = parameters->fpga_address;
-    TAMP->BKP4R = parameters->bootloader_address;
-    PWR->CR1 &= ~(PWR_CR1_DBP);
-    RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
+void hw_reset (loader_parameters_t *parameters) {
+    if (parameters != NULL) {
+        RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+        PWR->CR1 |= PWR_CR1_DBP;
+        TAMP->BKP0R = parameters->magic;
+        TAMP->BKP1R = parameters->flags;
+        TAMP->BKP2R = parameters->mcu_address;
+        TAMP->BKP3R = parameters->fpga_address;
+        TAMP->BKP4R = parameters->bootloader_address;
+        PWR->CR1 &= ~(PWR_CR1_DBP);
+        RCC->APBENR1 &= ~(RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
+    }
     NVIC_SystemReset();
 }
 
@@ -397,18 +453,16 @@ static void hw_init_spi (void) {
     hw_gpio_init(GPIO_ID_SPI_CLK, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_SPI_MISO, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_SPI_MOSI, GPIO_ALT, GPIO_PP, GPIO_SPEED_HIGH, GPIO_PULL_NONE, GPIO_AF_0, 0);
-    hw_gpio_init(GPIO_ID_FPGA_INT, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
 }
 
 static void hw_init_i2c (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
 
-    I2C1->TIMINGR = 0x10B17DB5UL;
+    I2C1->TIMINGR = 0x00C12166UL;
     I2C1->CR1 |= (I2C_CR1_TCIE | I2C_CR1_STOPIE | I2C_CR1_RXIE | I2C_CR1_TXIE | I2C_CR1_PE);
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
     hw_gpio_init(GPIO_ID_I2C_SDA, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
-    hw_gpio_init(GPIO_ID_RTC_MFP, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
 }
 
 static void hw_init_uart (void) {
@@ -416,11 +470,12 @@ static void hw_init_uart (void) {
 
     SYSCFG->CFGR1 |= (SYSCFG_CFGR1_PA12_RMP | SYSCFG_CFGR1_PA11_RMP);
 
-    USART1->BRR = (64000000UL) / 1000000;
-    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_TE | USART_CR1_UE;
+    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
+    hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
 
-    hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
-    hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_NONE, GPIO_AF_1, 0);
+    USART1->BRR = (64000000UL) / UART_BAUD;
+    USART1->RQR = USART_RQR_TXFRQ | USART_RQR_RXFRQ;
+    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_M0 | USART_CR1_PCE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
 }
 
 static void hw_init_tim (void) {
@@ -445,14 +500,22 @@ static void hw_init_tim (void) {
     );
 }
 
-static void hw_init_misc (void) {
+static void hw_init_crc (void) {
     RCC->AHBENR |= RCC_AHBENR_CRCEN;
 
     CRC->CR = (CRC_CR_REV_OUT | CRC_CR_REV_IN_0);
+}
 
+static void hw_init_misc (void) {
     hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_OUTPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);
+    hw_gpio_init(GPIO_ID_FPGA_INT, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
+    hw_gpio_init(GPIO_ID_RTC_MFP, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
+}
+
+void hw_set_vector_table (uint32_t offset) {
+    SCB->VTOR = (__IOM uint32_t) (offset);
 }
 
 void hw_init (void) {
@@ -461,6 +524,7 @@ void hw_init (void) {
     hw_init_i2c();
     hw_init_uart();
     hw_init_tim();
+    hw_init_crc();
     hw_init_misc();
 
     NVIC_SetPriority(EXTI0_1_IRQn, 0);
@@ -487,6 +551,14 @@ void hw_init (void) {
 void hw_loader_init (void) {
     hw_init_mcu();
     hw_init_spi();
+}
+
+void hw_primer_init (void) {
+    hw_init_mcu();
+    hw_init_spi();
+    hw_init_i2c();
+    hw_init_uart();
+    hw_init_crc();
 }
 
 

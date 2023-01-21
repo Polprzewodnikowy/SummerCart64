@@ -6,9 +6,9 @@ PACKAGE_FILE_NAME="SC64"
 
 FILES=(
     "./fw/ftdi/ft232h_config.xml"
-    "./fw/project/lcmxo2/impl1/sc64_impl1.mrp"
-    "./fw/project/lcmxo2/impl1/sc64_impl1.twr"
     "./sw/pc/dd64.py"
+    "./sw/pc/primer.py"
+    "./sw/pc/requirements.txt"
     "./sw/pc/sc64.py"
     "./sw/update/sc64.upd"
     "./LICENSE"
@@ -89,6 +89,7 @@ build_update () {
         --mcu ../controller/build/app/app.bin \
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \
+        --primer ../controller/build/primer/primer.bin \
         sc64.upd
     popd > /dev/null
 
@@ -113,7 +114,7 @@ print_usage () {
     echo "usage: ./build.sh [bootloader] [controller] [fpga] [update] [release] [-c] [--help]"
     echo "parameters:"
     echo "  bootloader  - compile N64 bootloader software"
-    echo "  controller  - compile ARM controller software"
+    echo "  controller  - compile MCU controller software"
     echo "  fpga        - compile FPGA design"
     echo "  update      - compile all software and designs"
     echo "  release     - collect and zip files for release (triggers 'update' build)"

@@ -14,7 +14,6 @@ SRC_DIR = src
 SRCS = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 OBJS = $(addprefix $(BUILD_DIR)/, $(notdir $(patsubst %,%.o,$(SRCS))))
 DEPS = $(OBJS:.o=.d)
-
 VPATH = $(SRC_DIR)
 
 $(@info $(shell mkdir -p ./$(BUILD_DIR) &> /dev/null))
