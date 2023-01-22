@@ -2,7 +2,6 @@ EXE_NAME = app
 BUILD_DIR = build/app
 
 LD_SCRIPT = app.ld
-PAD_TO = 0x08008000
 
 SRC_FILES = \
 	app.S \

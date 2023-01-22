@@ -45,6 +45,12 @@ SECTIONS {
         _ebss = .;
     } > ram
 
+    .fill : {
+        FILL(0xFF);
+        BYTE(0xFF);
+        . = ORIGIN(rom) + LENGTH(rom);
+    } > rom
+
     _sheap = .;
     . = ORIGIN(ram) + LENGTH(ram) - __exception_stack_size - __stack_size;
     _eheap = .;
@@ -54,13 +60,6 @@ SECTIONS {
 
     . += __stack_size;
     _sp = .;
-
-    .fill : {
-        . = ALIGN(1024) - 4;
-        LONG(0xDEADBEEF);
-        FILL(0xFFFFFFFF);
-        . = ORIGIN(rom) + LENGTH(rom);
-    } > rom
 
     /DISCARD/ : {
         *(.MIPS.*)

@@ -6,6 +6,8 @@ MEMORY {
 
 ENTRY(Reset_Handler)
 
+__bin_align = 8;
+
 SECTIONS {
     .loader : {
         . = ALIGN(4);
@@ -53,7 +55,8 @@ SECTIONS {
         . = ALIGN(4);
         *(.rodata)
         *(.rodata*)
-        . = ALIGN(4);
+        FILL(0xFF);
+        . = ALIGN(__bin_align);
     } > code
 
     _estack = ORIGIN(ram) + LENGTH(ram);

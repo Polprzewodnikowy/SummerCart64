@@ -19,8 +19,8 @@
  - Enhanced [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
  - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug terminal)
  - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
- - Initial board programming via UART header on board or dedicated JTAG/SWD interfaces
- - Software and firmware update via USB interface
+ - Initial programming via UART header or dedicated JTAG/SWD interfaces
+ - Software and firmware updatable via USB interface
  - 3D printable plastic shell
 
 ---

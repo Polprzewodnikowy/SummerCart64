@@ -29,7 +29,7 @@ $(BUILD_DIR)/$(EXE_NAME).elf: $(OBJS) $(LD_SCRIPT)
 	@$(OBJDUMP) -S -D $@ > $(BUILD_DIR)/$(EXE_NAME).lst
 
 $(BUILD_DIR)/$(EXE_NAME).bin: $(BUILD_DIR)/$(EXE_NAME).elf
-	$(OBJCOPY) -O binary --gap-fill 0xFF --pad-to $(PAD_TO) $< $@
+	$(OBJCOPY) -O binary --gap-fill 0xFF $< $@
 
 $(BUILD_DIR)/$(EXE_NAME).hex: $(BUILD_DIR)/$(EXE_NAME).bin
 	@$(OBJCOPY) -I binary -O ihex $< $@
