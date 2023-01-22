@@ -60,6 +60,34 @@ static const vi_regs_t vi_config[] = {{
 }};
 
 
+static void display_decompress_background (uint32_t *background) {
+    uint32_t pixel_count = ((*background++) / sizeof(uint32_t));
+    uint32_t pixels_painted = 0;
+    uint8_t *background_data = (uint8_t *) (background);
+    uint32_t *framebuffer = (uint32_t *) (display_framebuffer);
+
+    while (pixels_painted < pixel_count) {
+        int pixel_repeat = ((background_data[0]) + 1);
+        uint32_t pixel_value = (
+            ((background_data[1]) << 24) |
+            ((background_data[2]) << 16) |
+            ((background_data[3]) << 8) |
+            (background_data[4])
+        );
+        for (int i = 0; i < pixel_repeat; i++) {
+            io_write(framebuffer++, pixel_value);
+        }
+        pixels_painted += pixel_repeat;
+        background_data += 5;
+    }
+}
+
+static void display_clear_background (void) {
+    for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
+        io_write(&display_framebuffer[i], BACKGROUND_COLOR);
+    }
+}
+
 static void display_draw_character (char c) {
     if (c == '\n') {
         char_x = BORDER_WIDTH;
@@ -106,14 +134,10 @@ void display_init (uint32_t *background) {
     char_x = BORDER_WIDTH;
     char_y = BORDER_HEIGHT;
 
-    if (background == NULL) {
-        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
-            io_write(&display_framebuffer[i], BACKGROUND_COLOR);
-        }
+    if (background != NULL) {
+        display_decompress_background(background);
     } else {
-        for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
-            io_write(&display_framebuffer[i], *background++);
-        }
+        display_clear_background();
     }
 
     io_write(&VI->MADDR, (uint32_t) (display_framebuffer));

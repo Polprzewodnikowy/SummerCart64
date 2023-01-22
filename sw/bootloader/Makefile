@@ -57,8 +57,8 @@ $(BUILD_DIR)/%.S.o: %.S
 $(BUILD_DIR)/%.c.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.asset: $(ASSET_DIR)/%.png
-	$(PYTHON) tools/asset_converter.py $< $@
+$(BUILD_DIR)/%.asset: $(ASSET_DIR)/%.png tools/asset_converter.py
+	$(PYTHON) tools/asset_converter.py $< $@ --compress
 
 $(BUILD_DIR)/%.asset.o: $(BUILD_DIR)/%.asset $(ASSET_DIR)/assets.S
 	@sed -e "s,@sym@,$*,g" -e "s,@file@,$<," < $(ASSET_DIR)/assets.S | $(CC) -x assembler-with-cpp $(FLAGS) $(ASFLAGS) $(CFLAGS) -c - -o $@
@@ -67,7 +67,7 @@ $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 	$(CXX) $(FLAGS) $(LDFLAGS) -TN64.ld $(OBJS) -o $@
 	@$(OBJDUMP) -S $@ > $(BUILD_DIR)/bootloader.lst
 
-$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf
+$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf tools/strip.py
 	@$(OBJCOPY) -O binary $< $@
 	@chksum64 $@ > /dev/null
 	@$(PYTHON) tools/strip.py $@

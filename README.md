@@ -15,11 +15,12 @@
  - Status LED and button for general use
  - 64DD add-on emulation
  - IS-Viewer 64 debug interface
- - Software and firmware update via USB interface
  - N64 bootloader with support for IPL3 registers spoofing and loading menu from SD card
  - Enhanced [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
  - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug terminal)
  - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
+ - Initial board programming via UART header on board or dedicated JTAG/SWD interfaces
+ - Software and firmware update via USB interface
  - 3D printable plastic shell
 
 ---
