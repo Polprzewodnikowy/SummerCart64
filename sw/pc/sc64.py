@@ -460,7 +460,13 @@ class SC64:
     def upload_bootloader(self, data: bytes) -> None:
         if (len(data) > self.__Length.BOOTLOADER):
             raise ValueError('Bootloader size too big')
-        self.__program_flash(self.__Address.BOOTLOADER, data)
+        padded_data = data + (b'\xFF' * (self.__Length.BOOTLOADER - len(data)))
+        if (self.__read_memory(self.__Address.BOOTLOADER, self.__Length.BOOTLOADER) != padded_data):
+            self.__erase_flash_region(self.__Address.BOOTLOADER, self.__Length.BOOTLOADER)
+            self.__write_memory(self.__Address.BOOTLOADER, data)
+            self.__flash_wait_busy()
+            if (self.__read_memory(self.__Address.BOOTLOADER, self.__Length.BOOTLOADER) != padded_data):
+                raise ConnectionException('Bootloader program failure')
 
     def set_rtc(self, t: datetime) -> None:
         to_bcd = lambda v: ((int((v / 10) % 10) << 4) | int(int(v) % 10))
@@ -739,7 +745,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SC64 control software')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
-    parser.add_argument('--bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
+    parser.add_argument('--update-bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
@@ -779,8 +785,8 @@ if __name__ == '__main__':
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
         
-        if (args.bootloader):
-            with open(args.bootloader, 'rb') as f:
+        if (args.update_bootloader):
+            with open(args.update_bootloader, 'rb') as f:
                 print('Uploading Bootloader... ', end='', flush=True)
                 sc64.upload_bootloader(f.read())
                 print('done')

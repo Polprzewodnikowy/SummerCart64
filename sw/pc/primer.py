@@ -99,6 +99,12 @@ class SC64UpdateData:
         return (id, data)
 
     def load(self, path: str, require_all: bool=False) -> None:
+        self.__update_info = None
+        self.__mcu_data = None
+        self.__fpga_data = None
+        self.__bootloader_data = None
+        self.__primer_data = None
+
         try:
             with open(path, 'rb') as f:
                 if (f.read(len(self.__UPDATE_TOKEN)) != self.__UPDATE_TOKEN):
@@ -228,7 +234,7 @@ class STM32Bootloader:
         length = len(data)
         if (length == 0 or length > self.__MEMORY_RW_MAX_SIZE):
             raise ValueError('Wrong data size for write memory command')
-        if (length % 4):
+        if (((address % 4) != 0) or ((length % 4) != 0)):
             raise ValueError('Write memory command requires 4 byte alignment')
         self.__cmd_send(b'\x31')
         self.__data_write(address.to_bytes(4, byteorder='big'))
@@ -354,6 +360,8 @@ class LCMXO2Primer:
         length = len(data)
         if (length > (self.__FLASH_PAGE_SIZE * self.__FLASH_NUM_PAGES)):
             raise LCMXO2PrimerException('FPGA data size too big')
+        if ((length % self.__FLASH_PAGE_SIZE) != 0):
+            raise LCMXO2PrimerException('FPGA data size not aligned to page size')
 
         self.__cmd_execute(self.__CMD_ENABLE_FLASH)
 
