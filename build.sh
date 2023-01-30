@@ -30,12 +30,12 @@ build_bootloader () {
     if [ "$FORCE_CLEAN" = true ]; then
         make clean
     fi
-    FLAGS="$USER_FLAGS"
-    if [ ! -z "${GIT_BRANCH+x}" ]; then FLAGS+=" -DGIT_BRANCH='\"$GIT_BRANCH\"'"; fi
-    if [ ! -z "${GIT_TAG+x}" ]; then FLAGS+=" -DGIT_TAG='\"$GIT_TAG\"'"; fi
-    if [ ! -z "${GIT_SHA+x}" ]; then FLAGS+=" -DGIT_SHA='\"$GIT_SHA\"'"; fi
-    if [ ! -z "${GIT_MESSAGE+x}" ]; then FLAGS+=" -DGIT_MESSAGE='\"$GIT_MESSAGE\"'"; fi
-    make all -j USER_FLAGS="$FLAGS"
+    VERSION=""
+    if [ ! -z "${GIT_BRANCH+x}" ]; then VERSION+=" -DGIT_BRANCH='\"$GIT_BRANCH\"'"; fi
+    if [ ! -z "${GIT_TAG+x}" ]; then VERSION+=" -DGIT_TAG='\"$GIT_TAG\"'"; fi
+    if [ ! -z "${GIT_SHA+x}" ]; then VERSION+=" -DGIT_SHA='\"$GIT_SHA\"'"; fi
+    if [ ! -z "${GIT_MESSAGE+x}" ]; then VERSION+=" -DGIT_MESSAGE='\"$GIT_MESSAGE\"'"; fi
+    make all -j VERSION="$VERSION" USER_FLAGS="$USER_FLAGS"
     popd > /dev/null
 
     BUILT_BOOTLOADER=true

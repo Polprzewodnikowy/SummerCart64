@@ -45,12 +45,6 @@ SECTIONS {
         _ebss = .;
     } > ram
 
-    .fill : {
-        FILL(0xFF);
-        BYTE(0xFF);
-        . = ORIGIN(rom) + LENGTH(rom);
-    } > rom
-
     _sheap = .;
     . = ORIGIN(ram) + LENGTH(ram) - __exception_stack_size - __stack_size;
     _eheap = .;

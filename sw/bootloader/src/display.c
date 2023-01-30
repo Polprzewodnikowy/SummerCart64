@@ -14,7 +14,7 @@
 #define LINE_SPACING            (2)
 
 
-static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((section(".framebuffer")));
+static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((section(".framebuffer, \"aw\", %nobits#")));
 static int char_x;
 static int char_y;
 static const vi_regs_t vi_config[] = {{

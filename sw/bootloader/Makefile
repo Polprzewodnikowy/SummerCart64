@@ -10,6 +10,7 @@ FLAGS = -march=vr4300 -mtune=vr4300 $(USER_FLAGS)
 CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 ASFLAGS = -Wa,-I$(N64_INST)/mips64-elf/lib
 LDFLAGS = -lc -nostartfiles -Wl,--gc-sections
+VERSION ?=
 
 SRC_DIR = src
 ASSET_DIR = assets
@@ -57,6 +58,9 @@ $(BUILD_DIR)/%.S.o: %.S
 $(BUILD_DIR)/%.c.o: %.c
 	$(CC) $(FLAGS) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/version.c.o: version.c .FORCE
+	$(CC) $(FLAGS) $(CFLAGS) $(VERSION) -c $< -o $@
+
 $(BUILD_DIR)/%.asset: $(ASSET_DIR)/%.png tools/asset_converter.py
 	$(PYTHON) tools/asset_converter.py $< $@ --compress
 
@@ -67,13 +71,9 @@ $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 	$(CXX) $(FLAGS) $(LDFLAGS) -TN64.ld $(OBJS) -o $@
 	@$(OBJDUMP) -S $@ > $(BUILD_DIR)/bootloader.lst
 
-$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf tools/strip.py
+$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf tools/finalize.py
 	@$(OBJCOPY) -O binary $< $@
-	@chksum64 $@ > /dev/null
-	@$(PYTHON) tools/strip.py $@ 1024
-
-$(BUILD_DIR)/bootloader.hex: $(BUILD_DIR)/bootloader.bin
-	@$(OBJCOPY) -I binary -O ihex $< $@
+	@$(PYTHON) tools/finalize.py $@ > /dev/null
 
 print_size: $(BUILD_DIR)/bootloader.elf
 	@echo 'Size of modules:'
@@ -81,12 +81,10 @@ print_size: $(BUILD_DIR)/bootloader.elf
 	@echo 'Size of bootloader:'
 	@$(SIZE) -B -d $<
 
-all: $(BUILD_DIR)/bootloader.hex print_size
+all: $(BUILD_DIR)/bootloader.bin print_size
 
 clean:
 	@rm -rf ./$(BUILD_DIR)/*
-
-$(BUILD_DIR)/version.c.o: .FORCE
 
 .FORCE:
 

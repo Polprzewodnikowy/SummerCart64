@@ -2,7 +2,8 @@
 .set noreorder
 
 
-.section .data.ipl2
+.section .text.ipl2, "ax", %progbits
+.type ipl2, %object
 ipl2:
     .global ipl2
     lui $t5, 0xBFC0

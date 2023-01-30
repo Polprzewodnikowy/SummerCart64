@@ -33,9 +33,9 @@ def compress(data: bytes, step_size: int=4) -> bytes:
     return compressed_data
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     if (len(sys.argv) < 3):
-        print(f"Usage: python {sys.argv[0]} input_path output_path [--compress]")
+        print(f'Usage: python {sys.argv[0]} input_path output_path [--compress]')
         sys.exit(1)
 
     asset_input = sys.argv[1]
@@ -47,17 +47,22 @@ if __name__ == "__main__":
 
     try:
         source_asset = Image.open(asset_input)
-        converted_asset = source_asset.convert("RGBA").tobytes()
+        converted_asset = source_asset.convert('RGBA').tobytes()
+
         if (asset_compress):
             converted_asset = compress(converted_asset)
-        final_asset = open(asset_output, "wb")
+
+        final_asset = open(asset_output, 'wb')
         final_asset.write(converted_asset)
+
     except FileNotFoundError:
-        print(f"Couldn't open file \"{asset_input}\"")
+        print(f'Couldn\'t open file "{asset_input}"')
         sys.exit(2)
+
     except Exception as e:
         print(e)
         sys.exit(3)
+
     finally:
         if (source_asset):
             source_asset.close()

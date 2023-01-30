@@ -7,6 +7,7 @@
 #define VECTOR_SIZE                 (0x80)
 #define VECTOR_NUM                  (4)
 
+#define ZR_OFFSET                   (0)
 #define AT_OFFSET                   (8)
 #define V0_OFFSET                   (16)
 #define V1_OFFSET                   (24)
@@ -49,6 +50,7 @@
 exception_handler:
     .set noat
     la $k0, (_esp - SAVE_REGISTERS_SIZE)
+    sd $zero, ZR_OFFSET($k0)
     sd $at, AT_OFFSET($k0)
     sd $v0, V0_OFFSET($k0)
     sd $v1, V1_OFFSET($k0)
