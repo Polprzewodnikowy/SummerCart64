@@ -22,3 +22,4 @@
 | `p` | **FLASH_WAIT_BUSY**    | wait         | ---          | ---  | erase_block_size | Wait until flash ready / get flash block erase size |
 | `P` | **FLASH_ERASE_BLOCK**  | address      | ---          | ---  | ---              | Start flash block erase                             |
 | `?` | **DEBUG_GET**          | ---          | ---          | ---  | debug_data       | Get internal FPGA debug info                        |
+| `%` | **STACK_USAGE_GET**    | ---          | ---          | ---  | stack_usage      | Get per task stack usage                            |

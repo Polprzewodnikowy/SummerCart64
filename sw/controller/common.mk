@@ -31,16 +31,13 @@ $(BUILD_DIR)/$(EXE_NAME).elf: $(OBJS) $(LD_SCRIPT)
 $(BUILD_DIR)/$(EXE_NAME).bin: $(BUILD_DIR)/$(EXE_NAME).elf
 	$(OBJCOPY) -O binary --gap-fill 0xFF $< $@
 
-$(BUILD_DIR)/$(EXE_NAME).hex: $(BUILD_DIR)/$(EXE_NAME).bin
-	@$(OBJCOPY) -I binary -O ihex $< $@
-
 print_size: $(BUILD_DIR)/$(EXE_NAME).elf
 	@echo 'Size of modules:'
 	@$(SIZE) -B -d -t --common $(OBJS)
 	@echo 'Size of $(EXE_NAME):'
 	@$(SIZE) -B -d $<
 
-all: $(BUILD_DIR)/$(EXE_NAME).hex print_size
+all: $(BUILD_DIR)/$(EXE_NAME).bin print_size
 
 clean:
 	@rm -rf ./$(BUILD_DIR)/*

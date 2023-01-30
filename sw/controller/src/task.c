@@ -5,6 +5,7 @@
 
 #define TASK_INITIAL_XPSR       (0x21000000UL)
 #define TASK_CONTEXT_SWITCH()   { SCB->ICSR = (1 << SCB_ICSR_PENDSVSET_Pos); }
+#define TASK_STACK_FILL_VALUE   (0xDEADBEEF)
 
 
 typedef enum {
@@ -38,7 +39,9 @@ static void task_initialize (task_id_t id) {
     *--sp = TASK_INITIAL_XPSR;
     *--sp = task->initial_pc;
     *--sp = ((uint32_t) (task_exit));
-    sp -= 13;
+    for (int i = 0; i < 13; i++) {
+        *--sp = 0;
+    }
     task->sp = ((uint32_t) (sp));
 }
 
@@ -67,6 +70,9 @@ static uint32_t task_switch_context (uint32_t sp) {
 
 void task_create (task_id_t id, void (*code)(void), void *stack, size_t stack_size) {
     if (id < __TASK_ID_MAX) {
+        for (size_t i = 0; i < stack_size; i += sizeof(uint32_t)) {
+            (*(uint32_t *) (stack + i)) = TASK_STACK_FILL_VALUE;
+        }
         task_t *task = &task_table[id];
         task->initial_pc = (uint32_t) (code);
         task->initial_sp = (((uint32_t) (stack)) + stack_size);
@@ -88,6 +94,15 @@ void task_set_ready (task_id_t id) {
 void task_set_ready_and_reset (task_id_t id) {
     task_table[id].flags |= (TASK_FLAG_RESET | TASK_FLAG_READY);
     TASK_CONTEXT_SWITCH();
+}
+
+size_t task_get_stack_usage (void *stack, size_t stack_size) {
+    for (size_t i = 0; i < stack_size; i += sizeof(uint32_t)) {
+        if ((*(uint32_t *) (stack + i)) != TASK_STACK_FILL_VALUE) {
+            return (stack_size - i);
+        }
+    }
+    return 0;
 }
 
 __attribute__((naked)) void task_scheduler_start (void) {

@@ -18,6 +18,7 @@ void task_create (task_id_t id, void (*code)(void), void *stack, size_t stack_si
 void task_yield (void);
 void task_set_ready (task_id_t id);
 void task_set_ready_and_reset (task_id_t id);
+size_t task_get_stack_usage (void *stack, size_t stack_size);
 void task_scheduler_start (void);
 
 

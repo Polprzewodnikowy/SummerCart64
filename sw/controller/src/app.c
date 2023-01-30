@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include "app.h"
 #include "cic.h"
 #include "gvr.h"
 #include "hw.h"
@@ -18,6 +18,13 @@ uint8_t rtc_stack[RTC_STACK_SIZE] __attribute__((aligned(8)));
 uint8_t led_stack[LED_STACK_SIZE] __attribute__((aligned(8)));
 uint8_t gvr_stack[GVR_STACK_SIZE] __attribute__((aligned(8)));
 
+
+void app_get_stack_usage (uint32_t *usage) {
+    *usage++ = task_get_stack_usage(cic_stack, CIC_STACK_SIZE);
+    *usage++ = task_get_stack_usage(rtc_stack, RTC_STACK_SIZE);
+    *usage++ = task_get_stack_usage(led_stack, LED_STACK_SIZE);
+    *usage++ = task_get_stack_usage(gvr_stack, GVR_STACK_SIZE);
+}
 
 void app (void) {
     hw_init();
