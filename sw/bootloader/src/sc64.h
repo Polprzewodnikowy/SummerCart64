@@ -110,8 +110,8 @@ typedef struct {
 #define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
 
 typedef struct {
-    uint32_t (*read)(io32_t *address);
-    void (*write)(io32_t *address, uint32_t value);
+    uint32_t (*read)(volatile uint32_t *address);
+    void (*write)(volatile uint32_t *address, uint32_t value);
 } sc64_pi_io_t;
 
 
