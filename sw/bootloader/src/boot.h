@@ -32,9 +32,7 @@ typedef struct {
 } boot_info_t;
 
 
-bool boot_get_tv_type (boot_info_t *info);
-bool boot_get_cic_seed_version (boot_info_t *info);
-void boot (boot_info_t *info);
+void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed_version);
 
 
 #endif

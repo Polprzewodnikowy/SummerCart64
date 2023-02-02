@@ -37,7 +37,7 @@ static io32_t *boot_get_device_base (boot_info_t *info) {
     return device_base_address;
 }
 
-bool boot_get_tv_type (boot_info_t *info) {
+static bool boot_get_tv_type (boot_info_t *info) {
     io32_t *base = boot_get_device_base(info);
 
     char region = ((pi_io_read(&base[15]) >> 8) & 0xFF);
@@ -64,7 +64,7 @@ bool boot_get_tv_type (boot_info_t *info) {
     return true;
 }
 
-bool boot_get_cic_seed_version (boot_info_t *info) {
+static bool boot_get_cic_seed_version (boot_info_t *info) {
     io32_t *base = boot_get_device_base(info);
 
     uint32_t ipl3[1008] __attribute__((aligned(8)));
@@ -84,47 +84,56 @@ bool boot_get_cic_seed_version (boot_info_t *info) {
     return false;
 }
 
-void boot (boot_info_t *info) {
+void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed_version) {
+    if (detect_tv_type && !boot_get_tv_type(info)) {
+        info->tv_type = OS_INFO->tv_type;
+    }
+
+    if (detect_cic_seed_version && !boot_get_cic_seed_version(info)) {
+        info->cic_seed = 0x3F;
+        info->version = 0;
+    }
+
     OS_INFO->mem_size_6105 = OS_INFO->mem_size;
 
-    while (!(io_read(&SP->SR) & SP_SR_HALT));
+    while (!(cpu_io_read(&SP->SR) & SP_SR_HALT));
 
-    io_write(&SP->SR, SP_SR_CLR_INTR | SP_SR_SET_HALT);
+    cpu_io_write(&SP->SR, SP_SR_CLR_INTR | SP_SR_SET_HALT);
 
-    while (io_read(&SP->DMA_BUSY));
+    while (cpu_io_read(&SP->DMA_BUSY));
 
-    io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
-    io_write(&VI->V_INTR, 0x3FF);
-    io_write(&VI->H_LIMITS, 0);
-    io_write(&VI->CURR_LINE, 0);
-    io_write(&AI->MADDR, 0);
-    io_write(&AI->LEN, 0);
+    cpu_io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
+    cpu_io_write(&VI->V_INTR, 0x3FF);
+    cpu_io_write(&VI->H_LIMITS, 0);
+    cpu_io_write(&VI->CURR_LINE, 0);
+    cpu_io_write(&AI->MADDR, 0);
+    cpu_io_write(&AI->LEN, 0);
 
     io32_t *base = boot_get_device_base(info);
 
     uint32_t pi_config = pi_io_read(base);
 
-    io_write(&PI->DOM[0].LAT, pi_config & 0xFF);
-    io_write(&PI->DOM[0].PWD, pi_config >> 8);
-    io_write(&PI->DOM[0].PGS, pi_config >> 16);
-    io_write(&PI->DOM[0].RLS, pi_config >> 20);
+    cpu_io_write(&PI->DOM[0].LAT, pi_config & 0xFF);
+    cpu_io_write(&PI->DOM[0].PWD, pi_config >> 8);
+    cpu_io_write(&PI->DOM[0].PGS, pi_config >> 16);
+    cpu_io_write(&PI->DOM[0].RLS, pi_config >> 20);
 
-    if (io_read(&DPC->SR) & DPC_SR_XBUS_DMEM_DMA) {
-        while (io_read(&DPC->SR) & DPC_SR_PIPE_BUSY);
+    if (cpu_io_read(&DPC->SR) & DPC_SR_XBUS_DMEM_DMA) {
+        while (cpu_io_read(&DPC->SR) & DPC_SR_PIPE_BUSY);
     }
 
     uint32_t *ipl2_src = &ipl2;
     io32_t *ipl2_dst = SP_MEM->IMEM;
 
     for (int i = 0; i < 8; i++) {
-        io_write(&ipl2_dst[i], ipl2_src[i]);
+        cpu_io_write(&ipl2_dst[i], ipl2_src[i]);
     }
 
     io32_t *ipl3_src = base;
     io32_t *ipl3_dst = SP_MEM->DMEM;
 
     for (int i = 16; i < 1024; i++) {
-        io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
+        cpu_io_write(&ipl3_dst[i], pi_io_read(&ipl3_src[i]));
     }
 
     register void (*entry_point)(void) asm ("t3");

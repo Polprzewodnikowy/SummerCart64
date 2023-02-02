@@ -245,8 +245,8 @@ typedef struct {
 #define OS_INFO                     ((os_info_t *) OS_INFO_BASE)
 
 
-uint32_t io_read (io32_t *address);
-void io_write (io32_t *address, uint32_t value);
+uint32_t cpu_io_read (io32_t *address);
+void cpu_io_write (io32_t *address, uint32_t value);
 uint32_t pi_busy (void);
 uint32_t pi_io_read (io32_t *address);
 void pi_io_write (io32_t *address, uint32_t value);

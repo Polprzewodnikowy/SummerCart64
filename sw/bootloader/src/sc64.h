@@ -109,6 +109,13 @@ typedef struct {
 #define SC64_BUFFERS_BASE   (0x1FFE0000UL)
 #define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
 
+typedef struct {
+    uint32_t (*read)(io32_t *address);
+    void (*write)(io32_t *address, uint32_t value);
+} sc64_pi_io_t;
+
+
+void sc64_set_pi_io_functions (sc64_pi_io_t functions);
 
 sc64_error_t sc64_get_error (void);
 

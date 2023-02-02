@@ -30,27 +30,15 @@ void main (void) {
             break;
     }
 
+    bool detect_tv_type = (sc64_boot_info.tv_type == TV_TYPE_UNKNOWN);
+    bool detect_cic_seed_version = (sc64_boot_info.cic_seed == CIC_SEED_UNKNOWN);
+
     boot_info.reset_type = OS_INFO->reset_type;
-
-    if (sc64_boot_info.tv_type != TV_TYPE_UNKNOWN) {
-        boot_info.tv_type = sc64_boot_info.tv_type;
-    } else {
-        if (!boot_get_tv_type(&boot_info)) {
-            boot_info.tv_type = OS_INFO->tv_type;
-        }
-    }
-
-    if (sc64_boot_info.cic_seed != CIC_SEED_UNKNOWN) {
-        boot_info.cic_seed = sc64_boot_info.cic_seed & 0xFF;
-        boot_info.version = (sc64_boot_info.cic_seed >> 8) & 0x01;
-    } else {
-        if (!boot_get_cic_seed_version(&boot_info)) {
-            boot_info.cic_seed = 0x3F;
-            boot_info.version = 0;
-        }
-    }
+    boot_info.tv_type = sc64_boot_info.tv_type;
+    boot_info.cic_seed = sc64_boot_info.cic_seed & 0xFF;
+    boot_info.version = (sc64_boot_info.cic_seed >> 8) & 0x01;
 
     deinit();
 
-    boot(&boot_info);
+    boot(&boot_info, detect_tv_type, detect_cic_seed_version);
 }

@@ -75,7 +75,7 @@ static void display_decompress_background (uint32_t *background) {
             (background_data[4])
         );
         for (int i = 0; i < pixel_repeat; i++) {
-            io_write(framebuffer++, pixel_value);
+            cpu_io_write(framebuffer++, pixel_value);
         }
         pixels_painted += pixel_repeat;
         background_data += 5;
@@ -84,7 +84,7 @@ static void display_decompress_background (uint32_t *background) {
 
 static void display_clear_background (void) {
     for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT); i++) {
-        io_write(&display_framebuffer[i], BACKGROUND_COLOR);
+        cpu_io_write(&display_framebuffer[i], BACKGROUND_COLOR);
     }
 }
 
@@ -114,7 +114,7 @@ static void display_draw_character (char c) {
 
         if (font_data[c - ' '][i / 8] & (1 << (i % 8))) {
             int screen_offset = c_x + (c_y * SCREEN_WIDTH);
-            io_write(&display_framebuffer[screen_offset], TEXT_COLOR);
+            cpu_io_write(&display_framebuffer[screen_offset], TEXT_COLOR);
         }
     }
 
@@ -140,20 +140,20 @@ void display_init (uint32_t *background) {
         display_clear_background();
     }
 
-    io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
-    io_write(&VI->H_WIDTH, cfg->H_WIDTH);
-    io_write(&VI->V_INTR, cfg->V_INTR);
-    io_write(&VI->CURR_LINE, cfg->CURR_LINE);
-    io_write(&VI->TIMING, cfg->TIMING);
-    io_write(&VI->V_SYNC, cfg->V_SYNC);
-    io_write(&VI->H_SYNC, cfg->H_SYNC);
-    io_write(&VI->H_SYNC_LEAP, cfg->H_SYNC_LEAP);
-    io_write(&VI->H_LIMITS, cfg->H_LIMITS);
-    io_write(&VI->V_LIMITS, cfg->V_LIMITS);
-    io_write(&VI->COLOR_BURST, cfg->COLOR_BURST);
-    io_write(&VI->H_SCALE, cfg->H_SCALE);
-    io_write(&VI->V_SCALE, cfg->V_SCALE);
-    io_write(&VI->CR, cfg->CR);
+    cpu_io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
+    cpu_io_write(&VI->H_WIDTH, cfg->H_WIDTH);
+    cpu_io_write(&VI->V_INTR, cfg->V_INTR);
+    cpu_io_write(&VI->CURR_LINE, cfg->CURR_LINE);
+    cpu_io_write(&VI->TIMING, cfg->TIMING);
+    cpu_io_write(&VI->V_SYNC, cfg->V_SYNC);
+    cpu_io_write(&VI->H_SYNC, cfg->H_SYNC);
+    cpu_io_write(&VI->H_SYNC_LEAP, cfg->H_SYNC_LEAP);
+    cpu_io_write(&VI->H_LIMITS, cfg->H_LIMITS);
+    cpu_io_write(&VI->V_LIMITS, cfg->V_LIMITS);
+    cpu_io_write(&VI->COLOR_BURST, cfg->COLOR_BURST);
+    cpu_io_write(&VI->H_SCALE, cfg->H_SCALE);
+    cpu_io_write(&VI->V_SCALE, cfg->V_SCALE);
+    cpu_io_write(&VI->CR, cfg->CR);
 }
 
 void display_vprintf (const char *fmt, va_list args) {
