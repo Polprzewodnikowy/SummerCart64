@@ -5,20 +5,22 @@
 #include "test.h"
 
 
-bool test_check (void) {
-    if (sc64_get_config(CFG_ID_BUTTON_STATE)) {
-        return true;
-    }
-    return false;
+static void test_rtc (void) {
+    sc64_rtc_time_t t;
+    const char *weekdays[8] = { "", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+
+    sc64_get_time(&t);
+
+    display_printf("RTC current time:\n");
+    display_printf("    %02d:%02d:%02d", FROM_BCD(t.hour), FROM_BCD(t.minute), FROM_BCD(t.second));
+    display_printf(" %s ", weekdays[FROM_BCD(t.weekday)]);
+    display_printf("%d.%02d.%04d", FROM_BCD(t.day), FROM_BCD(t.month), 2000 + FROM_BCD(t.year));
+    display_printf("\n");
 }
 
-void test_execute (void) {
-    sd_card_status_t card_status;
+static void test_sd_card (void) {
+    sc64_sd_card_status_t card_status;
     uint8_t card_info[32] __attribute__((aligned(8)));
-
-    display_init(NULL);
-
-    display_printf("SC64 Test suite\n\n");
 
     card_status = sc64_sd_card_get_status();
 
@@ -30,7 +32,7 @@ void test_execute (void) {
 
     if (sc64_sd_card_init()) {
         display_printf("SD card init error!\n");
-        while (1);
+        return;
     }
 
     card_status = sc64_sd_card_get_status();
@@ -47,7 +49,7 @@ void test_execute (void) {
 
     if (sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) {
         display_printf("SD card get info error!\n");
-        while (1);
+        return;
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), card_info, sizeof(card_info));
@@ -64,6 +66,27 @@ void test_execute (void) {
     for (int i = 16; i < 32; i++) {
         display_printf("%c ", card_info[i] >= ' ' ? card_info[i] : 0xFF);
     }
+}
+
+
+bool test_check (void) {
+    if (OS_INFO->reset_type != OS_INFO_RESET_TYPE_COLD) {
+        return false;
+    }
+    return sc64_get_config(CFG_ID_BUTTON_STATE);
+}
+
+void test_execute (void) {
+    display_init(NULL);
+    display_printf("SC64 Test suite\n\n");
+
+    display_printf("[ RTC tests ]\n");
+    test_rtc();
+    display_printf("\n");
+
+    display_printf("[ SD card tests ]\n");
+    test_sd_card();
+    display_printf("\n");
 
     while (1);
 }

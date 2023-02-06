@@ -52,60 +52,50 @@ typedef enum {
     SD_CARD_OP_GET_INFO = 3,
 } sd_card_op_t;
 
-static sc64_pi_io_t pi_io = {
-    .read = pi_io_read,
-    .write = pi_io_write
-};
-
 
 static bool sc64_wait_cpu_busy (void) {
     uint32_t sr;
     do {
-        sr = pi_io.read(&SC64_REGS->SR_CMD);
+        sr = pi_io_read(&SC64_REGS->SR_CMD);
     } while (sr & SC64_SR_CPU_BUSY);
     return (sr & SC64_SR_CMD_ERROR);
 }
 
 static bool sc64_execute_cmd (uint8_t cmd, uint32_t *args, uint32_t *result) {
     if (args != NULL) {
-        pi_io.write(&SC64_REGS->DATA[0], args[0]);
-        pi_io.write(&SC64_REGS->DATA[1], args[1]);
+        pi_io_write(&SC64_REGS->DATA[0], args[0]);
+        pi_io_write(&SC64_REGS->DATA[1], args[1]);
     }
-    pi_io.write(&SC64_REGS->SR_CMD, ((uint32_t) (cmd)) & 0xFF);
+    pi_io_write(&SC64_REGS->SR_CMD, ((uint32_t) (cmd)) & 0xFF);
     bool error = sc64_wait_cpu_busy();
     if (result != NULL) {
-        result[0] = pi_io.read(&SC64_REGS->DATA[0]);
-        result[1] = pi_io.read(&SC64_REGS->DATA[1]);
+        result[0] = pi_io_read(&SC64_REGS->DATA[0]);
+        result[1] = pi_io_read(&SC64_REGS->DATA[1]);
     }
     return error;
 }
 
 
-void sc64_set_pi_io_functions (sc64_pi_io_t functions) {
-    pi_io.read = functions.read;
-    pi_io.write = functions.write;
-}
-
 sc64_error_t sc64_get_error (void) {
-    if (pi_io.read(&SC64_REGS->SR_CMD) & SC64_SR_CMD_ERROR) {
-        return (sc64_error_t) (pi_io.read(&SC64_REGS->DATA[0]));
+    if (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_CMD_ERROR) {
+        return (sc64_error_t) (pi_io_read(&SC64_REGS->DATA[0]));
     }
     return SC64_OK;
 }
 
 void sc64_unlock (void) {
-    pi_io.write(&SC64_REGS->KEY, SC64_KEY_RESET);
-    pi_io.write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_1);
-    pi_io.write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_2);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_RESET);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_1);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_2);
 }
 
 void sc64_lock (void) {
-    pi_io.write(&SC64_REGS->KEY, SC64_KEY_RESET);
-    pi_io.write(&SC64_REGS->KEY, SC64_KEY_LOCK);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_RESET);
+    pi_io_write(&SC64_REGS->KEY, SC64_KEY_LOCK);
 }
 
 bool sc64_check_presence (void) {
-    uint32_t version = pi_io.read(&SC64_REGS->VERSION);
+    uint32_t version = pi_io_read(&SC64_REGS->VERSION);
     if (version == SC64_VERSION_2) {
         sc64_wait_cpu_busy();
         return true;
@@ -114,35 +104,35 @@ bool sc64_check_presence (void) {
 }
 
 bool sc64_irq_pending (void) {
-    if (pi_io.read(&SC64_REGS->SR_CMD) & SC64_SR_IRQ_PENDING) {
+    if (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_IRQ_PENDING) {
         return true;
     }
     return false;
 }
 
 void sc64_irq_clear (void) {
-    pi_io.write(&SC64_REGS->VERSION, 0);
+    pi_io_write(&SC64_REGS->VERSION, 0);
 }
 
-uint32_t sc64_get_config (cfg_id_t id) {
+uint32_t sc64_get_config (sc64_cfg_id_t id) {
     uint32_t args[2] = { id, 0 };
     uint32_t result[2];
     sc64_execute_cmd(SC64_CMD_CONFIG_GET, args, result);
     return result[1];
 }
 
-void sc64_set_config (cfg_id_t id, uint32_t value) {
+void sc64_set_config (sc64_cfg_id_t id, uint32_t value) {
     uint32_t args[2] = { id, value };
     sc64_execute_cmd(SC64_CMD_CONFIG_SET, args, NULL);
 }
 
 void sc64_get_boot_info (sc64_boot_info_t *info) {
-    info->cic_seed = (uint16_t) sc64_get_config(CFG_ID_CIC_SEED);
-    info->tv_type = (tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
-    info->boot_mode = (boot_mode_t) sc64_get_config(CFG_ID_BOOT_MODE);
+    info->boot_mode = (sc64_boot_mode_t) sc64_get_config(CFG_ID_BOOT_MODE);
+    info->cic_seed = (sc64_cic_seed_t) sc64_get_config(CFG_ID_CIC_SEED);
+    info->tv_type = (sc64_tv_type_t) sc64_get_config(CFG_ID_TV_TYPE);
 }
 
-void sc64_get_time (rtc_time_t *t) {
+void sc64_get_time (sc64_rtc_time_t *t) {
     uint32_t result[2];
     sc64_execute_cmd(SC64_CMD_TIME_GET, NULL, result);
     t->second = (result[0] & 0xFF);
@@ -154,7 +144,7 @@ void sc64_get_time (rtc_time_t *t) {
     t->year = ((result[1] >> 16) & 0xFF);
 }
 
-void sc64_set_time (rtc_time_t *t) {
+void sc64_set_time (sc64_rtc_time_t *t) {
     uint32_t args[2] = {
         ((t->hour << 16) | (t->minute << 8) | t->second),
         ((t->weekday << 24) | (t->year << 16) | (t->month << 8) | t->day),
@@ -214,13 +204,13 @@ bool sc64_sd_card_deinit (void) {
     return false;
 }
 
-sd_card_status_t sc64_sd_card_get_status (void) {
+sc64_sd_card_status_t sc64_sd_card_get_status (void) {
     uint32_t args[2] = { (uint32_t) (NULL), SD_CARD_OP_GET_STATUS };
     uint32_t result[2];
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, result)) {
         return false;
     }
-    return (sd_card_status_t) (result[1]);
+    return (sc64_sd_card_status_t) (result[1]);
 }
 
 bool sc64_sd_card_get_info (void *address) {

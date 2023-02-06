@@ -3,12 +3,10 @@
 #include "diskio.h"
 #include "../io.h"
 #include "../sc64.h"
-#include "../error.h"
 
 
 #define SD_SECTOR_SIZE      (512)
 #define BUFFER_BLOCKS_MAX   (sizeof(SC64_BUFFERS->BUFFER) / SD_SECTOR_SIZE)
-#define FROM_BCD(x)         ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
 
 
 DSTATUS disk_status (BYTE pdrv) {
@@ -17,7 +15,7 @@ DSTATUS disk_status (BYTE pdrv) {
     }
 
     DSTATUS status = 0;
-    sd_card_status_t sd_card_status = sc64_sd_card_get_status();
+    sc64_sd_card_status_t sd_card_status = sc64_sd_card_get_status();
 
     if (!(sd_card_status & SD_CARD_STATUS_INSERTED)) {
         status |= STA_NODISK;
@@ -114,7 +112,7 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void *buff) {
 }
 
 DWORD get_fattime(void) {
-    rtc_time_t t;
+    sc64_rtc_time_t t;
     sc64_get_time(&t);
     return (
         ((FROM_BCD(t.year) + 20) << 25) |

@@ -493,7 +493,7 @@ if __name__ == '__main__':
     Utils.log()
 
     Utils.warning('[ IMPORTANT ]')
-    Utils.warning('Unplug board from power and reconnect it before proceeding')
+    Utils.warning('Unplug SC64 board from power and reconnect it before proceeding')
     Utils.log()
 
     try:

@@ -17,6 +17,8 @@ typedef volatile uint32_t io32_t;
 
 #define N64_RAM_SIZE                (0x00800000UL)
 
+#define FROM_BCD(x)                 ((((x >> 4) & 0x0F) * 10) + (x & 0x0F))
+
 
 typedef struct {
     io32_t DMEM[1024];
@@ -227,6 +229,10 @@ typedef struct {
 #define PIFRAM_BASE                 (0x1FC007C0UL)
 #define PIFRAM                      ((io8_t *) PIFRAM_BASE)
 
+#define PIFRAM_STATUS               (&PIFRAM[0x3C])
+
+#define PIFRAM_TERMINATE_BOOT       (1 << 3)
+
 
 typedef struct {
     uint32_t tv_type;
@@ -243,6 +249,9 @@ typedef struct {
 
 #define OS_INFO_BASE                (0x80000300UL)
 #define OS_INFO                     ((os_info_t *) OS_INFO_BASE)
+
+#define OS_INFO_RESET_TYPE_COLD     (0)
+#define OS_INFO_RESET_TYPE_NMI      (1)
 
 
 uint32_t cpu_io_read (io32_t *address);

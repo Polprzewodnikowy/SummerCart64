@@ -32,21 +32,21 @@ typedef enum {
     CFG_ID_BUTTON_STATE,
     CFG_ID_BUTTON_MODE,
     CFG_ID_ROM_EXTENDED_ENABLE,
-} cfg_id_t;
+} sc64_cfg_id_t;
 
 typedef enum {
     DD_MODE_DISABLED = 0,
     DD_MODE_REGS = 1,
     DD_MODE_IPL = 2,
     DD_MODE_FULL = 3
-} dd_mode_t;
+} sc64_dd_mode_t;
 
 typedef enum {
     BOOT_MODE_MENU = 0,
     BOOT_MODE_ROM = 1,
     BOOT_MODE_DDIPL = 2,
     BOOT_MODE_DIRECT = 3
-} boot_mode_t;
+} sc64_boot_mode_t;
 
 typedef enum {
     SAVE_TYPE_NONE = 0,
@@ -55,37 +55,37 @@ typedef enum {
     SAVE_TYPE_SRAM = 3,
     SAVE_TYPE_FLASHRAM = 4,
     SAVE_TYPE_SRAM_BANKED = 5
-} save_type_t;
+} sc64_save_type_t;
 
 typedef enum {
     CIC_SEED_UNKNOWN = 0xFFFF
-} cic_seed_t;
+} sc64_cic_seed_t;
 
 typedef enum {
     TV_TYPE_PAL = 0,
     TV_TYPE_NTSC = 1,
     TV_TYPE_MPAL = 2,
     TV_TYPE_UNKNOWN = 3
-} tv_type_t;
+} sc64_tv_type_t;
 
 typedef enum {
     BUTTON_MODE_NONE,
     BUTTON_MODE_N64_IRQ,
     BUTTON_MODE_USB_PACKET,
     BUTTON_MODE_DD_DISK_SWAP,
-} button_mode_t;
+} sc64_button_mode_t;
 
 typedef enum {
     SD_CARD_STATUS_INSERTED = (1 << 0),
     SD_CARD_STATUS_INITIALIZED = (1 << 1),
     SD_CARD_STATUS_TYPE_BLOCK = (1 << 2),
     SD_CARD_STATUS_50MHZ_MODE = (1 << 3),
-} sd_card_status_t;
+} sc64_sd_card_status_t;
 
 typedef struct {
-    boot_mode_t boot_mode;
-    uint16_t cic_seed;
-    tv_type_t tv_type;
+    sc64_boot_mode_t boot_mode;
+    sc64_cic_seed_t cic_seed;
+    sc64_tv_type_t tv_type;
 } sc64_boot_info_t;
 
 typedef struct {
@@ -96,7 +96,7 @@ typedef struct {
     uint8_t day;
     uint8_t month;
     uint8_t year;
-} rtc_time_t;
+} sc64_rtc_time_t;
 
 
 typedef struct {
@@ -109,13 +109,6 @@ typedef struct {
 #define SC64_BUFFERS_BASE   (0x1FFE0000UL)
 #define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
 
-typedef struct {
-    uint32_t (*read)(volatile uint32_t *address);
-    void (*write)(volatile uint32_t *address, uint32_t value);
-} sc64_pi_io_t;
-
-
-void sc64_set_pi_io_functions (sc64_pi_io_t functions);
 
 sc64_error_t sc64_get_error (void);
 
@@ -126,12 +119,12 @@ bool sc64_check_presence (void);
 bool sc64_irq_pending (void);
 void sc64_irq_clear (void);
 
-uint32_t sc64_get_config (cfg_id_t id);
-void sc64_set_config (cfg_id_t id, uint32_t value);
+uint32_t sc64_get_config (sc64_cfg_id_t id);
+void sc64_set_config (sc64_cfg_id_t id, uint32_t value);
 void sc64_get_boot_info (sc64_boot_info_t *info);
 
-void sc64_get_time (rtc_time_t *t);
-void sc64_set_time (rtc_time_t *t);
+void sc64_get_time (sc64_rtc_time_t *t);
+void sc64_set_time (sc64_rtc_time_t *t);
 
 bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
 bool sc64_usb_read (void *address, uint32_t length);
@@ -140,7 +133,7 @@ bool sc64_usb_write (void *address, uint8_t type, uint32_t length);
 
 bool sc64_sd_card_init (void);
 bool sc64_sd_card_deinit (void);
-sd_card_status_t sc64_sd_card_get_status (void);
+sc64_sd_card_status_t sc64_sd_card_get_status (void);
 bool sc64_sd_card_get_info (void *address);
 bool sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);

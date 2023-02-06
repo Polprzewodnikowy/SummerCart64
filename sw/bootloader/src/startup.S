@@ -1,7 +1,10 @@
 #include "vr4300.h"
 
 
-.section .text.rom_header
+.section .text.rom_header, "a", %progbits
+.type rom_header, %object
+rom_header:
+
 header_pi_config:
     .word 0x80371240
 
@@ -23,12 +26,14 @@ header_text_info:
     .org 0x40, 0x00
 
 
-.section .text.ipl3
+.section .text.ipl3, "a", %progbits
+.type ipl3, %object
 ipl3:
     .incbin "header", 0x40
 
 
-.section .text.entry_handler
+.section .text.entry_handler, "ax", %progbits
+.type entry_handler, %function
 entry_handler:
     .global entry_handler
 

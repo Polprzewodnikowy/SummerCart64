@@ -6,8 +6,8 @@
 
 
 void init (void) {
-    uint32_t pifram = si_io_read((io32_t *) (&PIFRAM[0x3C]));
-    si_io_write((io32_t *) (&PIFRAM[0x3C]), pifram | 0x08);
+    uint32_t pifram = si_io_read((io32_t *) (PIFRAM_STATUS));
+    si_io_write((io32_t *) (PIFRAM_STATUS), pifram | PIFRAM_TERMINATE_BOOT);
 
     exception_install();
 
@@ -29,7 +29,7 @@ void init (void) {
 }
 
 void deinit (void) {
+    sc64_lock();
     exception_disable_interrupts();
     exception_disable_watchdog();
-    sc64_lock();
 }

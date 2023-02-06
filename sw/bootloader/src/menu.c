@@ -81,12 +81,12 @@ void menu_load_and_run (void) {
         size = (size_t) (f_size(&fil) - ROM_CODE_OFFSET);
     }
     menu_check_load_address(menu, size);
+    cache_data_hit_writeback_invalidate(menu, size);
+    cache_inst_hit_invalidate(menu, size);
     FF_CHECK(f_read(&fil, menu, size, &br), "Couldn't read menu file");
     FF_CHECK((br != size) ? FR_INT_ERR : FR_OK, "Read size is different than expected");
     FF_CHECK(f_close(&fil), "Couldn't close menu file");
     FF_CHECK(f_unmount(""), "Couldn't unmount drive");
-
-    cache_inst_hit_invalidate(menu, size);
 
     deinit();
 

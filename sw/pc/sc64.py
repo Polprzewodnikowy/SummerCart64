@@ -223,7 +223,7 @@ class SC64:
         EEPROM_16K = (2 * 1024)
         SRAM = (32 * 1024)
         FLASHRAM = (128 * 1024)
-        SRAM_3X = (3 * 32 * 1024)
+        SRAM_BANKED = (3 * 32 * 1024)
 
     class __CfgId(IntEnum):
         BOOTLOADER_SWITCH = 0
@@ -290,7 +290,7 @@ class SC64:
         EEPROM_16K = 2
         SRAM = 3
         FLASHRAM = 4
-        SRAM_3X = 5
+        SRAM_BANKED = 5
 
     class CICSeed(IntEnum):
         DEFAULT = 0x3F
