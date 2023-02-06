@@ -8,7 +8,7 @@
 | --- | ---------------------- | ------------ | ------------ | ---- | ---------------- | --------------------------------------------------- |
 | `v` | **VERSION_GET**        | ---          | ---          | ---  | api_version      | Get command API version                             |
 | `R` | **STATE_RESET**        | ---          | ---          | ---  | ---              | Reset entire flashcart state                        |
-| `B` | **CIC_PARAMS_SET**     | cic_params_0 | cic_params_1 | ---  | ---              | Set CIC mode/seed/version/checksum                  |
+| `B` | **CIC_PARAMS_SET**     | cic_params_0 | cic_params_1 | ---  | ---              | Set CIC disable/mode/seed/checksum                  |
 | `c` | **CONFIG_GET**         | config_id    | ---          | ---  | current_value    | Get config option                                   |
 | `C` | **CONFIG_SET**         | config_id    | new_value    | ---  | ---              | Set config option                                   |
 | `t` | **TIME_GET**           | ---          | ---          | ---  | time             | Get current RTC value                               |

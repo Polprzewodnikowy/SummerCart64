@@ -320,7 +320,7 @@ bool cfg_update (uint32_t *args) {
             return cfg_set_save_type((save_type_t) (args[1]));
             break;
         case CFG_ID_CIC_SEED:
-            if ((args[1] != 0xFFFF) && (args[1] > 0x1FF)) {
+            if ((args[1] != 0xFFFF) && (args[1] > 0xFF)) {
                 return true;
             }
             p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);

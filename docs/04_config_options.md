@@ -138,11 +138,10 @@ Any successful write to this config will disable automatic save writeback to SD 
 
 type: *word* | default: `0xFFFF`
 
-- `0x0000` to `0x01FF` - Specified CIC seed/version value will be used
-- `0xFFFF` - CIC seed/version value will be autodetected
+- `0x0000` to `0x00FF` - Specified CIC seed value will be used
+- `0xFFFF` - CIC seed value will be autodetected
 
-Use this setting to force specific CIC seed/version.
-Lower 8 bits represents CIC seed and 9th bit represents CIC version.
+Use this setting to force specific CIC seed.
 By setting value `0xFFFF` bootloader will try to guess needed values from loaded ROM IPL3.
 This setting is not used when **BOOT_MODE** is set to `3` (direct boot).
 

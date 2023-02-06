@@ -750,6 +750,7 @@ if __name__ == '__main__':
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
+    parser.add_argument('--cic-params', metavar='disabled,dd_mode,seed,checksum', help='set CIC emulation parameters')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
     parser.add_argument('--rom', metavar='file', help='upload ROM from specified file')
@@ -840,6 +841,18 @@ if __name__ == '__main__':
                 print('Uploading 64DD IPL... ', end='', flush=True)
                 sc64.upload_ddipl(f.read())
                 print('done')
+
+        if (args.cic_params != None):
+            # TODO: calculate checksum in script
+            params = args.cic_params.split(',')
+            if (len(params) != 4):
+                raise ValueError('Incorrect number of CIC parameters')
+            disabled = (params[0] != '0')
+            dd_mode = (params[1] != '0')
+            seed = int(params[2])
+            checksum = int(params[3]).to_bytes(6, byteorder='big', signed=False)
+            sc64.set_cic_parameters(disabled, dd_mode, seed, checksum)
+            print(f'CIC parameters set to [{"DISABLED, " if disabled else ""}{"DDIPL" if dd_mode else "ROM"}, seed: 0x{seed:02X}, checksum: 0x{int(params[3]):12X}]')
 
         if (args.debug):
             sc64.debug_loop(isv=args.isv, disks=args.disk)
