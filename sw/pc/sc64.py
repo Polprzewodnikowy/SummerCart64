@@ -293,12 +293,11 @@ class SC64:
         SRAM_3X = 5
 
     class CICSeed(IntEnum):
-        ALECK = 0xAC
-        X101 = 0x13F
-        X102 = 0x3F
+        DEFAULT = 0x3F
         X103 = 0x78
         X105 = 0x91
         X106 = 0x85
+        ALECK = 0xAC
         DD_JP = 0xDD
         DD_US = 0xDE
         AUTO = 0xFFFF
@@ -487,7 +486,7 @@ class SC64:
 
     def set_cic_seed(self, seed: int) -> None:
         if (seed != self.CICSeed.AUTO):
-            if (seed < 0 or seed > 0x1FF):
+            if (seed < 0 or seed > 0xFF):
                 raise ValueError('CIC seed outside of allowed values')
         self.__set_config(self.__CfgId.CIC_SEED, seed)
 

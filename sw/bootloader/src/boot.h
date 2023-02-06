@@ -28,11 +28,10 @@ typedef struct {
     boot_reset_type_t reset_type;
     boot_tv_type_t tv_type;
     uint8_t cic_seed;
-    uint8_t version;
 } boot_info_t;
 
 
-void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed_version);
+void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed);
 
 
 #endif

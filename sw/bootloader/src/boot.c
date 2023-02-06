@@ -9,23 +9,22 @@ extern uint32_t ipl2 __attribute__((section(".data")));
 typedef struct {
     const uint32_t crc32;
     const uint8_t seed;
-    const uint8_t version;
 } ipl3_crc32_t;
 
 static const ipl3_crc32_t ipl3_crc32[] = {
-    { .crc32 = 0x587BD543, .seed = 0xAC, .version = 0 },   // 5101
-    { .crc32 = 0x6170A4A1, .seed = 0x3F, .version = 1 },   // 6101
-    { .crc32 = 0x009E9EA3, .seed = 0x3F, .version = 1 },   // 7102
-    { .crc32 = 0x90BB6CB5, .seed = 0x3F, .version = 0 },   // x102
-    { .crc32 = 0x0B050EE0, .seed = 0x78, .version = 0 },   // x103
-    { .crc32 = 0x98BC2C86, .seed = 0x91, .version = 0 },   // x105
-    { .crc32 = 0xACC8580A, .seed = 0x85, .version = 0 },   // x106
-    { .crc32 = 0x0E018159, .seed = 0xDD, .version = 0 },   // 5167
-    { .crc32 = 0x10C68B18, .seed = 0xDD, .version = 0 },   // NDXJ0
-    { .crc32 = 0xBC605D0A, .seed = 0xDD, .version = 0 },   // NDDJ0
-    { .crc32 = 0x502C4466, .seed = 0xDD, .version = 0 },   // NDDJ1
-    { .crc32 = 0x0C965795, .seed = 0xDD, .version = 0 },   // NDDJ2
-    { .crc32 = 0x8FEBA21E, .seed = 0xDE, .version = 0 },   // NDDE0
+    { .crc32 = 0x587BD543, .seed = 0xAC },  // 5101
+    { .crc32 = 0x6170A4A1, .seed = 0x3F },  // 6101
+    { .crc32 = 0x009E9EA3, .seed = 0x3F },  // 7102
+    { .crc32 = 0x90BB6CB5, .seed = 0x3F },  // x102
+    { .crc32 = 0x0B050EE0, .seed = 0x78 },  // x103
+    { .crc32 = 0x98BC2C86, .seed = 0x91 },  // x105
+    { .crc32 = 0xACC8580A, .seed = 0x85 },  // x106
+    { .crc32 = 0x0E018159, .seed = 0xDD },  // 5167
+    { .crc32 = 0x10C68B18, .seed = 0xDD },  // NDXJ0
+    { .crc32 = 0xBC605D0A, .seed = 0xDD },  // NDDJ0
+    { .crc32 = 0x502C4466, .seed = 0xDD },  // NDDJ1
+    { .crc32 = 0x0C965795, .seed = 0xDD },  // NDDJ2
+    { .crc32 = 0x8FEBA21E, .seed = 0xDE },  // NDDE0
 };
 
 
@@ -64,7 +63,7 @@ static bool boot_get_tv_type (boot_info_t *info) {
     return true;
 }
 
-static bool boot_get_cic_seed_version (boot_info_t *info) {
+static bool boot_get_cic_seed (boot_info_t *info) {
     io32_t *base = boot_get_device_base(info);
 
     uint32_t ipl3[1008] __attribute__((aligned(8)));
@@ -76,7 +75,6 @@ static bool boot_get_cic_seed_version (boot_info_t *info) {
     for (int i = 0; i < sizeof(ipl3_crc32) / sizeof(ipl3_crc32_t); i++) {
         if (ipl3_crc32[i].crc32 == crc32) {
             info->cic_seed = ipl3_crc32[i].seed;
-            info->version = ipl3_crc32[i].version;
             return true;
         }
     }
@@ -84,14 +82,13 @@ static bool boot_get_cic_seed_version (boot_info_t *info) {
     return false;
 }
 
-void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed_version) {
+void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
     if (detect_tv_type && !boot_get_tv_type(info)) {
         info->tv_type = OS_INFO->tv_type;
     }
 
-    if (detect_cic_seed_version && !boot_get_cic_seed_version(info)) {
+    if (detect_cic_seed && !boot_get_cic_seed(info)) {
         info->cic_seed = 0x3F;
-        info->version = 0;
     }
 
     OS_INFO->mem_size_6105 = OS_INFO->mem_size;
@@ -149,7 +146,7 @@ void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed_version)
     tv_type = (info->tv_type & 0x03);
     reset_type = (info->reset_type & 0x01);
     cic_seed = (info->cic_seed & 0xFF);
-    version = (info->version & 0x01);
+    version = 1;
     stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
 
     asm volatile (
