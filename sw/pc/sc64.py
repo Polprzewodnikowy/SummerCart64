@@ -4,6 +4,7 @@ import argparse
 import os
 import queue
 import serial
+import socket
 import sys
 import time
 from datetime import datetime
@@ -313,9 +314,11 @@ class SC64:
         RAWBINARY = 2
         HEADER = 3
         SCREENSHOT = 4
+        GDB = 0xDB
 
     __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
+    __gdb_client: Optional[socket.socket] = None
 
     def __init__(self) -> None:
         self.__link = SC64Serial()
@@ -496,16 +499,18 @@ class SC64:
     def set_save_type(self, type: SaveType) -> None:
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
 
-    def set_cic_parameters(self, disabled=False, dd_mode: bool=False, seed: int=0x3F, checksum: bytes=bytes([0xA5, 0x36, 0xC0, 0xF1, 0xD8, 0x59])) -> None:
+    def set_cic_parameters(self, disabled=False, dd_mode: bool=False, seed: Optional[int]=None, checksum: Optional[int]=None) -> None:
+        # TODO: guess seed and calculate checksum if not provided
+        seed = seed if seed else 0x3F
+        checksum = checksum if checksum else 0xA536C0F1D859
         if (seed < 0 or seed > 0xFF):
             raise ValueError('CIC seed outside of allowed values')
-        if (len(checksum) != 6):
-            raise ValueError('CIC checksum length outside of allowed values')
         mode = (1 << 1) if disabled else 0
         mode |= (1 << 0) if dd_mode else 0
         data = bytes([mode, seed])
-        data = [*data, *checksum]
+        data = [*data, *checksum.to_bytes(6, byteorder='big')]
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
+        return (seed, checksum)
 
     def update_firmware(self, data: bytes, status_callback: Optional[Callable[[str], None]]=None) -> None:
         address = self.__Address.FIRMWARE
@@ -607,6 +612,35 @@ class SC64:
                     print('Screenshot header data is invalid')
             else:
                 print('Got screenshot packet without header data')
+        elif (datatype == self.__DebugDatatype.GDB):
+            self.__handle_gdb_datatype(packet)
+
+    def __handle_gdb_socket(self, gdb_port: int) -> None:
+        MAX_PACKET_SIZE = 65536
+        gdb_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        gdb_socket.bind(('localhost', gdb_port))
+        gdb_socket.listen()
+        while (True):
+            (self.__gdb_client, address) = gdb_socket.accept()
+            client_address = f'{address[0]}:{address[1]}'
+            print(f'[GDB]: New connection ({client_address})')
+            while (True):
+                try:
+                    data = self.__gdb_client.recv(MAX_PACKET_SIZE)
+                    if (len(data) == 0):
+                        break
+                    self.debug_send(self.__DebugDatatype.GDB, data)
+                except:
+                    self.__gdb_client.close()
+                    break
+            print(f'[GDB]: Connection closed ({client_address})')
+
+    def __handle_gdb_datatype(self, data: bytes) -> None:
+        if (self.__gdb_client):
+            try:
+                self.__gdb_client.sendall(data)
+            except:
+                pass
 
     def __handle_debug_input(self) -> None:
         running = True
@@ -641,7 +675,7 @@ class SC64:
             except EOFError:
                 running = False
 
-    def debug_loop(self, isv: int=0, disks: Optional[list[str]]=None) -> None:
+    def debug_loop(self, isv: int=0, disks: Optional[list[str]]=None, gdb_port: Optional[int]=None) -> None:
         dd = None
         current_image = 0
         next_image = 0
@@ -651,7 +685,7 @@ class SC64:
         if (isv != 0):
             print(f'IS-Viewer64 support set to [ENABLED] at ROM offset [0x{(isv):08X}]')
             if (self.__get_config(self.__CfgId.ROM_SHADOW_ENABLE)):
-                print('ROM shadow enabled - IS-Viewer64 will NOT work (use --no-shadow option to disable it)')
+                print('ROM shadow enabled - IS-Viewer64 will NOT work (use --no-shadow option while uploading ROM to disable it)')
 
         if (disks):
             dd = DD64Image()
@@ -681,6 +715,11 @@ class SC64:
                 for disk in disks:
                     print(f' - {os.path.basename(disk)}')
                 print('Press button on SC64 device to cycle through provided disks')
+
+        if (gdb_port):
+            gdb_thread = Thread(target=lambda: self.__handle_gdb_socket(gdb_port), daemon=True)
+            gdb_thread.start()
+            print(f'GDB server started and listening on port [{gdb_port}]')
 
         print('\nDebug loop started, press Ctrl-C to exit\n')
 
@@ -741,6 +780,14 @@ class EnumAction(argparse.Action):
 
 
 if __name__ == '__main__':
+    def cic_params_type(argument: str):
+        params = argument.split(',')
+        disabled = bool(int(params[0]))
+        dd_mode = bool(int(params[1])) if len(params) >= 2 else None
+        seed = int(params[2], 0) if len(params) >= 3 else None
+        checksum = int(params[3], 0) if len(params) >= 4 else None
+        return (disabled, dd_mode, seed, checksum)
+
     parser = argparse.ArgumentParser(description='SC64 control software')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
@@ -750,7 +797,7 @@ if __name__ == '__main__':
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
-    parser.add_argument('--cic-params', metavar='disabled,dd_mode,seed,checksum', help='set CIC emulation parameters')
+    parser.add_argument('--cic-params', metavar='disabled,[dd_mode,[seed,[checksum]]]', type=cic_params_type, help='set CIC emulation parameters')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
     parser.add_argument('--rom', metavar='file', help='upload ROM from specified file')
@@ -760,7 +807,8 @@ if __name__ == '__main__':
     parser.add_argument('--ddipl', metavar='file', help='upload 64DD IPL from specified file')
     parser.add_argument('--disk', metavar='file', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
     parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
-    parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD and IS-Viewer64)')
+    parser.add_argument('--gdb', metavar='port', type=int, help='expose socket port for GDB debugging')
+    parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD, IS-Viewer64 and GDB)')
     parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
 
     if (len(sys.argv) <= 1):
@@ -843,19 +891,16 @@ if __name__ == '__main__':
                 print('done')
 
         if (args.cic_params != None):
-            # TODO: calculate checksum in script
-            params = args.cic_params.split(',')
-            if (len(params) != 4):
-                raise ValueError('Incorrect number of CIC parameters')
-            disabled = (params[0] != '0')
-            dd_mode = (params[1] != '0')
-            seed = int(params[2])
-            checksum = int(params[3]).to_bytes(6, byteorder='big', signed=False)
-            sc64.set_cic_parameters(disabled, dd_mode, seed, checksum)
-            print(f'CIC parameters set to [{"DISABLED, " if disabled else ""}{"DDIPL" if dd_mode else "ROM"}, seed: 0x{seed:02X}, checksum: 0x{int(params[3]):12X}]')
+            (disabled, dd_mode, seed, checksum) = args.cic_params
+            (seed, checksum) = sc64.set_cic_parameters(disabled, dd_mode, seed, checksum)
+            print('CIC parameters set to [', end='')
+            print(f'{"DISABLED" if disabled else "ENABLED"}, ', end='')
+            print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
+            print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:12X}', end='')
+            print(']')
 
         if (args.debug):
-            sc64.debug_loop(isv=args.isv, disks=args.disk)
+            sc64.debug_loop(isv=args.isv, disks=args.disk, gdb_port=args.gdb)
 
         if (args.backup_save):
             with open(args.backup_save, 'wb') as f:
