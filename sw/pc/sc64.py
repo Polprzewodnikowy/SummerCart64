@@ -624,16 +624,19 @@ class SC64:
             (self.__gdb_client, address) = gdb_socket.accept()
             client_address = f'{address[0]}:{address[1]}'
             print(f'[GDB]: New connection ({client_address})')
-            while (True):
-                try:
+            try:
+                connected = True
+                while (connected):
                     data = self.__gdb_client.recv(MAX_PACKET_SIZE)
-                    if (len(data) == 0):
-                        break
-                    self.debug_send(self.__DebugDatatype.GDB, data)
-                except:
-                    self.__gdb_client.close()
-                    break
-            print(f'[GDB]: Connection closed ({client_address})')
+                    if (data):
+                        self.debug_send(self.__DebugDatatype.GDB, data)
+                    else:
+                        connected = False
+            except:
+                pass
+            finally:
+                self.__gdb_client.close()
+                print(f'[GDB]: Connection closed ({client_address})')
 
     def __handle_gdb_datatype(self, data: bytes) -> None:
         if (self.__gdb_client):
