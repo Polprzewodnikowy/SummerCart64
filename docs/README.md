@@ -6,6 +6,7 @@
 
 ## Documentation
 
+- [Quick startup guide](./00_quick_startup_guide.md)
 - [Memory map](./01_memory_map.md)
 - [USB commands](./02_usb_commands.md)
 - [N64 commands](./03_n64_commands.md)
