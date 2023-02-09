@@ -39,7 +39,7 @@ Arguments `--save-type` and/or `--save` can be ommited if game doesn't require a
 
 `python3 sc64.py --backup-save path_to_save.sav`
 
-Replace `path_to_save.sav` with appropriate value. Specifying save type by `--save` argument isn't required when set correctly previously.
+Replace `path_to_save.sav` with appropriate value. Specifying save type isn't required when set correctly previously.
 
 ---
 
@@ -54,7 +54,7 @@ Replace `path_to_ddipl.n64` / `path_to_disk_x.ndd` with appropriate values. Argu
 ## Direct boot option
 
 If booting game through included bootloader isn't a desired option then flashcart can be put in special mode that ommits this step.
-Run `python3 sc64.py --boot direct --rom path_to_rom.n64` to disable bootloader during boot and console reset. By default only games with 6102/7101 CIC chips will boot correctly. To change this use `--cic-params 0,0,0x3F,0x12345678ABCD` argument with appropriate values. Refer to included help in script for values meaning.
+Run `python3 sc64.py --boot direct --rom path_to_rom.n64` to disable bootloader during boot and console reset. By default only games with 6102/7101 CIC chips will boot correctly. To change this use `--cic-params 0,0,0x3F,0x12345678ABCD` argument with appropriate values. Refer to included help in script for values meaning. This option is useful only for very specific cases (e.g. running SC64 on top of GameShark).
 
 ---
 
