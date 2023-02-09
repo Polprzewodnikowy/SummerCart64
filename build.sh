@@ -4,13 +4,22 @@ set -e
 
 PACKAGE_FILE_NAME="SC64"
 
-FILES=(
-    "./fw/ftdi/ft232h_config.xml"
+TOP_FILES=(
     "./sw/pc/dd64.py"
     "./sw/pc/primer.py"
     "./sw/pc/requirements.txt"
     "./sw/pc/sc64.py"
     "./sw/update/sc64.upd"
+)
+
+FILES=(
+    "./docs/*"
+    "./fw/ftdi/ft232h_config.xml"
+    "./hw/pcb/sc64v2.kicad_pcb"
+    "./hw/pcb/sc64v2.kicad_pro"
+    "./hw/pcb/sc64v2.kicad_sch"
+    "./hw/shell/sc64_shell_back.stl"
+    "./hw/shell/sc64_shell_front.stl"
     "./LICENSE"
     "./README.md"
 )
@@ -104,7 +113,9 @@ build_release () {
     if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
         rm -f "./${PACKAGE_FILE_NAME}.zip"
     fi
-    zip -j -r "./${PACKAGE_FILE_NAME}.zip" ${FILES[@]}
+    PACKAGE="./${PACKAGE_FILE_NAME}.zip"
+    zip -j -r $PACKAGE ${TOP_FILES[@]}
+    zip -r $PACKAGE ${FILES[@]}
 
     BUILT_RELEASE=true
 }
