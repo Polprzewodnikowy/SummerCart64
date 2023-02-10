@@ -189,6 +189,20 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 break;
 
+            case 'a':
+                p.response_error = cfg_query_setting(p.rx_args);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = p.rx_args[1];
+                break;
+
+            case 'A':
+                p.response_error = cfg_update_setting(p.rx_args);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
             case 't':
                 cfg_get_time(p.rx_args);
                 p.rx_state = RX_STATE_IDLE;

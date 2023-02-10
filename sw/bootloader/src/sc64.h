@@ -35,6 +35,10 @@ typedef enum {
 } sc64_cfg_id_t;
 
 typedef enum {
+    SETTING_ID_LED_ENABLE,
+} sc64_setting_id_t;
+
+typedef enum {
     DD_MODE_DISABLED = 0,
     DD_MODE_REGS = 1,
     DD_MODE_IPL = 2,
@@ -121,6 +125,8 @@ void sc64_irq_clear (void);
 
 uint32_t sc64_get_config (sc64_cfg_id_t id);
 void sc64_set_config (sc64_cfg_id_t id, uint32_t value);
+uint32_t sc64_get_setting (sc64_setting_id_t id);
+void sc64_set_setting (sc64_setting_id_t id, uint32_t value);
 void sc64_get_boot_info (sc64_boot_info_t *info);
 
 void sc64_get_time (sc64_rtc_time_t *t);

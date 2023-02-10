@@ -9,6 +9,8 @@
 | `v` | **VERSION_GET**       | ---        | ---          | api_version      | ---            | Get command API version                            |
 | `c` | **CONFIG_GET**        | config_id  | ---          | ---              | current_value  | Get config option                                  |
 | `C` | **CONFIG_SET**        | config_id  | new_value    | ---              | previous_value | Set config option and get previous value           |
+| `c` | **SETTING_GET**       | setting_id | ---          | ---              | current_value  | Get persistent setting option                      |
+| `C` | **SETTING_SET**       | setting_id | new_value    | ---              | ---            | Set persistent setting option                      |
 | `t` | **TIME_GET**          | ---        | ---          | time_0           | time_1         | Get current RTC value                              |
 | `T` | **TIME_SET**          | time_0     | time_1       | ---              | ---            | Set RTC value                                      |
 | `m` | **USB_READ**          | pi_address | length       | ---              | ---            | Receive data from USB to flashcart                 |

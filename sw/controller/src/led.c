@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include "hw.h"
 #include "led.h"
+#include "rtc.h"
 #include "task.h"
 #include "timer.h"
 
@@ -26,16 +27,29 @@ static void led_task_resume (void) {
     task_set_ready(TASK_ID_LED);
 }
 
+static void led_set_state (bool state, bool force) {
+    rtc_settings_t *settings = rtc_get_settings();
+    if (settings->led_enabled || force) {
+        if (state) {
+            hw_gpio_set(GPIO_ID_LED);
+        } else {
+            hw_gpio_reset(GPIO_ID_LED);
+        }
+    } else {
+        hw_gpio_reset(GPIO_ID_LED);
+    }
+}
+
 static void led_update_error_mode (void) {
     if (error_mode) {
         if (!(cic_error || rtc_error)) {
-            hw_gpio_reset(GPIO_ID_LED);
+            led_set_state(false, true);
             error_mode = false;
             act_timer = 0;
         }
     } else {
         if (cic_error || rtc_error) {
-            hw_gpio_reset(GPIO_ID_LED);
+            led_set_state(false, true);
             error_mode = true;
             error_timer = 0;
         }
@@ -58,10 +72,10 @@ static void led_process_errors (void) {
         if (error_timer >= LED_ERROR_TICKS_PERIOD) {
             uint32_t error_cycle = (error_timer % LED_ERROR_TICKS_PERIOD);
             if (error_cycle == LED_ERROR_TICKS_ON) {
-                hw_gpio_set(GPIO_ID_LED);
+                led_set_state(true, true);
             }
             if (error_cycle == 0) {
-                hw_gpio_reset(GPIO_ID_LED);
+                led_set_state(false, true);
             }
         }
     }
@@ -78,10 +92,10 @@ static void led_process_act (void) {
     if (act_timer > 0) {
         act_timer -= 1;
         if (act_timer == LED_ACT_TICKS_ON) {
-            hw_gpio_set(GPIO_ID_LED);
+            led_set_state(true, false);
         }
         if (act_timer == 0) {
-            hw_gpio_reset(GPIO_ID_LED);
+            led_set_state(false, false);
         }
     }
 }

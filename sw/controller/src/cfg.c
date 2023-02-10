@@ -33,6 +33,10 @@ typedef enum {
 } cfg_id_t;
 
 typedef enum {
+    SETTING_ID_LED_ENABLE,
+} setting_id_t;
+
+typedef enum {
     DD_MODE_DISABLED = 0,
     DD_MODE_REGS = 1,
     DD_MODE_IPL = 2,
@@ -356,6 +360,36 @@ bool cfg_update (uint32_t *args) {
     return false;
 }
 
+bool cfg_query_setting (uint32_t *args) {
+    rtc_settings_t settings = (*rtc_get_settings());
+
+    switch (args[0]) {
+        case SETTING_ID_LED_ENABLE:
+            args[1] = settings.led_enabled;
+            break;
+        default:
+            return true;
+    }
+
+    return false;
+}
+
+bool cfg_update_setting (uint32_t *args) {
+    rtc_settings_t settings = (*rtc_get_settings());
+
+    switch (args[0]) {
+        case SETTING_ID_LED_ENABLE:
+            settings.led_enabled = args[1];
+            break;
+        default:
+            return true;
+    }
+
+    rtc_set_settings(&settings);
+
+    return false;
+}
+
 bool cfg_set_rom_write_enable (bool value) {
     uint32_t scr = fpga_reg_get(REG_CFG_SCR);
     cfg_change_scr_bits(CFG_SCR_ROM_WRITE_ENABLED, value);
@@ -445,6 +479,20 @@ void cfg_process (void) {
                     return;
                 }
                 args[1] = prev_cfg[1];
+                break;
+
+            case 'a':
+                if (cfg_query_setting(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
+                    return;
+                }
+                break;
+
+            case 'A':
+                if (cfg_update_setting(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
+                    return;
+                }
                 break;
 
             case 't':

@@ -318,7 +318,7 @@ static void cic_soft_reset_timeout (void) {
 
 static void cic_soft_reset (void) {
     cic_read();
-    hw_tim_setup(TIM_ID_CIC, 550, cic_soft_reset_timeout);
+    hw_tim_setup(TIM_ID_CIC, 500, cic_soft_reset_timeout);
     task_yield();
 }
 
@@ -367,7 +367,7 @@ void cic_task (void) {
 
     cic_write_id(region);
 
-    hw_tim_setup(TIM_ID_CIC, 1000, cic_write_id_failed);
+    hw_tim_setup(TIM_ID_CIC, 100, cic_write_id_failed);
     cic_write_seed();
     hw_tim_stop(TIM_ID_CIC);
 

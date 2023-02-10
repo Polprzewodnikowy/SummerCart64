@@ -27,6 +27,8 @@ typedef enum {
     SC64_CMD_VERSION_GET        = 'v',
     SC64_CMD_CONFIG_GET         = 'c',
     SC64_CMD_CONFIG_SET         = 'C',
+    SC64_CMD_SETTING_GET        = 'a',
+    SC64_CMD_SETTING_SET        = 'A',
     SC64_CMD_TIME_GET           = 't',
     SC64_CMD_TIME_SET           = 'T',
     SC64_CMD_USB_READ           = 'm',
@@ -124,6 +126,18 @@ uint32_t sc64_get_config (sc64_cfg_id_t id) {
 void sc64_set_config (sc64_cfg_id_t id, uint32_t value) {
     uint32_t args[2] = { id, value };
     sc64_execute_cmd(SC64_CMD_CONFIG_SET, args, NULL);
+}
+
+uint32_t sc64_get_setting (sc64_setting_id_t id) {
+    uint32_t args[2] = { id, 0 };
+    uint32_t result[2];
+    sc64_execute_cmd(SC64_CMD_SETTING_GET, args, result);
+    return result[1];
+}
+
+void sc64_set_setting (sc64_setting_id_t id, uint32_t value) {
+    uint32_t args[2] = { id, value };
+    sc64_execute_cmd(SC64_CMD_SETTING_SET, args, NULL);
 }
 
 void sc64_get_boot_info (sc64_boot_info_t *info) {

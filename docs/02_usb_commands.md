@@ -11,6 +11,8 @@
 | `B` | **CIC_PARAMS_SET**     | cic_params_0 | cic_params_1 | ---  | ---              | Set CIC disable/mode/seed/checksum                  |
 | `c` | **CONFIG_GET**         | config_id    | ---          | ---  | current_value    | Get config option                                   |
 | `C` | **CONFIG_SET**         | config_id    | new_value    | ---  | ---              | Set config option                                   |
+| `a` | **SETTING_GET**        | setting_id   | ---          | ---  | current_value    | Get persistent setting                              |
+| `A` | **SETTING_SET**        | setting_id   | new_value    | ---  | ---              | Set persistent setting                              |
 | `t` | **TIME_GET**           | ---          | ---          | ---  | time             | Get current RTC value                               |
 | `T` | **TIME_SET**           | time_0       | time_1       | ---  | ---              | Set RTC value                                       |
 | `m` | **MEMORY_READ**        | address      | length       | ---  | data             | Read data from specified memory address             |

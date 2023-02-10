@@ -18,15 +18,17 @@
 #define RTC_ADDRESS_OSCTRIM         (0x08)
 #define RTC_ADDRESS_SRAM_MAGIC      (0x20)
 #define RTC_ADDRESS_SRAM_REGION     (0x24)
+#define RTC_ADDRESS_SRAM_VERSION    (0x28)
+#define RTC_ADDRESS_SRAM_SETTINGS   (0x2C)
 
 #define RTC_RTCSEC_ST               (1 << 7)
 
 #define RTC_RTCWKDAY_VBATEN         (1 << 3)
 #define RTC_RTCWKDAY_OSCRUN         (1 << 5)
 
+#define RTC_SETTINGS_VERSION        (1)
 
-static uint8_t rtc_region = 0xFF;
-static volatile bool rtc_region_pending = false;
+
 static rtc_time_t rtc_time = {
     .second     = 0x00,
     .minute     = 0x00,
@@ -38,6 +40,14 @@ static rtc_time_t rtc_time = {
 };
 static bool rtc_time_valid = false;
 static volatile bool rtc_time_pending = false;
+
+static uint8_t rtc_region = 0xFF;
+static volatile bool rtc_region_pending = false;
+
+static rtc_settings_t rtc_settings = {
+    .led_enabled    = true,
+};
+static volatile bool rtc_settings_pending = false;
 
 static const uint8_t rtc_regs_bit_mask[7] = {
     0b01111111,
@@ -151,10 +161,19 @@ static void rtc_write_region (void) {
     rtc_write(RTC_ADDRESS_SRAM_REGION, &rtc_region, 1);
 }
 
+static void rtc_read_settings (void) {
+    rtc_read(RTC_ADDRESS_SRAM_SETTINGS, (uint8_t *) (&rtc_settings), sizeof(rtc_settings));
+}
+
+static void rtc_write_settings (void) {
+    rtc_write(RTC_ADDRESS_SRAM_SETTINGS, (uint8_t *) (&rtc_settings), sizeof(rtc_settings));
+}
+
 static void rtc_init (void) {
     bool uninitialized = false;
     const char *magic = "SC64";
     uint8_t buffer[4];
+    uint32_t settings_version;
 
     rtc_read(RTC_ADDRESS_SRAM_MAGIC, buffer, 4);
 
@@ -171,6 +190,14 @@ static void rtc_init (void) {
         rtc_write(RTC_ADDRESS_OSCTRIM, buffer, 1);
         rtc_write_time();
         rtc_write_region();
+    }
+
+    rtc_read(RTC_ADDRESS_SRAM_VERSION, (uint8_t *) (&settings_version), 4);
+
+    if (uninitialized || (settings_version != RTC_SETTINGS_VERSION)) {
+        settings_version = RTC_SETTINGS_VERSION;
+        rtc_write(RTC_ADDRESS_SRAM_VERSION, (uint8_t *) (&settings_version), 4);
+        rtc_write_settings();
     }
 }
 
@@ -222,10 +249,24 @@ void rtc_set_region (uint8_t region) {
     rtc_region_pending = true;
 }
 
+rtc_settings_t *rtc_get_settings (void) {
+    return (&rtc_settings);
+}
+
+void rtc_set_settings (rtc_settings_t *settings) {
+    hw_tim_disable_irq(TIM_ID_LED);
+
+    rtc_settings = *settings;
+    rtc_settings_pending = true;
+
+    hw_tim_enable_irq(TIM_ID_LED);
+}
+
 void rtc_task (void) {
     rtc_init();
 
     rtc_read_region();
+    rtc_read_settings();
 
     while (1) {
         if (rtc_time_pending) {
@@ -236,6 +277,11 @@ void rtc_task (void) {
         if (rtc_region_pending) {
             rtc_region_pending = false;
             rtc_write_region();
+        }
+
+        if (rtc_settings_pending) {
+            rtc_settings_pending = false;
+            rtc_write_settings();
         }
 
         rtc_read_time();

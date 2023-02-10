@@ -243,6 +243,9 @@ class SC64:
         BUTTON_MODE = 13
         ROM_EXTENDED_ENABLE = 14
 
+    class __SettingId(IntEnum):
+        LED_ENABLE = 0
+
     class __UpdateError(IntEnum):
         OK = 0
         TOKEN = 1
@@ -342,6 +345,19 @@ class SC64:
             raise ValueError(f'Could not get config {config.name}')
         return self.__get_int(data)
 
+    def __set_setting(self, setting: __SettingId, value: int) -> None:
+        try:
+            self.__link.execute_cmd(cmd=b'A', args=[setting, value])
+        except ConnectionException:
+            raise ValueError(f'Could not set setting {setting.name} to {value:08X}')
+
+    def __get_setting(self, setting: __SettingId) -> int:
+        try:
+            data = self.__link.execute_cmd(cmd=b'a', args=[setting, 0])
+        except ConnectionException:
+            raise ValueError(f'Could not get setting {setting.name}')
+        return self.__get_int(data)
+
     def __write_memory(self, address: int, data: bytes) -> None:
         if (len(data) > 0):
             self.__link.execute_cmd(cmd=b'M', args=[address, len(data)], data=data, timeout=20.0)
@@ -424,6 +440,7 @@ class SC64:
             'button_state': bool(self.__get_config(self.__CfgId.BUTTON_STATE)),
             'button_mode': self.__ButtonMode(self.__get_config(self.__CfgId.BUTTON_MODE)),
             'rom_extended_enable': bool(self.__get_config(self.__CfgId.ROM_EXTENDED_ENABLE)),
+            'led_enable': bool(self.__get_setting(self.__SettingId.LED_ENABLE)),
         }
 
     def debug_send(self, datatype: __DebugDatatype, data: bytes) -> None:
@@ -530,6 +547,9 @@ class SC64:
         data = [*data, *checksum.to_bytes(6, byteorder='big')]
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
         return (seed, checksum)
+
+    def set_led_enable(self, enabled: bool) -> None:
+        self.__set_setting(self.__SettingId.LED_ENABLE, enabled)
 
     def update_firmware(self, data: bytes, status_callback: Optional[Callable[[str], None]]=None) -> None:
         address = self.__Address.FIRMWARE
@@ -816,6 +836,7 @@ if __name__ == '__main__':
     parser.add_argument('--update-bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
+    parser.add_argument('--led-enabled', metavar='{true,false}', help='disable or enable LED I/O activity blinking')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
@@ -873,6 +894,11 @@ if __name__ == '__main__':
                 if (hasattr(value, 'name')):
                     value = getattr(value, 'name')
                 print(f'  {key}: {value}')
+
+        if (args.led_enabled != None):
+            value = (args.led_enabled == 'true')
+            sc64.set_led_enable(value)
+            print(f'LED blinking set to [{"ENABLED" if value else "DISABLED"}]')
 
         if (args.boot != None):
             sc64.set_boot_mode(args.boot)

@@ -14,6 +14,8 @@
   - [`12`: **BUTTON\_STATE**](#12-button_state)
   - [`13`: **BUTTON\_MODE**](#13-button_mode)
   - [`14`: **ROM\_EXTENDED\_ENABLE**](#14-rom_extended_enable)
+- [Supported persistent setting options](#supported-persistent-setting-options)
+  - [`0`: **LED\_ENABLE**](#0-led_enable)
 
 ---
 
@@ -231,3 +233,24 @@ type: *bool* | default: `0`
 - `1` - ROM extended PI access is enabled
 
 Use this setting to enable PI access for extended ROM data located inside flash memory.
+
+---
+
+## Supported persistent setting options
+
+These options are similar to config options but state is persisted through power cycles.
+
+| id  | name           | type   | description                                   |
+| --- | -------------- | ------ | --------------------------------------------- |
+| `0` | **LED_ENABLE** | *bool* | Enables or disables LED I/O activity blinking |
+
+---
+
+### `0`: **LED_ENABLE**
+
+type: *bool* | default: `1`
+
+- `0` - LED I/O activity blinking is disabled
+- `1` - LED I/O activity blinking is enabled
+
+Use this setting to enable or disable LED I/O activity blinking.
