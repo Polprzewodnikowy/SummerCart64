@@ -19,6 +19,7 @@ typedef enum {
 uint32_t cfg_get_version (void);
 bool cfg_query (uint32_t *args);
 bool cfg_update (uint32_t *args);
+bool cfg_set_rom_write_enable (bool value);
 save_type_t cfg_get_save_type (void);
 void cfg_get_time (uint32_t *args);
 void cfg_set_time (uint32_t *args);

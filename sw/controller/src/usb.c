@@ -252,15 +252,19 @@ static void usb_rx_process (void) {
                 }
                 break;
 
-            case 'f':
+            case 'f': {
+                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_backup(p.rx_args[0], &p.response_info.data[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_error = (p.response_info.data[0] != UPDATE_OK);
                 p.response_info.data_length = 8;
+                cfg_set_rom_write_enable(rom_write_enable_restore);
                 break;
+            }
 
-            case 'F':
+            case 'F': {
+                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_prepare(p.rx_args[0], p.rx_args[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
@@ -269,8 +273,10 @@ static void usb_rx_process (void) {
                     p.response_info.done_callback = update_start;
                 } else {
                     p.response_error = true;
+                    cfg_set_rom_write_enable(rom_write_enable_restore);
                 }
                 break;
+            }
 
             case 'p':
                 if (p.rx_args[0]) {
