@@ -13,6 +13,7 @@ TOP_FILES=(
 )
 
 FILES=(
+    "./assets/*"
     "./docs/*"
     "./fw/ftdi/ft232h_config.xml"
     "./hw/pcb/sc64v2.kicad_pcb"
