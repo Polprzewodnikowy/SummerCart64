@@ -385,6 +385,25 @@ class SC64:
             if (self.__read_memory(address, len(data)) != data):
                 raise ConnectionException('Flash memory program failure')
 
+    def autodetect_save_type(self, data: bytes) -> Optional[SaveType]:
+        if (len(data) < 0x40):
+            return None
+        if (data[0x3C:0x3E] != b'ED'):
+            return None
+        save = (data[0x3F] >> 4) & 0x0F
+        if (save < 0 or save > 6):
+            return None
+        save_type_mapping = [
+            self.SaveType.NONE,
+            self.SaveType.EEPROM_4K,
+            self.SaveType.EEPROM_16K,
+            self.SaveType.SRAM,
+            self.SaveType.SRAM_BANKED,
+            self.SaveType.FLASHRAM,
+            self.SaveType.SRAM,
+        ]
+        return save_type_mapping[save]
+
     def reset_state(self) -> None:
         self.__link.execute_cmd(cmd=b'R')
 
@@ -822,6 +841,7 @@ if __name__ == '__main__':
 
     try:
         sc64 = SC64()
+        autodetected_save_type = None
 
         if (args.backup_firmware):
             with open(args.backup_firmware, 'wb') as f:
@@ -874,12 +894,15 @@ if __name__ == '__main__':
         if (args.rom):
             with open(args.rom, 'rb') as f:
                 print('Uploading ROM... ', end='', flush=True)
-                sc64.upload_rom(f.read(), use_shadow=args.no_shadow)
+                rom_data = f.read()
+                sc64.upload_rom(rom_data, use_shadow=args.no_shadow)
+                autodetected_save_type = sc64.autodetect_save_type(rom_data)
                 print('done')
 
-        if (args.save_type != None):
-            sc64.set_save_type(args.save_type)
-            print(f'Save type set to [{args.save_type.name}]')
+        if (args.save_type != None or autodetected_save_type != None):
+            save_type = args.save_type if args.save_type != None else autodetected_save_type
+            sc64.set_save_type(save_type)
+            print(f'Save type set to [{save_type.name}]{" (autodetected)" if autodetected_save_type != None else ""}')
 
         if (args.save):
             with open(args.save, 'rb') as f:
