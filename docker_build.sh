@@ -20,7 +20,7 @@ docker run \
     --rm \
     --user $(id -u):$(id -g) \
     --mac-address ${MAC_ADDRESS:-F8:12:34:56:78:90} \
-    --mount type=bind,src="$(pwd)/flexlm",target="/flexlm" \
+    --mount type=bind,src="$(pwd)/fw/project/lcmxo2/license.dat",target="/flexlm/license.dat" \
     --mount type=bind,src="$(pwd)",target="/workdir" \
     -h=`hostname` \
     -e GIT_BRANCH="$GIT_BRANCH" \
