@@ -31,6 +31,7 @@ jobs:
           mkdir -p ./flexlm
           echo "$ENCODED_LICENSE" > ./flexlm/encoded_license
           base64 -d ./flexlm/encoded_license > ./flexlm/license.dat
+
       - name: Build script
         env:
           MAC_ADDRESS: ${{ secrets.LATTICE_DIAMOND_MAC }}
