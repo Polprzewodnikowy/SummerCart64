@@ -25,13 +25,17 @@ jobs:
           submodules: true
 
       - name: Prepare Lattice Diamond license
+        env:
+          ENCODED_LICENSE: ${{ vars.LATTICE_DIAMOND_LICENSE }}
         run: |
           mkdir -p ./flexlm
-          echo "$LATTICE_DIAMOND_LICENSE" > ./flexlm/encoded_license
+          echo "$ENCODED_LICENSE" > ./flexlm/encoded_license
           base64 -d ./flexlm/encoded_license > ./flexlm/license.dat
 
       - name: Build script
-        run: MAC_ADDRESS=$LATTICE_DIAMOND_MAC ./docker_build.sh release --force-clean
+        env:
+          MAC_ADDRESS: ${{ vars.LATTICE_DIAMOND_MAC }}
+        run: ./docker_build.sh release --force-clean
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
