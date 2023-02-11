@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
       
@@ -35,7 +35,7 @@ jobs:
         run: ./docker_build.sh release --force-clean
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: SC64
           path: SC64.zip
@@ -43,13 +43,13 @@ jobs:
       - name: Get release
         if: github.event_name == 'release' && github.event.action == 'created'
         id: get_release
-        uses: bruceadams/get-release@v1.2.2
+        uses: bruceadams/get-release@v1.3.2
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Upload release asset
         if: github.event_name == 'release' && github.event.action == 'created'
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v1 # This will start failing soon due to needing node 12!
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
