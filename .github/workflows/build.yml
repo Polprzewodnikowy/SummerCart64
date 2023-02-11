@@ -4,7 +4,7 @@ on:
   push:
     branches: 
       - main
-  pull_request_target:
+  pull_request:
     branches:
       - main
   release:
@@ -25,17 +25,13 @@ jobs:
           submodules: true
 
       - name: Prepare Lattice Diamond license
-        env:
-          ENCODED_LICENSE: ${{ secrets.LATTICE_DIAMOND_LICENSE }}
         run: |
           mkdir -p ./flexlm
-          echo "$ENCODED_LICENSE" > ./flexlm/encoded_license
+          echo "$LATTICE_DIAMOND_LICENSE" > ./flexlm/encoded_license
           base64 -d ./flexlm/encoded_license > ./flexlm/license.dat
 
       - name: Build script
-        env:
-          MAC_ADDRESS: ${{ secrets.LATTICE_DIAMOND_MAC }}
-        run: ./docker_build.sh release --force-clean
+        run: MAC_ADDRESS=$LATTICE_DIAMOND_MAC ./docker_build.sh release --force-clean
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
