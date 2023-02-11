@@ -4,12 +4,12 @@ on:
   push:
     branches: 
       - main
-  pull_request:
-    branches:
-      - main
   release:
     types:
       - created
+  workflow_run:
+    workflows:
+      - pull-request
   workflow_dispatch:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      
+
       - name: Prepare Lattice Diamond license
         env:
           ENCODED_LICENSE: ${{ secrets.LATTICE_DIAMOND_LICENSE }}
