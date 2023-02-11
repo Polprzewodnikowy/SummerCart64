@@ -4,12 +4,12 @@ on:
   push:
     branches: 
       - main
-  pull_request:
-    branches:
-      - main
   release:
     types:
       - created
+  workflow_run:
+    workflows:
+      - pull-request
   workflow_dispatch:
 
 jobs:

@@ -1,0 +1,14 @@
+name: pull-request
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  trigger-pull-request-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger PR build
+        run: echo "Triggering \"${{ github.event.pull_request.title }}\" build"
