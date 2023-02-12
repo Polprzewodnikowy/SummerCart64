@@ -163,23 +163,23 @@ class SC64Serial:
         packet += data
         self.__queue_output.put(packet)
 
-    def __pop_response(self, cmd: bytes, timeout: float) -> bytes:
+    def __pop_response(self, cmd: bytes, timeout: float, raise_on_err: bool) -> bytes:
         try:
             (response_cmd, data, success) = self.__queue_input.get(timeout=timeout)
             self.__queue_input.task_done()
             if (cmd != response_cmd):
                 raise ConnectionException('CMD wrong command response')
-            if (success == False):
+            if (raise_on_err and success == False):
                 raise ConnectionException('CMD response error')
             return data
         except queue.Empty:
             raise ConnectionException('CMD response timeout')
 
-    def execute_cmd(self, cmd: bytes, args: list[int]=[0, 0], data: bytes=b'', response: bool=True, timeout: float=5.0) -> Optional[bytes]:
+    def execute_cmd(self, cmd: bytes, args: list[int]=[0, 0], data: bytes=b'', response: bool=True, timeout: float=5.0, raise_on_err: bool=True) -> Optional[bytes]:
         self.__check_threads()
         self.__queue_cmd(cmd, args, data)
         if (response):
-            return self.__pop_response(cmd, timeout)
+            return self.__pop_response(cmd, timeout, raise_on_err)
         return None
 
     def get_packet(self, timeout: float=0.1) -> Optional[tuple[bytes, bytes]]:
@@ -554,7 +554,7 @@ class SC64:
     def update_firmware(self, data: bytes, status_callback: Optional[Callable[[str], None]]=None) -> None:
         address = self.__Address.FIRMWARE
         self.__write_memory(address, data)
-        response = self.__link.execute_cmd(cmd=b'F', args=[address, len(data)])
+        response = self.__link.execute_cmd(cmd=b'F', args=[address, len(data)], raise_on_err=False)
         error = self.__UpdateError(self.__get_int(response[0:4]))
         if (error != self.__UpdateError.OK):
             raise ConnectionException(f'Bad update image [{error.name}]')
@@ -575,7 +575,7 @@ class SC64:
 
     def backup_firmware(self) -> bytes:
         address = self.__Address.FIRMWARE
-        info = self.__link.execute_cmd(cmd=b'f', args=[address, 0], timeout=60.0)
+        info = self.__link.execute_cmd(cmd=b'f', args=[address, 0], timeout=60.0, raise_on_err=False)
         error = self.__UpdateError(self.__get_int(info[0:4]))
         length = self.__get_int(info[4:8])
         if (error != self.__UpdateError.OK):
