@@ -25,6 +25,7 @@ SRC_FILES = \
 	timer.c \
 	update.c \
 	usb.c \
+	version.c \
 	writeback.c
 
 include common.mk

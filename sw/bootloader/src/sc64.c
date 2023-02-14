@@ -24,7 +24,8 @@ typedef struct {
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
 
 typedef enum {
-    SC64_CMD_VERSION_GET        = 'v',
+    SC64_CMD_HW_VERSION_GET     = 'v',
+    SC64_CMD_API_VERSION_GET    = 'V',
     SC64_CMD_CONFIG_GET         = 'c',
     SC64_CMD_CONFIG_SET         = 'C',
     SC64_CMD_SETTING_GET        = 'a',

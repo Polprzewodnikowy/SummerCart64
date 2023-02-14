@@ -6,7 +6,8 @@
 
 | id  | name                   | arg0         | arg1         | data | response         | description                                         |
 | --- | ---------------------- | ------------ | ------------ | ---- | ---------------- | --------------------------------------------------- |
-| `v` | **VERSION_GET**        | ---          | ---          | ---  | api_version      | Get command API version                             |
+| `v` | **HW_VERSION_GET**     | ---          | ---          | ---  | hw_version       | Get HW version                                      |
+| `V` | **API_VERSION_GET**    | ---          | ---          | ---  | api_version      | Get USB command API version                         |
 | `R` | **STATE_RESET**        | ---          | ---          | ---  | ---              | Reset entire flashcart state                        |
 | `B` | **CIC_PARAMS_SET**     | cic_params_0 | cic_params_1 | ---  | ---              | Set CIC disable/mode/seed/checksum                  |
 | `c` | **CONFIG_GET**         | config_id    | ---          | ---  | current_value    | Get config option                                   |

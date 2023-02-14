@@ -7,6 +7,7 @@
 #include "rtc.h"
 #include "update.h"
 #include "usb.h"
+#include "version.h"
 
 
 enum rx_state {
@@ -160,6 +161,13 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 p.response_info.data_length = 4;
                 p.response_info.data[0] = cfg_get_version();
+                break;
+
+            case 'V':
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = version_api(API_USB);
                 break;
 
             case 'R':

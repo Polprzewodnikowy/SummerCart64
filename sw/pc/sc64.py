@@ -319,6 +319,8 @@ class SC64:
         SCREENSHOT = 4
         GDB = 0xDB
 
+    __MIN_SUPPORTED_API_VERSION = 1
+
     __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
     __gdb_client: Optional[socket.socket] = None
@@ -327,10 +329,19 @@ class SC64:
         self.__link = SC64Serial()
         version = self.__link.execute_cmd(cmd=b'v')
         if (version != b'SCv2'):
-            raise ConnectionException('Unknown SC64 API version')
+            raise ConnectionException('Unknown SC64 HW version')
 
     def __get_int(self, data: bytes) -> int:
         return int.from_bytes(data[:4], byteorder='big')
+
+    def check_api_version(self) -> None:
+        try:
+            data = self.__link.execute_cmd(cmd=b'V')
+        except ConnectionException:
+            raise ConnectionException('Outdated SC64 API, please update firmware')
+        version = self.__get_int(data)
+        if (version < self.__MIN_SUPPORTED_API_VERSION):
+            raise ConnectionException('Unsupported SC64 API version, please update firmware')
 
     def __set_config(self, config: __CfgId, value: int) -> None:
         try:
@@ -876,7 +887,9 @@ if __name__ == '__main__':
                 status_callback = lambda status: print(f'{status} ', end='', flush=True)
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
-        
+
+        sc64.check_api_version()
+
         if (args.update_bootloader):
             with open(args.update_bootloader, 'rb') as f:
                 print('Uploading Bootloader... ', end='', flush=True)

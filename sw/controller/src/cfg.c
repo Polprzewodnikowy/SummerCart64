@@ -7,6 +7,7 @@
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
+#include "version.h"
 #include "writeback.h"
 
 
@@ -462,6 +463,10 @@ void cfg_process (void) {
         switch (cmd) {
             case 'v':
                 args[0] = cfg_get_version();
+                break;
+
+            case 'V':
+                args[0] = version_api(API_N64);
                 break;
 
             case 'c':

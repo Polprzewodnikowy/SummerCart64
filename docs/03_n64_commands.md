@@ -6,7 +6,8 @@
 
 | id  | name                  | arg0       | arg1         | rsp0             | rsp1           | description                                        |
 | --- | --------------------- | ---------- | ------------ | ---------------- | -------------- | -------------------------------------------------- |
-| `v` | **VERSION_GET**       | ---        | ---          | api_version      | ---            | Get command API version                            |
+| `v` | **HW_VERSION_GET**    | ---        | ---          | hw_version       | ---            | Get HW version                                     |
+| `V` | **API_VERSION_GET**   | ---        | ---          | api_version      | ---            | Get N64 command API version                        |
 | `c` | **CONFIG_GET**        | config_id  | ---          | ---              | current_value  | Get config option                                  |
 | `C` | **CONFIG_SET**        | config_id  | new_value    | ---              | previous_value | Set config option and get previous value           |
 | `c` | **SETTING_GET**       | setting_id | ---          | ---              | current_value  | Get persistent setting option                      |
