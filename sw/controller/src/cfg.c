@@ -136,7 +136,7 @@ static bool cfg_translate_address (uint32_t *address, uint32_t length, translate
         }
         if (*address >= 0x1FFC0000 && *address < 0x1FFE0000) {
             if ((*address + length) <= 0x1FFE0000) {
-                *address = *address - 0x1FFC0000 + 0x04E00000;
+                *address = *address - 0x1FFC0000 + 0x04FE0000;
                 return false;
             }
         }
