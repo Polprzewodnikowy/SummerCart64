@@ -367,7 +367,7 @@ void cic_task (void) {
 
     cic_write_id(region);
 
-    hw_tim_setup(TIM_ID_CIC, 100, cic_write_id_failed);
+    hw_tim_setup(TIM_ID_CIC, 500, cic_write_id_failed);
     cic_write_seed();
     hw_tim_stop(TIM_ID_CIC);
 
