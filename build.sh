@@ -16,6 +16,7 @@ FILES=(
     "./assets/*"
     "./docs/*"
     "./fw/ftdi/ft232h_config.xml"
+    "./hw/pcb/sc64_hw_v2.0a_bom.html"
     "./hw/pcb/sc64v2.kicad_pcb"
     "./hw/pcb/sc64v2.kicad_pro"
     "./hw/pcb/sc64v2.kicad_sch"
