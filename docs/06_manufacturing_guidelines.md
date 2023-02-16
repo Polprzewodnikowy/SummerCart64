@@ -1,0 +1,100 @@
+- [Step by step guide how to make SC64](#step-by-step-guide-how-to-make-sc64)
+  - [**PCB manufacturing data**](#pcb-manufacturing-data)
+  - [**PCB requirements**](#pcb-requirements)
+  - [**Components**](#components)
+  - [**Plastic shell**](#plastic-shell)
+  - [**Putting it together**](#putting-it-together)
+  - [**Initial programming**](#initial-programming)
+  - [**Troubleshooting**](#troubleshooting)
+
+---
+
+## Step by step guide how to make SC64
+
+All necessary manufacturing files are packaged in every `SC64.zip` file in GitHub releases. Please download latest release before proceeding with the instructions.
+
+---
+
+### **PCB manufacturing data**
+
+   1. Locate KiCad project inside `hw/pcb` folder
+   2. Export gerber/drill files
+   3. Export BOM spreadsheet
+   4. Export PnP placement files
+   5. Send appropriate files to the PCB manufacturer
+
+---
+
+### **PCB requirements**
+
+  - Thickness: 1.2 mm
+  - At least ENIG plating or better
+  - PCB contains edge connector: yes
+  - Beveled edge connector: yes, 45°
+
+---
+
+### **Components**
+
+  1. Locate interactive BOM file inside `hw/pcb` folder
+  2. Order all parts listed in the BOM file or use PCB assembly service together with your PCB order
+
+---
+
+### **Plastic shell**
+
+  1. Locate `.stl` files inside `hw/shell` folder
+  2. Use these files in the slicer and 3D printer of your choice or order ready made prints from 3D printing company
+  3. Find matching screws, dimensions are the same as on retail N64 cartridges
+
+---
+
+### **Putting it together**
+
+There are no special requirements for soldering components to board. All chips and connectors can be soldered with standard manual soldering iron, although hot air station is recommended. Interactive BOM has every component and its value highlighted on PCB drawings and it's strongly recommended to use during assembly process. You can skip this step if PCB assembly service was used in previous steps.
+
+---
+
+### **Initial programming**
+
+For initial programming you are going to need a PC and a USB to UART (serial) adapter (3.3V signaling is required). These steps assume you are using modern Windows OS (version 10 or higher).
+
+As for software here's list of required applications:
+ - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software
+ - [Python 3](https://www.python.org/downloads/) - necessary for initial programming script, `primer.py`
+
+Programming must be done in specific order for `primer.py` script to work correctly.
+
+First, program FT232H EEPROM:
+ 1. Connect SC64 board to the PC with USB-C cable
+ 2. Locate FT232H EEPROM template in `fw/ftdi` folder
+ 3. Launch `FT_PROG` software
+ 4. Click on `Scan and parse` if no device has shown up
+ 5. Right click on SC64 device and choose `Apply Template -> From File`
+ 6. Select previously located `ft232h_config.xml`
+ 7. Right click on SC64 device and choose `Program Device`
+
+Your SC64 should be ready for next programming step.
+
+Second, program FPGA, microcontroller and Flash memory:
+ 1. Disconnect SC64 board from power (unplug USB-C cable)
+ 2. Connect USB to UART adapter to TX/RX/GND pads marked on the PCB
+ 3. Connect serial adapter to the PC
+ 4. Connect SC64 board to the PC with USB-C cable (**IMPORTANT:** connect it to the same computer as serial adapter)
+ 5. Check in device manager which port number (`COMx`) is assigned to serial adapter (**not SC64 port number**)
+ 6. Locate `primer.py` script in root folder
+ 7. Make sure `sc64.py` and `dd64.py` scripts are located in the same folder as `primer.py`
+ 8. Make sure `sc64.upd` firmware update file is located in the same folder as `primer.py`
+ 9. Run `python3 primer.py COMx sc64.upd` (replace `COMx` with port located in step **5**)
+ 10. Follow the instructions on the screen
+ 11. Wait until programming process has finished
+
+Congratulations! Your SC64 flashcart should be ready for use!
+
+---
+
+### **Troubleshooting**
+
+*`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
+
+This issue can be attributed to incorrectly programmed FT232H EPPROM in first programming step. Check again in `FT_PROG` if device was configured properly. Once FPGA and microcontroller has been programmed successfully, `primer.py` script cannot be used again. Please use command `python3 sc64.py --update-firmware sc64.py` to try programming bootloader again.
