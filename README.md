@@ -37,6 +37,17 @@
 
 ---
 
+## How do I get one?
+
+I've prepared all necessary manufacturing files on [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
+Full disclosure: for every order made through this link I will receive 10% of PCB manufacturing and PCB assembly service cost. This is a great way of supporting further project development.
+
+<a href="https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html"><img src="https://www.pcbway.com/project/img/images/frompcbway-1220.png" alt="PCB from PCBWay" /></a>
+
+If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
+
+---
+
 ## Where's menu?
 
 Menu, as known from 64drive or EverDrive-64, is currently under development. Progress can be tracked in [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu) repository.
