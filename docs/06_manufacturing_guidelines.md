@@ -97,4 +97,4 @@ Congratulations! Your SC64 flashcart should be ready for use!
 
 *`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
 
-This issue can be attributed to incorrectly programmed FT232H EPPROM in first programming step. Check again in `FT_PROG` if device was configured properly. Once FPGA and microcontroller has been programmed successfully, `primer.py` script cannot be used again. Please use command `python3 sc64.py --update-firmware sc64.py` to try programming bootloader again.
+This issue can be attributed to incorrectly programmed FT232H EPPROM in first programming step. Check again in `FT_PROG` if device was configured properly. Once FPGA and microcontroller has been programmed successfully, `primer.py` script cannot be used again. Please use command `python3 sc64.py --update-firmware sc64.upd` to try programming bootloader again.
