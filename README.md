@@ -37,6 +37,13 @@
 
 ---
 
+## Where's menu?
+
+Menu, as known from 64drive or EverDrive-64, is currently under development. Progress can be tracked in [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu) repository.
+Ambitious goal of this software is to target every flashcart available on the market. However, main focus for now is getting at least basic UI running on the SC64.
+
+---
+
 ## Help / Q&A
 
 For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCollection/discussions) tab in GitHub repository.
