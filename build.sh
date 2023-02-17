@@ -9,7 +9,7 @@ TOP_FILES=(
     "./sw/pc/primer.py"
     "./sw/pc/requirements.txt"
     "./sw/pc/sc64.py"
-    "./sw/update/sc64.upd"
+    "./sw/update/sc64_update_package.bin"
 )
 
 FILES=(
@@ -87,7 +87,7 @@ build_update () {
 
     pushd sw/update > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        rm -f ./sc64.upd
+        rm -f ./sc64_update_package.bin
     fi
     GIT_INFO=""
     if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+="branch: [$GIT_BRANCH] "; fi
@@ -101,7 +101,7 @@ build_update () {
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \
         --primer ../controller/build/primer/primer.bin \
-        sc64.upd
+        sc64_update_package.bin
     popd > /dev/null
 
     BUILT_UPDATE=true

@@ -61,7 +61,7 @@ For initial programming you are going to need a PC and a USB to UART (serial) ad
 
 As for software here's list of required applications:
  - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software
- - [Python 3](https://www.python.org/downloads/) - necessary for initial programming script, `primer.py`
+ - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script, `primer.py`
 
 Programming must be done in specific order for `primer.py` script to work correctly.
 
@@ -78,14 +78,14 @@ Your SC64 should be ready for next programming step.
 
 Second, program FPGA, microcontroller and Flash memory:
  1. Disconnect SC64 board from power (unplug USB-C cable)
- 2. Connect USB to UART adapter to TX/RX/GND pads marked on the PCB
+ 2. Connect serial adapter to `TX/RX/GND` pads marked on the PCB
  3. Connect serial adapter to the PC
- 4. Connect SC64 board to the PC with USB-C cable (**IMPORTANT:** connect it to the same computer as serial adapter)
- 5. Check in device manager which port number (`COMx`) is assigned to serial adapter (**not SC64 port number**)
+ 4. Check in device manager which port number `COMx` is assigned to serial adapter
+ 5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter)
  6. Locate `primer.py` script in root folder
- 7. Make sure `sc64.py` and `dd64.py` scripts are located in the same folder as `primer.py`
- 8. Make sure `sc64.upd` firmware update file is located in the same folder as `primer.py`
- 9. Run `python3 primer.py COMx sc64.upd` (replace `COMx` with port located in step **5**)
+ 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64.py`, `dd64.py`, `sc64_update_package.bin`
+ 8. Run `pip3 install -r requirements.txt` to install required python packages
+ 9. Run `python3 primer.py COMx sc64_update_package.bin` (replace `COMx` with port located in step **4**)
  10. Follow the instructions on the screen
  11. Wait until programming process has finished
 
@@ -97,4 +97,4 @@ Congratulations! Your SC64 flashcart should be ready for use!
 
 *`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
 
-This issue can be attributed to incorrectly programmed FT232H EPPROM in first programming step. Check again in `FT_PROG` if device was configured properly. Once FPGA and microcontroller has been programmed successfully, `primer.py` script cannot be used again. Please use command `python3 sc64.py --update-firmware sc64.upd` to try programming bootloader again.
+This issue can be attributed to incorrectly programmed FT232H EPPROM in first programming step. Check again in `FT_PROG` if device was configured properly. Once FPGA and microcontroller has been programmed successfully, `primer.py` script cannot be used again. Please use command `python3 sc64.py --update-firmware sc64_update_package.bin` to try programming bootloader again.
