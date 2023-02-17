@@ -422,41 +422,41 @@ class SC64BringUp:
     def get_update_info(self) -> str:
         return self.__sc64_update_data.get_update_info()
 
-    def start_bring_up(self, port: str) -> None:
+    def start_bring_up(self, port: str, only_bootloader: bool=False) -> None:
         link = None
         try:
-            link = serial.Serial(
-                port,
-                baudrate=self.__SERIAL_BAUD,
-                parity=serial.PARITY_EVEN,
-                timeout=self.__SERIAL_TIMEOUT,
-                write_timeout=self.__SERIAL_TIMEOUT
-            )
+            if (not only_bootloader):
+                link = serial.Serial(
+                    port,
+                    baudrate=self.__SERIAL_BAUD,
+                    parity=serial.PARITY_EVEN,
+                    timeout=self.__SERIAL_TIMEOUT,
+                    write_timeout=self.__SERIAL_TIMEOUT
+                )
 
-            stm32_bootloader = STM32Bootloader(link.write, link.read, self.__progress)
-            lcmxo2_primer = LCMXO2Primer(link.write, link.read, self.__progress)
+                stm32_bootloader = STM32Bootloader(link.write, link.read, self.__progress)
+                lcmxo2_primer = LCMXO2Primer(link.write, link.read, self.__progress)
 
-            stm32_bootloader.connect(stm32_bootloader.DEV_ID_STM32G030XX)
-            stm32_bootloader.load_ram_and_run(self.__sc64_update_data.get_primer_data(), 'FPGA primer -> STM32 RAM')
-            time.sleep(self.__INTERVAL_TIME)
-            link.read_all()
+                stm32_bootloader.connect(stm32_bootloader.DEV_ID_STM32G030XX)
+                stm32_bootloader.load_ram_and_run(self.__sc64_update_data.get_primer_data(), 'FPGA primer -> STM32 RAM')
+                time.sleep(self.__INTERVAL_TIME)
+                link.read_all()
 
-            lcmxo2_primer.connect(lcmxo2_primer.DEV_ID_LCMXO2_7000HC)
-            lcmxo2_primer.load_flash_and_run(self.__sc64_update_data.get_fpga_data(), 'FPGA configuration -> LCMXO2 FLASH')
-            time.sleep(self.__INTERVAL_TIME)
-            link.read_all()
+                lcmxo2_primer.connect(lcmxo2_primer.DEV_ID_LCMXO2_7000HC)
+                lcmxo2_primer.load_flash_and_run(self.__sc64_update_data.get_fpga_data(), 'FPGA configuration -> LCMXO2 FLASH')
+                time.sleep(self.__INTERVAL_TIME)
+                link.read_all()
 
-            stm32_bootloader.connect(stm32_bootloader.DEV_ID_STM32G030XX)
-            stm32_bootloader.load_flash_and_run(self.__sc64_update_data.get_mcu_data(), 'MCU software -> STM32 FLASH')
-            time.sleep(self.__INTERVAL_TIME)
-            link.read_all()
+                stm32_bootloader.connect(stm32_bootloader.DEV_ID_STM32G030XX)
+                stm32_bootloader.load_flash_and_run(self.__sc64_update_data.get_mcu_data(), 'MCU software -> STM32 FLASH')
+                time.sleep(self.__INTERVAL_TIME)
+                link.read_all()
 
-            sc64 = SC64()
             bootloader_description = 'Bootloader -> SC64 FLASH'
             bootloader_data = self.__sc64_update_data.get_bootloader_data()
             bootloader_length = len(bootloader_data)
             self.__progress(bootloader_length, 0, bootloader_description)
-            sc64.upload_bootloader(bootloader_data)
+            SC64().upload_bootloader(bootloader_data)
             self.__progress(bootloader_length, bootloader_length, bootloader_description)
         finally:
             if (link and link.is_open):
@@ -464,11 +464,19 @@ class SC64BringUp:
 
 
 if __name__ == '__main__':
-    if (len(sys.argv) != 3):
-        Utils.die(f'Usage: {sys.argv[0]} serial_port update_file')
+    nargs = len(sys.argv)
+    if (nargs < 3 or nargs > 4):
+        Utils.die(f'Usage: {sys.argv[0]} serial_port update_file [--only-bootloader]')
 
     port = sys.argv[1]
     update_data_path = sys.argv[2]
+    only_bootloader = False
+    if (nargs == 4):
+        if (sys.argv[3] == '--only-bootloader'):
+            only_bootloader = True
+        else:
+            Utils.die(f'Unknown argument: {sys.argv[3]}')
+
     utils = Utils()
     sc64_bring_up = SC64BringUp(progress=utils.progress)
 
@@ -485,6 +493,10 @@ if __name__ == '__main__':
     Utils.log_no_end('Update info: ')
     Utils.log(sc64_bring_up.get_update_info())
     Utils.log()
+
+    if (only_bootloader):
+        Utils.log('Running in "only bootloader" mode')
+        Utils.log()
 
     Utils.warning('[  CAUTION  ]')
     Utils.warning('Configure FTDI chip with provided ft232h_config.xml before continuing')
@@ -507,7 +519,7 @@ if __name__ == '__main__':
     original_sigint_handler = signal.getsignal(signal.SIGINT)
     try:
         signal.signal(signal.SIGINT, lambda *kwargs: utils.exit_warning())
-        sc64_bring_up.start_bring_up(port)
+        sc64_bring_up.start_bring_up(port, only_bootloader)
     except (serial.SerialException, STM32BootloaderException, LCMXO2PrimerException) as e:
         if (utils.get_progress_active):
             Utils.log()
