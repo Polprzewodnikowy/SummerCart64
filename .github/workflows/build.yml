@@ -42,13 +42,12 @@ jobs:
         include:
           - os: windows-latest
             name: sc64-windows
-            options: --onefile --console --icon ../../assets/sc64_logo_256_256.png
+            options: --console --icon ../../assets/sc64_logo_256_256.png
           - os: ubuntu-latest
             name: sc64-linux
-            options: --onefile
           - os: macos-latest
             name: sc64-macos
-            options: --onedir --console --icon ../../assets/sc64_logo_256_256.png --target-architecture universal2
+            options: --console --icon ../../assets/sc64_logo_256_256.png --target-architecture universal2
 
     runs-on: ${{ matrix.os }}
 
@@ -66,7 +65,7 @@ jobs:
         working-directory: sw/pc
 
       - name: Create sc64 executable
-        run: pyinstaller --clean ${{ matrix.options }} sc64.py
+        run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
         working-directory: sw/pc
 
       - name: Upload artifact
