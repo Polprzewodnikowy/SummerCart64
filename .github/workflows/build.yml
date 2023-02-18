@@ -13,39 +13,39 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fw-hw-sw:
-    runs-on: ubuntu-latest
+  # build-fw-hw-sw:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Git checkout
+  #       uses: actions/checkout@v3
 
-      - name: Build script
-        run: ./docker_build.sh release --force-clean
+  #     - name: Build script
+  #       run: ./docker_build.sh release --force-clean
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: SC64
-          path: SC64.zip
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: SC64
+  #         path: SC64.zip
 
-      - name: Get release
-        if: github.event_name == 'release' && github.event.action == 'created'
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+  #     - name: Get release
+  #       if: github.event_name == 'release' && github.event.action == 'created'
+  #       id: get_release
+  #       uses: bruceadams/get-release@v1.3.2
+  #       env:
+  #         GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Upload release asset
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: actions/upload-release-asset@v1 # This will start failing soon due to needing node 12!
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: SC64.zip
-          asset_name: SC64.zip
-          asset_content_type: application/zip
+  #     - name: Upload release asset
+  #       if: github.event_name == 'release' && github.event.action == 'created'
+  #       uses: actions/upload-release-asset@v1 # This will start failing soon due to needing node 12!
+  #       env:
+  #         GITHUB_TOKEN: ${{ github.token }}
+  #       with:
+  #         upload_url: ${{ steps.get_release.outputs.upload_url }}
+  #         asset_path: SC64.zip
+  #         asset_name: SC64.zip
+  #         asset_content_type: application/zip
 
   build-executables:
     strategy:
@@ -87,3 +87,19 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: sw/pc/dist/*
+
+      - name: Zip executables
+        run: zip -j -r ${{ matrix.artifact }}.zip dist/*
+        working-directory: sw/pc
+
+      - name: TEST
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact }}-test
+          path: sw/pc/${{ matrix.artifact }}.zip
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v0.1.15
+        if: github.event_name == 'release' && github.event.action == 'created'
+        with:
+          files: sw/pc/${{ matrix.artifact }}.zip
