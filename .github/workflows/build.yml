@@ -13,27 +13,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fw-hw-sw:
-    runs-on: ubuntu-latest
+  # build-fw-hw-sw:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Git checkout
+  #       uses: actions/checkout@v3
 
-      - name: Build script
-        run: ./docker_build.sh release --force-clean
+  #     - name: Build script
+  #       run: ./docker_build.sh release --force-clean
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: SC64
-          path: SC64.zip
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: SC64
+  #         path: SC64.zip
 
-      - name: Upload release assets
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: softprops/action-gh-release@v0.1.15
-        with:
-          files: SC64.zip
+  #     - name: Upload release assets
+  #       if: github.event_name == 'release' && github.event.action == 'created'
+  #       uses: softprops/action-gh-release@v0.1.15
+  #       with:
+  #         files: SC64.zip
 
   build-apps:
     strategy:
@@ -42,13 +42,15 @@ jobs:
         include:
           - os: windows-latest
             name: Apps-Windows
-            zip: tar.exe -a -c -f
+            options: --console
+            # zip: tar.exe -a -c -f
           - os: ubuntu-latest
             name: Apps-Linux
-            zip: zip -r
+            # zip: zip -r
           - os: macos-latest
             name: Apps-macOS
-            zip: zip -r
+            options: --console
+            # zip: zip -r
 
     runs-on: ${{ matrix.os }}
 
@@ -66,12 +68,12 @@ jobs:
         working-directory: sw/pc
 
       - name: Create sc64 executable
-        run: pyinstaller --onefile sc64.py
+        run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
         working-directory: sw/pc
 
-      - name: Create primer executable
-        run: pyinstaller --onefile primer.py
-        working-directory: sw/pc
+      # - name: Create primer executable
+      #   run: pyinstaller --onefile primer.py
+      #   working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
@@ -79,13 +81,13 @@ jobs:
           name: ${{ matrix.name }}
           path: sw/pc/dist/*
 
-      - name: Zip release executables
-        if: github.event_name == 'release' && github.event.action == 'created'
-        run: ${{ matrix.zip }} ${{ matrix.name }}.zip *
-        working-directory: sw/pc/dist
+      # - name: Zip release executables
+      #   if: github.event_name == 'release' && github.event.action == 'created'
+      #   run: ${{ matrix.zip }} ${{ matrix.name }}.zip *
+      #   working-directory: sw/pc/dist
 
-      - name: Upload release assets
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: softprops/action-gh-release@v0.1.15
-        with:
-          files: sw/pc/dist/${{ matrix.name }}.zip
+      # - name: Upload release assets
+      #   if: github.event_name == 'release' && github.event.action == 'created'
+      #   uses: softprops/action-gh-release@v0.1.15
+      #   with:
+      #     files: sw/pc/dist/${{ matrix.name }}.zip
