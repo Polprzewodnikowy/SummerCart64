@@ -45,9 +45,11 @@ jobs:
             options: --console --icon ../../assets/sc64_logo_256_256.png
           - os: ubuntu-latest
             name: sc64-linux
+            finalize: chmod +x dist/*
           - os: macos-latest
             name: sc64-macos
             options: --console --icon ../../assets/sc64_logo_256_256.png
+            finalize: chmod +x dist/*
 
     runs-on: ${{ matrix.os }}
 
@@ -66,6 +68,11 @@ jobs:
 
       - name: Create sc64 executable
         run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
+        working-directory: sw/pc
+
+      - name: Finalize executable
+        if: ${{ matrix.finalize }}
+        run: ${{ matrix.finalize }}
         working-directory: sw/pc
 
       - name: Upload artifact
