@@ -52,8 +52,10 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
+          - zip: zip -j -r ${{ matrix.artifact }}.zip dist/*
           - os: windows-latest
             artifact: Apps-Windows
+            zip: tar.exe -a -c -C dist -f ${{ matrix.artifact }}.zip *
           - os: ubuntu-latest
             artifact: Apps-Linux
           - os: macos-latest
@@ -89,7 +91,7 @@ jobs:
           path: sw/pc/dist/*
 
       - name: Zip executables
-        run: zip -j -r ${{ matrix.artifact }}.zip dist/*
+        run: ${{ matrix.zip }}
         working-directory: sw/pc
 
       - name: TEST
