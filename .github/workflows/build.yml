@@ -52,14 +52,15 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
-          - zip: zip -j -r ${{ matrix.artifact }}.zip dist/*
           - os: windows-latest
             artifact: Apps-Windows
-            zip: tar.exe -a -c -C dist -f ${{ matrix.artifact }}.zip *
+            zip: tar.exe -a -c -f
           - os: ubuntu-latest
             artifact: Apps-Linux
+            zip: zip -r
           - os: macos-latest
             artifact: Apps-macOS
+            zip: zip -r
 
     runs-on: ${{ matrix.os }}
 
@@ -91,17 +92,17 @@ jobs:
           path: sw/pc/dist/*
 
       - name: Zip executables
-        run: ${{ matrix.zip }}
-        working-directory: sw/pc
+        run: ${{ matrix.zip }} ${{ matrix.artifact }}.zip *
+        working-directory: sw/pc/dist
 
       - name: TEST
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.artifact }}-test
-          path: sw/pc/${{ matrix.artifact }}.zip
+          path: sw/pc/dist/${{ matrix.artifact }}.zip
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v0.1.15
         if: github.event_name == 'release' && github.event.action == 'created'
         with:
-          files: sw/pc/${{ matrix.artifact }}.zip
+          files: sw/pc/dist/${{ matrix.artifact }}.zip
