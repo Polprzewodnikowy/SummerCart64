@@ -48,10 +48,11 @@ jobs:
           asset_content_type: application/zip
 
   build-executables:
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: ['windows-latest', 'ubuntu-latest, 'macos-latest']
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Git checkout
