@@ -50,7 +50,7 @@ jobs:
   build-executables:
     strategy:
       matrix:
-        os: ['windows-latest', 'ubuntu-latest, 'macos-latest']
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -61,7 +61,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
       - name: Install python requirements
         run: pip install -r requirements.txt pyinstaller
