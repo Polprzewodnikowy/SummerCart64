@@ -26,8 +26,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: SC64-FW-HW-SW
-          path: SC64-FW-HW-SW.zip
+          name: SC64
+          path: SC64.zip
 
       - name: Get release
         if: github.event_name == 'release' && github.event.action == 'created'
@@ -43,8 +43,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: SC64-FW-HW-SW.zip
-          asset_name: SC64-FW-HW-SW.zip
+          asset_path: SC64.zip
+          asset_name: SC64.zip
           asset_content_type: application/zip
 
   build-executables:
@@ -53,11 +53,11 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            artifact: SC64-Windows
+            artifact: Apps-Windows
           - os: ubuntu-latest
-            artifact: SC64-Linux
+            artifact: Apps-Linux
           - os: macos-latest
-            artifact: SC64-macOS
+            artifact: Apps-macOS
 
     runs-on: ${{ matrix.os }}
 
