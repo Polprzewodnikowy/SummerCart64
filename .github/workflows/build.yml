@@ -43,16 +43,16 @@ jobs:
           - os: windows-latest
             name: sc64-windows
             options: --console --icon ../../assets/sc64_logo_256_256.png
-            # package: tar.exe -a -c -C dist -f package/sc64-windows.zip sc64.exe
-            package: cp dist/* package
+            package: tar.exe -a -c -C dist -f package/sc64-windows.zip *
+            # package: cp dist/* package
           - os: ubuntu-latest
             name: sc64-linux
-            package: tar -czf package/sc64-linux.tgz dist/*
+            package: tar -czf -C dist package/sc64-linux.tgz *
             # finalize: chmod +x dist/*
           - os: macos-latest
             name: sc64-macos
             options: --console --icon ../../assets/sc64_logo_256_256.png
-            package: tar -czf package/sc64-macos.tgz dist/*
+            package: tar -czf -C dist package/sc64-macos.tgz *
             # finalize: chmod +x dist/*
 
     runs-on: ${{ matrix.os }}
