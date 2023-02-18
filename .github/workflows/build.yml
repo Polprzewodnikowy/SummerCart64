@@ -45,15 +45,17 @@ jobs:
             options: --console --icon ../../assets/sc64_logo_256_256.png
             package-options: -a -c -f
             package-ext: zip
+
           - os: ubuntu-latest
             name: sc64-linux
             package-options: -czf
-            package-ext: tar.gz
+            package-ext: tgz
+
           - os: macos-latest
             name: sc64-macos
             options: --console --icon ../../assets/sc64_logo_256_256.png
             package-options: -czf
-            package-ext: tar.gz
+            package-ext: tgz
 
     runs-on: ${{ matrix.os }}
 
@@ -88,13 +90,8 @@ jobs:
           name: ${{ matrix.name }}
           path: sw/pc/package/*
 
-      # - name: Zip release executables
-      #   if: github.event_name == 'release' && github.event.action == 'created'
-      #   run: ${{ matrix.zip }} ${{ matrix.name }}.zip *
-      #   working-directory: sw/pc/dist
-
-      # - name: Upload release assets
-      #   if: github.event_name == 'release' && github.event.action == 'created'
-      #   uses: softprops/action-gh-release@v0.1.15
-      #   with:
-      #     files: sw/pc/dist/${{ matrix.name }}.zip
+      - name: Upload release assets
+        if: github.event_name == 'release' && github.event.action == 'created'
+        uses: softprops/action-gh-release@v0.1.15
+        with:
+          files: sw/pc/package/${{ matrix.name }}.${{ matrix.package-ext }}
