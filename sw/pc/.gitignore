@@ -1,8 +1,11 @@
-**/__pycache__
+/__pycache__
+/build
+/dist
 *.bin
 *.eep
 *.fla
 *.n64
+*.spec
 *.srm
 *.v64
 *.z64

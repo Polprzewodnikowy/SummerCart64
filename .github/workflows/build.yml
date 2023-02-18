@@ -13,13 +13,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-fw-hw-sw:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
+      - name: Git checkout
+        uses: actions/checkout@v3
 
       - name: Build script
         run: ./docker_build.sh release --force-clean
@@ -47,3 +46,37 @@ jobs:
           asset_path: SC64.zip
           asset_name: SC64.zip
           asset_content_type: application/zip
+
+  build-executables:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['windows-latest', 'ubuntu-latest, 'macos-latest']
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install python requirements
+        run: pip install -r requirements.txt pyinstaller
+        working-directory: sw/pc
+
+      - name: Create sc64 executable
+        run: pyinstaller --onefile sc64.py
+        working-directory: sw/pc
+
+      - name: Create primer executable
+        run: pyinstaller --onefile primer.py
+        working-directory: sw/pc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        working-directory: sw/pc
+        with:
+          path: dist/*
