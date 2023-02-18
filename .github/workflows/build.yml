@@ -13,29 +13,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  # build-fw-hw-sw:
-  #   runs-on: ubuntu-latest
+  build-fw-hw-sw:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Git checkout
-  #       uses: actions/checkout@v3
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
 
-  #     - name: Build script
-  #       run: ./docker_build.sh release --force-clean
+      - name: Build script
+        run: ./docker_build.sh release --force-clean
 
-  #     - name: Upload artifact
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: SC64
-  #         path: SC64.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: SC64
+          path: SC64.zip
 
-  #     - name: Upload release assets
-  #       if: github.event_name == 'release' && github.event.action == 'created'
-  #       uses: softprops/action-gh-release@v0.1.15
-  #       with:
-  #         files: SC64.zip
+      - name: Upload release assets
+        if: github.event_name == 'release' && github.event.action == 'created'
+        uses: softprops/action-gh-release@v0.1.15
+        with:
+          files: SC64.zip
 
-  build-executables:
+  build-apps:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
