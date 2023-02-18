@@ -77,7 +77,9 @@ jobs:
       - name: Package executable
         run: |
           mkdir package
-          tar -C dist ${{ matrix.package-options }} package/${{ matrix.name }}.${{ matrix.package-ext }} *
+          pushd dist
+          tar ${{ matrix.package-options }} ../package/${{ matrix.name }}.${{ matrix.package-ext }} *
+          popd
         working-directory: sw/pc
 
       - name: Upload artifact
