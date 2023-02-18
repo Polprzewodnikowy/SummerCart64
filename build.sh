@@ -2,7 +2,7 @@
 
 set -e
 
-PACKAGE_FILE_NAME="SC64"
+PACKAGE_FILE_NAME="SC64-FW-HW-SW"
 
 TOP_FILES=(
     "./sw/pc/dd64.py"
