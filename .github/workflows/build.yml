@@ -77,6 +77,5 @@ jobs:
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
-        working-directory: sw/pc
         with:
-          path: dist/*
+          path: sw/pc/dist/*
