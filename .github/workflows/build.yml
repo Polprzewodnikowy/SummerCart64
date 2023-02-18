@@ -47,7 +47,7 @@ jobs:
             name: sc64-linux
           - os: macos-latest
             name: sc64-macos
-            options: --console --icon ../../assets/sc64_logo_256_256.png --target-architecture universal2
+            options: --console --icon ../../assets/sc64_logo_256_256.png
 
     runs-on: ${{ matrix.os }}
 
