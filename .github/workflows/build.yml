@@ -41,16 +41,13 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            name: Apps-Windows
-            options: --console
-            # zip: tar.exe -a -c -f
+            name: sc64-windows
+            options: --console --icon ../../assets/sc64_logo_256_256.png
           - os: ubuntu-latest
-            name: Apps-Linux
-            # zip: zip -r
+            name: sc64-linux
           - os: macos-latest
-            name: Apps-macOS
-            options: --console
-            # zip: zip -r
+            name: sc64-macos
+            options: --console --icon ../../assets/sc64_logo_256_256.png
 
     runs-on: ${{ matrix.os }}
 
@@ -68,12 +65,8 @@ jobs:
         working-directory: sw/pc
 
       - name: Create sc64 executable
-        run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
+        run: pyinstaller --clean --onefile --name ${{ matrix.name }} ${{ matrix.options }} sc64.py
         working-directory: sw/pc
-
-      # - name: Create primer executable
-      #   run: pyinstaller --onefile primer.py
-      #   working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
