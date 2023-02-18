@@ -48,7 +48,7 @@ jobs:
             options: --onefile
           - os: macos-latest
             name: sc64-macos
-            options: --onedir --console --icon ../../assets/sc64_logo_256_256.png
+            options: --onedir --console --icon ../../assets/sc64_logo_256_256.png --target-architecture universal2
 
     runs-on: ${{ matrix.os }}
 
