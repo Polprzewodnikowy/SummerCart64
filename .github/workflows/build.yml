@@ -43,14 +43,17 @@ jobs:
           - os: windows-latest
             name: sc64-windows
             options: --console --icon ../../assets/sc64_logo_256_256.png
-            package: tar.exe -C dist -a -c -f package/sc64-windows.zip .
+            package-options: -a -c -f
+            package-ext: zip
           - os: ubuntu-latest
             name: sc64-linux
-            package: tar -C dist -czf package/sc64-linux.tgz .
+            package-options: -czf
+            package-ext: tar.gz
           - os: macos-latest
             name: sc64-macos
             options: --console --icon ../../assets/sc64_logo_256_256.png
-            package: tar -C dist -czf package/sc64-macos.tgz .
+            package-options: -czf
+            package-ext: tar.gz
 
     runs-on: ${{ matrix.os }}
 
@@ -74,7 +77,7 @@ jobs:
       - name: Package executable
         run: |
           mkdir package
-          ${{ matrix.package }}
+          tar -C dist ${{ matrix.package-options }} package/${{ matrix.name }}.${{ matrix.package-ext }} *
         working-directory: sw/pc
 
       - name: Upload artifact
