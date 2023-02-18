@@ -43,13 +43,17 @@ jobs:
           - os: windows-latest
             name: sc64-windows
             options: --console --icon ../../assets/sc64_logo_256_256.png
+            # package: tar.exe -a -c -C dist -f package/sc64-windows.zip sc64.exe
+            package: cp dist/* package
           - os: ubuntu-latest
             name: sc64-linux
-            finalize: chmod +x dist/*
+            package: tar -czf package/sc64-linux.tgz dist/*
+            # finalize: chmod +x dist/*
           - os: macos-latest
             name: sc64-macos
             options: --console --icon ../../assets/sc64_logo_256_256.png
-            finalize: chmod +x dist/*
+            package: tar -czf package/sc64-macos.tgz dist/*
+            # finalize: chmod +x dist/*
 
     runs-on: ${{ matrix.os }}
 
@@ -70,16 +74,17 @@ jobs:
         run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
         working-directory: sw/pc
 
-      - name: Finalize executable
-        if: ${{ matrix.finalize }}
-        run: ${{ matrix.finalize }}
+      - name: Package executable
+        run: |
+          mkdir package
+          ${{ matrix.package }}
         working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.name }}
-          path: sw/pc/dist/*
+          path: sw/pc/package/*
 
       # - name: Zip release executables
       #   if: github.event_name == 'release' && github.event.action == 'created'
