@@ -13,27 +13,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  # build-fw-hw-sw:
-  #   runs-on: ubuntu-latest
+  build-fw-hw-sw:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Git checkout
-  #       uses: actions/checkout@v3
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
 
-  #     - name: Build script
-  #       run: ./docker_build.sh release --force-clean
+      - name: Build script
+        run: ./docker_build.sh release --force-clean
 
-  #     - name: Upload artifact
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: SC64
-  #         path: SC64.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: SC64
+          path: SC64.zip
 
-  #     - name: Upload release assets
-  #       if: github.event_name == 'release' && github.event.action == 'created'
-  #       uses: softprops/action-gh-release@v0.1.15
-  #       with:
-  #         files: SC64.zip
+      - name: Upload release assets
+        if: github.event_name == 'release' && github.event.action == 'created'
+        uses: softprops/action-gh-release@v0.1.15
+        with:
+          files: |
+            SC64.zip
+            sc64_firmware.bin
 
   build-apps:
     strategy:
@@ -41,21 +43,21 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            name: sc64-windows
-            options: --console --icon ../../assets/sc64_logo_256_256.png
-            package-options: -a -c -f
-            package-ext: zip
+            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+            package-name: sc64-windows
+            package-options: -c -a -f
+            package-extension: zip
 
           - os: ubuntu-latest
-            name: sc64-linux
+            package-name: sc64-linux
             package-options: -czf
-            package-ext: tgz
+            package-extension: tgz
 
           - os: macos-latest
-            name: sc64-macos
-            options: --console --icon ../../assets/sc64_logo_256_256.png
+            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+            package-name: sc64-macos
             package-options: -czf
-            package-ext: tgz
+            package-extension: tgz
 
     runs-on: ${{ matrix.os }}
 
@@ -73,25 +75,25 @@ jobs:
         working-directory: sw/pc
 
       - name: Create sc64 executable
-        run: pyinstaller --clean --onefile ${{ matrix.options }} sc64.py
+        run: pyinstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
         working-directory: sw/pc
 
       - name: Package executable
         run: |
           mkdir package
           pushd dist
-          tar ${{ matrix.package-options }} ../package/${{ matrix.name }}.${{ matrix.package-ext }} *
+          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}.${{ matrix.package-extension }} *
           popd
         working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.name }}
-          path: sw/pc/package/*
+          name: ${{ matrix.package-name }}
+          path: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
-          files: sw/pc/package/${{ matrix.name }}.${{ matrix.package-ext }}
+          files: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
