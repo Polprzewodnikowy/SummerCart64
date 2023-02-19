@@ -595,7 +595,6 @@ class SC64:
         seed = seed if (seed != None) else self.__guess_ipl3_seed(ipl3)
         checksum = self.__calculate_ipl3_checksum(ipl3, seed)
         data = [(1 << 0) if disabled else 0, seed, *checksum.to_bytes(6, byteorder='big')]
-        print(data)
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
         return (seed, checksum, boot_mode == self.BootMode.DIRECT_DDIPL)
 
