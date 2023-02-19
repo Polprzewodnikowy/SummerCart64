@@ -24,7 +24,6 @@
 // SOFTWARE.
 
 
-#include <stdbool.h>
 #include "cic.h"
 #include "hw.h"
 #include "led.h"
@@ -336,8 +335,7 @@ void cic_reset_parameters (void) {
 }
 
 void cic_set_parameters (uint32_t *args) {
-    cic_disabled = (args[0] >> 24) & (1 << 1);
-    cic_dd_mode = (args[0] >> 24) & (1 << 0);
+    cic_disabled = (args[0] >> 24) & (1 << 0);
     cic_seed = (args[0] >> 16) & 0xFF;
     cic_checksum[0] = (args[0] >> 8) & 0xFF;
     cic_checksum[1] = args[0] & 0xFF;
@@ -345,6 +343,10 @@ void cic_set_parameters (uint32_t *args) {
     cic_checksum[3] = (args[1] >> 16) & 0xFF;
     cic_checksum[4] = (args[1] >> 8) & 0xFF;
     cic_checksum[5] = args[1] & 0xFF;
+}
+
+void cic_set_dd_mode (bool enabled) {
+    cic_dd_mode = enabled;
 }
 
 void cic_hw_init (void) {

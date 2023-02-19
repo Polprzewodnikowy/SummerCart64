@@ -113,10 +113,12 @@ type: *enum* | default: `0`
 - `0` - Load menu from SD card
 - `1` - Attempt to boot application loaded in ROM section
 - `2` - Attempt to boot 64DD IPL
-- `3` - Direct mode, skips bootloader entirely
+- `3` - Direct ROM mode, skips bootloader entirely
+- `4` - Direct 64DD IPL mode, skips bootloader entirely
 
 Use this setting to change boot behavior.
-Value `3` (direct boot) will always keep **BOOTLOADER_SWITCH** option disabled.
+Value `3` or `4` (direct boot) will always keep **BOOTLOADER_SWITCH** option disabled.
+Value `4` will set CIC emulation to 64DD mode
 
 ---
 
@@ -145,7 +147,7 @@ type: *word* | default: `0xFFFF`
 
 Use this setting to force specific CIC seed.
 By setting value `0xFFFF` bootloader will try to guess needed values from loaded ROM IPL3.
-This setting is not used when **BOOT_MODE** is set to `3` (direct boot).
+This setting is not used when **BOOT_MODE** is set to `3` or `4` (direct boot).
 
 ---
 
@@ -160,7 +162,7 @@ type: *enum* | default: `3`
 
 Use this setting to force specific TV type.
 By setting value `3` bootloader will try to guess TV type from loaded ROM header.
-This setting is not used when **BOOT_MODE** is set to `3` (direct boot).
+This setting is not used when **BOOT_MODE** is set to `3` or `4` (direct boot).
 
 ---
 
@@ -238,7 +240,7 @@ Use this setting to enable PI access for extended ROM data located inside flash 
 
 ## Supported persistent setting options
 
-These options are similar to config options but state is persisted through power cycles.
+These options are similar to config options but state is persisted through power cycles. Setting are kept in RTC backup memory and require battery to be installed for correct operation.
 
 | id  | name           | type   | description                                   |
 | --- | -------------- | ------ | --------------------------------------------- |
