@@ -1,8 +1,8 @@
 #include "version.h"
 
 
-#define VERSION_API_USB     (1)
-#define VERSION_API_N64     (1)
+#define VERSION_API_USB     (2)
+#define VERSION_API_N64     (2)
 
 
 uint32_t version_api (version_api_type_t type) {

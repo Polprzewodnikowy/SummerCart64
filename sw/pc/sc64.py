@@ -7,6 +7,7 @@ import serial
 import socket
 import sys
 import time
+from binascii import crc32
 from datetime import datetime
 from dd64 import BadBlockError, DD64Image
 from enum import Enum, IntEnum
@@ -286,7 +287,8 @@ class SC64:
         MENU = 0
         ROM = 1
         DDIPL = 2
-        DIRECT = 3
+        DIRECT_ROM = 3
+        DIRECT_DDIPL = 4
 
     class SaveType(IntEnum):
         NONE = 0
@@ -319,7 +321,7 @@ class SC64:
         SCREENSHOT = 4
         GDB = 0xDB
 
-    __MIN_SUPPORTED_API_VERSION = 1
+    __MIN_SUPPORTED_API_VERSION = 2
 
     __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
@@ -546,19 +548,6 @@ class SC64:
     def set_save_type(self, type: SaveType) -> None:
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
 
-    def set_cic_parameters(self, disabled=False, dd_mode: bool=False, seed: Optional[int]=None, checksum: Optional[int]=None) -> None:
-        # TODO: guess seed and calculate checksum if not provided
-        seed = seed if seed else 0x3F
-        checksum = checksum if checksum else 0xA536C0F1D859
-        if (seed < 0 or seed > 0xFF):
-            raise ValueError('CIC seed outside of allowed values')
-        mode = (1 << 1) if disabled else 0
-        mode |= (1 << 0) if dd_mode else 0
-        data = bytes([mode, seed])
-        data = [*data, *checksum.to_bytes(6, byteorder='big')]
-        self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
-        return (seed, checksum)
-
     def set_led_enable(self, enabled: bool) -> None:
         self.__set_setting(self.__SettingId.LED_ENABLE, enabled)
 
@@ -592,6 +581,169 @@ class SC64:
         if (error != self.__UpdateError.OK):
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
+
+    def set_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
+        if ((seed != None) and (seed < 0 or seed > 0xFF)):
+            raise ValueError('CIC seed outside of allowed values')
+        boot_mode = self.__get_config(self.__CfgId.BOOT_MODE)
+        address = self.__Address.BOOTLOADER
+        if (boot_mode == self.BootMode.DIRECT_ROM):
+            address = self.__Address.SDRAM
+        elif (boot_mode == self.BootMode.DIRECT_DDIPL):
+            address = self.__Address.DDIPL
+        ipl3 = self.__read_memory(address, 4096)[0x40:0x1000]
+        seed = seed if (seed != None) else self.__guess_ipl3_seed(ipl3)
+        checksum = self.__calculate_ipl3_checksum(ipl3, seed)
+        data = [(1 << 0) if disabled else 0, seed, *checksum.to_bytes(6, byteorder='big')]
+        print(data)
+        self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
+        return (seed, checksum, boot_mode == self.BootMode.DIRECT_DDIPL)
+
+    def __guess_ipl3_seed(self, ipl3: bytes) -> int:
+        checksum = crc32(ipl3)
+        seed_mapping = {
+            0x587BD543: 0xAC,   # 5101
+            0x6170A4A1: 0x3F,   # 6101
+            0x009E9EA3: 0x3F,   # 7102
+            0x90BB6CB5: 0x3F,   # 6102/7101
+            0x0B050EE0: 0x78,   # x103
+            0x98BC2C86: 0x91,   # x105
+            0xACC8580A: 0x85,   # x106
+            0x0E018159: 0xDD,   # 5167
+            0x10C68B18: 0xDD,   # NDXJ0
+            0xBC605D0A: 0xDD,   # NDDJ0
+            0x502C4466: 0xDD,   # NDDJ1
+            0x0C965795: 0xDD,   # NDDJ2
+            0x8FEBA21E: 0xDE,   # NDDE0
+        }
+        return seed_mapping[checksum] if checksum in seed_mapping else 0x3F
+
+    def __calculate_ipl3_checksum(self, ipl3: bytes, seed: int) -> int:
+        _CHECKSUM_MAGIC = 0x6C078965
+
+        _add = lambda a1, a2: ((a1 + a2) & 0xFFFFFFFF)
+        _sub = lambda a1, a2: ((a1 - a2) & 0xFFFFFFFF)
+        _mul = lambda a1, a2: ((a1 * a2) & 0xFFFFFFFF)
+        _xor = lambda a1, a2: ((a1 ^ a2) & 0xFFFFFFFF)
+        _lsh = lambda a, s: (((a & 0xFFFFFFFF) << s) & 0xFFFFFFFF)
+        _rsh = lambda a, s: (((a & 0xFFFFFFFF) >> s) & 0xFFFFFFFF)
+
+        def _get(offset: int) -> int:
+            offset *= 4
+            return int.from_bytes(ipl3[offset:(offset + 4)], byteorder='big')
+
+        def _checksum(a0: int, a1: int, a2: int) -> int:
+            prod = (a0 * (a2 if (a1 == 0) else a1))
+            hi = ((prod >> 32) & 0xFFFFFFFF)
+            lo = (prod & 0xFFFFFFFF)
+            diff = ((hi - lo) & 0xFFFFFFFF)
+            return ((a0 if (diff == 0) else diff) & 0xFFFFFFFF)
+
+        if (seed < 0x00 or seed > 0xFF):
+            raise ValueError('Invalid seed')
+
+        buffer = [_xor(_add(_mul(_CHECKSUM_MAGIC, seed), 1), _get(0))] * 16
+
+        for i in range(1, 1009):
+            data_prev = data_curr if (i > 1) else _get(0)
+            data_curr = _get(i - 1)
+            data_next = _get(i)
+
+            buffer[0] = _add(buffer[0], _checksum(_sub(1007, i), data_curr, i))
+            buffer[1] = _checksum(buffer[1], data_curr, i)
+            buffer[2] = _xor(buffer[2], data_curr)
+            buffer[3] = _add(buffer[3], _checksum(_add(data_curr, 5), _CHECKSUM_MAGIC, i))
+
+            shift = (data_prev & 0x1F)
+            data_left = _lsh(data_curr, (32 - shift))
+            data_right = _rsh(data_curr, shift)
+            b4_shifted = (data_left | data_right)
+            buffer[4] = _add(buffer[4], b4_shifted)
+
+            shift = _rsh(data_prev, 27)
+            data_left = _lsh(data_curr, shift)
+            data_right = _rsh(data_curr, (32 - shift))
+            b5_shifted = (data_left | data_right)
+            buffer[5] = _add(buffer[5], b5_shifted)
+
+            if (data_curr < buffer[6]):
+                buffer[6] = _xor(_add(buffer[3], buffer[6]), _add(data_curr, i))
+            else:
+                buffer[6] = _xor(_add(buffer[4], data_curr), buffer[6])
+
+            shift = (data_prev & 0x1F)
+            data_left = _lsh(data_curr, shift)
+            data_right = _rsh(data_curr, (32 - shift))
+            buffer[7] = _checksum(buffer[7], (data_left | data_right), i)
+
+            shift = _rsh(data_prev, 27)
+            data_left = _lsh(data_curr, (32 - shift))
+            data_right = _rsh(data_curr, shift)
+            buffer[8] = _checksum(buffer[8], (data_left | data_right), i)
+
+            if (data_prev < data_curr):
+                buffer[9] = _checksum(buffer[9], data_curr, i)
+            else:
+                buffer[9] = _add(buffer[9], data_curr)
+
+            if (i == 1008):
+                break
+
+            buffer[10] = _checksum(_add(buffer[10], data_curr), data_next, i)
+            buffer[11] = _checksum(_xor(buffer[11], data_curr), data_next, i)
+            buffer[12] = _add(buffer[12], _xor(buffer[8], data_curr))
+
+            shift = (data_curr & 0x1F)
+            data_left = _lsh(data_curr, (32 - shift))
+            data_right = _rsh(data_curr, shift)
+            tmp = (data_left | data_right)
+            shift = (data_next & 0x1F)
+            data_left = _lsh(data_next, (32 - shift))
+            data_right = _rsh(data_next, shift)
+            buffer[13] = _add(buffer[13], _add(tmp, (data_left | data_right)))
+
+            shift = (data_curr & 0x1F)
+            data_left = _lsh(data_next, (32 - shift))
+            data_right = _rsh(data_next, shift)
+            sum = _checksum(buffer[14], b4_shifted, i)
+            buffer[14] = _checksum(sum, (data_left | data_right), i)
+
+            shift = _rsh(data_curr, 27)
+            data_left = _lsh(data_next, shift)
+            data_right = _rsh(data_next, (32 - shift))
+            sum = _checksum(buffer[15], b5_shifted, i)
+            buffer[15] = _checksum(sum, (data_left | data_right), i)
+
+        final_buffer = [buffer[0]] * 4
+
+        for i in range(16):
+            data = buffer[i]
+
+            shift = (data & 0x1F)
+            data_left = _lsh(data, (32 - shift))
+            data_right = _rsh(data, shift)
+            b0_shifted = _add(final_buffer[0], (data_left | data_right))
+            final_buffer[0] = b0_shifted
+
+            if (data < b0_shifted):
+                final_buffer[1] = _add(final_buffer[1], data)
+            else:
+                final_buffer[1] = _checksum(final_buffer[1], data, i)
+
+            if (_rsh((data & 0x02), 1) == (data & 0x01)):
+                final_buffer[2] = _add(final_buffer[2], data)
+            else:
+                final_buffer[2] = _checksum(final_buffer[2], data, i)
+
+            if (data & 0x01):
+                final_buffer[3] = _xor(final_buffer[3], data)
+            else:
+                final_buffer[3] = _checksum(final_buffer[3], data, i)
+
+        sum = _checksum(final_buffer[0], final_buffer[1], 16)
+        xor = _xor(final_buffer[3], final_buffer[2])
+
+        return ((sum << 32) | xor) & 0xFFFF_FFFFFFFF
 
     def __generate_filename(self, prefix: str, extension: str) -> str:
         return f'{prefix}-{datetime.now().strftime("%y%m%d%H%M%S.%f")}.{extension}'
@@ -835,11 +987,11 @@ class EnumAction(argparse.Action):
 if __name__ == '__main__':
     def cic_params_type(argument: str):
         params = argument.split(',')
-        disabled = bool(int(params[0]))
-        dd_mode = bool(int(params[1])) if len(params) >= 2 else None
-        seed = int(params[2], 0) if len(params) >= 3 else None
-        checksum = int(params[3], 0) if len(params) >= 4 else None
-        return (disabled, dd_mode, seed, checksum)
+        if (len(params) > 2):
+            raise argparse.ArgumentError()
+        seed = int(params[0], 0) if len(params) >= 1 else None
+        disabled = bool(int(params[1])) if len(params) >= 2 else None
+        return (seed, disabled)
 
     parser = argparse.ArgumentParser(description='SC64 control software')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
@@ -851,7 +1003,7 @@ if __name__ == '__main__':
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
     parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
     parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
-    parser.add_argument('--cic-params', metavar='disabled,[dd_mode,[seed,[checksum]]]', type=cic_params_type, help='set CIC emulation parameters')
+    parser.add_argument('--cic-params', metavar='seed,[disabled]', type=cic_params_type, help='set CIC emulation parameters')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
     parser.add_argument('--rom', metavar='file', help='upload ROM from specified file')
@@ -862,7 +1014,7 @@ if __name__ == '__main__':
     parser.add_argument('--disk', metavar='file', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
     parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
     parser.add_argument('--gdb', metavar='port', type=int, help='expose socket port for GDB debugging')
-    parser.add_argument('--debug', action='store_true', help='run debug loop (required for 64DD, IS-Viewer64 and GDB)')
+    parser.add_argument('--debug', action='store_true', help='run debug loop')
     parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
 
     if (len(sys.argv) <= 1):
@@ -913,10 +1065,6 @@ if __name__ == '__main__':
             sc64.set_led_enable(value)
             print(f'LED blinking set to [{"ENABLED" if value else "DISABLED"}]')
 
-        if (args.boot != None):
-            sc64.set_boot_mode(args.boot)
-            print(f'Boot mode set to [{args.boot.name}]')
-
         if (args.tv != None):
             sc64.set_tv_type(args.tv)
             print(f'TV type set to [{args.tv.name}]')
@@ -955,16 +1103,22 @@ if __name__ == '__main__':
                 sc64.upload_ddipl(f.read())
                 print('done')
 
+        if (args.boot != None):
+            sc64.set_boot_mode(args.boot)
+            print(f'Boot mode set to [{args.boot.name}]')
+
         if (args.cic_params != None):
-            (disabled, dd_mode, seed, checksum) = args.cic_params
-            (seed, checksum) = sc64.set_cic_parameters(disabled, dd_mode, seed, checksum)
+            (seed, disabled) = args.cic_params
+            (seed, checksum, dd_mode) = sc64.set_cic_parameters(seed, disabled)
             print('CIC parameters set to [', end='')
             print(f'{"DISABLED" if disabled else "ENABLED"}, ', end='')
             print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
-            print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:12X}', end='')
+            print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:012X}', end='')
             print(']')
+        else:
+            sc64.set_cic_parameters()
 
-        if (args.debug):
+        if (args.debug or args.isv or args.disk or args.gdb):
             sc64.debug_loop(isv=args.isv, disks=args.disk, gdb_port=args.gdb)
 
         if (args.backup_save):

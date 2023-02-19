@@ -1,6 +1,7 @@
 #include "boot.h"
 #include "crc32.h"
 #include "io.h"
+#include "vr4300.h"
 
 
 extern uint32_t ipl2 __attribute__((section(".data")));
@@ -15,7 +16,7 @@ static const ipl3_crc32_t ipl3_crc32[] = {
     { .crc32 = 0x587BD543, .seed = 0xAC },  // 5101
     { .crc32 = 0x6170A4A1, .seed = 0x3F },  // 6101
     { .crc32 = 0x009E9EA3, .seed = 0x3F },  // 7102
-    { .crc32 = 0x90BB6CB5, .seed = 0x3F },  // x102
+    { .crc32 = 0x90BB6CB5, .seed = 0x3F },  // 6102/7101
     { .crc32 = 0x0B050EE0, .seed = 0x78 },  // x103
     { .crc32 = 0x98BC2C86, .seed = 0x91 },  // x105
     { .crc32 = 0xACC8580A, .seed = 0x85 },  // x106
@@ -83,13 +84,23 @@ static bool boot_get_cic_seed (boot_info_t *info) {
 }
 
 void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
-    if (detect_tv_type && !boot_get_tv_type(info)) {
-        info->tv_type = OS_INFO->tv_type;
+    if (detect_tv_type) {
+        if (!boot_get_tv_type(info)) {
+            info->tv_type = OS_INFO->tv_type;
+        }
     }
 
-    if (detect_cic_seed && !boot_get_cic_seed(info)) {
-        info->cic_seed = 0x3F;
+    if (detect_cic_seed) {
+        if (!boot_get_cic_seed(info)) {
+            info->cic_seed = 0x3F;
+        }
     }
+
+    asm volatile (
+        "li $t1, %[status] \n"
+        "mtc0 $t1, $12 \n" ::
+        [status] "i" (C0_SR_CU1 | C0_SR_CU0 | C0_SR_FR)
+    );
 
     OS_INFO->mem_size_6105 = OS_INFO->mem_size;
 
@@ -106,8 +117,21 @@ void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
     cpu_io_write(&AI->MADDR, 0);
     cpu_io_write(&AI->LEN, 0);
 
-    io32_t *base = boot_get_device_base(info);
+    while (cpu_io_read(&SP->SR) & SP_SR_DMA_BUSY);
 
+    uint32_t *ipl2_src = &ipl2;
+    io32_t *ipl2_dst = SP_MEM->IMEM;
+
+    for (int i = 0; i < 8; i++) {
+        cpu_io_write(&ipl2_dst[i], ipl2_src[i]);
+    }
+
+    cpu_io_write(&PI->DOM[0].LAT, 0xFF);
+    cpu_io_write(&PI->DOM[0].PWD, 0xFF);
+    cpu_io_write(&PI->DOM[0].PGS, 0x0F);
+    cpu_io_write(&PI->DOM[0].RLS, 0x03);
+
+    io32_t *base = boot_get_device_base(info);
     uint32_t pi_config = pi_io_read(base);
 
     cpu_io_write(&PI->DOM[0].LAT, pi_config & 0xFF);
@@ -117,13 +141,6 @@ void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
 
     if (cpu_io_read(&DPC->SR) & DPC_SR_XBUS_DMEM_DMA) {
         while (cpu_io_read(&DPC->SR) & DPC_SR_PIPE_BUSY);
-    }
-
-    uint32_t *ipl2_src = &ipl2;
-    io32_t *ipl2_dst = SP_MEM->IMEM;
-
-    for (int i = 0; i < 8; i++) {
-        cpu_io_write(&ipl2_dst[i], ipl2_src[i]);
     }
 
     io32_t *ipl3_src = base;
@@ -146,7 +163,7 @@ void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
     tv_type = (info->tv_type & 0x03);
     reset_type = (info->reset_type & 0x01);
     cic_seed = (info->cic_seed & 0xFF);
-    version = 1;
+    version = (info->tv_type == BOOT_TV_TYPE_PAL) ? 6 : 1;
     stack_pointer = (void *) UNCACHED(&SP_MEM->IMEM[1020]);
 
     asm volatile (

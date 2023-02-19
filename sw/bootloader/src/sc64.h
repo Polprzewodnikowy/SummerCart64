@@ -49,7 +49,8 @@ typedef enum {
     BOOT_MODE_MENU = 0,
     BOOT_MODE_ROM = 1,
     BOOT_MODE_DDIPL = 2,
-    BOOT_MODE_DIRECT = 3
+    BOOT_MODE_DIRECT_ROM = 3,
+    BOOT_MODE_DIRECT_DDIPL = 4,
 } sc64_boot_mode_t;
 
 typedef enum {

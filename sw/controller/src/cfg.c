@@ -1,5 +1,6 @@
 #include "button.h"
 #include "cfg.h"
+#include "cic.h"
 #include "dd.h"
 #include "flash.h"
 #include "fpga.h"
@@ -47,8 +48,9 @@ typedef enum {
 typedef enum {
     BOOT_MODE_MENU = 0,
     BOOT_MODE_ROM = 1,
-    BOOT_MODE_DD = 2,
-    BOOT_MODE_DIRECT = 3
+    BOOT_MODE_DDIPL = 2,
+    BOOT_MODE_DIRECT_ROM = 3,
+    BOOT_MODE_DIRECT_DDIPL = 4,
 } boot_mode_t;
 
 typedef enum {
@@ -315,11 +317,15 @@ bool cfg_update (uint32_t *args) {
             return isv_set_address(args[1]);
             break;
         case CFG_ID_BOOT_MODE:
-            if (args[1] > BOOT_MODE_DIRECT) {
+            if (args[1] > BOOT_MODE_DIRECT_DDIPL) {
                 return true;
             }
             p.boot_mode = args[1];
-            cfg_change_scr_bits(CFG_SCR_BOOTLOADER_SKIP, (args[1] == BOOT_MODE_DIRECT));
+            cfg_change_scr_bits(CFG_SCR_BOOTLOADER_SKIP,
+                (args[1] == BOOT_MODE_DIRECT_ROM) ||
+                (args[1] == BOOT_MODE_DIRECT_DDIPL)
+            );
+            cic_set_dd_mode(args[1] == BOOT_MODE_DIRECT_DDIPL);
             break;
         case CFG_ID_SAVE_TYPE:
             return cfg_set_save_type((save_type_t) (args[1]));
