@@ -16,7 +16,7 @@ typedef enum {
 } save_type_t;
 
 
-uint32_t cfg_get_version (void);
+uint32_t cfg_get_identifier (void);
 bool cfg_query (uint32_t *args);
 bool cfg_update (uint32_t *args);
 bool cfg_query_setting (uint32_t *args);

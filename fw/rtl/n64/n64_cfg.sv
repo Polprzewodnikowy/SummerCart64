@@ -16,8 +16,8 @@ module n64_cfg (
         REG_DATA_0_L,
         REG_DATA_1_H,
         REG_DATA_1_L,
-        REG_VERSION_H,
-        REG_VERSION_L,
+        REG_IDENTIFIER_H,
+        REG_IDENTIFIER_L,
         REG_KEY_H,
         REG_KEY_L
     } e_reg;
@@ -39,8 +39,8 @@ module n64_cfg (
                 REG_DATA_0_L: reg_bus.rdata = n64_scb.cfg_wdata[0][15:0];
                 REG_DATA_1_H: reg_bus.rdata = n64_scb.cfg_wdata[1][31:16];
                 REG_DATA_1_L: reg_bus.rdata = n64_scb.cfg_wdata[1][15:0];
-                REG_VERSION_H: reg_bus.rdata = n64_scb.cfg_version[31:16];
-                REG_VERSION_L: reg_bus.rdata = n64_scb.cfg_version[15:0];
+                REG_IDENTIFIER_H: reg_bus.rdata = n64_scb.cfg_identifier[31:16];
+                REG_IDENTIFIER_L: reg_bus.rdata = n64_scb.cfg_identifier[15:0];
                 REG_KEY_H: reg_bus.rdata = 16'd0;
                 REG_KEY_L: reg_bus.rdata = 16'd0;
             endcase
@@ -83,7 +83,7 @@ module n64_cfg (
                     REG_DATA_0_L: n64_scb.cfg_rdata[0][15:0] <= reg_bus.wdata;
                     REG_DATA_1_H: n64_scb.cfg_rdata[1][31:16] <= reg_bus.wdata;
                     REG_DATA_1_L: n64_scb.cfg_rdata[1][15:0] <= reg_bus.wdata;
-                    REG_VERSION_H: irq <= 1'b0;
+                    REG_IDENTIFIER_H: irq <= 1'b0;
                     REG_KEY_H, REG_KEY_L: begin
                         lock_sequence_counter <= lock_sequence_counter + 1'd1;
                         if (reg_bus.wdata != 16'hFFFF) begin

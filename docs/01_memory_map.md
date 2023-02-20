@@ -5,7 +5,7 @@
 - [SC64 registers](#sc64-registers)
     - [`0x1FFF_0000`: **STATUS/COMMAND**](#0x1fff_0000-statuscommand)
     - [`0x1FFF_0004`: **DATA0** and `0x1FFF_0008`: **DATA1**](#0x1fff_0004-data0-and-0x1fff_0008-data1)
-    - [`0x1FFF_000C`: **VERSION**](#0x1fff_000c-version)
+    - [`0x1FFF_000C`: **IDENTIFIER**](#0x1fff_000c-identifier)
     - [`0x1FFF_0010`: **KEY**](#0x1fff_0010-key)
 - [Command execution flow](#command-execution-flow)
 
@@ -87,13 +87,13 @@ SC64 contains small register region used for communication between N64 and contr
 Protocol is command based with support for up to 256 diferrent commands and two 32-bit argument/result values per operation.
 Support for interrupts is provided but currently no command relies on it, 64DD IRQ is handled separately.
 
-| name               | address       | size    | access | usage                            |
-| ------------------ | ------------- | ------- | ------ | -------------------------------- |
-| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execution and status     |
-| **DATA0**          | `0x1FFF_0004` | 4 bytes | RW     | Command argument/result 0        |
-| **DATA1**          | `0x1FFF_0008` | 4 bytes | RW     | Command argument/result 1        |
-| **VERSION**        | `0x1FFF_000C` | 4 bytes | RW     | Hardware version and IRQ clear   |
-| **KEY**            | `0x1FFF_0010` | 4 bytes | W      | SC64 register access lock/unlock |
+| name               | address       | size    | access | usage                              |
+| ------------------ | ------------- | ------- | ------ | ---------------------------------- |
+| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execution and status       |
+| **DATA0**          | `0x1FFF_0004` | 4 bytes | RW     | Command argument/result 0          |
+| **DATA1**          | `0x1FFF_0008` | 4 bytes | RW     | Command argument/result 1          |
+| **IDENTIFIER**     | `0x1FFF_000C` | 4 bytes | RW     | Flashcart identifier and IRQ clear |
+| **KEY**            | `0x1FFF_0010` | 4 bytes | W      | SC64 register access lock/unlock   |
 
 ---
 
@@ -121,11 +121,11 @@ Note: Result is valid only when command has executed and `CMD_BUSY` bit is reset
 
 ---
 
-#### `0x1FFF_000C`: **VERSION**
+#### `0x1FFF_000C`: **IDENTIFIER**
 
-| name      | bits   | access | meaning                                       |
-| --------- | ------ | ------ | --------------------------------------------- |
-| `VERSION` | [31:0] | RW     | Hardware version (ASCII `SCv2`) and IRQ clear |
+| name         | bits   | access | meaning                                           |
+| ------------ | ------ | ------ | ------------------------------------------------- |
+| `IDENTIFIER` | [31:0] | RW     | Flashcart identifier (ASCII `SCv2`) and IRQ clear |
 
 Note: Writing any value to this register will clear pending flashcart interrupt.
 

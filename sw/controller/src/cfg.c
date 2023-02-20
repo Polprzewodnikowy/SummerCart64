@@ -221,8 +221,8 @@ static bool cfg_set_save_type (save_type_t save_type) {
 }
 
 
-uint32_t cfg_get_version (void) {
-    return fpga_reg_get(REG_CFG_VERSION);
+uint32_t cfg_get_identifier (void) {
+    return fpga_reg_get(REG_CFG_IDENTIFIER);
 }
 
 bool cfg_query (uint32_t *args) {
@@ -468,11 +468,11 @@ void cfg_process (void) {
 
         switch (cmd) {
             case 'v':
-                args[0] = cfg_get_version();
+                args[0] = cfg_get_identifier();
                 break;
 
             case 'V':
-                args[0] = version_api(API_N64);
+                args[0] = version_firmware();
                 break;
 
             case 'c':
@@ -664,11 +664,6 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
                 }
-                break;
-
-            case '?':
-                args[0] = fpga_reg_get(REG_DEBUG_0);
-                args[1] = fpga_reg_get(REG_DEBUG_1);
                 break;
 
             default:

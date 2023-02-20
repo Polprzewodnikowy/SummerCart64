@@ -200,6 +200,7 @@ class SC64:
         FLASH = 0x0400_0000
         BUFFER = 0x0500_0000
         EEPROM = 0x0500_2000
+        END = 0x0500_297F
         FIRMWARE = 0x0200_0000
         DDIPL = 0x03BC_0000
         SAVE = 0x03FE_0000
@@ -321,7 +322,8 @@ class SC64:
         SCREENSHOT = 4
         GDB = 0xDB
 
-    __MIN_SUPPORTED_API_VERSION = 2
+    __SUPPORTED_MAJOR_VERSION = 2
+    __SUPPORTED_MINOR_VERSION = 12
 
     __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
@@ -329,21 +331,24 @@ class SC64:
 
     def __init__(self) -> None:
         self.__link = SC64Serial()
-        version = self.__link.execute_cmd(cmd=b'v')
-        if (version != b'SCv2'):
-            raise ConnectionException('Unknown SC64 HW version')
+        identifier = self.__link.execute_cmd(cmd=b'v')
+        if (identifier != b'SCv2'):
+            raise ConnectionException('Unknown SC64 v2 identifier')
 
     def __get_int(self, data: bytes) -> int:
         return int.from_bytes(data[:4], byteorder='big')
 
-    def check_api_version(self) -> None:
+    def check_firmware_version(self) -> None:
         try:
-            data = self.__link.execute_cmd(cmd=b'V')
+            version = self.__link.execute_cmd(cmd=b'V')
+            major = self.__get_int(version[0:2])
+            minor = self.__get_int(version[2:4])
+            if (major != self.__SUPPORTED_MAJOR_VERSION):
+                raise ConnectionException()
+            if (minor < self.__SUPPORTED_MINOR_VERSION):
+                raise ConnectionException()
         except ConnectionException:
-            raise ConnectionException('Outdated SC64 API, please update firmware')
-        version = self.__get_int(data)
-        if (version < self.__MIN_SUPPORTED_API_VERSION):
-            raise ConnectionException('Unsupported SC64 API version, please update firmware')
+            raise ConnectionException(f'Unsupported SC64 version ({major}.{minor}), please update firmware')
 
     def __set_config(self, config: __CfgId, value: int) -> None:
         try:
@@ -461,8 +466,10 @@ class SC64:
             raise ValueError('Debug data size too big')
         self.__link.execute_cmd(cmd=b'U', args=[datatype, len(data)], data=data, response=False)
 
-    def download_memory(self) -> bytes:
-        return self.__read_memory(self.__Address.MEMORY, self.__Length.MEMORY)
+    def download_memory(self, address: int, length: int) -> bytes:
+        if ((address < 0) or (length < 0) or ((address + length) > self.__Address.END)):
+            raise ValueError('Invalid address or length')
+        return self.__read_memory(address, length)
 
     def upload_rom(self, data: bytes, use_shadow: bool=True) -> None:
         rom_length = len(data)
@@ -582,7 +589,7 @@ class SC64:
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
 
-    def set_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
+    def update_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
         if ((seed != None) and (seed < 0 or seed > 0xFF)):
             raise ValueError('CIC seed outside of allowed values')
         boot_mode = self.__get_config(self.__CfgId.BOOT_MODE)
@@ -884,7 +891,7 @@ class SC64:
         current_image = 0
         next_image = 0
 
-        self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, isv)
+        self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, 1 if (isv != 0) else 0)
         self.__set_config(self.__CfgId.ISV_ADDRESS, isv)
         if (isv != 0):
             print(f'IS-Viewer64 support set to [ENABLED] at ROM offset [0x{(isv):08X}]')
@@ -992,16 +999,24 @@ if __name__ == '__main__':
         disabled = bool(int(params[1])) if len(params) >= 2 else None
         return (seed, disabled)
 
+    def download_memory_type(argument: str):
+        params = argument.split(',')
+        if (len(params) < 2 or len(params) > 3):
+            raise argparse.ArgumentError()
+        address = int(params[0], 0)
+        length = int(params[1], 0)
+        file = params[2] if len(params) >= 3 else 'sc64dump.bin'
+        return (address, length, file)
+
     parser = argparse.ArgumentParser(description='SC64 control software')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
-    parser.add_argument('--update-bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
-    parser.add_argument('--led-enabled', metavar='{true,false}', help='disable or enable LED I/O activity blinking')
+    parser.add_argument('--led-blink', metavar='{yes,no}', help='disable or enable LED I/O activity blinking')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
-    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
-    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
+    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value, not used when direct boot mode is enabled')
+    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value, not used when direct boot mode is enabled')
     parser.add_argument('--cic-params', metavar='seed,[disabled]', type=cic_params_type, help='set CIC emulation parameters')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
@@ -1014,7 +1029,7 @@ if __name__ == '__main__':
     parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
     parser.add_argument('--gdb', metavar='port', type=int, help='expose socket port for GDB debugging')
     parser.add_argument('--debug', action='store_true', help='run debug loop')
-    parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
+    parser.add_argument('--download-memory', metavar='address,length,[file]', type=download_memory_type, help='download specified memory region and write it to file')
 
     if (len(sys.argv) <= 1):
         parser.print_help()
@@ -1039,13 +1054,7 @@ if __name__ == '__main__':
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
 
-        sc64.check_api_version()
-
-        if (args.update_bootloader):
-            with open(args.update_bootloader, 'rb') as f:
-                print('Uploading Bootloader... ', end='', flush=True)
-                sc64.upload_bootloader(f.read())
-                print('done')
+        sc64.check_firmware_version()
 
         if (args.reset_state):
             sc64.reset_state()
@@ -1059,10 +1068,10 @@ if __name__ == '__main__':
                     value = getattr(value, 'name')
                 print(f'  {key}: {value}')
 
-        if (args.led_enabled != None):
-            value = (args.led_enabled == 'true')
-            sc64.set_led_enable(value)
-            print(f'LED blinking set to [{"ENABLED" if value else "DISABLED"}]')
+        if (args.led_blink):
+            blink = (args.led_blink == 'yes')
+            sc64.set_led_enable(blink)
+            print(f'LED blinking set to [{"ENABLED" if blink else "DISABLED"}]')
 
         if (args.tv != None):
             sc64.set_tv_type(args.tv)
@@ -1085,6 +1094,12 @@ if __name__ == '__main__':
                 autodetected_save_type = sc64.autodetect_save_type(rom_data)
                 print('done')
 
+        if (args.ddipl):
+            with open(args.ddipl, 'rb') as f:
+                print('Uploading 64DD IPL... ', end='', flush=True)
+                sc64.upload_ddipl(f.read())
+                print('done')
+
         if (args.save_type != None or autodetected_save_type != None):
             save_type = args.save_type if args.save_type != None else autodetected_save_type
             sc64.set_save_type(save_type)
@@ -1096,26 +1111,20 @@ if __name__ == '__main__':
                 sc64.upload_save(f.read())
                 print('done')
 
-        if (args.ddipl):
-            with open(args.ddipl, 'rb') as f:
-                print('Uploading 64DD IPL... ', end='', flush=True)
-                sc64.upload_ddipl(f.read())
-                print('done')
-
         if (args.boot != None):
             sc64.set_boot_mode(args.boot)
             print(f'Boot mode set to [{args.boot.name}]')
 
         if (args.cic_params != None):
             (seed, disabled) = args.cic_params
-            (seed, checksum, dd_mode) = sc64.set_cic_parameters(seed, disabled)
+            (seed, checksum, dd_mode) = sc64.update_cic_parameters(seed, disabled)
             print('CIC parameters set to [', end='')
             print(f'{"DISABLED" if disabled else "ENABLED"}, ', end='')
             print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
             print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:012X}', end='')
             print(']')
         else:
-            sc64.set_cic_parameters()
+            sc64.update_cic_parameters()
 
         if (args.debug or args.isv or args.disk or args.gdb):
             sc64.debug_loop(isv=args.isv, disks=args.disk, gdb_port=args.gdb)
@@ -1126,10 +1135,11 @@ if __name__ == '__main__':
                 f.write(sc64.download_save())
                 print('done')
 
-        if (args.download_memory):
-            with open(args.download_memory, 'wb') as f:
+        if (args.download_memory != None):
+            (address, length, file) = args.download_memory
+            with open(file, 'wb') as f:
                 print('Downloading memory... ', end='', flush=True)
-                f.write(sc64.download_memory())
+                f.write(sc64.download_memory(address, length))
                 print('done')
     except ValueError as e:
         print(f'\nValue error: {e}')

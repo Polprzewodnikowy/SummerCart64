@@ -6,14 +6,14 @@
 
 | id  | name                  | arg0       | arg1         | rsp0             | rsp1           | description                                        |
 | --- | --------------------- | ---------- | ------------ | ---------------- | -------------- | -------------------------------------------------- |
-| `v` | **HW_VERSION_GET**    | ---        | ---          | hw_version       | ---            | Get HW version                                     |
-| `V` | **API_VERSION_GET**   | ---        | ---          | api_version      | ---            | Get N64 command API version                        |
+| `v` | **IDENTIFIER_GET**    | ---        | ---          | identifier       | ---            | Get flashcart identifier `SCv2`                    |
+| `V` | **VERSION_GET**       | ---        | ---          | version          | ---            | Get flashcart firmware version                     |
 | `c` | **CONFIG_GET**        | config_id  | ---          | ---              | current_value  | Get config option                                  |
 | `C` | **CONFIG_SET**        | config_id  | new_value    | ---              | previous_value | Set config option and get previous value           |
 | `c` | **SETTING_GET**       | setting_id | ---          | ---              | current_value  | Get persistent setting option                      |
 | `C` | **SETTING_SET**       | setting_id | new_value    | ---              | ---            | Set persistent setting option                      |
 | `t` | **TIME_GET**          | ---        | ---          | time_0           | time_1         | Get current RTC value                              |
-| `T` | **TIME_SET**          | time_0     | time_1       | ---              | ---            | Set RTC value                                      |
+| `T` | **TIME_SET**          | time_0     | time_1       | ---              | ---            | Set new RTC value                                  |
 | `m` | **USB_READ**          | pi_address | length       | ---              | ---            | Receive data from USB to flashcart                 |
 | `M` | **USB_WRITE**         | pi_address | length/type  | ---              | ---            | Send data from from flashcart to USB               |
 | `u` | **USB_READ_STATUS**   | ---        | ---          | read_status/type | length         | Get USB read status and type/length                |
@@ -27,4 +27,3 @@
 | `K` | **FLASH_PROGRAM**     | pi_address | length       | ---              | ---            | Program flash with bytes loaded into data buffer   |
 | `p` | **FLASH_WAIT_BUSY**   | wait       | ---          | erase_block_size | ---            | Wait until flash ready / get block erase size      |
 | `P` | **FLASH_ERASE_BLOCK** | pi_address | ---          | ---              | ---            | Start flash block erase                            |
-| `?` | **DEBUG_GET**         | ---        | ---          | debug_data_0     | debug_data_1   | Get internal FPGA debug info                       |

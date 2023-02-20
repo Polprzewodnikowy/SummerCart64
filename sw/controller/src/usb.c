@@ -160,14 +160,14 @@ static void usb_rx_process (void) {
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 4;
-                p.response_info.data[0] = cfg_get_version();
+                p.response_info.data[0] = cfg_get_identifier();
                 break;
 
             case 'V':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 4;
-                p.response_info.data[0] = version_api(API_USB);
+                p.response_info.data[0] = version_firmware();
                 break;
 
             case 'R':
@@ -247,12 +247,6 @@ static void usb_rx_process (void) {
                 }
                 break;
 
-            case 'D':
-                dd_set_block_ready(p.rx_args[0] == 0);
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                break;
-
             case 'U':
                 if ((p.read_length > 0) && usb_dma_ready()) {
                     uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
@@ -272,6 +266,28 @@ static void usb_rx_process (void) {
                         }
                     }
                 }
+                break;
+
+            case 'D':
+                dd_set_block_ready(p.rx_args[0] == 0);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
+            case 'p':
+                if (p.rx_args[0]) {
+                    flash_wait_busy();
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = FLASH_ERASE_BLOCK_SIZE;
+                break;
+
+            case 'P':
+                p.response_error = flash_erase_block(p.rx_args[0]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
                 break;
 
             case 'f': {
@@ -299,22 +315,6 @@ static void usb_rx_process (void) {
                 }
                 break;
             }
-
-            case 'p':
-                if (p.rx_args[0]) {
-                    flash_wait_busy();
-                }
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                p.response_info.data_length = 4;
-                p.response_info.data[0] = FLASH_ERASE_BLOCK_SIZE;
-                break;
-
-            case 'P':
-                p.response_error = flash_erase_block(p.rx_args[0]);
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                break;
 
             case '?':
                 p.rx_state = RX_STATE_IDLE;

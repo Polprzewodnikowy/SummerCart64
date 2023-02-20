@@ -5,7 +5,7 @@
 typedef struct {
     io32_t SR_CMD;
     io32_t DATA[2];
-    io32_t VERSION;
+    io32_t IDENTIFIER;
     io32_t KEY;
 } sc64_regs_t;
 
@@ -16,7 +16,7 @@ typedef struct {
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)
 
-#define SC64_VERSION_2              (0x53437632)
+#define SC64_V2_IDENTIFIER          (0x53437632)
 
 #define SC64_KEY_RESET              (0x00000000UL)
 #define SC64_KEY_UNLOCK_1           (0x5F554E4CUL)
@@ -24,8 +24,8 @@ typedef struct {
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
 
 typedef enum {
-    SC64_CMD_HW_VERSION_GET     = 'v',
-    SC64_CMD_API_VERSION_GET    = 'V',
+    SC64_CMD_IDENTIFIER_GET     = 'v',
+    SC64_CMD_VERSION_GET        = 'V',
     SC64_CMD_CONFIG_GET         = 'c',
     SC64_CMD_CONFIG_SET         = 'C',
     SC64_CMD_SETTING_GET        = 'a',
@@ -45,7 +45,6 @@ typedef enum {
     SC64_CMD_FLASH_PROGRAM      = 'K',
     SC64_CMD_FLASH_WAIT_BUSY    = 'p',
     SC64_CMD_FLASH_ERASE_BLOCK  = 'P',
-    SC64_CMD_DEBUG_GET          = '?',
 } cmd_id_t;
 
 typedef enum {
@@ -98,8 +97,8 @@ void sc64_lock (void) {
 }
 
 bool sc64_check_presence (void) {
-    uint32_t version = pi_io_read(&SC64_REGS->VERSION);
-    if (version == SC64_VERSION_2) {
+    uint32_t identifier = pi_io_read(&SC64_REGS->IDENTIFIER);
+    if (identifier == SC64_V2_IDENTIFIER) {
         sc64_wait_cpu_busy();
         return true;
     }
@@ -114,7 +113,7 @@ bool sc64_irq_pending (void) {
 }
 
 void sc64_irq_clear (void) {
-    pi_io_write(&SC64_REGS->VERSION, 0);
+    pi_io_write(&SC64_REGS->IDENTIFIER, 0);
 }
 
 uint32_t sc64_get_config (sc64_cfg_id_t id) {
