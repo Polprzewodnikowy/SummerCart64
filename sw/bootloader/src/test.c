@@ -81,6 +81,7 @@ static void test_sd_card (void) {
 
     if (sc64_sd_read_sectors((void *) (SC64_BUFFERS->BUFFER), 0, 1)) {
         display_printf("SD card read sector 0 error!\n");
+        return;
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), sector, sizeof(sector));
@@ -94,7 +95,7 @@ static void test_sd_card (void) {
         display_printf("%02X ", sector[0x1CE + i]);
     }
     display_printf("\n");
-    display_printf(" Boot signature: 0x%02X%02X", sector[510], sector[511]);
+    display_printf(" Boot signature: 0x%02X%02X\n", sector[510], sector[511]);
 }
 
 

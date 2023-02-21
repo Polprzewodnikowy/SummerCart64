@@ -338,7 +338,7 @@ class SC64:
     def __get_int(self, data: bytes) -> int:
         return int.from_bytes(data[:4], byteorder='big')
 
-    def check_firmware_version(self) -> None:
+    def check_firmware_version(self) -> tuple[str, bool]:
         try:
             version = self.__link.execute_cmd(cmd=b'V')
             major = self.__get_int(version[0:2])
@@ -347,8 +347,9 @@ class SC64:
                 raise ConnectionException()
             if (minor < self.__SUPPORTED_MINOR_VERSION):
                 raise ConnectionException()
+            return (f'{major}.{minor}', minor > self.__SUPPORTED_MINOR_VERSION)
         except ConnectionException:
-            raise ConnectionException(f'Unsupported SC64 version ({major}.{minor}), please update firmware')
+            raise ConnectionException(f'Unsupported SC64 version [{major}.{minor}], please update firmware')
 
     def __set_config(self, config: __CfgId, value: int) -> None:
         try:
@@ -1054,7 +1055,15 @@ if __name__ == '__main__':
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
 
-        sc64.check_firmware_version()
+        (version, script_outdated) = sc64.check_firmware_version()
+
+        print(f'SC64 firmware version: [{version}]')
+        if (script_outdated):
+            print('\x1b[33m')
+            print('[      SC64 firmware is newer than last known version.      ]')
+            print('[          Consider downloading latest script from          ]')
+            print('[ https://github.com/Polprzewodnikowy/SummerCart64/releases ]')
+            print('\x1b[0m')
 
         if (args.reset_state):
             sc64.reset_state()
@@ -1142,6 +1151,6 @@ if __name__ == '__main__':
                 f.write(sc64.download_memory(address, length))
                 print('done')
     except ValueError as e:
-        print(f'\nValue error: {e}')
+        print(f'\n\x1b[31mValue error: {e}\x1b[0m\n')
     except ConnectionException as e:
-        print(f'\nSC64 error: {e}')
+        print(f'\n\x1b[31mSC64 error: {e}\x1b[0m\n')
