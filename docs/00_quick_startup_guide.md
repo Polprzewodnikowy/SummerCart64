@@ -24,9 +24,9 @@
 
 Keeping SC64 firmware up to date is highly recommended. `sc64.py` script is tightly coupled with specific firmware versions and will error out when it detects unsupported firmware version.
 
-To download and backup current version of SC64 firmware run `python3 sc64.py --backup-firmware sc64_backup_package.bin`
+To download and backup current version of SC64 firmware run `python3 sc64.py --backup-firmware sc64_firmware_backup.bin`
 
-To update SC64 firmware run `python3 sc64.py --update-firmware sc64_update_package.bin`
+To update SC64 firmware run `python3 sc64.py --update-firmware sc64_firmware.bin`
 
 ---
 
