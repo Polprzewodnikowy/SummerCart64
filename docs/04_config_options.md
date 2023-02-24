@@ -174,7 +174,6 @@ type: *bool* | default: `0`
 - `1` - 64DD block requests are passed to SD card
 
 Use this setting to change where 64DD emulation will be passing incoming block R/W requests.
-For more information about 64DD and USB request passing check [sc64.py](../sw/pc/sc64.py#L636) implementation.
 
 ---
 
