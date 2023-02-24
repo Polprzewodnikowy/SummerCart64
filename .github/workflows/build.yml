@@ -73,7 +73,7 @@ jobs:
           python-version: 3.11
 
       - name: Download pyinstaller repository
-        user: actions/checkout@v3
+        uses: actions/checkout@v3
         with:
           repository: 'https://github.com/pyinstaller/pyinstaller.git'
           ref: 'v5.8.0'
@@ -88,7 +88,7 @@ jobs:
         working-directory: pyinstaller
 
       - name: Install python requirements
-        run: pip install -r requirements.txt #pyinstaller
+        run: pip install -r requirements.txt
         working-directory: sw/pc
         # env:
         #   PYINSTALLER_COMPILE_BOOTLOADER: true
