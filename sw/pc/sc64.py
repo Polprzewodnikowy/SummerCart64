@@ -1328,8 +1328,8 @@ if __name__ == '__main__':
         print(f'\x1b[32mSC64 firmware version: [{version}]\x1b[0m')
         if (script_outdated):
             print('\x1b[33m')
-            print('[      SC64 firmware is newer than last known version.      ]')
-            print('[          Consider downloading latest script from          ]')
+            print('[      SC64 firmware is newer than last known version       ]')
+            print('[     Consider downloading latest sc64 executable from      ]')
             print('[ https://github.com/Polprzewodnikowy/SummerCart64/releases ]')
             print('\x1b[0m')
 

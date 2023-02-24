@@ -8,6 +8,7 @@ import sys
 import time
 from binascii import crc32
 from sc64 import SC64
+from sys import exit
 from typing import Callable, Optional
 
 
