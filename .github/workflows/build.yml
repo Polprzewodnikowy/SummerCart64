@@ -24,7 +24,7 @@ jobs:
         id: sc64version
         with:
           _input-text: ${{ github.ref_name }}
-          \: -
+          "\\": -
 
       # - name: Set SC64 version
       #   run: |
