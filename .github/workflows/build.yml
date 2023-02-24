@@ -30,6 +30,8 @@ jobs:
 
       - name: Build everything
         run: ./docker_build.sh release --force-clean
+        env:
+          SC64_VERSION: ${{ steps.sc64version.outputs.replaced }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
