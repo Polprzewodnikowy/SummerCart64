@@ -13,51 +13,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fw-hw-sw:
-    runs-on: ubuntu-latest
+  # build-fw-hw-sw:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Git checkout
+  #       uses: actions/checkout@v3
 
-      - name: Build script
-        run: ./docker_build.sh release --force-clean
+  #     - name: Build script
+  #       run: ./docker_build.sh release --force-clean
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: SC64
-          path: SC64.zip
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: SC64
+  #         path: SC64.zip
 
-      - name: Upload release assets
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: softprops/action-gh-release@v0.1.15
-        with:
-          files: |
-            SC64.zip
-            sc64_firmware.bin
+  #     - name: Upload release assets
+  #       if: github.event_name == 'release' && github.event.action == 'created'
+  #       uses: softprops/action-gh-release@v0.1.15
+  #       with:
+  #         files: |
+  #           SC64.zip
+  #           sc64_firmware.bin
 
   build-apps:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        # os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         include:
-          - os: windows-latest
-            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
-            package-name: sc64-windows
-            package-options: -c -a -f
-            package-extension: zip
+          # - os: windows-latest
+          #   pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+          #   package-name: sc64-windows
+          #   package-options: -c -a -f
+          #   package-extension: zip
 
           - os: ubuntu-latest
             package-name: sc64-linux
             package-options: -czf
             package-extension: tgz
 
-          - os: macos-latest
-            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
-            package-name: sc64-macos
-            package-options: -czf
-            package-extension: tgz
+          # - os: macos-latest
+          #   pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+          #   package-name: sc64-macos
+          #   package-options: -czf
+          #   package-extension: tgz
 
     runs-on: ${{ matrix.os }}
 
@@ -70,9 +71,22 @@ jobs:
         with:
           python-version: 3.11
 
+      # - name: Download pyinstaller repository
+      #   user: actions/checkout@v3
+      #   with:
+      #     repository: 'https://github.com/pyinstaller/pyinstaller.git'
+      #     ref: 'v5.8.0'
+      #     path: pyinstaller
+
+      # - name: Compile pyinstaller bootloader
+      #   run: python ./waf all
+      #   working-directory: pyinstaller/bootloader
+
       - name: Install python requirements
         run: pip install -r requirements.txt pyinstaller
         working-directory: sw/pc
+        env:
+          PYINSTALLER_COMPILE_BOOTLOADER: true
 
       - name: Create sc64 executable
         run: pyinstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
@@ -92,8 +106,8 @@ jobs:
           name: ${{ matrix.package-name }}
           path: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
 
-      - name: Upload release assets
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: softprops/action-gh-release@v0.1.15
-        with:
-          files: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
+      # - name: Upload release assets
+      #   if: github.event_name == 'release' && github.event.action == 'created'
+      #   uses: softprops/action-gh-release@v0.1.15
+      #   with:
+      #     files: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
