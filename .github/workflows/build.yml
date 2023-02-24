@@ -41,18 +41,19 @@ jobs:
     strategy:
       matrix:
         # os: [windows-latest, ubuntu-latest, macos-latest]
-        os: [ubuntu-latest]
+        # os: [ubuntu-latest]
+        os: [windows-latest]
         include:
-          # - os: windows-latest
-          #   pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
-          #   package-name: sc64-windows
-          #   package-options: -c -a -f
-          #   package-extension: zip
+          - os: windows-latest
+            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+            package-name: sc64-windows
+            package-options: -c -a -f
+            package-extension: zip
 
-          - os: ubuntu-latest
-            package-name: sc64-linux
-            package-options: -czf
-            package-extension: tgz
+          # - os: ubuntu-latest
+          #   package-name: sc64-linux
+          #   package-options: -czf
+          #   package-extension: tgz
 
           # - os: macos-latest
           #   pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
@@ -71,25 +72,29 @@ jobs:
         with:
           python-version: 3.11
 
-      # - name: Download pyinstaller repository
-      #   user: actions/checkout@v3
-      #   with:
-      #     repository: 'https://github.com/pyinstaller/pyinstaller.git'
-      #     ref: 'v5.8.0'
-      #     path: pyinstaller
+      - name: Download pyinstaller repository
+        user: actions/checkout@v3
+        with:
+          repository: 'https://github.com/pyinstaller/pyinstaller.git'
+          ref: 'v5.8.0'
+          path: pyinstaller
 
-      # - name: Compile pyinstaller bootloader
-      #   run: python ./waf all
-      #   working-directory: pyinstaller/bootloader
+      - name: Compile and install pyinstaller
+        run: |
+          pushd bootloader
+          python3 ./waf all
+          popd
+          python3 setup.py install
+        working-directory: pyinstaller
 
       - name: Install python requirements
-        run: pip install -r requirements.txt pyinstaller
+        run: pip install -r requirements.txt #pyinstaller
         working-directory: sw/pc
-        env:
-          PYINSTALLER_COMPILE_BOOTLOADER: true
+        # env:
+        #   PYINSTALLER_COMPILE_BOOTLOADER: true
 
       - name: Create sc64 executable
-        run: pyinstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
+        run: python3 -m PyInstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
         working-directory: sw/pc
 
       - name: Package executable
