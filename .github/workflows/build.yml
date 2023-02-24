@@ -44,6 +44,7 @@ jobs:
         os: [windows-latest, ubuntu-latest]
         include:
           - os: windows-latest
+            pyinstaller-build-options: --target-arch=64bit
             pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
             package-name: sc64-windows
             package-options: -c -a -f
@@ -80,9 +81,10 @@ jobs:
 
       - name: Compile and install pyinstaller
         run: |
+          pip3 uninstall pyinstaller
           pip3 install wheel
           pushd bootloader
-          python3 ./waf all
+          python3 ./waf all ${{ matrix.pyinstaller-build-options }}
           popd
           pip3 install .
         working-directory: pyinstaller
