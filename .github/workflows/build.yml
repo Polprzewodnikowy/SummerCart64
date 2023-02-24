@@ -44,18 +44,19 @@ jobs:
         include:
           - os: windows-latest
             pyinstaller-build-options: --target-arch=64bit
-            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+            pyinstaller-options: --onefile --console --icon ../../assets/sc64_logo_256_256.png
             package-name: sc64-windows
             package-options: -c -a -f
             package-extension: zip
 
           - os: ubuntu-latest
+            pyinstaller-options: --onefile
             package-name: sc64-linux
             package-options: -czf
             package-extension: tgz
 
           - os: macos-latest
-            pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
+            pyinstaller-options: --onedir --console --icon ../../assets/sc64_logo_256_256.png
             package-name: sc64-macos
             package-options: -czf
             package-extension: tgz
@@ -93,7 +94,7 @@ jobs:
         working-directory: sw/pc
 
       - name: Create sc64.py executable
-        run: python3 -m PyInstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
+        run: python3 -m PyInstaller --clean ${{ matrix.pyinstaller-options }} sc64.py
         working-directory: sw/pc
 
       - name: Package executable
