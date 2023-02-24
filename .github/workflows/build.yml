@@ -87,7 +87,7 @@ jobs:
           pushd bootloader
           python3 ./waf all
           popd
-          python3 setup.py install
+          pip3 install .
         working-directory: pyinstaller
 
       - name: Install sc64.py requirements
