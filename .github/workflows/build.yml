@@ -65,7 +65,7 @@ jobs:
             pyinstaller-options: --onefile
             package-name: sc64-linux
             package-options: -czf
-            package-extension: tgz
+            package-extension: tar.gz
 
           - os: macos-latest
             pyinstaller-options: --onedir --console --icon ../../assets/sc64_logo_256_256.png
