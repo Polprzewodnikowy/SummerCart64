@@ -25,7 +25,7 @@ jobs:
         id: sc64version
         with:
           pattern: '\/'
-          string: ${{ github.ref_name }}
+          string: '-${{ github.ref_name }}'
           replace-with: '-'
 
       - name: Build everything
@@ -82,7 +82,7 @@ jobs:
         id: sc64version
         with:
           pattern: '\/'
-          string: ${{ github.ref_name }}
+          string: '-${{ github.ref_name }}'
           replace-with: '-'
 
       - name: Setup python
