@@ -28,7 +28,7 @@ typedef enum {
     REG_CFG_DATA_0,
     REG_CFG_DATA_1,
     REG_CFG_CMD,
-    REG_CFG_VERSION,
+    REG_CFG_IDENTIFIER,
     REG_FLASHRAM_SCR,
     REG_FLASH_SCR,
     REG_RTC_SCR,

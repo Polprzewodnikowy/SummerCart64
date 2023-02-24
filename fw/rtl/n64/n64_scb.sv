@@ -51,7 +51,7 @@ interface n64_scb ();
     logic [7:0] cfg_cmd;
     logic [31:0] cfg_rdata [0:1];
     logic [31:0] cfg_wdata [0:1];
-    logic [31:0] cfg_version;
+    logic [31:0] cfg_identifier;
 
     logic [15:0] save_count;
 
@@ -94,7 +94,7 @@ interface n64_scb ();
         input cfg_cmd,
         input cfg_rdata,
         output cfg_wdata,
-        output cfg_version,
+        output cfg_identifier,
 
         input save_count,
 
@@ -194,7 +194,7 @@ interface n64_scb ();
         output cfg_cmd,
         output cfg_rdata,
         input cfg_wdata,
-        input cfg_version
+        input cfg_identifier
     );
 
     modport save_counter (

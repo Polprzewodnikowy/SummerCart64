@@ -5,7 +5,6 @@ set -e
 PACKAGE_FILE_NAME="SC64"
 
 TOP_FILES=(
-    "./sw/pc/dd64.py"
     "./sw/pc/primer.py"
     "./sw/pc/requirements.txt"
     "./sw/pc/sc64.py"

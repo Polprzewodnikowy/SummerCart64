@@ -6,6 +6,7 @@
 - [Running 64DD games](#running-64dd-games)
 - [Direct boot option](#direct-boot-option)
 - [Debug terminal](#debug-terminal)
+- [LED blink patters](#led-blink-patters)
 
 ---
 
@@ -24,9 +25,9 @@
 
 Keeping SC64 firmware up to date is highly recommended. `sc64.py` script is tightly coupled with specific firmware versions and will error out when it detects unsupported firmware version.
 
-To download and backup current version of SC64 firmware run `python3 sc64.py --backup-firmware sc64_backup_package.bin`
+To download and backup current version of SC64 firmware run `python3 sc64.py --backup-firmware sc64_firmware_backup.bin`
 
-To update SC64 firmware run `python3 sc64.py --update-firmware sc64_update_package.bin`
+To update SC64 firmware run `python3 sc64.py --update-firmware sc64_firmware.bin`
 
 ---
 
@@ -71,3 +72,21 @@ Run `python3 sc64.py --boot direct-rom --rom path_to_rom.n64` to disable bootloa
 ## Debug terminal
 
 `sc64.py` supports UNFLoader protocol and has same functionality implemented as aforementioned program. Use argument `--debug` to activate it.
+
+---
+
+## LED blink patters
+
+LED on SC64 board can blink in certain situations. Most of them during normal use are related to SD card access. Here's list of blink patters meaning:
+
+| Pattern                              | Meaning                                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Nx [Short ON - Short OFF]            | SD card is being accessed (initialization or data read/write) or save writeback is in progress               |
+| Nx [Medium ON - Long OFF]            | CIC region didn't match, please power off console and power on again                                         |
+| 2x [Very short ON - Short OFF]       | Pattern used during firmware update process, it means that specific part of firmware has started programming |
+| 10x [Very short ON - Very short OFF] | Firmware has been successfully updated                                                                       |
+| 30x [Long ON - Long OFF]             | There was serious problem during firmware update, device is most likely bricked                              |
+
+Nx means that blink count is varied.
+
+LED blinking on SD card access can be disabled through `sc64.py` script. Please refer to included help for option to change the LED behavior.

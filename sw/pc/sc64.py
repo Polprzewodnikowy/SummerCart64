@@ -9,13 +9,217 @@ import sys
 import time
 from binascii import crc32
 from datetime import datetime
-from dd64 import BadBlockError, DD64Image
 from enum import Enum, IntEnum
+from io import BufferedReader
 from serial.tools import list_ports
 from threading import Thread
 from typing import Callable, Optional
 from PIL import Image
 
+
+
+class BadBlockError(Exception):
+    pass
+
+
+class DD64Image:
+    __DISK_HEADS = 2
+    __DISK_TRACKS = 1175
+    __DISK_BLOCKS_PER_TRACK = 2
+    __DISK_SECTORS_PER_BLOCK = 85
+    __DISK_BAD_TRACKS_PER_ZONE = 12
+    __DISK_SYSTEM_SECTOR_SIZE = 232
+    __DISK_ZONES = [
+        (0, 232, 158, 0),
+        (0, 216, 158, 158),
+        (0, 208, 149, 316),
+        (0, 192, 149, 465),
+        (0, 176, 149, 614),
+        (0, 160, 149, 763),
+        (0, 144, 149, 912),
+        (0, 128, 114, 1061),
+        (1, 216, 158, 157),
+        (1, 208, 158, 315),
+        (1, 192, 149, 464),
+        (1, 176, 149, 613),
+        (1, 160, 149, 762),
+        (1, 144, 149, 911),
+        (1, 128, 149, 1060),
+        (1, 112, 114, 1174),
+    ]
+    __DISK_VZONE_TO_PZONE = [
+        [0, 1, 2, 9, 8, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10],
+        [0, 1, 2, 3, 10, 9, 8, 4, 5, 6, 7, 15, 14, 13, 12, 11],
+        [0, 1, 2, 3, 4, 11, 10, 9, 8, 5, 6, 7, 15, 14, 13, 12],
+        [0, 1, 2, 3, 4, 5, 12, 11, 10, 9, 8, 6, 7, 15, 14, 13],
+        [0, 1, 2, 3, 4, 5, 6, 13, 12, 11, 10, 9, 8, 7, 15, 14],
+        [0, 1, 2, 3, 4, 5, 6, 7, 14, 13, 12, 11, 10, 9, 8, 15],
+        [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
+    ]
+    __DISK_DRIVE_TYPES = [(
+        'development',
+        192,
+        [11, 10, 3, 2],
+        [0, 1, 8, 9, 16, 17, 18, 19, 20, 21, 22, 23],
+    ), (
+        'retail',
+        232,
+        [9, 8, 1, 0],
+        [2, 3, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23],
+    )]
+
+    __file: Optional[BufferedReader]
+    __drive_type: Optional[str]
+    __block_info_table: list[tuple[int, int]]
+    loaded: bool = False
+
+    def __init__(self) -> None:
+        self.__file = None
+        self.__drive_type = None
+        block_info_table_length = self.__DISK_HEADS * self.__DISK_TRACKS * self.__DISK_BLOCKS_PER_TRACK
+        self.__block_info_table = [None] * block_info_table_length
+
+    def __del__(self) -> None:
+        self.unload()
+
+    def __check_system_block(self, lba: int, sector_size: int, check_disk_type: bool) -> tuple[bool, bytes]:
+        self.__file.seek(lba * self.__DISK_SYSTEM_SECTOR_SIZE * self.__DISK_SECTORS_PER_BLOCK)
+        system_block_data = self.__file.read(sector_size * self.__DISK_SECTORS_PER_BLOCK)
+        system_data = system_block_data[:sector_size]
+        for sector in range(1, self.__DISK_SECTORS_PER_BLOCK):
+            sector_data = system_block_data[(sector * sector_size):][:sector_size]
+            if (system_data != sector_data):
+                return (False, None)
+        if (check_disk_type):
+            if (system_data[4] != 0x10):
+                return (False, None)
+            if ((system_data[5] & 0xF0) != 0x10):
+                return (False, None)
+        return (True, system_data)
+
+    def __parse_disk(self) -> None:
+        disk_system_data = None
+        disk_id_data = None
+        disk_bad_lbas = []
+
+        drive_index = 0
+        while (disk_system_data == None) and (drive_index < len(self.__DISK_DRIVE_TYPES)):
+            (drive_type, system_sector_size, system_data_lbas, bad_lbas) = self.__DISK_DRIVE_TYPES[drive_index]
+            disk_bad_lbas.clear()
+            disk_bad_lbas.extend(bad_lbas)
+            for system_lba in system_data_lbas:
+                (valid, system_data) = self.__check_system_block(system_lba, system_sector_size, check_disk_type=True)
+                if (valid):
+                    self.__drive_type = drive_type
+                    disk_system_data = system_data
+                else:
+                    disk_bad_lbas.append(system_lba)
+            drive_index += 1
+
+        for id_lba in [15, 14]:
+            (valid, id_data) = self.__check_system_block(id_lba, self.__DISK_SYSTEM_SECTOR_SIZE, check_disk_type=False)
+            if (valid):
+                disk_id_data = id_data
+            else:
+                disk_bad_lbas.append(id_lba)
+
+        if not (disk_system_data and disk_id_data):
+            raise ValueError('Provided 64DD disk file is not valid')
+
+        disk_zone_bad_tracks = []
+
+        for zone in range(len(self.__DISK_ZONES)):
+            zone_bad_tracks = []
+            start = 0 if zone == 0 else system_data[0x07 + zone]
+            stop = system_data[0x07 + zone + 1]
+            for offset in range(start, stop):
+                zone_bad_tracks.append(system_data[0x20 + offset])
+            for ignored_track in range(self.__DISK_BAD_TRACKS_PER_ZONE - len(zone_bad_tracks)):
+                zone_bad_tracks.append(self.__DISK_ZONES[zone][2] - ignored_track - 1)
+            disk_zone_bad_tracks.append(zone_bad_tracks)
+
+        disk_type = disk_system_data[5] & 0x0F
+
+        current_lba = 0
+        starting_block = 0
+        disk_file_offset = 0
+
+        for zone in self.__DISK_VZONE_TO_PZONE[disk_type]:
+            (head, sector_size, tracks, track) = self.__DISK_ZONES[zone]
+
+            for zone_track in range(tracks):
+                current_zone_track = (
+                    (tracks - 1) - zone_track) if head else zone_track
+
+                if (current_zone_track in disk_zone_bad_tracks[zone]):
+                    track += (-1) if head else 1
+                    continue
+
+                for block in range(self.__DISK_BLOCKS_PER_TRACK):
+                    index = (track << 2) | (head << 1) | (starting_block ^ block)
+                    if (current_lba not in disk_bad_lbas):
+                        self.__block_info_table[index] = (disk_file_offset, sector_size * self.__DISK_SECTORS_PER_BLOCK)
+                    else:
+                        self.__block_info_table[index] = None
+                    disk_file_offset += sector_size * self.__DISK_SECTORS_PER_BLOCK
+                    current_lba += 1
+
+                track += (-1) if head else 1
+                starting_block ^= 1
+
+    def __check_track_head_block(self, track: int, head: int, block: int) -> None:
+        if (track < 0 or track >= self.__DISK_TRACKS):
+            raise ValueError('Track outside of possible range')
+        if (head < 0 or head >= self.__DISK_HEADS):
+            raise ValueError('Head outside of possible range')
+        if (block < 0 or block >= self.__DISK_BLOCKS_PER_TRACK):
+            raise ValueError('Block outside of possible range')
+
+    def __get_table_index(self, track: int, head: int, block: int) -> int:
+        return (track << 2) | (head << 1) | (block)
+
+    def __get_block_info(self, track: int, head: int, block: int) -> Optional[tuple[int, int]]:
+        if (self.__file.closed):
+            return None
+        self.__check_track_head_block(track, head, block)
+        index = self.__get_table_index(track, head, block)
+        return self.__block_info_table[index]
+
+    def load(self, path: str) -> None:
+        self.unload()
+        self.__file = open(path, 'rb+')
+        self.__parse_disk()
+        self.loaded = True
+
+    def unload(self) -> None:
+        self.loaded = False
+        if (self.__file != None and not self.__file.closed):
+            self.__file.close()
+        self.__drive_type = None
+
+    def get_block_info_table(self) -> list[tuple[int, int]]:
+        return self.__block_info_table
+
+    def get_drive_type(self) -> str:
+        return self.__drive_type
+
+    def read_block(self, track: int, head: int, block: int) -> bytes:
+        info = self.__get_block_info(track, head, block)
+        if (info == None):
+            raise BadBlockError
+        (offset, block_size) = info
+        self.__file.seek(offset)
+        return self.__file.read(block_size)
+
+    def write_block(self, track: int, head: int, block: int, data: bytes) -> None:
+        info = self.__get_block_info(track, head, block)
+        if (info == None):
+            raise BadBlockError
+        (offset, block_size) = info
+        if (len(data) != block_size):
+            raise ValueError(f'Provided data block size is different than expected ({len(data)} != {block_size})')
+        self.__file.seek(offset)
+        self.__file.write(data)
 
 
 class ConnectionException(Exception):
@@ -200,6 +404,7 @@ class SC64:
         FLASH = 0x0400_0000
         BUFFER = 0x0500_0000
         EEPROM = 0x0500_2000
+        END = 0x0500_297F
         FIRMWARE = 0x0200_0000
         DDIPL = 0x03BC_0000
         SAVE = 0x03FE_0000
@@ -321,7 +526,8 @@ class SC64:
         SCREENSHOT = 4
         GDB = 0xDB
 
-    __MIN_SUPPORTED_API_VERSION = 2
+    __SUPPORTED_MAJOR_VERSION = 2
+    __SUPPORTED_MINOR_VERSION = 12
 
     __isv_line_buffer: bytes = b''
     __debug_header: Optional[bytes] = None
@@ -329,21 +535,25 @@ class SC64:
 
     def __init__(self) -> None:
         self.__link = SC64Serial()
-        version = self.__link.execute_cmd(cmd=b'v')
-        if (version != b'SCv2'):
-            raise ConnectionException('Unknown SC64 HW version')
+        identifier = self.__link.execute_cmd(cmd=b'v')
+        if (identifier != b'SCv2'):
+            raise ConnectionException('Unknown SC64 v2 identifier')
 
     def __get_int(self, data: bytes) -> int:
         return int.from_bytes(data[:4], byteorder='big')
 
-    def check_api_version(self) -> None:
+    def check_firmware_version(self) -> tuple[str, bool]:
         try:
-            data = self.__link.execute_cmd(cmd=b'V')
+            version = self.__link.execute_cmd(cmd=b'V')
+            major = self.__get_int(version[0:2])
+            minor = self.__get_int(version[2:4])
+            if (major != self.__SUPPORTED_MAJOR_VERSION):
+                raise ConnectionException()
+            if (minor < self.__SUPPORTED_MINOR_VERSION):
+                raise ConnectionException()
+            return (f'{major}.{minor}', minor > self.__SUPPORTED_MINOR_VERSION)
         except ConnectionException:
-            raise ConnectionException('Outdated SC64 API, please update firmware')
-        version = self.__get_int(data)
-        if (version < self.__MIN_SUPPORTED_API_VERSION):
-            raise ConnectionException('Unsupported SC64 API version, please update firmware')
+            raise ConnectionException(f'Unsupported SC64 version [{major}.{minor}], please update firmware')
 
     def __set_config(self, config: __CfgId, value: int) -> None:
         try:
@@ -461,8 +671,10 @@ class SC64:
             raise ValueError('Debug data size too big')
         self.__link.execute_cmd(cmd=b'U', args=[datatype, len(data)], data=data, response=False)
 
-    def download_memory(self) -> bytes:
-        return self.__read_memory(self.__Address.MEMORY, self.__Length.MEMORY)
+    def download_memory(self, address: int, length: int) -> bytes:
+        if ((address < 0) or (length < 0) or ((address + length) > self.__Address.END)):
+            raise ValueError('Invalid address or length')
+        return self.__read_memory(address, length)
 
     def upload_rom(self, data: bytes, use_shadow: bool=True) -> None:
         rom_length = len(data)
@@ -582,7 +794,7 @@ class SC64:
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
 
-    def set_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
+    def update_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
         if ((seed != None) and (seed < 0 or seed > 0xFF)):
             raise ValueError('CIC seed outside of allowed values')
         boot_mode = self.__get_config(self.__CfgId.BOOT_MODE)
@@ -884,7 +1096,7 @@ class SC64:
         current_image = 0
         next_image = 0
 
-        self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, isv)
+        self.__set_config(self.__CfgId.ROM_WRITE_ENABLE, 1 if (isv != 0) else 0)
         self.__set_config(self.__CfgId.ISV_ADDRESS, isv)
         if (isv != 0):
             print(f'IS-Viewer64 support set to [ENABLED] at ROM offset [0x{(isv):08X}]')
@@ -992,16 +1204,24 @@ if __name__ == '__main__':
         disabled = bool(int(params[1])) if len(params) >= 2 else None
         return (seed, disabled)
 
+    def download_memory_type(argument: str):
+        params = argument.split(',')
+        if (len(params) < 2 or len(params) > 3):
+            raise argparse.ArgumentError()
+        address = int(params[0], 0)
+        length = int(params[1], 0)
+        file = params[2] if len(params) >= 3 else 'sc64dump.bin'
+        return (address, length, file)
+
     parser = argparse.ArgumentParser(description='SC64 control software')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
-    parser.add_argument('--update-bootloader', metavar='file', help='update SC64 bootloader (not recommended, use --update-firmware instead)')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
-    parser.add_argument('--led-enabled', metavar='{true,false}', help='disable or enable LED I/O activity blinking')
+    parser.add_argument('--led-blink', metavar='{yes,no}', help='disable or enable LED I/O activity blinking')
     parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
-    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value')
-    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value')
+    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value, not used when direct boot mode is enabled')
+    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value, not used when direct boot mode is enabled')
     parser.add_argument('--cic-params', metavar='seed,[disabled]', type=cic_params_type, help='set CIC emulation parameters')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
@@ -1014,7 +1234,7 @@ if __name__ == '__main__':
     parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
     parser.add_argument('--gdb', metavar='port', type=int, help='expose socket port for GDB debugging')
     parser.add_argument('--debug', action='store_true', help='run debug loop')
-    parser.add_argument('--download-memory', metavar='file', help='download whole memory space and write it to specified file')
+    parser.add_argument('--download-memory', metavar='address,length,[file]', type=download_memory_type, help='download specified memory region and write it to file')
 
     if (len(sys.argv) <= 1):
         parser.print_help()
@@ -1039,13 +1259,15 @@ if __name__ == '__main__':
                 sc64.update_firmware(f.read(), status_callback)
                 print('done')
 
-        sc64.check_api_version()
+        (version, script_outdated) = sc64.check_firmware_version()
 
-        if (args.update_bootloader):
-            with open(args.update_bootloader, 'rb') as f:
-                print('Uploading Bootloader... ', end='', flush=True)
-                sc64.upload_bootloader(f.read())
-                print('done')
+        print(f'SC64 firmware version: [{version}]')
+        if (script_outdated):
+            print('\x1b[33m')
+            print('[      SC64 firmware is newer than last known version.      ]')
+            print('[          Consider downloading latest script from          ]')
+            print('[ https://github.com/Polprzewodnikowy/SummerCart64/releases ]')
+            print('\x1b[0m')
 
         if (args.reset_state):
             sc64.reset_state()
@@ -1059,10 +1281,10 @@ if __name__ == '__main__':
                     value = getattr(value, 'name')
                 print(f'  {key}: {value}')
 
-        if (args.led_enabled != None):
-            value = (args.led_enabled == 'true')
-            sc64.set_led_enable(value)
-            print(f'LED blinking set to [{"ENABLED" if value else "DISABLED"}]')
+        if (args.led_blink):
+            blink = (args.led_blink == 'yes')
+            sc64.set_led_enable(blink)
+            print(f'LED blinking set to [{"ENABLED" if blink else "DISABLED"}]')
 
         if (args.tv != None):
             sc64.set_tv_type(args.tv)
@@ -1085,6 +1307,12 @@ if __name__ == '__main__':
                 autodetected_save_type = sc64.autodetect_save_type(rom_data)
                 print('done')
 
+        if (args.ddipl):
+            with open(args.ddipl, 'rb') as f:
+                print('Uploading 64DD IPL... ', end='', flush=True)
+                sc64.upload_ddipl(f.read())
+                print('done')
+
         if (args.save_type != None or autodetected_save_type != None):
             save_type = args.save_type if args.save_type != None else autodetected_save_type
             sc64.set_save_type(save_type)
@@ -1096,26 +1324,20 @@ if __name__ == '__main__':
                 sc64.upload_save(f.read())
                 print('done')
 
-        if (args.ddipl):
-            with open(args.ddipl, 'rb') as f:
-                print('Uploading 64DD IPL... ', end='', flush=True)
-                sc64.upload_ddipl(f.read())
-                print('done')
-
         if (args.boot != None):
             sc64.set_boot_mode(args.boot)
             print(f'Boot mode set to [{args.boot.name}]')
 
         if (args.cic_params != None):
             (seed, disabled) = args.cic_params
-            (seed, checksum, dd_mode) = sc64.set_cic_parameters(seed, disabled)
+            (seed, checksum, dd_mode) = sc64.update_cic_parameters(seed, disabled)
             print('CIC parameters set to [', end='')
             print(f'{"DISABLED" if disabled else "ENABLED"}, ', end='')
             print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
             print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:012X}', end='')
             print(']')
         else:
-            sc64.set_cic_parameters()
+            sc64.update_cic_parameters()
 
         if (args.debug or args.isv or args.disk or args.gdb):
             sc64.debug_loop(isv=args.isv, disks=args.disk, gdb_port=args.gdb)
@@ -1126,12 +1348,13 @@ if __name__ == '__main__':
                 f.write(sc64.download_save())
                 print('done')
 
-        if (args.download_memory):
-            with open(args.download_memory, 'wb') as f:
+        if (args.download_memory != None):
+            (address, length, file) = args.download_memory
+            with open(file, 'wb') as f:
                 print('Downloading memory... ', end='', flush=True)
-                f.write(sc64.download_memory())
+                f.write(sc64.download_memory(address, length))
                 print('done')
     except ValueError as e:
-        print(f'\nValue error: {e}')
+        print(f'\n\x1b[31mValue error: {e}\x1b[0m\n')
     except ConnectionException as e:
-        print(f'\nSC64 error: {e}')
+        print(f'\n\x1b[31mSC64 error: {e}\x1b[0m\n')

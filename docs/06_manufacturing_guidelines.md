@@ -57,6 +57,8 @@ There are no special requirements for soldering components to board. All chips a
 
 ### **Initial programming**
 
+**Please read the following instructions carefully before proceeding with programming.**
+
 For initial programming you are going to need a PC and a USB to UART (serial) adapter (3.3V signaling is required). These steps assume you are using modern Windows OS (version 10 or higher).
 
 As for software here's list of required applications:
@@ -83,11 +85,11 @@ Second, program FPGA, microcontroller and Flash memory:
  4. Check in device manager which port number `COMx` is assigned to serial adapter
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter)
  6. Locate `primer.py` script in root folder
- 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64.py`, `dd64.py`, `sc64_firmware.bin`
+ 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64.py`, `sc64_firmware.bin`
  8. Run `pip3 install -r requirements.txt` to install required python packages
  9. Run `python3 primer.py COMx sc64_firmware.bin` (replace `COMx` with port located in step **4**)
  10. Follow the instructions on the screen
- 11. Wait until programming process has finished
+ 11. Wait until programming process has finished (**DO NOT STOP PROGRAMMING PROCESS OR DISCONNECT SC64 BOARD FROM PC**, doing so might irrecoverably break programming through UART header and you would need to program microcontroller, FPGA and bootloader with separate dedicated programming interfaces through *Tag-Connect* connector on the PCB)
 
 Congratulations! Your SC64 flashcart should be ready for use!
 

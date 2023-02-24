@@ -33,7 +33,8 @@
 #define SWITCH_FUNCTION_GROUP_1_HS      (1 << 1)
 
 #define DAT_BLOCK_MAX_COUNT             (256)
-#define DAT_TIMEOUT_MS                  (1000)
+#define DAT_TIMEOUT_INIT_MS             (2000)
+#define DAT_TIMEOUT_DATA_MS             (5000)
 
 
 typedef enum {
@@ -300,7 +301,7 @@ bool sd_card_init (void) {
         sd_card_deinit();
         return true;
     }
-    sd_dat_wait(DAT_TIMEOUT_MS);
+    sd_dat_wait(DAT_TIMEOUT_INIT_MS);
     if (sd_did_timeout()) {
         sd_card_deinit();
         return true;
@@ -318,7 +319,7 @@ bool sd_card_init (void) {
             sd_card_deinit();
             return true;
         }
-        sd_dat_wait(DAT_TIMEOUT_MS);
+        sd_dat_wait(DAT_TIMEOUT_INIT_MS);
         if (sd_did_timeout()) {
             sd_card_deinit();
             return true;
@@ -382,14 +383,11 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     while (count > 0) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
         led_blink_act();
-        if (sd_cmd(23, blocks, RSP_R1, NULL)) {
-            return true;
-        }
         if (sd_cmd(25, sector, RSP_R1, NULL)) {
             return true;
         }
         sd_dat_prepare(address, blocks, DAT_WRITE);
-        if (sd_dat_wait(DAT_TIMEOUT_MS)) {
+        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS)) {
             sd_dat_abort();
             sd_cmd(12, 0, RSP_R1b, NULL);
             return true;
@@ -416,20 +414,17 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
         led_blink_act();
         sd_dat_prepare(address, blocks, DAT_READ);
-        if (sd_cmd(23, blocks, RSP_R1, NULL)) {
-            sd_dat_abort();
-            return true;
-        }
         if (sd_cmd(18, sector, RSP_R1, NULL)) {
             sd_dat_abort();
             return true;
         }
-        if (sd_dat_wait(DAT_TIMEOUT_MS)) {
+        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS)) {
             if (sd_did_timeout()) {
                 sd_cmd(12, 0, RSP_R1b, NULL);
             }
             return true;
         }
+        sd_cmd(12, 0, RSP_R1b, NULL);
         address += (blocks * SD_SECTOR_SIZE);
         sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;

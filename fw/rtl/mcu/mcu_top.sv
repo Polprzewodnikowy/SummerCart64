@@ -332,7 +332,7 @@ module mcu_top (
         REG_CFG_DATA_0,
         REG_CFG_DATA_1,
         REG_CFG_CMD,
-        REG_CFG_VERSION,
+        REG_CFG_IDENTIFIER,
         REG_FLASHRAM_SCR,
         REG_FLASH_SCR,
         REG_RTC_SCR,
@@ -363,7 +363,7 @@ module mcu_top (
 
     logic bootloader_skip;
 
-    assign n64_scb.cfg_version = 32'h53437632;
+    assign n64_scb.cfg_identifier = 32'h53437632;
 
     logic dd_bm_ack;
 
@@ -460,8 +460,8 @@ module mcu_top (
                     };
                 end
 
-                REG_CFG_VERSION: begin
-                    reg_rdata <= n64_scb.cfg_version;
+                REG_CFG_IDENTIFIER: begin
+                    reg_rdata <= n64_scb.cfg_identifier;
                 end
 
                 REG_FLASHRAM_SCR: begin
