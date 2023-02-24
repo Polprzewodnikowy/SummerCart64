@@ -11,7 +11,7 @@
 
 ## Step by step guide how to make SC64
 
-All necessary manufacturing files are packaged in every `SC64.zip` file in GitHub releases. Please download latest release before proceeding with the instructions.
+All necessary manufacturing files are packaged in every `sc64-extra-{version}.zip` file in GitHub releases. Please download latest release before proceeding with the instructions.
 
 ---
 
@@ -85,9 +85,9 @@ Second, program FPGA, microcontroller and Flash memory:
  4. Check in device manager which port number `COMx` is assigned to serial adapter
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter)
  6. Locate `primer.py` script in root folder
- 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64.py`, `sc64_firmware.bin`
+ 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64.py`, `sc64-firmware.bin`
  8. Run `pip3 install -r requirements.txt` to install required python packages
- 9. Run `python3 primer.py COMx sc64_firmware.bin` (replace `COMx` with port located in step **4**)
+ 9. Run `python3 primer.py COMx sc64-firmware.bin` (replace `COMx` with port located in step **4**)
  10. Follow the instructions on the screen
  11. Wait until programming process has finished (**DO NOT STOP PROGRAMMING PROCESS OR DISCONNECT SC64 BOARD FROM PC**, doing so might irrecoverably break programming through UART header and you would need to program microcontroller, FPGA and bootloader with separate dedicated programming interfaces through *Tag-Connect* connector on the PCB)
 
@@ -99,4 +99,4 @@ Congratulations! Your SC64 flashcart should be ready for use!
 
 *`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
 
-This issue can be attributed to incorrectly programmed FT232H EEPROM in the first programming step. Check again in `FT_PROG` program if device was configured properly. Once FPGA and microcontroller has been programmed successfully `primer.py` script needs to be run in special mode. Please use command `python3 primer.py COMx sc64_firmware.bin --only-bootloader` to try programming bootloader again.
+This issue can be attributed to incorrectly programmed FT232H EEPROM in the first programming step. Check again in `FT_PROG` program if device was configured properly. Once FPGA and microcontroller has been programmed successfully `primer.py` script needs to be run in special mode. Please use command `python3 primer.py COMx sc64-firmware.bin --only-bootloader` to try programming bootloader again.

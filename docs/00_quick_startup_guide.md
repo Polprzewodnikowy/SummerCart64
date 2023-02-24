@@ -14,9 +14,9 @@
 
 **Windows platform: replace `./sc64` in examples below with `sc64.exe`**
 
-1. Download the latest `sc64-{os}` (choose OS matching your system) and `sc64_firmware.bin` from GitHub releases page
-2. Extract `sc64-{os}` package contents to a folder and place `sc64_firmware.bin` inside it
-3. Update SC64 firmware to the latest version with `./sc64 --update-firmware sc64_firmware.bin`
+1. Download the latest `sc64-{os}-{version}` (choose OS matching your system) and `sc64-firmware-{version}.bin` from GitHub releases page
+2. Extract `sc64-{os}-{version}` package contents to a folder and place `sc64-firmware-{version}.bin` inside it
+3. Update SC64 firmware to the latest version with `./sc64 --update-firmware sc64-firmware-{version}.bin`
 4. Run `./sc64 --print-state` to check if SC64 is detected correctly
 
 ---
@@ -25,9 +25,9 @@
 
 Keeping SC64 firmware up to date is highly recommended. `sc64` executable is tightly coupled with specific firmware versions and will error out when it detects unsupported firmware version.
 
-To download and backup current version of SC64 firmware run `./sc64 --backup-firmware sc64_firmware_backup.bin`
+To download and backup current version of SC64 firmware run `./sc64 --backup-firmware sc64-firmware-backup.bin`
 
-To update SC64 firmware run `./sc64 --update-firmware sc64_firmware.bin`
+To update SC64 firmware run `./sc64 --update-firmware sc64-firmware-{version}.bin`
 
 ---
 

@@ -20,22 +20,27 @@ jobs:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
+      - name: Set SC64 version
+        run: SC64_VERSION=-${{ github.ref_name }}
+
       - name: Build everything
         run: ./docker_build.sh release --force-clean
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: SC64
-          path: SC64.zip
+          name: sc64-pkg${{ env.SC64_VERSION }}
+          path: |
+            sc64-extra${{ env.SC64_VERSION }}.zip
+            sc64-firmware${{ env.SC64_VERSION }}.bin
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            SC64.zip
-            sw/update/sc64_firmware.bin
+            sc64-extra${{ env.SC64_VERSION }}.zip
+            sc64-firmware${{ env.SC64_VERSION }}.bin
 
   build-sc64-py:
     strategy:
@@ -101,19 +106,19 @@ jobs:
         run: |
           mkdir package
           pushd dist
-          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}.${{ matrix.package-extension }} *
+          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }} *
           popd
         working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.package-name }}
-          path: sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
+          name: ${{ matrix.package-name }}-${{ github.ref_name }}
+          path: sw/pc/package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sw/pc/package/${{ matrix.package-name }}.${{ matrix.package-extension }}
+            sw/pc/package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }}

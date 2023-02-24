@@ -27,6 +27,7 @@ docker run \
     -e GIT_TAG="$GIT_TAG" \
     -e GIT_SHA="$GIT_SHA" \
     -e GIT_MESSAGE="$GIT_MESSAGE" \
+    -e SC64_VERSION=${SC64_VERSION:-""} \
     $BUILDER_IMAGE \
     ./build.sh $@
 
