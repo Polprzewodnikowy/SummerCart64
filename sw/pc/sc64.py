@@ -624,24 +624,85 @@ class SC64:
             if (self.__read_memory(address, len(data)) != data):
                 raise ConnectionException('Flash memory program failure')
 
-    def autodetect_save_type(self, data: bytes) -> Optional[SaveType]:
+    def autodetect_save_type(self, data: bytes) -> SaveType:
         if (len(data) < 0x40):
-            return None
-        if (data[0x3C:0x3E] != b'ED'):
-            return None
-        save = (data[0x3F] >> 4) & 0x0F
-        if (save < 0 or save > 6):
-            return None
+            return self.SaveType.NONE
+
+        if (data[0x3C:0x3E] == b'ED'):
+            save = (data[0x3F] >> 4) & 0x0F
+            if (save < 0 or save > 6):
+                return self.SaveType.NONE
+            save_type_mapping = [
+                self.SaveType.NONE,
+                self.SaveType.EEPROM_4K,
+                self.SaveType.EEPROM_16K,
+                self.SaveType.SRAM,
+                self.SaveType.SRAM_BANKED,
+                self.SaveType.FLASHRAM,
+                self.SaveType.SRAM,
+            ]
+            return save_type_mapping[save]
+
+        # Original ROM database sourced from ares emulator: https://github.com/ares-emulator/ares/blob/master/mia/medium/nintendo-64.cpp
+
+        rom_id = data[0x3B:0x3E]
+        region = data[0x3E]
+        revision = data[0x3F]
+
         save_type_mapping = [
-            self.SaveType.NONE,
-            self.SaveType.EEPROM_4K,
-            self.SaveType.EEPROM_16K,
-            self.SaveType.SRAM,
-            self.SaveType.SRAM_BANKED,
-            self.SaveType.FLASHRAM,
-            self.SaveType.SRAM,
+            ([
+                b'NTW', b'NHF', b'NOS', b'NTC', b'NER', b'NAG', b'NAB', b'NS3', b'NTN', b'NBN', b'NBK', b'NFH',
+                b'NMU', b'NBC', b'NBH', b'NHA', b'NBM', b'NBV', b'NBD', b'NCT', b'NCH', b'NCG', b'NP2', b'NXO',
+                b'NCU', b'NCX', b'NDY', b'NDQ', b'NDR', b'NN6', b'NDU', b'NJM', b'NFW', b'NF2', b'NKA', b'NFG',
+                b'NGL', b'NGV', b'NGE', b'NHP', b'NPG', b'NIJ', b'NIC', b'NFY', b'NKI', b'NLL', b'NLR', b'NKT',
+                b'CLB', b'NLB', b'NMW', b'NML', b'NTM', b'NMI', b'NMG', b'NMO', b'NMS', b'NMR', b'NCR', b'NEA',
+                b'NPW', b'NPY', b'NPT', b'NRA', b'NWQ', b'NSU', b'NSN', b'NK2', b'NSV', b'NFX', b'NFP', b'NS6',
+                b'NNA', b'NRS', b'NSW', b'NSC', b'NSA', b'NB6', b'NSS', b'NTX', b'NT6', b'NTP', b'NTJ', b'NRC',
+                b'NTR', b'NTB', b'NGU', b'NIR', b'NVL', b'NVY', b'NWC', b'NAD', b'NWU', b'NYK', b'NMZ', b'NSM',
+                b'NWR',
+            ], self.SaveType.EEPROM_4K),
+            ([
+                b'NB7', b'NGT', b'NFU', b'NCW', b'NCZ', b'ND6', b'NDO', b'ND2', b'N3D', b'NMX', b'NGC', b'NIM',
+                b'NNB', b'NMV', b'NM8', b'NEV', b'NPP', b'NUB', b'NPD', b'NRZ', b'NR7', b'NEP', b'NYS',
+            ], self.SaveType.EEPROM_16K),
+            ([
+                b'NTE', b'NVB', b'NB5', b'CFZ', b'NFZ', b'NSI', b'NG6', b'NGP', b'NYW', b'NHY', b'NIB', b'NPS',
+                b'NPA', b'NP4', b'NJ5', b'NP6', b'NPE', b'NJG', b'CZL', b'NZL', b'NKG', b'NMF', b'NRI', b'NUT',
+                b'NUM', b'NOB', b'CPS', b'NPM', b'NRE', b'NAL', b'NT3', b'NS4', b'NA2', b'NVP', b'NWL', b'NW2',
+                b'NWX',
+            ], self.SaveType.SRAM),
+            ([
+                b'CDZ',
+            ], self.SaveType.SRAM_BANKED),
+            ([
+                b'NCC', b'NDA', b'NAF', b'NJF', b'NKJ', b'NZS', b'NM6', b'NCK', b'NMQ', b'NPN', b'NPF', b'NPO',
+                b'CP2', b'NP3', b'NRH', b'NSQ', b'NT9', b'NW4', b'NDP',
+            ], self.SaveType.FLASHRAM),
         ]
-        return save_type_mapping[save]
+
+        for (rom_id_table, save) in save_type_mapping:
+            if (rom_id in rom_id_table):
+                return save
+
+        special_mapping = [
+            (b'NKD', b'J', None, self.SaveType.EEPROM_4K),
+            (b'NWT', b'J', None, self.SaveType.EEPROM_4K),
+            (b'ND3', b'J', None, self.SaveType.EEPROM_16K),
+            (b'ND4', b'J', None, self.SaveType.EEPROM_16K),
+            (b'N3H', b'J', None, self.SaveType.SRAM),
+            (b'NK4', b'J', 2,    self.SaveType.SRAM),
+        ]
+
+        for (special_rom_id, special_region, special_revision, save) in special_mapping:
+            if (rom_id != special_rom_id):
+                continue
+            if (region != special_region):
+                continue
+            if (special_revision != None and revision >= special_revision):
+                continue
+            return save
+
+        return self.SaveType.NONE
 
     def reset_state(self) -> None:
         self.__link.execute_cmd(cmd=b'R')
@@ -754,8 +815,11 @@ class SC64:
                 raise ValueError('CIC seed outside of allowed values')
         self.__set_config(self.__CfgId.CIC_SEED, seed)
 
-    def set_tv_type(self, type: TVType) -> None:
+    def set_tv_type(self, type: TVType) -> bool:
         self.__set_config(self.__CfgId.TV_TYPE, type)
+        boot_mode = self.__get_config(self.__CfgId.BOOT_MODE)
+        direct = (boot_mode == self.BootMode.DIRECT_ROM) or (boot_mode == self.BootMode.DIRECT_DDIPL)
+        return direct
 
     def set_save_type(self, type: SaveType) -> None:
         self.__set_config(self.__CfgId.SAVE_TYPE, type)
@@ -794,7 +858,7 @@ class SC64:
             raise ConnectionException('Error while getting firmware backup')
         return self.__read_memory(address, length)
 
-    def update_cic_parameters(self, seed: Optional[int]=None, disabled=False) -> tuple[int, int, bool]:
+    def update_cic_parameters(self, seed: Optional[int]=None, disabled: Optional[bool]=False) -> tuple[int, int, bool, bool]:
         if ((seed != None) and (seed < 0 or seed > 0xFF)):
             raise ValueError('CIC seed outside of allowed values')
         boot_mode = self.__get_config(self.__CfgId.BOOT_MODE)
@@ -808,7 +872,8 @@ class SC64:
         checksum = self.__calculate_ipl3_checksum(ipl3, seed)
         data = [(1 << 0) if disabled else 0, seed, *checksum.to_bytes(6, byteorder='big')]
         self.__link.execute_cmd(cmd=b'B', args=[self.__get_int(data[0:4]), self.__get_int(data[4:8])])
-        return (seed, checksum, boot_mode == self.BootMode.DIRECT_DDIPL)
+        direct = (boot_mode == self.BootMode.DIRECT_ROM) or (boot_mode == self.BootMode.DIRECT_DDIPL)
+        return (seed, checksum, boot_mode == self.BootMode.DIRECT_DDIPL, direct)
 
     def __guess_ipl3_seed(self, ipl3: bytes) -> int:
         checksum = crc32(ipl3)
@@ -1196,14 +1261,6 @@ class EnumAction(argparse.Action):
 
 
 if __name__ == '__main__':
-    def cic_params_type(argument: str):
-        params = argument.split(',')
-        if (len(params) > 2):
-            raise argparse.ArgumentError()
-        seed = int(params[0], 0) if len(params) >= 1 else None
-        disabled = bool(int(params[1])) if len(params) >= 2 else None
-        return (seed, disabled)
-
     def download_memory_type(argument: str):
         params = argument.split(',')
         if (len(params) < 2 or len(params) > 3):
@@ -1214,25 +1271,23 @@ if __name__ == '__main__':
         return (address, length, file)
 
     parser = argparse.ArgumentParser(description='SC64 control software')
+    parser.add_argument('rom', nargs='?', help='upload ROM from specified file')
     parser.add_argument('--backup-firmware', metavar='file', help='backup SC64 firmware and write it to specified file')
     parser.add_argument('--update-firmware', metavar='file', help='update SC64 firmware from specified file')
     parser.add_argument('--reset-state', action='store_true', help='reset SC64 internal state')
     parser.add_argument('--print-state', action='store_true', help='print SC64 internal state')
-    parser.add_argument('--led-blink', metavar='{yes,no}', help='disable or enable LED I/O activity blinking')
-    parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
-    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value, not used when direct boot mode is enabled')
-    parser.add_argument('--cic', type=SC64.CICSeed, action=EnumAction, help='force CIC seed to set value, not used when direct boot mode is enabled')
-    parser.add_argument('--cic-params', metavar='seed,[disabled]', type=cic_params_type, help='set CIC emulation parameters')
+    parser.add_argument('--led-blink', metavar='{yes,no}', help='enable or disable LED I/O activity blinking')
     parser.add_argument('--rtc', action='store_true', help='update clock in SC64 to system time')
+    parser.add_argument('--boot', type=SC64.BootMode, action=EnumAction, help='set boot mode')
+    parser.add_argument('--tv', type=SC64.TVType, action=EnumAction, help='force TV type to set value, ignored when one of direct boot modes are selected')
     parser.add_argument('--no-shadow', action='store_false', help='do not put last 128 kB of ROM inside flash memory (can corrupt non EEPROM saves)')
-    parser.add_argument('--rom', metavar='file', help='upload ROM from specified file')
     parser.add_argument('--save-type', type=SC64.SaveType, action=EnumAction, help='set save type')
     parser.add_argument('--save', metavar='file', help='upload save from specified file')
     parser.add_argument('--backup-save', metavar='file', help='download save and write it to specified file')
     parser.add_argument('--ddipl', metavar='file', help='upload 64DD IPL from specified file')
     parser.add_argument('--disk', metavar='file', action='append', help='path to 64DD disk (.ndd format), can be specified multiple times')
-    parser.add_argument('--isv', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
-    parser.add_argument('--gdb', metavar='port', type=int, help='expose socket port for GDB debugging')
+    parser.add_argument('--isv', metavar='offset', type=lambda x: int(x, 0), default=0, help='enable IS-Viewer64 support at provided ROM offset')
+    parser.add_argument('--gdb', metavar='port', type=int, help='expose TCP socket port for GDB debugging')
     parser.add_argument('--debug', action='store_true', help='run debug loop')
     parser.add_argument('--download-memory', metavar='address,length,[file]', type=download_memory_type, help='download specified memory region and write it to file')
 
@@ -1241,6 +1296,15 @@ if __name__ == '__main__':
         parser.exit()
 
     args = parser.parse_args()
+
+    def fix_rom_endianness(rom: bytes) -> bytes:
+        data = bytearray(rom)
+        pi_config = int.from_bytes(rom[0:4], byteorder='big')
+        if (pi_config == 0x37804012):
+            data[0::2], data[1::2] = data[1::2], data[0::2]
+        elif (pi_config == 0x40123780):
+            data[0::4], data[1::4], data[2::4], data[3::4] = data[3::4], data[2::4], data[1::4], data[0::4]
+        return bytes(data)
 
     try:
         sc64 = SC64()
@@ -1261,7 +1325,7 @@ if __name__ == '__main__':
 
         (version, script_outdated) = sc64.check_firmware_version()
 
-        print(f'SC64 firmware version: [{version}]')
+        print(f'\x1b[32mSC64 firmware version: [{version}]\x1b[0m')
         if (script_outdated):
             print('\x1b[33m')
             print('[      SC64 firmware is newer than last known version       ]')
@@ -1273,26 +1337,10 @@ if __name__ == '__main__':
             sc64.reset_state()
             print('SC64 internal state reset')
 
-        if (args.print_state):
-            state = sc64.get_state()
-            print('Current SC64 internal state:')
-            for key, value in state.items():
-                if (hasattr(value, 'name')):
-                    value = getattr(value, 'name')
-                print(f'  {key}: {value}')
-
         if (args.led_blink):
             blink = (args.led_blink == 'yes')
             sc64.set_led_enable(blink)
             print(f'LED blinking set to [{"ENABLED" if blink else "DISABLED"}]')
-
-        if (args.tv != None):
-            sc64.set_tv_type(args.tv)
-            print(f'TV type set to [{args.tv.name}]')
-
-        if (args.cic != None):
-            sc64.set_cic_seed(args.cic)
-            print(f'CIC seed set to [0x{args.cic:X}]')
 
         if (args.rtc):
             value = datetime.now()
@@ -1301,8 +1349,8 @@ if __name__ == '__main__':
 
         if (args.rom):
             with open(args.rom, 'rb') as f:
-                print('Uploading ROM... ', end='', flush=True)
-                rom_data = f.read()
+                rom_data = fix_rom_endianness(f.read())
+                print(f'Uploading ROM ({len(rom_data) / (1 * 1024 * 1024):.2f} MiB)... ', end='', flush=True)
                 sc64.upload_rom(rom_data, use_shadow=args.no_shadow)
                 autodetected_save_type = sc64.autodetect_save_type(rom_data)
                 print('done')
@@ -1312,6 +1360,25 @@ if __name__ == '__main__':
                 print('Uploading 64DD IPL... ', end='', flush=True)
                 sc64.upload_ddipl(f.read())
                 print('done')
+
+        if (args.rom or args.ddipl or args.boot != None):
+            mode = args.boot
+            if (mode == None):
+                mode = SC64.BootMode.ROM if args.rom else SC64.BootMode.DDIPL
+            sc64.set_boot_mode(mode)
+            print(f'Boot mode set to [{mode.name}]')
+            (seed, checksum, dd_mode, direct) = sc64.update_cic_parameters()
+            if (direct):
+                print('CIC parameters set to [', end='')
+                print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
+                print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:012X}', end='')
+                print(']')
+
+        if (args.rom or args.ddipl or args.tv != None):
+            tv = args.tv if args.tv else SC64.TVType.AUTO
+            direct = sc64.set_tv_type(tv)
+            if (args.tv != None):
+                print(f'TV type set to [{args.tv.name}]{" (ignored)" if direct else ""}')
 
         if (args.save_type != None or autodetected_save_type != None):
             save_type = args.save_type if args.save_type != None else autodetected_save_type
@@ -1324,20 +1391,13 @@ if __name__ == '__main__':
                 sc64.upload_save(f.read())
                 print('done')
 
-        if (args.boot != None):
-            sc64.set_boot_mode(args.boot)
-            print(f'Boot mode set to [{args.boot.name}]')
-
-        if (args.cic_params != None):
-            (seed, disabled) = args.cic_params
-            (seed, checksum, dd_mode) = sc64.update_cic_parameters(seed, disabled)
-            print('CIC parameters set to [', end='')
-            print(f'{"DISABLED" if disabled else "ENABLED"}, ', end='')
-            print(f'{"DDIPL" if dd_mode else "ROM"}, ', end='')
-            print(f'seed: 0x{seed:02X}, checksum: 0x{checksum:012X}', end='')
-            print(']')
-        else:
-            sc64.update_cic_parameters()
+        if (args.print_state):
+            state = sc64.get_state()
+            print('Current SC64 internal state:')
+            for key, value in state.items():
+                if (hasattr(value, 'name')):
+                    value = getattr(value, 'name')
+                print(f'  {key}: {value}')
 
         if (args.debug or args.isv or args.disk or args.gdb):
             sc64.debug_loop(isv=args.isv, disks=args.disk, gdb_port=args.gdb)
@@ -1358,3 +1418,5 @@ if __name__ == '__main__':
         print(f'\n\x1b[31mValue error: {e}\x1b[0m\n')
     except ConnectionException as e:
         print(f'\n\x1b[31mSC64 error: {e}\x1b[0m\n')
+    except Exception as e:
+        print(f'\n\x1b[31mUnhandled error "{e.__class__.__name__}": {e}\x1b[0m\n')

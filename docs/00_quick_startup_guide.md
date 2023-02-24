@@ -14,10 +14,10 @@
 
 **Windows platform: replace `./sc64` in examples below with `sc64.exe`**
 
-1. Download the latest `sc64-{os}-{version}` (choose OS matching your system) and `sc64-firmware-{version}.bin` from GitHub releases page
-2. Extract `sc64-{os}-{version}` package contents to a folder and place `sc64-firmware-{version}.bin` inside it
+1. Download the latest `sc64-{os}-{version}.{ext}` (choose OS matching your system) and `sc64-firmware-{version}.bin` from GitHub releases page
+2. Extract `sc64-{os}-{version}.{ext}` package contents to a folder and place `sc64-firmware-{version}.bin` inside it
 3. Update SC64 firmware to the latest version with `./sc64 --update-firmware sc64-firmware-{version}.bin`
-4. Run `./sc64 --print-state` to check if SC64 is detected correctly
+4. Run `./sc64 --print-state` to check if update process finished successfully and SC64 is detected correctly
 
 ---
 
@@ -41,8 +41,8 @@ SC64 holds some internal configuration options after `sc64` executable finished 
 
 `./sc64 --boot rom --rom path_to_rom.n64 --save-type eeprom-4k --save path_to_save.sav`
 
-Replace `path_to_rom.n64` / `eeprom-4k` / `path_to_save.sav` with appropriate values for desired game. Check included help in program to check available save types.
-Arguments `--save-type` and/or `--save` can be omitted if game doesn't require any save.
+Replace `path_to_rom.n64` / `eeprom-4k` / `path_to_save.sav` with appropriate values for desired game. Script will try to autodetect used save type so explicitly setting save type usually isn't needed. Check included help in program to list available save types.
+Arguments `--save-type` and/or `--save` can be omitted if game doesn't require any save or you want to start fresh.
 
 ---
 
@@ -58,14 +58,14 @@ Replace `path_to_save.sav` with appropriate value. Specifying save type isn't re
 
 64DD games require DDIPL ROM and disk images. To run disk game type `./sc64 --boot ddipl --ddipl path_to_ddipl.n64 --disk path_to_disk_1.ndd --disk path_to_disk_2.ndd`.
 
-Replace `path_to_ddipl.n64` / `path_to_disk_x.ndd` with appropriate values. Argument `--disk` can be specified multiple times. Only `.ndd` disk format is supported currently. To change inserted disk press button on the back of SC64 flashcart.
+Replace `path_to_ddipl.n64` / `path_to_disk_x.ndd` with appropriate values. Argument `--disk` can be specified multiple times. Only `.ndd` disk format is supported currently. To change inserted disk press button on the back of SC64 flashcart. Make sure retail and development disks aren't mixed together. 64DD IPL can handle only one drive type at a time.
 
 ---
 
 ## Direct boot option
 
 If booting game through included bootloader isn't a desired option then flashcart can be put in special mode that omits this step.
-Run `./sc64 --boot direct-rom --rom path_to_rom.n64` to disable bootloader during boot and console reset. By default `sc64` executable will try to guess CIC seed and calculate checksum. To change seed or disable CIC use `--cic-params 0x3F,0` argument with appropriate values. Refer to included help in program for values meaning. This option is useful only for very specific cases (e.g. testing custom IPL3 or running SC64 on top of GameShark).
+Run `./sc64 --boot direct-rom --rom path_to_rom.n64` to disable bootloader during boot and console reset. This option is useful only for very specific cases (e.g. testing custom IPL3 or running SC64 on top of GameShark).
 
 ---
 
