@@ -2,13 +2,13 @@
 
 set -e
 
-PACKAGE_FILE_NAME="SC64"
+PACKAGE_FILE_NAME="sc64-extra"
 
 TOP_FILES=(
     "./sw/pc/primer.py"
     "./sw/pc/requirements.txt"
     "./sw/pc/sc64.py"
-    "./sw/update/sc64_firmware.bin"
+    "./sw/update/sc64-firmware.bin"
 )
 
 FILES=(
@@ -86,7 +86,7 @@ build_update () {
 
     pushd sw/update > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        rm -f ./sc64_firmware.bin
+        rm -f ./sc64-firmware.bin
     fi
     GIT_INFO=""
     if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+="branch: [$GIT_BRANCH] "; fi
@@ -100,7 +100,7 @@ build_update () {
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \
         --primer ../controller/build/primer/primer.bin \
-        sc64_firmware.bin
+        sc64-firmware.bin
     popd > /dev/null
 
     BUILT_UPDATE=true
@@ -114,9 +114,11 @@ build_release () {
     if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
         rm -f "./${PACKAGE_FILE_NAME}.zip"
     fi
-    PACKAGE="./${PACKAGE_FILE_NAME}.zip"
+    PACKAGE="./${PACKAGE_FILE_NAME}${SC64_VERSION}.zip"
     zip -j -r $PACKAGE ${TOP_FILES[@]}
     zip -r $PACKAGE ${FILES[@]}
+
+    cp sw/update/sc64-firmware.bin ./sc64-firmware${SC64_VERSION}.bin
 
     BUILT_RELEASE=true
 }

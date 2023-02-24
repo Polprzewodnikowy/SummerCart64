@@ -13,37 +13,127 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-fw-hw-sw:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
+      - name: Download SummerCart64 repository
+        uses: actions/checkout@v3
 
-      - name: Build script
+      - name: Set SC64 version
+        uses: frabert/replace-string-action@v2
+        id: sc64version
+        with:
+          pattern: '\/'
+          string: '-${{ github.ref_name }}'
+          replace-with: '-'
+
+      - name: Build everything
         run: ./docker_build.sh release --force-clean
+        env:
+          SC64_VERSION: ${{ steps.sc64version.outputs.replaced }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: SC64
-          path: SC64.zip
+          name: sc64-pkg${{ steps.sc64version.outputs.replaced }}
+          path: |
+            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
+            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
 
-      - name: Get release
+      - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Upload release asset
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: actions/upload-release-asset@v1 # This will start failing soon due to needing node 12!
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        uses: softprops/action-gh-release@v0.1.15
         with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: SC64.zip
-          asset_name: SC64.zip
-          asset_content_type: application/zip
+          files: |
+            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
+            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
+
+  build-sc64-py:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            pyinstaller-build-options: --target-arch=64bit
+            pyinstaller-options: --onefile --console --icon ../../assets/sc64_logo_256_256.png
+            package-name: sc64-windows
+            package-options: -c -a -f
+            package-extension: zip
+
+          - os: ubuntu-latest
+            pyinstaller-options: --onefile
+            package-name: sc64-linux
+            package-options: -czf
+            package-extension: tar.gz
+
+          - os: macos-latest
+            pyinstaller-options: --onedir --console --icon ../../assets/sc64_logo_256_256.png
+            package-name: sc64-macos
+            package-options: -czf
+            package-extension: tgz
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Download SummerCart64 repository
+        uses: actions/checkout@v3
+
+      - name: Set SC64 version
+        uses: frabert/replace-string-action@v2
+        id: sc64version
+        with:
+          pattern: '\/'
+          string: '-${{ github.ref_name }}'
+          replace-with: '-'
+
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Download pyinstaller repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'pyinstaller/pyinstaller'
+          ref: 'v5.8.0'
+          path: pyinstaller
+
+      - name: Compile and install pyinstaller
+        run: |
+          pip3 uninstall pyinstaller
+          pip3 install wheel
+          pushd bootloader
+          python3 ./waf all ${{ matrix.pyinstaller-build-options }}
+          popd
+          pip3 install .
+        working-directory: pyinstaller
+
+      - name: Install sc64.py requirements
+        run: pip3 install -r requirements.txt
+        working-directory: sw/pc
+
+      - name: Create sc64.py executable
+        run: python3 -m PyInstaller --clean ${{ matrix.pyinstaller-options }} sc64.py
+        working-directory: sw/pc
+
+      - name: Package executable
+        run: |
+          mkdir package
+          pushd dist
+          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }} *
+          popd
+        working-directory: sw/pc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}
+          path: sw/pc/package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }}
+
+      - name: Upload release assets
+        if: github.event_name == 'release' && github.event.action == 'created'
+        uses: softprops/action-gh-release@v0.1.15
+        with:
+          files: |
+            sw/pc/package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }}

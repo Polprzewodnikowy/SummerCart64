@@ -1,6 +1,7 @@
 **/.DS_Store
 **/.vscode/
 **/*.bak
+**/*.bin
 **/*.zip
 
 !**/.vscode/tasks.json
