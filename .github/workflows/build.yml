@@ -41,8 +41,7 @@ jobs:
     strategy:
       matrix:
         # os: [windows-latest, ubuntu-latest, macos-latest]
-        # os: [ubuntu-latest]
-        os: [windows-latest]
+        os: [windows-latest, ubuntu-latest]
         include:
           - os: windows-latest
             pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
@@ -50,10 +49,10 @@ jobs:
             package-options: -c -a -f
             package-extension: zip
 
-          # - os: ubuntu-latest
-          #   package-name: sc64-linux
-          #   package-options: -czf
-          #   package-extension: tgz
+          - os: ubuntu-latest
+            package-name: sc64-linux
+            package-options: -czf
+            package-extension: tgz
 
           # - os: macos-latest
           #   pyinstaller-options: --console --icon ../../assets/sc64_logo_256_256.png
@@ -64,7 +63,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Git checkout
+      - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
       - name: Setup python
@@ -79,11 +78,9 @@ jobs:
           ref: 'v5.8.0'
           path: pyinstaller
 
-      - name: Install pyinstaller requirements
-        run: pip3 install wheel
-
       - name: Compile and install pyinstaller
         run: |
+          pip3 install wheel
           pushd bootloader
           python3 ./waf all
           popd
@@ -93,8 +90,6 @@ jobs:
       - name: Install sc64.py requirements
         run: pip3 install -r requirements.txt
         working-directory: sw/pc
-        # env:
-        #   PYINSTALLER_COMPILE_BOOTLOADER: true
 
       - name: Create sc64 executable
         run: python3 -m PyInstaller --clean --onefile ${{ matrix.pyinstaller-options }} sc64.py
