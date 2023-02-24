@@ -79,6 +79,9 @@ jobs:
           ref: 'v5.8.0'
           path: pyinstaller
 
+      - name: Install pyinstaller requirements
+        run: pip3 install wheel
+
       - name: Compile and install pyinstaller
         run: |
           pushd bootloader
@@ -87,8 +90,8 @@ jobs:
           python3 setup.py install
         working-directory: pyinstaller
 
-      - name: Install python requirements
-        run: pip install -r requirements.txt
+      - name: Install sc64.py requirements
+        run: pip3 install -r requirements.txt
         working-directory: sw/pc
         # env:
         #   PYINSTALLER_COMPILE_BOOTLOADER: true
