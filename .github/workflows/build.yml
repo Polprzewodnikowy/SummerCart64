@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set SC64 version
-        run: SC64_VERSION=-${{ github.ref_name }}
+        run: SC64_VERSION=-${GITHUB_REF_NAME//\//-}
 
       - name: Build everything
         run: ./docker_build.sh release --force-clean
@@ -72,6 +72,9 @@ jobs:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
+      - name: Set SC64 version
+        run: SC64_VERSION=-${GITHUB_REF_NAME//\//-}
+
       - name: Setup python
         uses: actions/setup-python@v4
         with:
@@ -106,19 +109,19 @@ jobs:
         run: |
           mkdir package
           pushd dist
-          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }} *
+          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}${{ env.SC64_VERSION }}.${{ matrix.package-extension }} *
           popd
         working-directory: sw/pc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.package-name }}-${{ github.ref_name }}
-          path: sw/pc/package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }}
+          name: ${{ matrix.package-name }}${{ env.SC64_VERSION }}
+          path: sw/pc/package/${{ matrix.package-name }}${{ env.SC64_VERSION }}.${{ matrix.package-extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sw/pc/package/${{ matrix.package-name }}-${{ github.ref_name }}.${{ matrix.package-extension }}
+            sw/pc/package/${{ matrix.package-name }}${{ env.SC64_VERSION }}.${{ matrix.package-extension }}
