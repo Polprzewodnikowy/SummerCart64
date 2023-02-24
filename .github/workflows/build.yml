@@ -75,7 +75,7 @@ jobs:
       - name: Download pyinstaller repository
         uses: actions/checkout@v3
         with:
-          repository: 'https://github.com/pyinstaller/pyinstaller.git'
+          repository: 'pyinstaller/pyinstaller'
           ref: 'v5.8.0'
           path: pyinstaller
 
