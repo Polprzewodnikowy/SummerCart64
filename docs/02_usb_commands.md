@@ -37,9 +37,9 @@ What follows is the description of the command arguments' bit fields.
 
 These arguments are encoded in big-endian, and are laid out as such:
 
-| arg1 | arg0 |
-| --- | --- |
-| `bit63..bit32` | `bit31..bit0` |
+| | arg1 | arg0 |
+| --- | --- | --- |
+| bits | `[63:32]` | `[31:0]` |
 
 ---
 
@@ -47,11 +47,10 @@ These arguments are encoded in big-endian, and are laid out as such:
 
 | bits | description |
 | ---  | --- |
-| `0..7` | Seconds |
-| `8..15` | Minutes |
-| `16..23` | Hours |
-| `24..31` | Week day |
-| `32..39` | Day |
-| `40..47` | Month |
-| `48..55` | Year |
-
+| `[7:0]` | Seconds |
+| `[15:8]` | Minutes |
+| `[23:16]` | Hours |
+| `[31:24]` | Week day |
+| `[39:32]` | Day |
+| `[47:40]` | Month |
+| `[55:48]` | Year |
