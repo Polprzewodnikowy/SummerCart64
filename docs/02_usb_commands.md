@@ -1,4 +1,6 @@
 - [USB commands](#usb-commands)
+- [USB command arguments](#usb-command-arguments)
+  - [`T`: **TIME_SET**](#t-time_set)
 
 ---
 
@@ -15,7 +17,7 @@
 | `a` | **SETTING_GET**        | setting_id   | ---          | ---  | current_value    | Get persistent setting option                                 |
 | `A` | **SETTING_SET**        | setting_id   | new_value    | ---  | ---              | Set persistent setting option                                 |
 | `t` | **TIME_GET**           | ---          | ---          | ---  | time             | Get current RTC value                                         |
-| `T` | **TIME_SET**           | time_0       | time_1       | ---  | ---              | Set new RTC value                                             |
+| `T` | [**TIME_SET**](#t-time_set)           | time_0       | time_1       | ---  | ---              | Set new RTC value                                             |
 | `m` | **MEMORY_READ**        | address      | length       | ---  | data             | Read data from specified memory address                       |
 | `M` | **MEMORY_WRITE**       | address      | length       | data | ---              | Write data to specified memory address                        |
 | `U` | **USB_WRITE**          | type         | length       | data | N/A              | Send data to be received by app running on N64 (no response!) |
@@ -26,3 +28,30 @@
 | `F` | **FIRMWARE_UPDATE**    | address      | length       | ---  | status           | Update firmware from specified memory address                 |
 | `?` | **DEBUG_GET**          | ---          | ---          | ---  | debug_data       | Get internal FPGA debug info                                  |
 | `%` | **STACK_USAGE_GET**    | ---          | ---          | ---  | stack_usage      | Get per task stack usage                                      |
+
+---
+
+## USB command arguments
+
+What follows is the description of the command arguments' bit fields.
+
+These arguments are encoded in big-endian, and are laid out as such:
+
+| arg1 | arg0 |
+| --- | --- |
+| `bit63..bit32` | `bit31..bit0` |
+
+---
+
+### `T`: [**TIME_SET**](https://github.com/Polprzewodnikowy/SummerCart64/blob/f8cb1b20bdc7b7cebbf1c50f7901213b0f705a72/sw/controller/src/cfg.c#L417)
+
+| bits | description |
+| ---  | --- |
+| `0..7` | Seconds |
+| `8..15` | Minutes |
+| `16..23` | Hours |
+| `24..31` | Week day |
+| `32..39` | Day |
+| `40..47` | Month |
+| `48..55` | Year |
+
