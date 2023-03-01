@@ -1,0 +1,18 @@
+[package]
+name = "sc64deployer"
+version = "2.12.2"
+edition = "2021"
+authors = ["Polprzewodnikowy"]
+description = "SC64 loader and control software"
+documentation = "https://github.com/Polprzewodnikowy/SummerCart64"
+
+[dependencies]
+chrono = "0.4.23"
+clap = { version = "4.1.6", features = ["derive"] }
+clap-num = "1.0.2"
+colored = "2.0.0"
+crc32fast = "1.3.2"
+ctrlc = "3.2.5"
+encoding_rs = "0.8.32"
+panic-message = "0.3.0"
+serialport = { git = "https://github.com/serialport/serialport-rs", branch = "main" }

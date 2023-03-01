@@ -1,0 +1,8 @@
+/target
+*.bin
+*.eep
+*.fla
+*.n64
+*.srm
+*.v64
+*.z64
