@@ -39,7 +39,7 @@ SC64 holds some internal configuration options after `sc64` executable finished 
 
 ## Uploading game/save
 
-`./sc64 --boot rom --rom path_to_rom.n64 --save-type eeprom-4k --save path_to_save.sav`
+`./sc64 --boot rom path_to_rom.n64 --save-type eeprom-4k --save path_to_save.sav`
 
 Replace `path_to_rom.n64` / `eeprom-4k` / `path_to_save.sav` with appropriate values for desired game. Script will try to autodetect used save type so explicitly setting save type usually isn't needed. Check included help in program to list available save types.
 Arguments `--save-type` and/or `--save` can be omitted if game doesn't require any save or you want to start fresh.
@@ -65,7 +65,7 @@ Replace `path_to_ddipl.n64` / `path_to_disk_x.ndd` with appropriate values. Argu
 ## Direct boot option
 
 If booting game through included bootloader isn't a desired option then flashcart can be put in special mode that omits this step.
-Run `./sc64 --boot direct-rom --rom path_to_rom.n64` to disable bootloader during boot and console reset. This option is useful only for very specific cases (e.g. testing custom IPL3 or running SC64 on top of GameShark).
+Run `./sc64 --boot direct-rom path_to_rom.n64` to disable bootloader during boot and console reset. This option is useful only for very specific cases (e.g. testing custom IPL3 or running SC64 on top of GameShark).
 
 ---
 
