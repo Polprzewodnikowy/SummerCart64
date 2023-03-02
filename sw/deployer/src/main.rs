@@ -177,7 +177,7 @@ enum TvType {
 fn main() {
     let cli = Cli::parse();
 
-    // panic::set_hook(Box::new(|_| {}));
+    panic::set_hook(Box::new(|_| {}));
 
     match panic::catch_unwind(|| handle_command(&cli.command, cli.sn)) {
         Ok(_) => {}
@@ -329,7 +329,7 @@ fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64:
                 _ => {}
             }
         } else {
-            thread::sleep(Duration::from_micros(1));
+            thread::sleep(Duration::from_millis(1));
         }
     }
 

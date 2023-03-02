@@ -64,7 +64,7 @@ jobs:
 
           - os: ubuntu-latest
             # pyinstaller-options: --onefile
-            packages: libudev-dev
+            linux-packages: libudev-dev
             executable-name: sc64deployer
             package-name: sc64deployer-linux
             # package-options: -czf
@@ -92,10 +92,10 @@ jobs:
           replace-with: '-'
 
       - name: Install required linux packages
-        if: matrix.packages
+        if: matrix.linux-packages
         run: |
           sudo apt-get update
-          sudo apt-get -y install ${{ matrix.packages }}
+          sudo apt-get -y install ${{ matrix.linux-packages }}
 
       - name: Build deployer
         run: cargo b -r
