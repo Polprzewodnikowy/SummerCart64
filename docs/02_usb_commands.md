@@ -1,5 +1,6 @@
 - [USB commands](#usb-commands)
 - [USB command arguments](#usb-command-arguments)
+  - [**TIME_GET**](#t-time_get)
   - [**TIME_SET**](#t-time_set)
   - [**CIC_PARAMS_SET**](#b-cic_params_set)
 
@@ -17,7 +18,7 @@
 | `C` | **CONFIG_SET**         | config_id    | new_value    | ---  | ---              | Set config option                                             |
 | `a` | **SETTING_GET**        | setting_id   | ---          | ---  | current_value    | Get persistent setting option                                 |
 | `A` | **SETTING_SET**        | setting_id   | new_value    | ---  | ---              | Set persistent setting option                                 |
-| `t` | **TIME_GET**           | ---          | ---          | ---  | time             | Get current RTC value                                         |
+| `t` | [**TIME_GET**](#t-time_get) | ---          | ---          | ---  | time             | Get current RTC value                                         |
 | `T` | [**TIME_SET**](#t-time_set) | time_0       | time_1       | ---  | ---              | Set new RTC value                                             |
 | `m` | **MEMORY_READ**        | address      | length       | ---  | data             | Read data from specified memory address                       |
 | `M` | **MEMORY_WRITE**       | address      | length       | data | ---              | Write data to specified memory address                        |
@@ -51,6 +52,12 @@ These arguments are encoded in big-endian, and are laid out as such:
 | `[56]` | Disable CIC |
 | `[55:48]` | CIC seed (IPL2 and IPL3 stages) |
 | `[47:0]` | Checksum |
+
+---
+
+### `t`: [**TIME_GET**](https://github.com/Polprzewodnikowy/SummerCart64/blob/v2.12.1/sw/controller/src/cfg.c#L410)
+
+Same as [**TIME_SET**](#t-time_set).
 
 ---
 
