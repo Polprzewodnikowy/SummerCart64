@@ -377,7 +377,7 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
                 _ => {}
             }
         } else {
-            thread::sleep(Duration::from_micros(1));
+            thread::sleep(Duration::from_millis(1));
         }
     }
 
