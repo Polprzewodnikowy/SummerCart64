@@ -4,53 +4,56 @@ mod link;
 mod types;
 mod utils;
 
-use crate::sc64::cic::IPL3_OFFSET;
-
-use self::cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH};
-pub use self::link::list_serial_devices;
-pub use self::types::{
-    BootMode, DataPacket, DdDiskState, DdDriveType, DdMode, DebugPacket, DiskPacket,
-    FirmwareStatus, SaveType, TvType,
-};
-use self::types::{ButtonMode, CicSeed, UpdateStatus};
-use self::{
-    link::{Command, Link},
-    types::{get_config, get_setting, Config, ConfigId, Setting, SettingId},
-    utils::{
-        args_from_vec, datetime_from_vec, file_open_and_check_length, u32_from_vec,
-        vec_from_datetime,
+pub use self::{
+    error::Error,
+    link::list_serial_devices,
+    types::{
+        BootMode, DataPacket, DdDiskState, DdDriveType, DdMode, DebugPacket, DiskPacket, SaveType,
+        TvType,
     },
 };
+
+use self::{
+    cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
+    link::{Command, Link},
+    types::{
+        get_config, get_setting, ButtonMode, CicSeed, Config, ConfigId, FirmwareStatus, Setting,
+        SettingId, UpdateStatus, Switch, ButtonState,
+    },
+    utils::{args_from_vec, datetime_from_vec, u32_from_vec, vec_from_datetime},
+};
 use chrono::{DateTime, Local};
-pub use error::Error;
-use std::io::{Read, Seek};
-use std::time::Instant;
-use std::{cmp::min, time::Duration};
+use std::{
+    io::{Read, Seek},
+    time::Instant,
+    {cmp::min, time::Duration},
+};
 
 pub struct SC64 {
     link: Box<dyn Link>,
 }
 
-#[derive(Debug)]
 pub struct DeviceState {
-    pub bootloader_switch: bool,
-    pub rom_write_enable: bool,
-    pub rom_shadow_enable: bool,
+    pub bootloader_switch: Switch,
+    pub rom_write_enable: Switch,
+    pub rom_shadow_enable: Switch,
     pub dd_mode: DdMode,
     pub isv_address: u32,
     pub boot_mode: BootMode,
     pub save_type: SaveType,
     pub cic_seed: CicSeed,
     pub tv_type: TvType,
-    pub dd_sd_enable: bool,
+    pub dd_sd_enable: Switch,
     pub dd_drive_type: DdDriveType,
     pub dd_disk_state: DdDiskState,
-    pub button_state: bool,
+    pub button_state: ButtonState,
     pub button_mode: ButtonMode,
-    pub rom_extended_enable: bool,
-    pub led_enable: bool,
+    pub rom_extended_enable: Switch,
+    pub led_enable: Switch,
     pub datetime: DateTime<Local>,
 }
+
+const SC64_V2_IDENTIFIER: &[u8; 4] = b"SCv2";
 
 const SUPPORTED_MAJOR_VERSION: u16 = 2;
 const SUPPORTED_MINOR_VERSION: u16 = 12;
@@ -91,9 +94,11 @@ const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
 pub const MEMORY_LENGTH: usize = 0x0500_2980;
 
+const MEMORY_WRITE_CHUNK_SIZE: usize = 1 * 1024 * 1024;
+
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<Vec<u8>, Error> {
-        let identifier = self.link.execute_command(&Command {
+        let identifier = self.link.execute_command(&mut Command {
             id: b'v',
             args: [0, 0],
             data: vec![],
@@ -102,7 +107,7 @@ impl SC64 {
     }
 
     fn command_version_get(&mut self) -> Result<(u16, u16), Error> {
-        let version = self.link.execute_command(&Command {
+        let version = self.link.execute_command(&mut Command {
             id: b'V',
             args: [0, 0],
             data: vec![],
@@ -113,7 +118,7 @@ impl SC64 {
     }
 
     fn command_state_reset(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'R',
             args: [0, 0],
             data: vec![],
@@ -130,7 +135,7 @@ impl SC64 {
         let mut params: Vec<u8> = vec![];
         params.append(&mut [(disable as u8) << 0, seed].to_vec());
         params.append(&mut checksum.to_vec());
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'B',
             args: args_from_vec(&params[0..8])?,
             data: vec![],
@@ -139,7 +144,7 @@ impl SC64 {
     }
 
     fn command_config_get(&mut self, config_id: ConfigId) -> Result<Config, Error> {
-        let data = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&mut Command {
             id: b'c',
             args: [config_id.into(), 0],
             data: vec![],
@@ -149,7 +154,7 @@ impl SC64 {
     }
 
     fn command_config_set(&mut self, config: Config) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'C',
             args: config.into(),
             data: vec![],
@@ -158,7 +163,7 @@ impl SC64 {
     }
 
     fn command_setting_get(&mut self, setting_id: SettingId) -> Result<Setting, Error> {
-        let data = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&mut Command {
             id: b'a',
             args: [setting_id.into(), 0],
             data: vec![],
@@ -168,7 +173,7 @@ impl SC64 {
     }
 
     fn command_setting_set(&mut self, setting: Setting) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'A',
             args: setting.into(),
             data: vec![],
@@ -177,7 +182,7 @@ impl SC64 {
     }
 
     fn command_time_get(&mut self) -> Result<DateTime<Local>, Error> {
-        let data = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&mut Command {
             id: b't',
             args: [0, 0],
             data: vec![],
@@ -186,7 +191,7 @@ impl SC64 {
     }
 
     fn command_time_set(&mut self, datetime: DateTime<Local>) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'T',
             args: args_from_vec(&vec_from_datetime(datetime)?[0..8])?,
             data: vec![],
@@ -195,7 +200,7 @@ impl SC64 {
     }
 
     fn command_memory_read(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
-        let data = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&mut Command {
             id: b'm',
             args: [address, length as u32],
             data: vec![],
@@ -204,7 +209,7 @@ impl SC64 {
     }
 
     fn command_memory_write(&mut self, address: u32, data: &[u8]) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'M',
             args: [address, data.len() as u32],
             data: data.to_vec(),
@@ -214,7 +219,7 @@ impl SC64 {
 
     fn command_usb_write(&mut self, datatype: u8, data: &[u8]) -> Result<(), Error> {
         self.link.execute_command_raw(
-            &Command {
+            &mut Command {
                 id: b'U',
                 args: [datatype as u32, data.len() as u32],
                 data: data.to_vec(),
@@ -227,7 +232,7 @@ impl SC64 {
     }
 
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'D',
             args: [error as u32, 0],
             data: vec![],
@@ -236,7 +241,7 @@ impl SC64 {
     }
 
     fn command_flash_wait_busy(&mut self, wait: bool) -> Result<u32, Error> {
-        let erase_block_size = self.link.execute_command(&Command {
+        let erase_block_size = self.link.execute_command(&mut Command {
             id: b'p',
             args: [wait as u32, 0],
             data: vec![],
@@ -245,7 +250,7 @@ impl SC64 {
     }
 
     fn command_flash_erase_block(&mut self, address: u32) -> Result<(), Error> {
-        self.link.execute_command(&Command {
+        self.link.execute_command(&mut Command {
             id: b'P',
             args: [address, 0],
             data: vec![],
@@ -255,7 +260,7 @@ impl SC64 {
 
     fn command_firmware_backup(&mut self, address: u32) -> Result<(FirmwareStatus, u32), Error> {
         let data = self.link.execute_command_raw(
-            &Command {
+            &mut Command {
                 id: b'f',
                 args: [address, 0],
                 data: vec![],
@@ -275,7 +280,7 @@ impl SC64 {
         length: usize,
     ) -> Result<FirmwareStatus, Error> {
         let data = self.link.execute_command_raw(
-            &Command {
+            &mut Command {
                 id: b'F',
                 args: [address, length as u32],
                 data: vec![],
@@ -286,91 +291,34 @@ impl SC64 {
         )?;
         Ok(FirmwareStatus::try_from(utils::u32_from_vec(&data[0..4])?)?)
     }
-
-    fn flash_erase(&mut self, address: u32, length: usize) -> Result<(), Error> {
-        let erase_block_size = self.command_flash_wait_busy(false)?;
-        for offset in (0..length as u32).step_by(erase_block_size as usize) {
-            self.command_flash_erase_block(address + offset)?;
-        }
-        Ok(())
-    }
-
-    fn flash_program(&mut self, address: u32, data: &[u8]) -> Result<(), Error> {
-        let current_data = self.command_memory_read(address, data.len())?;
-        if data == current_data {
-            return Ok(());
-        }
-        self.flash_erase(address, data.len())?;
-        self.command_memory_write(address, data)?;
-        self.command_flash_wait_busy(true)?;
-        Ok(())
-    }
-
-    fn flash_program_shadow(&mut self, data: &[u8]) -> Result<(), Error> {
-        if data.len() > ROM_SHADOW_LENGTH {
-            return Err(Error::new(
-                "Invalid data length for program ROM shadow operation",
-            ));
-        }
-        self.flash_program(ROM_SHADOW_ADDRESS, data)
-    }
-
-    fn flash_program_extended(&mut self, data: &[u8]) -> Result<(), Error> {
-        if data.len() > ROM_EXTENDED_LENGTH {
-            return Err(Error::new(
-                "Invalid data length for program ROM extended operation",
-            ));
-        }
-        self.flash_program(ROM_EXTENDED_ADDRESS, data)
-    }
-
-    #[allow(dead_code)]
-    fn flash_program_bootloader(&mut self, data: &[u8]) -> Result<(), Error> {
-        if data.len() > BOOTLOADER_LENGTH {
-            return Err(Error::new(
-                "Invalid data length for program bootloader operation",
-            ));
-        }
-        self.flash_program(BOOTLOADER_ADDRESS, data)
-    }
 }
 
 impl SC64 {
-    pub fn check_firmware_version(&mut self) -> Result<(u16, u16), Error> {
-        let (major, minor) = self
-            .command_version_get()
-            .map_err(|_| Error::new("Outdated SC64 firmware version, please update firmware"))?;
-        if major != SUPPORTED_MAJOR_VERSION || minor < SUPPORTED_MINOR_VERSION {
-            return Err(Error::new(
-                "Unsupported SC64 firmware version, please update firmware",
-            ));
+    pub fn upload_rom<T: Read + Seek>(
+        &mut self,
+        reader: &mut T,
+        length: usize,
+        no_shadow: bool,
+    ) -> Result<(), Error> {
+        if length > MAX_ROM_LENGTH {
+            return Err(Error::new("ROM length too big"));
         }
-        Ok((major, minor))
-    }
 
-    pub fn reset_state(&mut self) -> Result<(), Error> {
-        self.command_state_reset()?;
-        Ok(())
-    }
+        let mut pi_config = vec![0u8; 4];
+        reader.read(&mut pi_config)?;
+        reader.rewind()?;
 
-    pub fn upload_rom(&mut self, path: &str, no_shadow: bool) -> Result<(), Error> {
-        const BUFFER_SIZE: usize = 1 * 1024 * 1024;
-
-        let (mut file, length) = file_open_and_check_length(path, MAX_ROM_LENGTH)?;
-
-        let mut endian_check = vec![0u8; 4];
-        file.read(&mut endian_check)?;
-        file.rewind()?;
-
-        let endian_swapper = match u32_from_vec(&endian_check[0..4])? {
-            0x37804012 => |b: &mut [u8]| b.chunks_exact_mut(2).for_each(|c| c.swap(0, 1)),
-            0x40123780 => |b: &mut [u8]| {
+        let endian_swapper = match &pi_config[0..4] {
+            [0x37, 0x80, 0x40, 0x12] => {
+                |b: &mut [u8]| b.chunks_exact_mut(2).for_each(|c| c.swap(0, 1))
+            }
+            [0x40, 0x12, 0x37, 0x80] => |b: &mut [u8]| {
                 b.chunks_exact_mut(4).for_each(|c| {
                     c.swap(0, 3);
                     c.swap(1, 2)
                 })
             },
-            _ => |_b: &mut [u8]| {},
+            _ => |_: &mut [u8]| {},
         };
 
         let rom_shadow_enabled = !no_shadow && length > (SDRAM_LENGTH - ROM_SHADOW_LENGTH);
@@ -382,68 +330,54 @@ impl SC64 {
             min(length, SDRAM_LENGTH)
         };
 
-        let mut buffer = vec![0u8; BUFFER_SIZE];
+        self.memory_write_chunked(reader, SDRAM_ADDRESS, sdram_length, Some(endian_swapper))?;
 
-        for offset in (0..sdram_length as u32).step_by(buffer.len()) {
-            let chunk = file.read(&mut buffer)?;
-            endian_swapper(&mut buffer);
-            self.command_memory_write(SDRAM_ADDRESS + offset, &buffer[0..chunk])?;
-        }
-
-        self.command_config_set(Config::RomShadowEnable(rom_shadow_enabled))?;
+        self.command_config_set(Config::RomShadowEnable(rom_shadow_enabled.into()))?;
         if rom_shadow_enabled {
-            let mut buffer = vec![0u8; ROM_SHADOW_LENGTH];
-            let chunk = file.read(&mut buffer)?;
-            endian_swapper(&mut buffer);
-            self.flash_program_shadow(&buffer[0..chunk])?;
+            let rom_shadow_length = min(length - sdram_length, ROM_SHADOW_LENGTH);
+            self.flash_program(
+                reader,
+                ROM_SHADOW_ADDRESS,
+                rom_shadow_length,
+                Some(endian_swapper),
+            )?;
         }
 
-        self.command_config_set(Config::RomExtendedEnable(rom_extended_enabled))?;
+        self.command_config_set(Config::RomExtendedEnable(rom_extended_enabled.into()))?;
         if rom_extended_enabled {
-            let mut buffer = vec![0u8; ROM_EXTENDED_LENGTH];
-            let chunk = file.read(&mut buffer)?;
-            endian_swapper(&mut buffer);
-            self.flash_program_extended(&buffer[0..chunk])?;
+            let rom_extended_length = min(length - SDRAM_LENGTH, ROM_EXTENDED_LENGTH);
+            self.flash_program(
+                reader,
+                ROM_EXTENDED_ADDRESS,
+                rom_extended_length,
+                Some(endian_swapper),
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn upload_ddipl(&mut self, path: &str) -> Result<(), Error> {
-        let (mut file, length) = file_open_and_check_length(path, DDIPL_LENGTH)?;
-
-        let mut buffer = vec![0u8; length];
-        let chunk = file.read(&mut buffer)?;
-
-        self.command_memory_write(DDIPL_ADDRESS, &buffer[0..chunk])
-    }
-
-    pub fn upload_save(&mut self, path: &str) -> Result<(), Error> {
-        let save_type = get_config!(self, SaveType)?;
-
-        if matches!(save_type, SaveType::None) {
-            return Err(Error::new("No save type is enabled"));
+    pub fn upload_ddipl<T: Read>(&mut self, reader: &mut T, length: usize) -> Result<(), Error> {
+        if length > DDIPL_LENGTH {
+            return Err(Error::new("DDIPL length too big"));
         }
 
-        let address = match save_type {
-            SaveType::None => 0,
-            SaveType::Eeprom4k => EEPROM_ADDRESS,
-            SaveType::Eeprom16k => EEPROM_ADDRESS,
-            SaveType::Sram => SAVE_ADDRESS,
-            SaveType::SramBanked => SAVE_ADDRESS,
-            SaveType::Flashram => SAVE_ADDRESS,
-        };
+        self.memory_write_chunked(reader, DDIPL_ADDRESS, length, None)
+    }
 
-        let save_length = match save_type {
-            SaveType::None => 0,
-            SaveType::Eeprom4k => EEPROM_4K_LENGTH,
-            SaveType::Eeprom16k => EEPROM_16K_LENGTH,
-            SaveType::Sram => SRAM_LENGTH,
-            SaveType::SramBanked => SRAM_BANKED_LENGTH,
-            SaveType::Flashram => FLASHRAM_LENGTH,
-        };
+    pub fn upload_save<T: Read>(&mut self, reader: &mut T, length: usize) -> Result<(), Error> {
+        let save_type = get_config!(self, SaveType)?;
 
-        let (mut file, length) = file_open_and_check_length(path, save_length)?;
+        let (address, save_length) = match save_type {
+            SaveType::None => {
+                return Err(Error::new("No save type is enabled"));
+            }
+            SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
+            SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
+            SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+        };
 
         if length != save_length {
             return Err(Error::new(
@@ -451,10 +385,7 @@ impl SC64 {
             ));
         }
 
-        let mut buffer = vec![0u8; length];
-        file.read(&mut buffer)?;
-
-        self.command_memory_write(address, &buffer)
+        self.memory_write_chunked(reader, address, save_length, None)
     }
 
     pub fn dump_memory(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
@@ -498,7 +429,7 @@ impl SC64 {
     }
 
     pub fn set_led_blink(&mut self, enabled: bool) -> Result<(), Error> {
-        self.command_setting_set(Setting::LedEnable(enabled))
+        self.command_setting_set(Setting::LedEnable(enabled.into()))
     }
 
     pub fn get_device_state(&mut self) -> Result<DeviceState, Error> {
@@ -529,7 +460,7 @@ impl SC64 {
         drive_type: DdDriveType,
     ) -> Result<(), Error> {
         self.command_config_set(Config::DdMode(dd_mode))?;
-        self.command_config_set(Config::DdSdEnable(false))?;
+        self.command_config_set(Config::DdSdEnable(Switch::Off))?;
         self.command_config_set(Config::DdDriveType(drive_type))?;
         self.command_config_set(Config::DdDiskState(DdDiskState::Ejected))?;
         Ok(())
@@ -539,22 +470,22 @@ impl SC64 {
         self.command_config_set(Config::DdDiskState(disk_state))
     }
 
-    pub fn configure_isviewer64(&mut self, offset: Option<u32>) -> Result<(), Error> {
-        if let Some(off) = offset {
-            if get_config!(self, RomShadowEnable)? {
-                if off > (SAVE_ADDRESS - ISV_BUFFER_LENGTH as u32) {
+    pub fn configure_is_viewer_64(&mut self, offset: Option<u32>) -> Result<(), Error> {
+        if let Some(offset) = offset {
+            if get_config!(self, RomShadowEnable)?.into() {
+                if offset > (SAVE_ADDRESS - ISV_BUFFER_LENGTH as u32) {
                     return Err(Error::new(
                         format!(
-                            "ROM shadow is enabled, IS-Viewer 64 at offset 0x{off:08X} won't work"
+                            "ROM shadow is enabled, IS-Viewer 64 at offset 0x{offset:08X} won't work"
                         )
                         .as_str(),
                     ));
                 }
             }
-            self.command_config_set(Config::RomWriteEnable(true))?;
-            self.command_config_set(Config::IsvAddress(off))?;
+            self.command_config_set(Config::RomWriteEnable(Switch::On))?;
+            self.command_config_set(Config::IsvAddress(offset))?;
         } else {
-            self.command_config_set(Config::RomWriteEnable(false))?;
+            self.command_config_set(Config::RomWriteEnable(Switch::Off))?;
             self.command_config_set(Config::IsvAddress(0))?;
         }
         Ok(())
@@ -586,12 +517,29 @@ impl SC64 {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
     }
 
+    pub fn check_firmware_version(&mut self) -> Result<(u16, u16), Error> {
+        let (major, minor) = self
+            .command_version_get()
+            .map_err(|_| Error::new("Outdated SC64 firmware version, please update firmware"))?;
+        if major != SUPPORTED_MAJOR_VERSION || minor < SUPPORTED_MINOR_VERSION {
+            return Err(Error::new(
+                "Unsupported SC64 firmware version, please update firmware",
+            ));
+        }
+        Ok((major, minor))
+    }
+
+    pub fn reset_state(&mut self) -> Result<(), Error> {
+        self.command_state_reset()?;
+        Ok(())
+    }
+
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
         self.command_state_reset()?;
         let (status, length) = self.command_firmware_backup(FIRMWARE_ADDRESS)?;
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
-                format!("Firmware backup error: {:?}", status).as_str(),
+                format!("Firmware backup error: {}", status).as_str(),
             ));
         }
         self.command_memory_read(FIRMWARE_ADDRESS, length as usize)
@@ -603,7 +551,7 @@ impl SC64 {
         let status = self.command_firmware_update(FIRMWARE_ADDRESS, data.len())?;
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
-                format!("Firmware update verify error: {:?}", status).as_str(),
+                format!("Firmware update verify error: {}", status).as_str(),
             ));
         }
         let timeout = Instant::now();
@@ -619,7 +567,7 @@ impl SC64 {
                         UpdateStatus::Err => {
                             return Err(Error::new(
                                 format!(
-                                "Firmware update error on step {:?}, device is most likely bricked",
+                                "Firmware update error on step {}, device is most likely bricked",
                                 last_update_status
                             )
                                 .as_str(),
@@ -640,6 +588,52 @@ impl SC64 {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    pub fn update_bootloader(&mut self, reader: &mut dyn Read, length: usize) -> Result<(), Error> {
+        if length > BOOTLOADER_LENGTH {
+            return Err(Error::new("Bootloader length too big"));
+        }
+        self.flash_program(reader, BOOTLOADER_ADDRESS, length, None)
+    }
+
+    fn memory_write_chunked(
+        &mut self,
+        reader: &mut dyn Read,
+        address: u32,
+        length: usize,
+        transform: Option<fn(&mut [u8])>,
+    ) -> Result<(), Error> {
+        let mut data: Vec<u8> = vec![0u8; MEMORY_WRITE_CHUNK_SIZE];
+        for offset in (0..length).step_by(MEMORY_WRITE_CHUNK_SIZE) {
+            let chunk = reader.read(&mut data)?;
+            if let Some(transform) = transform {
+                transform(&mut data);
+            }
+            self.command_memory_write(address + offset as u32, &data[0..chunk])?;
+        }
+        Ok(())
+    }
+
+    fn flash_erase(&mut self, address: u32, length: usize) -> Result<(), Error> {
+        let erase_block_size = self.command_flash_wait_busy(false)?;
+        for offset in (0..length as u32).step_by(erase_block_size as usize) {
+            self.command_flash_erase_block(address + offset)?;
+        }
+        Ok(())
+    }
+
+    fn flash_program(
+        &mut self,
+        reader: &mut dyn Read,
+        address: u32,
+        length: usize,
+        transform: Option<fn(&mut [u8])>,
+    ) -> Result<(), Error> {
+        self.flash_erase(address, length)?;
+        self.memory_write_chunked(reader, address, length, transform)?;
+        self.command_flash_wait_busy(true)?;
+        Ok(())
     }
 }
 
@@ -664,7 +658,7 @@ pub fn new(sn: Option<String>) -> Result<SC64, Error> {
         .command_identifier_get()
         .map_err(|_| Error::new("Couldn't get SC64 device identifier"))?;
 
-    if identifier != b"SCv2" {
+    if identifier != SC64_V2_IDENTIFIER {
         return Err(Error::new("Unknown identifier received, not a SC64 device"));
     }
 

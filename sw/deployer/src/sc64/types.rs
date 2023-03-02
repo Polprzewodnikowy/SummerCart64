@@ -1,5 +1,6 @@
 use super::{link::Packet, utils::u32_from_vec, Error};
 use encoding_rs::EUC_JP;
+use std::fmt::Display;
 
 #[derive(Clone, Copy)]
 pub enum ConfigId {
@@ -21,21 +22,21 @@ pub enum ConfigId {
 }
 
 pub enum Config {
-    BootloaderSwitch(bool),
-    RomWriteEnable(bool),
-    RomShadowEnable(bool),
+    BootloaderSwitch(Switch),
+    RomWriteEnable(Switch),
+    RomShadowEnable(Switch),
     DdMode(DdMode),
     IsvAddress(u32),
     BootMode(BootMode),
     SaveType(SaveType),
     CicSeed(CicSeed),
     TvType(TvType),
-    DdSdEnable(bool),
+    DdSdEnable(Switch),
     DdDriveType(DdDriveType),
     DdDiskState(DdDiskState),
-    ButtonState(bool),
+    ButtonState(ButtonState),
     ButtonMode(ButtonMode),
-    RomExtendedEnable(bool),
+    RomExtendedEnable(Switch),
 }
 
 impl From<ConfigId> for u32 {
@@ -65,21 +66,21 @@ impl TryFrom<(ConfigId, u32)> for Config {
     fn try_from(value: (ConfigId, u32)) -> Result<Self, Self::Error> {
         let (id, config) = value;
         Ok(match id {
-            ConfigId::BootloaderSwitch => Config::BootloaderSwitch(config != 0),
-            ConfigId::RomWriteEnable => Config::RomWriteEnable(config != 0),
-            ConfigId::RomShadowEnable => Config::RomShadowEnable(config != 0),
-            ConfigId::DdMode => Config::DdMode(config.try_into()?),
-            ConfigId::IsvAddress => Config::IsvAddress(config),
-            ConfigId::BootMode => Config::BootMode(config.try_into()?),
-            ConfigId::SaveType => Config::SaveType(config.try_into()?),
-            ConfigId::CicSeed => Config::CicSeed(config.try_into()?),
-            ConfigId::TvType => Config::TvType(config.try_into()?),
-            ConfigId::DdSdEnable => Config::DdSdEnable(config != 0),
-            ConfigId::DdDriveType => Config::DdDriveType(config.try_into()?),
-            ConfigId::DdDiskState => Config::DdDiskState(config.try_into()?),
-            ConfigId::ButtonState => Config::ButtonState(config != 0),
-            ConfigId::ButtonMode => Config::ButtonMode(config.try_into()?),
-            ConfigId::RomExtendedEnable => Config::RomExtendedEnable(config != 0),
+            ConfigId::BootloaderSwitch => Self::BootloaderSwitch(config.try_into()?),
+            ConfigId::RomWriteEnable => Self::RomWriteEnable(config.try_into()?),
+            ConfigId::RomShadowEnable => Self::RomShadowEnable(config.try_into()?),
+            ConfigId::DdMode => Self::DdMode(config.try_into()?),
+            ConfigId::IsvAddress => Self::IsvAddress(config),
+            ConfigId::BootMode => Self::BootMode(config.try_into()?),
+            ConfigId::SaveType => Self::SaveType(config.try_into()?),
+            ConfigId::CicSeed => Self::CicSeed(config.try_into()?),
+            ConfigId::TvType => Self::TvType(config.try_into()?),
+            ConfigId::DdSdEnable => Self::DdSdEnable(config.try_into()?),
+            ConfigId::DdDriveType => Self::DdDriveType(config.try_into()?),
+            ConfigId::DdDiskState => Self::DdDiskState(config.try_into()?),
+            ConfigId::ButtonState => Self::ButtonState(config.try_into()?),
+            ConfigId::ButtonMode => Self::ButtonMode(config.try_into()?),
+            ConfigId::RomExtendedEnable => Self::RomExtendedEnable(config.try_into()?),
         })
     }
 }
@@ -106,7 +107,58 @@ impl From<Config> for [u32; 2] {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone)]
+pub enum Switch {
+    Off,
+    On,
+}
+
+impl Display for Switch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Switch::Off => "Disabled",
+            Switch::On => "Enabled",
+        })
+    }
+}
+
+impl TryFrom<u32> for Switch {
+    type Error = Error;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Off,
+            _ => Self::On,
+        })
+    }
+}
+
+impl From<Switch> for u32 {
+    fn from(value: Switch) -> Self {
+        match value {
+            Switch::Off => 0,
+            Switch::On => 1,
+        }
+    }
+}
+
+impl From<bool> for Switch {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Self::Off,
+            true => Self::On,
+        }
+    }
+}
+
+impl From<Switch> for bool {
+    fn from(value: Switch) -> Self {
+        match value {
+            Switch::Off => false,
+            Switch::On => true,
+        }
+    }
+}
+
 pub enum DdMode {
     None,
     Regs,
@@ -114,14 +166,25 @@ pub enum DdMode {
     Full,
 }
 
+impl Display for DdMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            DdMode::None => "Disabled",
+            DdMode::Regs => "Only registers",
+            DdMode::DdIpl => "Only 64DD IPL",
+            DdMode::Full => "Registers + 64DD IPL",
+        })
+    }
+}
+
 impl TryFrom<u32> for DdMode {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => DdMode::None,
-            1 => DdMode::Regs,
-            2 => DdMode::DdIpl,
-            3 => DdMode::Full,
+            0 => Self::None,
+            1 => Self::Regs,
+            2 => Self::DdIpl,
+            3 => Self::Full,
             _ => return Err(Error::new("Unknown 64DD mode code")),
         })
     }
@@ -138,7 +201,6 @@ impl From<DdMode> for u32 {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
 pub enum BootMode {
     Menu,
     Rom,
@@ -147,15 +209,27 @@ pub enum BootMode {
     DirectDdIpl,
 }
 
+impl Display for BootMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Menu => "Menu",
+            Self::Rom => "Bootloader -> ROM",
+            Self::DdIpl => "Bootloader -> 64DD IPL",
+            Self::DirectRom => "ROM (direct)",
+            Self::DirectDdIpl => "64DD IPL (direct)",
+        })
+    }
+}
+
 impl TryFrom<u32> for BootMode {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => BootMode::Menu,
-            1 => BootMode::Rom,
-            2 => BootMode::DdIpl,
-            3 => BootMode::DirectRom,
-            4 => BootMode::DirectDdIpl,
+            0 => Self::Menu,
+            1 => Self::Rom,
+            2 => Self::DdIpl,
+            3 => Self::DirectRom,
+            4 => Self::DirectDdIpl,
             _ => return Err(Error::new("Unknown boot mode code")),
         })
     }
@@ -173,7 +247,6 @@ impl From<BootMode> for u32 {
     }
 }
 
-#[derive(Debug)]
 pub enum SaveType {
     None,
     Eeprom4k,
@@ -183,16 +256,29 @@ pub enum SaveType {
     SramBanked,
 }
 
+impl Display for SaveType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::None => "None",
+            Self::Eeprom4k => "EEPROM 4k",
+            Self::Eeprom16k => "EEPROM 16k",
+            Self::Sram => "SRAM",
+            Self::SramBanked => "SRAM banked",
+            Self::Flashram => "FlashRAM",
+        })
+    }
+}
+
 impl TryFrom<u32> for SaveType {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => SaveType::None,
-            1 => SaveType::Eeprom4k,
-            2 => SaveType::Eeprom16k,
-            3 => SaveType::Sram,
-            4 => SaveType::Flashram,
-            5 => SaveType::SramBanked,
+            0 => Self::None,
+            1 => Self::Eeprom4k,
+            2 => Self::Eeprom16k,
+            3 => Self::Sram,
+            4 => Self::Flashram,
+            5 => Self::SramBanked,
             _ => return Err(Error::new("Unknown save type code")),
         })
     }
@@ -211,19 +297,28 @@ impl From<SaveType> for u32 {
     }
 }
 
-#[derive(Debug)]
 pub enum CicSeed {
     Seed(u8),
     Auto,
+}
+
+impl Display for CicSeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let CicSeed::Seed(seed) = self {
+            f.write_fmt(format_args!("0x{seed:02X}"))
+        } else {
+            f.write_str("Auto")
+        }
+    }
 }
 
 impl TryFrom<u32> for CicSeed {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(if value <= 0xFF {
-            CicSeed::Seed(value as u8)
+            Self::Seed(value as u8)
         } else if value == 0xFFFF {
-            CicSeed::Auto
+            Self::Auto
         } else {
             return Err(Error::new("Unknown CIC seed code"));
         })
@@ -239,7 +334,6 @@ impl From<CicSeed> for u32 {
     }
 }
 
-#[derive(Debug)]
 pub enum TvType {
     PAL,
     NTSC,
@@ -247,14 +341,25 @@ pub enum TvType {
     Auto,
 }
 
+impl Display for TvType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::PAL => "PAL",
+            Self::NTSC => "NTSC",
+            Self::MPAL => "MPAL",
+            Self::Auto => "Auto",
+        })
+    }
+}
+
 impl TryFrom<u32> for TvType {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => TvType::PAL,
-            1 => TvType::NTSC,
-            2 => TvType::MPAL,
-            3 => TvType::Auto,
+            0 => Self::PAL,
+            1 => Self::NTSC,
+            2 => Self::MPAL,
+            3 => Self::Auto,
             _ => return Err(Error::new("Unknown TV type code")),
         })
     }
@@ -271,18 +376,26 @@ impl From<TvType> for u32 {
     }
 }
 
-#[derive(Debug)]
 pub enum DdDriveType {
     Retail,
     Development,
+}
+
+impl Display for DdDriveType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            DdDriveType::Retail => "Retail",
+            DdDriveType::Development => "Development",
+        })
+    }
 }
 
 impl TryFrom<u32> for DdDriveType {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => DdDriveType::Retail,
-            1 => DdDriveType::Development,
+            0 => Self::Retail,
+            1 => Self::Development,
             _ => return Err(Error::new("Unknown 64DD drive type code")),
         })
     }
@@ -297,20 +410,29 @@ impl From<DdDriveType> for u32 {
     }
 }
 
-#[derive(Debug)]
 pub enum DdDiskState {
     Ejected,
     Inserted,
     Changed,
 }
 
+impl Display for DdDiskState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            DdDiskState::Ejected => "Ejected",
+            DdDiskState::Inserted => "Inserted",
+            DdDiskState::Changed => "Changed",
+        })
+    }
+}
+
 impl TryFrom<u32> for DdDiskState {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => DdDiskState::Ejected,
-            1 => DdDiskState::Inserted,
-            2 => DdDiskState::Changed,
+            0 => Self::Ejected,
+            1 => Self::Inserted,
+            2 => Self::Changed,
             _ => return Err(Error::new("Unknown 64DD disk state code")),
         })
     }
@@ -326,7 +448,57 @@ impl From<DdDiskState> for u32 {
     }
 }
 
-#[derive(Debug)]
+pub enum ButtonState {
+    NotPressed,
+    Pressed,
+}
+
+impl Display for ButtonState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ButtonState::NotPressed => "Not pressed",
+            ButtonState::Pressed => "Pressed",
+        })
+    }
+}
+
+impl TryFrom<u32> for ButtonState {
+    type Error = Error;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::NotPressed,
+            _ => Self::Pressed,
+        })
+    }
+}
+
+impl From<ButtonState> for u32 {
+    fn from(value: ButtonState) -> Self {
+        match value {
+            ButtonState::NotPressed => 0,
+            ButtonState::Pressed => 1,
+        }
+    }
+}
+
+impl From<bool> for ButtonState {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Self::NotPressed,
+            true => Self::Pressed,
+        }
+    }
+}
+
+impl From<ButtonState> for bool {
+    fn from(value: ButtonState) -> Self {
+        match value {
+            ButtonState::NotPressed => false,
+            ButtonState::Pressed => true,
+        }
+    }
+}
+
 pub enum ButtonMode {
     None,
     N64Irq,
@@ -334,14 +506,25 @@ pub enum ButtonMode {
     DdDiskSwap,
 }
 
+impl Display for ButtonMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ButtonMode::None => "User",
+            ButtonMode::N64Irq => "N64 IRQ trigger",
+            ButtonMode::UsbPacket => "Send USB packet",
+            ButtonMode::DdDiskSwap => "Swap 64DD disk",
+        })
+    }
+}
+
 impl TryFrom<u32> for ButtonMode {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => ButtonMode::None,
-            1 => ButtonMode::N64Irq,
-            2 => ButtonMode::UsbPacket,
-            3 => ButtonMode::DdDiskSwap,
+            0 => Self::None,
+            1 => Self::N64Irq,
+            2 => Self::UsbPacket,
+            3 => Self::DdDiskSwap,
             _ => return Err(Error::new("Unknown button mode code")),
         })
     }
@@ -364,7 +547,7 @@ pub enum SettingId {
 }
 
 pub enum Setting {
-    LedEnable(bool),
+    LedEnable(Switch),
 }
 
 impl From<SettingId> for u32 {
@@ -380,7 +563,7 @@ impl TryFrom<(SettingId, u32)> for Setting {
     fn try_from(value: (SettingId, u32)) -> Result<Self, Self::Error> {
         let (id, setting) = value;
         Ok(match id {
-            SettingId::LedEnable => Setting::LedEnable(setting != 0),
+            SettingId::LedEnable => Self::LedEnable(setting.try_into()?),
         })
     }
 }
@@ -480,7 +663,6 @@ impl DiskBlock {
     }
 }
 
-#[derive(Debug)]
 pub enum FirmwareStatus {
     Ok,
     ErrToken,
@@ -490,22 +672,34 @@ pub enum FirmwareStatus {
     ErrRead,
 }
 
+impl Display for FirmwareStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            FirmwareStatus::Ok => "OK",
+            FirmwareStatus::ErrToken => "Invalid firmware header",
+            FirmwareStatus::ErrChecksum => "Invalid chunk checksum",
+            FirmwareStatus::ErrSize => "Invalid firmware size",
+            FirmwareStatus::ErrUnknownChunk => "Unknown chunk in firmware",
+            FirmwareStatus::ErrRead => "Firmware read error",
+        })
+    }
+}
+
 impl TryFrom<u32> for FirmwareStatus {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => FirmwareStatus::Ok,
-            1 => FirmwareStatus::ErrToken,
-            2 => FirmwareStatus::ErrChecksum,
-            3 => FirmwareStatus::ErrSize,
-            4 => FirmwareStatus::ErrUnknownChunk,
-            5 => FirmwareStatus::ErrRead,
+            0 => Self::Ok,
+            1 => Self::ErrToken,
+            2 => Self::ErrChecksum,
+            3 => Self::ErrSize,
+            4 => Self::ErrUnknownChunk,
+            5 => Self::ErrRead,
             _ => return Err(Error::new("Unknown firmware status code")),
         })
     }
 }
 
-#[derive(Debug)]
 pub enum UpdateStatus {
     MCU,
     FPGA,
@@ -514,15 +708,27 @@ pub enum UpdateStatus {
     Err,
 }
 
+impl Display for UpdateStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            UpdateStatus::MCU => "Microcontroller",
+            UpdateStatus::FPGA => "FPGA",
+            UpdateStatus::Bootloader => "Bootloader",
+            UpdateStatus::Done => "Done",
+            UpdateStatus::Err => "Error",
+        })
+    }
+}
+
 impl TryFrom<u32> for UpdateStatus {
     type Error = Error;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(match value {
-            1 => UpdateStatus::MCU,
-            2 => UpdateStatus::FPGA,
-            3 => UpdateStatus::Bootloader,
-            0x80 => UpdateStatus::Done,
-            0xFF => UpdateStatus::Err,
+            1 => Self::MCU,
+            2 => Self::FPGA,
+            3 => Self::Bootloader,
+            0x80 => Self::Done,
+            0xFF => Self::Err,
             _ => return Err(Error::new("Unknown update status code")),
         })
     }
@@ -540,7 +746,8 @@ macro_rules! get_config {
 
 macro_rules! get_setting {
     ($sc64:ident, $setting:ident) => {{
-        #[allow(irrefutable_let_patterns)] // TODO: is there another way to ignore this warning?
+        // Note: remove 'allow(irrefutable_let_patterns)' below when more settings are added
+        #[allow(irrefutable_let_patterns)]
         if let Setting::$setting(value) = $sc64.command_setting_get(SettingId::$setting)? {
             Ok(value)
         } else {

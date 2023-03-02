@@ -33,10 +33,10 @@ enum DataType {
 }
 
 pub trait Link {
-    fn execute_command(&mut self, command: &Command) -> Result<Vec<u8>, Error>;
+    fn execute_command(&mut self, command: &mut Command) -> Result<Vec<u8>, Error>;
     fn execute_command_raw(
         &mut self,
-        command: &Command,
+        command: &mut Command,
         timeout: Duration,
         no_response: bool,
         ignore_error: bool,
@@ -83,15 +83,17 @@ impl SerialLink {
         Ok(())
     }
 
-    fn serial_send_command(&mut self, command: &Command, timeout: Duration) -> Result<(), Error> {
-        let Command { id, args, mut data } = command.clone();
-
+    fn serial_send_command(
+        &mut self,
+        command: &mut Command,
+        timeout: Duration,
+    ) -> Result<(), Error> {
         let mut packet: Vec<u8> = Vec::new();
         packet.append(&mut b"CMD".to_vec());
-        packet.append(&mut [id].to_vec());
-        packet.append(&mut args[0].to_be_bytes().to_vec());
-        packet.append(&mut args[1].to_be_bytes().to_vec());
-        packet.append(&mut data);
+        packet.append(&mut [command.id].to_vec());
+        packet.append(&mut command.args[0].to_be_bytes().to_vec());
+        packet.append(&mut command.args[1].to_be_bytes().to_vec());
+        packet.append(&mut command.data);
 
         self.serial.set_timeout(timeout)?;
         self.serial.write_all(&packet)?;
@@ -140,7 +142,7 @@ impl SerialLink {
         Ok(None)
     }
 
-    fn send_command(&mut self, command: &Command) -> Result<(), Error> {
+    fn send_command(&mut self, command: &mut Command) -> Result<(), Error> {
         self.serial_send_command(command, COMMAND_TIMEOUT)
     }
 
@@ -153,13 +155,13 @@ impl SerialLink {
 }
 
 impl Link for SerialLink {
-    fn execute_command(&mut self, command: &Command) -> Result<Vec<u8>, Error> {
+    fn execute_command(&mut self, command: &mut Command) -> Result<Vec<u8>, Error> {
         self.execute_command_raw(command, COMMAND_TIMEOUT, false, false)
     }
 
     fn execute_command_raw(
         &mut self,
-        command: &Command,
+        command: &mut Command,
         timeout: Duration,
         no_response: bool,
         ignore_error: bool,
@@ -169,7 +171,9 @@ impl Link for SerialLink {
             return Ok(vec![]);
         }
         let response = self.receive_response(timeout)?;
-        compare_id(&command, &response)?;
+        if command.id != response.id {
+            return Err(Error::new("Command response ID didn't match"));
+        }
         if !ignore_error && response.error {
             return Err(Error::new("Command response error"));
         }
@@ -182,13 +186,6 @@ impl Link for SerialLink {
         }
         Ok(self.packets.pop_front())
     }
-}
-
-fn compare_id(command: &Command, response: &Response) -> Result<(), Error> {
-    if command.id != response.id {
-        return Err(Error::new("Command response ID didn't match"));
-    }
-    Ok(())
 }
 
 pub fn list_serial_devices() -> Result<Vec<Device>, Error> {
@@ -219,9 +216,7 @@ pub fn list_serial_devices() -> Result<Vec<Device>, Error> {
 
 pub fn new_serial(port: &str) -> Result<Box<dyn Link>, Error> {
     let mut link = SerialLink {
-        serial: serialport::new(port, 115_200)
-            .timeout(COMMAND_TIMEOUT)
-            .open()?,
+        serial: serialport::new(port, 115_200).open()?,
         packets: VecDeque::new(),
     };
 

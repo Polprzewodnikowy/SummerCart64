@@ -61,15 +61,3 @@ pub fn vec_from_datetime(datetime: DateTime<Local>) -> Result<Vec<u8>, Error> {
     let day = bcd_from_u8(datetime.day() as u8);
     Ok(vec![weekday, hour, minute, second, 0, year, month, day])
 }
-
-pub fn file_open_and_check_length(
-    path: &str,
-    max_length: usize,
-) -> Result<(std::fs::File, usize), Error> {
-    let file = std::fs::File::open(path)?;
-    let length = file.metadata()?.len() as usize;
-    if length > max_length {
-        return Err(Error::new("File size is too big"));
-    }
-    Ok((file, length))
-}
