@@ -161,7 +161,7 @@ struct FirmwareArgs {
     firmware: PathBuf,
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, ValueEnum)]
 enum SaveType {
     None,
     Eeprom4k,
@@ -197,7 +197,7 @@ impl From<SaveType> for sc64::SaveType {
     }
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, ValueEnum)]
 enum TvType {
     PAL,
     NTSC,

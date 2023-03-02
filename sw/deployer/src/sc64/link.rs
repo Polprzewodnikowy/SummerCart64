@@ -1,27 +1,23 @@
 use super::{error::Error, utils};
 use std::{collections::VecDeque, time::Duration};
 
-#[derive(Clone, Debug)]
 pub struct Device {
     pub sn: String,
     pub port: String,
 }
 
-#[derive(Clone, Debug)]
 pub struct Command {
     pub id: u8,
     pub args: [u32; 2],
     pub data: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
 pub struct Response {
     pub id: u8,
     pub data: Vec<u8>,
     pub error: bool,
 }
 
-#[derive(Clone, Debug)]
 pub struct Packet {
     pub id: u8,
     pub data: Vec<u8>,
