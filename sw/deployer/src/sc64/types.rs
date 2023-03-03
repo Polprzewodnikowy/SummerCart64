@@ -107,7 +107,6 @@ impl From<Config> for [u32; 2] {
     }
 }
 
-#[derive(Copy, Clone)]
 pub enum Switch {
     Off,
     On,

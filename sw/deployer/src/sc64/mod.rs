@@ -17,8 +17,8 @@ use self::{
     cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
     link::{Command, Link},
     types::{
-        get_config, get_setting, ButtonMode, CicSeed, Config, ConfigId, FirmwareStatus, Setting,
-        SettingId, UpdateStatus, Switch, ButtonState,
+        get_config, get_setting, ButtonMode, ButtonState, CicSeed, Config, ConfigId,
+        FirmwareStatus, Setting, SettingId, Switch, UpdateStatus,
     },
     utils::{args_from_vec, datetime_from_vec, u32_from_vec, vec_from_datetime},
 };
@@ -94,7 +94,7 @@ const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
 pub const MEMORY_LENGTH: usize = 0x0500_2980;
 
-const MEMORY_WRITE_CHUNK_SIZE: usize = 1 * 1024 * 1024;
+const MEMORY_WRITE_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<Vec<u8>, Error> {
@@ -530,8 +530,7 @@ impl SC64 {
     }
 
     pub fn reset_state(&mut self) -> Result<(), Error> {
-        self.command_state_reset()?;
-        Ok(())
+        self.command_state_reset()
     }
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
@@ -567,7 +566,7 @@ impl SC64 {
                         UpdateStatus::Err => {
                             return Err(Error::new(
                                 format!(
-                                "Firmware update error on step {}, device is most likely bricked",
+                                "Firmware update error on step {}, device is, most likely, bricked",
                                 last_update_status
                             )
                                 .as_str(),
@@ -604,8 +603,8 @@ impl SC64 {
         length: usize,
         transform: Option<fn(&mut [u8])>,
     ) -> Result<(), Error> {
-        let mut data: Vec<u8> = vec![0u8; MEMORY_WRITE_CHUNK_SIZE];
-        for offset in (0..length).step_by(MEMORY_WRITE_CHUNK_SIZE) {
+        let mut data: Vec<u8> = vec![0u8; MEMORY_WRITE_CHUNK_LENGTH];
+        for offset in (0..length).step_by(MEMORY_WRITE_CHUNK_LENGTH) {
             let chunk = reader.read(&mut data)?;
             if let Some(transform) = transform {
                 transform(&mut data);

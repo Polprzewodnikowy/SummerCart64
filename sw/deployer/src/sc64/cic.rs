@@ -4,29 +4,75 @@ use crc32fast::Hasher;
 pub const IPL3_OFFSET: u32 = 0x40;
 pub const IPL3_LENGTH: usize = 0xFC0;
 
+enum CicType {
+    _5101,
+    _6101,
+    _7102,
+    X102,
+    X103,
+    X105,
+    X106,
+    _5167,
+    NDXJ0,
+    NDDJ0,
+    NDDJ1,
+    NDDJ2,
+    NDDE0,
+}
+
+impl From<u32> for CicType {
+    fn from(value: u32) -> Self {
+        match value {
+            0x587BD543 => CicType::_5101,
+            0x6170A4A1 => CicType::_6101,
+            0x009E9EA3 => CicType::_7102,
+            0x90BB6CB5 => CicType::X102,
+            0x0B050EE0 => CicType::X103,
+            0x98BC2C86 => CicType::X105,
+            0xACC8580A => CicType::X106,
+            0x0E018159 => CicType::_5167,
+            0x10C68B18 => CicType::NDXJ0,
+            0xBC605D0A => CicType::NDDJ0,
+            0x502C4466 => CicType::NDDJ1,
+            0x0C965795 => CicType::NDDJ2,
+            0x8FEBA21E => CicType::NDDE0,
+            _ => CicType::X102,
+        }
+    }
+}
+
+impl From<CicType> for u8 {
+    fn from(value: CicType) -> Self {
+        match value {
+            CicType::_5101 => 0xAC,
+            CicType::_6101 => 0x3F,
+            CicType::_7102 => 0x3F,
+            CicType::X102 => 0x3F,
+            CicType::X103 => 0x78,
+            CicType::X105 => 0x91,
+            CicType::X106 => 0x85,
+            CicType::_5167 => 0xDD,
+            CicType::NDXJ0 => 0xDD,
+            CicType::NDDJ0 => 0xDD,
+            CicType::NDDJ1 => 0xDD,
+            CicType::NDDJ2 => 0xDD,
+            CicType::NDDE0 => 0xDE,
+        }
+    }
+}
+
 pub fn guess_ipl3_seed(ipl3: &[u8]) -> Result<u8, Error> {
     if ipl3.len() < IPL3_LENGTH {
         return Err(Error::new("Invalid IPL3 length provided"));
     }
 
     let mut hasher = Hasher::new();
+
     hasher.update(ipl3);
-    Ok(match hasher.finalize() {
-        0x587BD543 => 0xAC, // 5101
-        0x6170A4A1 => 0x3F, // 6101
-        0x009E9EA3 => 0x3F, // 7102
-        0x90BB6CB5 => 0x3F, // 6102/7101
-        0x0B050EE0 => 0x78, // x103
-        0x98BC2C86 => 0x91, // x105
-        0xACC8580A => 0x85, // x106
-        0x0E018159 => 0xDD, // 5167
-        0x10C68B18 => 0xDD, // NDXJ0
-        0xBC605D0A => 0xDD, // NDDJ0
-        0x502C4466 => 0xDD, // NDDJ1
-        0x0C965795 => 0xDD, // NDDJ2
-        0x8FEBA21E => 0xDE, // NDDE0
-        _ => 0x3F,
-    })
+
+    let cic_type: CicType = hasher.finalize().into();
+
+    Ok(cic_type.into())
 }
 
 pub fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<[u8; 6], Error> {
@@ -43,7 +89,6 @@ pub fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<[u8; 6], Error> 
             | ((ipl3[o + 2] as u32) << 8)
             | (ipl3[o + 3] as u32);
     };
-
     let add = |a1: u32, a2: u32| u32::wrapping_add(a1, a2);
     let sub = |a1: u32, a2: u32| u32::wrapping_sub(a1, a2);
     let mul = |a1: u32, a2: u32| u32::wrapping_mul(a1, a2);

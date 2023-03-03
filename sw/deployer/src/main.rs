@@ -379,7 +379,7 @@ fn handle_info_command(sn: Option<String>) -> Result<(), sc64::Error> {
     let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S %Z");
 
     println!("{}", "SC64 information and current state:".bold());
-    println!(" Firmware version:    {}.{}", major, minor);
+    println!(" Firmware version:    v{}.{}", major, minor);
     println!(" RTC datetime:        {}", datetime);
     println!(" Boot mode:           {}", state.boot_mode);
     println!(" Save type:           {}", state.save_type);
