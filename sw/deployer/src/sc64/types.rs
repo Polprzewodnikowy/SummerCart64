@@ -211,7 +211,7 @@ pub enum BootMode {
 impl Display for BootMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::Menu => "Menu",
+            Self::Menu => "Bootloader -> Menu from SD card",
             Self::Rom => "Bootloader -> ROM",
             Self::DdIpl => "Bootloader -> 64DD IPL",
             Self::DirectRom => "ROM (direct)",

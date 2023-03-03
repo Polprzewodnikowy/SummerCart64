@@ -9,61 +9,71 @@ pub enum SaveType {
     Flashram,
 }
 
+const HASH_CHUNK_LENGTH: usize = 64 * 1024;
+
 pub fn guess_save_type<T: Read + Seek>(reader: &mut T) -> Result<SaveType, Error> {
-    let mut header = vec![0u8; 0x40];
+    let mut ed64_header = vec![0u8; 4];
 
-    reader.rewind()?;
-    reader.read_exact(&mut header)?;
-
-    let pi_config = &header[0..4];
-    match pi_config {
-        [0x37, 0x80, 0x40, 0x12] => {
-            header.chunks_exact_mut(2).for_each(|c| c.swap(0, 1));
-        }
-        [0x40, 0x12, 0x37, 0x80] => {
-            header.chunks_exact_mut(4).for_each(|c| {
-                c.swap(0, 3);
-                c.swap(1, 2);
-            });
-        }
-        _ => {}
+    reader.seek(std::io::SeekFrom::Start(0x3C))?;
+    reader.read(&mut ed64_header)?;
+    if &ed64_header[0..2] == b"ED" {
+        return Ok(match ed64_header[3] >> 4 {
+            1 => SaveType::Eeprom4k,
+            2 => SaveType::Eeprom16k,
+            3 => SaveType::Sram,
+            4 => SaveType::SramBanked,
+            5 => SaveType::Flashram,
+            6 => SaveType::Sram,
+            _ => SaveType::None,
+        });
     }
 
-    let rom_id = &header[0x3B..0x3E];
-    // let region = header[0x3E];
-    // let revision = header[0x3F];
+    let mut pi_config = vec![0u8; 4];
 
-    // TODO: fix this mess
+    reader.rewind()?;
+    reader.read(&mut pi_config)?;
 
-    if let Some(save_type) = match rom_id {
-        b"NTW" | b"NHF" | b"NOS" | b"NTC" | b"NER" | b"NAG" | b"NAB" | b"NS3" | b"NTN" | b"NBN"
-        | b"NBK" | b"NFH" | b"NMU" | b"NBC" | b"NBH" | b"NHA" | b"NBM" | b"NBV" | b"NBD"
-        | b"NCT" | b"NCH" | b"NCG" | b"NP2" | b"NXO" | b"NCU" | b"NCX" | b"NDY" | b"NDQ"
-        | b"NDR" | b"NN6" | b"NDU" | b"NJM" | b"NFW" | b"NF2" | b"NKA" | b"NFG" | b"NGL"
-        | b"NGV" | b"NGE" | b"NHP" | b"NPG" | b"NIJ" | b"NIC" | b"NFY" | b"NKI" | b"NLL"
-        | b"NLR" | b"NKT" | b"CLB" | b"NLB" | b"NMW" | b"NML" | b"NTM" | b"NMI" | b"NMG"
-        | b"NMO" | b"NMS" | b"NMR" | b"NCR" | b"NEA" | b"NPW" | b"NPY" | b"NPT" | b"NRA"
-        | b"NWQ" | b"NSU" | b"NSN" | b"NK2" | b"NSV" | b"NFX" | b"NFP" | b"NS6" | b"NNA"
-        | b"NRS" | b"NSW" | b"NSC" | b"NSA" | b"NB6" | b"NSS" | b"NTX" | b"NT6" | b"NTP"
-        | b"NTJ" | b"NRC" | b"NTR" | b"NTB" | b"NGU" | b"NIR" | b"NVL" | b"NVY" | b"NWC"
-        | b"NAD" | b"NWU" | b"NYK" | b"NMZ" | b"NSM" | b"NWR" => Some(SaveType::Eeprom4k),
-        b"NB7" | b"NGT" | b"NFU" | b"NCW" | b"NCZ" | b"ND6" | b"NDO" | b"ND2" | b"N3D" | b"NMX"
-        | b"NGC" | b"NIM" | b"NNB" | b"NMV" | b"NM8" | b"NEV" | b"NPP" | b"NUB" | b"NPD"
-        | b"NRZ" | b"NR7" | b"NEP" | b"NYS" => Some(SaveType::Eeprom16k),
-        b"NTE" | b"NVB" | b"NB5" | b"CFZ" | b"NFZ" | b"NSI" | b"NG6" | b"NGP" | b"NYW" | b"NHY"
-        | b"NIB" | b"NPS" | b"NPA" | b"NP4" | b"NJ5" | b"NP6" | b"NPE" | b"NJG" | b"CZL"
-        | b"NZL" | b"NKG" | b"NMF" | b"NRI" | b"NUT" | b"NUM" | b"NOB" | b"CPS" | b"NPM"
-        | b"NRE" | b"NAL" | b"NT3" | b"NS4" | b"NA2" | b"NVP" | b"NWL" | b"NW2" | b"NWX" => {
-            Some(SaveType::Sram)
+    let endian_swapper = match &pi_config[0..4] {
+        [0x37, 0x80, 0x40, 0x12] => |b: &mut [u8]| b.chunks_exact_mut(2).for_each(|c| c.swap(0, 1)),
+        [0x40, 0x12, 0x37, 0x80] => |b: &mut [u8]| {
+            b.chunks_exact_mut(4).for_each(|c| {
+                c.swap(0, 3);
+                c.swap(1, 2)
+            })
+        },
+        _ => |_: &mut [u8]| {},
+    };
+
+    let mut hasher = md5::Context::new();
+    let mut buffer = vec![0u8; HASH_CHUNK_LENGTH];
+
+    reader.rewind()?;
+
+    loop {
+        let chunk = reader.read(&mut buffer)?;
+        if chunk > 0 {
+            endian_swapper(&mut buffer[0..chunk]);
+            hasher.consume(&buffer[0..chunk]);
+        } else {
+            break;
         }
-        b"CDZ" => Some(SaveType::SramBanked),
-        b"NCC" | b"NDA" | b"NAF" | b"NJF" | b"NKJ" | b"NZS" | b"NM6" | b"NCK" | b"NMQ" | b"NPN"
-        | b"NPF" | b"NPO" | b"CP2" | b"NP3" | b"NRH" | b"NSQ" | b"NT9" | b"NW4" | b"NDP" => {
-            Some(SaveType::Flashram)
+    }
+
+    let hash = hex::encode_upper(hasher.compute().0);
+
+    let database_ini = include_str!("../data/mupen64plus.ini");
+    let database = ini::Ini::load_from_str(database_ini)
+        .expect("Error during mupen64plus.ini parse operation");
+    if let Some(section) = database.section(Some(hash)) {
+        if let Some(save_type) = section.get("SaveType") {
+            return Ok(match save_type {
+                "Eeprom 4KB" => SaveType::Eeprom4k,
+                "Eeprom 16KB" => SaveType::Eeprom16k,
+                "SRAM" => SaveType::Sram,
+                "Flash RAM" => SaveType::Flashram,
+                _ => SaveType::None,
+            });
         }
-        _ => None,
-    } {
-        return Ok(save_type);
     }
 
     Ok(SaveType::None)

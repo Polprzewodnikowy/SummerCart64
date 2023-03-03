@@ -9,7 +9,7 @@ use colored::Colorize;
 use panic_message::panic_message;
 use std::{
     fs::File,
-    io::{self, Read, Write},
+    io::{self, BufReader, Read, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -250,7 +250,8 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
 
     sc64.reset_state()?;
 
-    let (mut rom_file, rom_name, rom_length) = open_file(&args.rom)?;
+    let (rom_file_unbuffered, rom_name, rom_length) = open_file(&args.rom)?;
+    let mut rom_file = BufReader::new(rom_file_unbuffered);
 
     log_wait(format!("Uploading ROM [{rom_name}]"), || {
         sc64.upload_rom(&mut rom_file, rom_length, args.no_shadow)
@@ -259,7 +260,10 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
     let save: SaveType = if let Some(save_type) = args.save_type.clone() {
         save_type
     } else {
-        n64::guess_save_type(&mut rom_file)?.into()
+        log_wait(format!("Calculating ROM hash"), || {
+            n64::guess_save_type(&mut rom_file)
+        })?
+        .into()
     };
 
     let save_type: sc64::SaveType = save.into();
