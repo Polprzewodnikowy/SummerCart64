@@ -20,9 +20,9 @@ jobs:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
-      - name: Set SC64 version
+      - name: Set package version
         uses: frabert/replace-string-action@v2
-        id: sc64version
+        id: version
         with:
           pattern: '\/'
           string: '-${{ github.ref_name }}'
@@ -31,23 +31,23 @@ jobs:
       - name: Build firmware
         run: ./docker_build.sh release --force-clean
         env:
-          SC64_VERSION: ${{ steps.sc64version.outputs.replaced }}
+          SC64_VERSION: ${{ steps.version.outputs.replaced }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sc64-pkg${{ steps.sc64version.outputs.replaced }}
+          name: sc64-pkg${{ steps.version.outputs.replaced }}
           path: |
-            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
+            sc64-extra${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware${{ steps.version.outputs.replaced }}.bin
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
+            sc64-extra${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware${{ steps.version.outputs.replaced }}.bin
 
   build-deployer:
     strategy:
