@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fw-hw-sw:
+  build-firmware:
     runs-on: ubuntu-latest
 
     steps:
@@ -56,20 +56,20 @@ jobs:
         include:
           - os: windows-latest
             executable: sc64deployer.exe
-            name: sc64deployer-windows
+            name: sc64-deployer-windows
             options: -c -a -f
             extension: zip
 
           - os: ubuntu-latest
             linux-packages: libudev-dev
             executable: sc64deployer
-            name: sc64deployer-linux
+            name: sc64-deployer-linux
             options: -czf
             extension: tar.gz
 
           - os: macos-latest
             executable: sc64deployer
-            name: sc64deployer-macos
+            name: sc64-deployer-macos
             options: -czf
             extension: tgz
 
