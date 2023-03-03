@@ -9,7 +9,7 @@ use colored::Colorize;
 use panic_message::panic_message;
 use std::{
     fs::File,
-    io::{self, BufReader, Read, Write},
+    io::{stdout, BufReader, Read, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -518,7 +518,7 @@ fn init_sc64(sn: Option<String>, check_firmware: bool) -> Result<sc64::SC64, sc6
 
 fn log_wait<F: FnOnce() -> Result<T, E>, T, E>(message: String, operation: F) -> Result<T, E> {
     print!("{}... ", message);
-    io::stdout().flush().unwrap();
+    stdout().flush().unwrap();
     let result = operation();
     println!("done");
     result
