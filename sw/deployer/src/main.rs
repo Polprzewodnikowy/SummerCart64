@@ -217,7 +217,10 @@ impl From<TvType> for sc64::TvType {
 fn main() {
     let cli = Cli::parse();
 
-    panic::set_hook(Box::new(|_| {}));
+    #[cfg(not(debug_assertions))]
+    {
+        panic::set_hook(Box::new(|_| {}));
+    }
 
     match panic::catch_unwind(|| handle_command(&cli.command, cli.sn)) {
         Ok(_) => {}
@@ -260,10 +263,11 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
     let save: SaveType = if let Some(save_type) = args.save_type.clone() {
         save_type
     } else {
-        log_wait(format!("Calculating ROM hash"), || {
-            n64::guess_save_type(&mut rom_file)
-        })?
-        .into()
+        let (save_type, name) = n64::guess_save_type(&mut rom_file)?;
+        if let Some(name) = name {
+            println!("Detected ROM name: {name}");
+        };
+        save_type.into()
     };
 
     let save_type: sc64::SaveType = save.into();
@@ -362,6 +366,7 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
         } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
             sc64.send_debug_packet(gdb_packet)?;
         } else {
+            // TODO: handle user input
             thread::sleep(Duration::from_millis(1));
         }
     }

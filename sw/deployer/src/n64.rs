@@ -9,23 +9,29 @@ pub enum SaveType {
     Flashram,
 }
 
-const HASH_CHUNK_LENGTH: usize = 64 * 1024;
+const HASH_CHUNK_LENGTH: usize = 256 * 1024;
 
-pub fn guess_save_type<T: Read + Seek>(reader: &mut T) -> Result<SaveType, Error> {
+pub fn guess_save_type<T: Read + Seek>(
+    reader: &mut T,
+) -> Result<(SaveType, Option<String>), Error> {
     let mut ed64_header = vec![0u8; 4];
 
     reader.seek(std::io::SeekFrom::Start(0x3C))?;
     reader.read(&mut ed64_header)?;
+
     if &ed64_header[0..2] == b"ED" {
-        return Ok(match ed64_header[3] >> 4 {
-            1 => SaveType::Eeprom4k,
-            2 => SaveType::Eeprom16k,
-            3 => SaveType::Sram,
-            4 => SaveType::SramBanked,
-            5 => SaveType::Flashram,
-            6 => SaveType::Sram,
-            _ => SaveType::None,
-        });
+        return Ok((
+            match ed64_header[3] >> 4 {
+                1 => SaveType::Eeprom4k,
+                2 => SaveType::Eeprom16k,
+                3 => SaveType::Sram,
+                4 => SaveType::SramBanked,
+                5 => SaveType::Flashram,
+                6 => SaveType::Sram,
+                _ => SaveType::None,
+            },
+            None,
+        ));
     }
 
     let mut pi_config = vec![0u8; 4];
@@ -48,7 +54,6 @@ pub fn guess_save_type<T: Read + Seek>(reader: &mut T) -> Result<SaveType, Error
     let mut buffer = vec![0u8; HASH_CHUNK_LENGTH];
 
     reader.rewind()?;
-
     loop {
         let chunk = reader.read(&mut buffer)?;
         if chunk > 0 {
@@ -66,15 +71,18 @@ pub fn guess_save_type<T: Read + Seek>(reader: &mut T) -> Result<SaveType, Error
         .expect("Error during mupen64plus.ini parse operation");
     if let Some(section) = database.section(Some(hash)) {
         if let Some(save_type) = section.get("SaveType") {
-            return Ok(match save_type {
-                "Eeprom 4KB" => SaveType::Eeprom4k,
-                "Eeprom 16KB" => SaveType::Eeprom16k,
-                "SRAM" => SaveType::Sram,
-                "Flash RAM" => SaveType::Flashram,
-                _ => SaveType::None,
-            });
+            return Ok((
+                match save_type {
+                    "Eeprom 4KB" => SaveType::Eeprom4k,
+                    "Eeprom 16KB" => SaveType::Eeprom16k,
+                    "SRAM" => SaveType::Sram,
+                    "Flash RAM" => SaveType::Flashram,
+                    _ => SaveType::None,
+                },
+                section.get("GoodName").map(|s| s.to_string()),
+            ));
         }
     }
 
-    Ok(SaveType::None)
+    Ok((SaveType::None, None))
 }

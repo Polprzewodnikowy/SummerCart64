@@ -1,8 +1,11 @@
 use crate::sc64;
 use chrono::Local;
+use colored::Colorize;
+use panic_message::panic_message;
 use std::{
     io::{ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
+    panic,
     sync::mpsc::{channel, Receiver, Sender},
     thread::{sleep, spawn},
     time::Duration,
@@ -77,7 +80,7 @@ impl Handler {
         let filename = &self.generate_filename("binaryout", "bin");
         let mut file = std::fs::File::create(filename)?;
         file.write_all(data)?;
-        println!("Wrote {} bytes to {}", data.len(), filename);
+        println!("Wrote {} bytes to [{}]", data.len(), filename);
         Ok(())
     }
 
@@ -89,7 +92,7 @@ impl Handler {
     fn handle_datatype_screenshot(&mut self, _data: &[u8]) -> Result<(), sc64::Error> {
         if let Some(header) = self.header.take() {
             // TODO: support screenshot datatype
-            println!("Screenshot datatype not supported yet {:?}", header);
+            println!("Screenshot datatype not supported yet {:02X?}", header);
         } else {
             println!("Got screenshot packet without header data");
         }
@@ -130,7 +133,7 @@ pub fn new(gdb_port: Option<u16>) -> Result<Handler, sc64::Error> {
         listener.set_nonblocking(true).map_err(|_| {
             sc64::Error::new("Couldn't set GDB TCP socket listener as non-blocking")
         })?;
-        spawn(move || gdb_loop(listener, gdb_loop_tx, gdb_loop_rx));
+        spawn(move || gdb_thread(listener, gdb_loop_tx, gdb_loop_rx));
     }
 
     Ok(Handler {
@@ -138,6 +141,15 @@ pub fn new(gdb_port: Option<u16>) -> Result<Handler, sc64::Error> {
         gdb_tx,
         gdb_rx,
     })
+}
+
+fn gdb_thread(listener: TcpListener, gdb_tx: Sender<Vec<u8>>, gdb_rx: Receiver<Vec<u8>>) {
+    match panic::catch_unwind(|| gdb_loop(listener, gdb_tx, gdb_rx)) {
+        Ok(_) => {}
+        Err(payload) => {
+            eprintln!("{}", panic_message(&payload).red());
+        }
+    };
 }
 
 fn gdb_loop(listener: TcpListener, gdb_tx: Sender<Vec<u8>>, gdb_rx: Receiver<Vec<u8>>) {
