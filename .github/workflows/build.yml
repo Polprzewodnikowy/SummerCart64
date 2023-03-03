@@ -101,9 +101,7 @@ jobs:
         run: |
           mkdir package
           cd target/release
-          tar ${{ matrix.options }} \
-            ../../package/${{ matrix.name }}${{ steps.version.outputs.replaced }}.${{ matrix.extension }} \
-            ${{ matrix.executable }}
+          tar ${{ matrix.options }} ../../package/${{ matrix.name }}${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
         working-directory: sw/deployer
 
       - name: Upload artifact
