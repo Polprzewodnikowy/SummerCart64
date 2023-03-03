@@ -359,7 +359,7 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
                     print!("{message}")
                 }
                 sc64::DataPacket::Debug(debug_packet) => {
-                    debug_handler.handle_debug_packet(debug_packet)?
+                    debug_handler.handle_debug_packet(debug_packet)
                 }
                 _ => {}
             }

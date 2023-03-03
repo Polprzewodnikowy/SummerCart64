@@ -3,6 +3,7 @@ use chrono::Local;
 use colored::Colorize;
 use panic_message::panic_message;
 use std::{
+    fs::File,
     io::{ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
     panic,
@@ -53,10 +54,7 @@ impl From<DataType> for u8 {
 }
 
 impl Handler {
-    pub fn handle_debug_packet(
-        &mut self,
-        debug_packet: sc64::DebugPacket,
-    ) -> Result<(), sc64::Error> {
+    pub fn handle_debug_packet(&mut self, debug_packet: sc64::DebugPacket) {
         let sc64::DebugPacket { datatype, data } = debug_packet;
         match datatype.into() {
             DataType::Text => self.handle_datatype_text(&data),
@@ -66,42 +64,91 @@ impl Handler {
             DataType::GDB => self.handle_datatype_gdb(&data),
             _ => {
                 println!("Unknown debug packet datatype: 0x{datatype:02X}");
-                Ok(())
             }
         }
     }
 
-    fn handle_datatype_text(&self, data: &[u8]) -> Result<(), sc64::Error> {
+    fn handle_datatype_text(&self, data: &[u8]) {
         print!("{}", String::from_utf8_lossy(data));
-        Ok(())
     }
 
-    fn handle_datatype_raw_binary(&self, data: &[u8]) -> Result<(), sc64::Error> {
+    fn handle_datatype_raw_binary(&self, data: &[u8]) {
         let filename = &self.generate_filename("binaryout", "bin");
-        let mut file = std::fs::File::create(filename)?;
-        file.write_all(data)?;
-        println!("Wrote {} bytes to [{}]", data.len(), filename);
-        Ok(())
+        match File::create(filename) {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(data) {
+                    println!("Error during raw binary save: {error}");
+                }
+                println!("Wrote {} bytes to [{}]", data.len(), filename);
+            }
+            Err(error) => {
+                println!("Error during raw binary file creation: {error}");
+            }
+        }
     }
 
-    fn handle_datatype_header(&mut self, data: &[u8]) -> Result<(), sc64::Error> {
+    fn handle_datatype_header(&mut self, data: &[u8]) {
         self.header = Some(data.to_vec());
-        Ok(())
     }
 
-    fn handle_datatype_screenshot(&mut self, _data: &[u8]) -> Result<(), sc64::Error> {
+    fn handle_datatype_screenshot(&mut self, data: &[u8]) {
         if let Some(header) = self.header.take() {
-            // TODO: support screenshot datatype
-            println!("Screenshot datatype not supported yet {:02X?}", header);
+            if header.len() != 16 {
+                println!("Invalid header length for screenshot datatype");
+                return;
+            }
+            if u32::from_be_bytes(header[0..4].try_into().unwrap()) != DataType::Screenshot as u32 {
+                println!("Invalid header datatype for screenshot datatype");
+                return;
+            }
+            let pixel_format: u32 = u32::from_be_bytes(header[4..8].try_into().unwrap());
+            let width: u32 = u32::from_be_bytes(header[8..12].try_into().unwrap());
+            let height: u32 = u32::from_be_bytes(header[12..16].try_into().unwrap());
+            if pixel_format != 2 && pixel_format != 4 {
+                println!("Invalid pixel format for screenshot datatype");
+                return;
+            }
+            if width > 4096 || height > 4096 {
+                println!("Invalid width or height for screenshot datatype");
+                return;
+            }
+            if data.len() as u32 != pixel_format * width * height {
+                println!("Data length did not match header information for screenshot datatype");
+                return;
+            }
+            let mut image = image::RgbaImage::new(width, height);
+            for (x, y, pixel) in image.enumerate_pixels_mut() {
+                let location = (x + (y * width)) as usize;
+                pixel.0 = match pixel_format {
+                    2 => {
+                        let p = &data[location..location + 2];
+                        let r = ((p[0] >> 3) & 0x1F) << 3;
+                        let g = (((p[0] & 0x07) << 2) | ((p[1] >> 6) & 0x03)) << 3;
+                        let b = ((p[1] >> 1) & 0x1F) << 3;
+                        let a = ((p[1]) & 0x01) * 255;
+                        [r, g, b, a]
+                    }
+                    4 => {
+                        let p = &data[location..location + 4];
+                        [p[0], p[1], p[2], p[3]]
+                    }
+                    _ => {
+                        println!("Unexpected pixel format for screenshot datatype");
+                        return;
+                    }
+                }
+            }
+            let filename = &self.generate_filename("screenshot", "png");
+            if let Some(error) = image.save(filename).err() {
+                println!("Error during image save: {error}");
+            }
         } else {
             println!("Got screenshot packet without header data");
         }
-        Ok(())
     }
 
-    fn handle_datatype_gdb(&self, data: &[u8]) -> Result<(), sc64::Error> {
+    fn handle_datatype_gdb(&self, data: &[u8]) {
         self.gdb_tx.send(data.to_vec()).ok();
-        Ok(())
     }
 
     fn generate_filename(&self, prefix: &str, extension: &str) -> String {
