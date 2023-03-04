@@ -327,8 +327,9 @@ impl SC64 {
         }
 
         let mut pi_config = vec![0u8; 4];
-        reader.read(&mut pi_config)?;
+
         reader.rewind()?;
+        reader.read(&mut pi_config)?;
 
         let endian_swapper = match &pi_config[0..4] {
             [0x37, 0x80, 0x40, 0x12] => {
@@ -351,6 +352,8 @@ impl SC64 {
         } else {
             min(length, SDRAM_LENGTH)
         };
+
+        reader.rewind()?;
 
         self.memory_write_chunked(reader, SDRAM_ADDRESS, sdram_length, Some(endian_swapper))?;
 

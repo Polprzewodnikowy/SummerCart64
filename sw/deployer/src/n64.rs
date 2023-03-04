@@ -7,6 +7,7 @@ pub enum SaveType {
     Sram,
     SramBanked,
     Flashram,
+    Sram128kB,
 }
 
 const HASH_CHUNK_LENGTH: usize = 256 * 1024;
@@ -27,7 +28,7 @@ pub fn guess_save_type<T: Read + Seek>(
                 3 => SaveType::Sram,
                 4 => SaveType::SramBanked,
                 5 => SaveType::Flashram,
-                6 => SaveType::Sram,
+                6 => SaveType::Sram128kB,
                 _ => SaveType::None,
             },
             None,
@@ -70,18 +71,15 @@ pub fn guess_save_type<T: Read + Seek>(
     let database = ini::Ini::load_from_str(database_ini)
         .expect("Error during mupen64plus.ini parse operation");
     if let Some(section) = database.section(Some(hash)) {
-        if let Some(save_type) = section.get("SaveType") {
-            return Ok((
-                match save_type {
-                    "Eeprom 4KB" => SaveType::Eeprom4k,
-                    "Eeprom 16KB" => SaveType::Eeprom16k,
-                    "SRAM" => SaveType::Sram,
-                    "Flash RAM" => SaveType::Flashram,
-                    _ => SaveType::None,
-                },
-                section.get("GoodName").map(|s| s.to_string()),
-            ));
-        }
+        let save_type = section.get("SaveType").map_or(SaveType::None, |t| match t {
+            "Eeprom 4KB" => SaveType::Eeprom4k,
+            "Eeprom 16KB" => SaveType::Eeprom16k,
+            "SRAM" => SaveType::Sram,
+            "Flash RAM" => SaveType::Flashram,
+            _ => SaveType::None,
+        });
+        let title = section.get("GoodName").map(|s| s.to_string());
+        return Ok((save_type, title));
     }
 
     Ok((SaveType::None, None))

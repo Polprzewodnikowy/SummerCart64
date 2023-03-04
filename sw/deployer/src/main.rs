@@ -180,6 +180,7 @@ impl From<n64::SaveType> for SaveType {
             n64::SaveType::Sram => Self::Sram,
             n64::SaveType::SramBanked => Self::SramBanked,
             n64::SaveType::Flashram => Self::Flashram,
+            n64::SaveType::Sram128kB => Self::Sram,
         }
     }
 }
@@ -263,9 +264,9 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
     let save: SaveType = if let Some(save_type) = args.save_type.clone() {
         save_type
     } else {
-        let (save_type, name) = n64::guess_save_type(&mut rom_file)?;
-        if let Some(name) = name {
-            println!("Detected ROM name: {name}");
+        let (save_type, title) = n64::guess_save_type(&mut rom_file)?;
+        if let Some(title) = title {
+            println!("ROM title: {title}");
         };
         save_type.into()
     };
