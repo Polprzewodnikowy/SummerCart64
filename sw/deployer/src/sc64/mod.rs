@@ -1,5 +1,6 @@
 mod cic;
 mod error;
+pub mod firmware;
 mod link;
 mod types;
 mod utils;

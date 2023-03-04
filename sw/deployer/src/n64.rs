@@ -1,4 +1,4 @@
-use std::io::{Error, Read, Seek};
+use std::io::{Error, Read, Seek, SeekFrom};
 
 pub enum SaveType {
     None,
@@ -16,7 +16,7 @@ pub fn guess_save_type<T: Read + Seek>(
 ) -> Result<(SaveType, Option<String>), Error> {
     let mut ed64_header = vec![0u8; 4];
 
-    reader.seek(std::io::SeekFrom::Start(0x3C))?;
+    reader.seek(SeekFrom::Start(0x3C))?;
     reader.read(&mut ed64_header)?;
 
     if &ed64_header[0..2] == b"ED" {

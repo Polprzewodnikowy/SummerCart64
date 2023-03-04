@@ -1,5 +1,4 @@
 use super::Error;
-use crc32fast::Hasher;
 
 pub const IPL3_OFFSET: u32 = 0x40;
 pub const IPL3_LENGTH: usize = 0xFC0;
@@ -66,11 +65,7 @@ pub fn guess_ipl3_seed(ipl3: &[u8]) -> Result<u8, Error> {
         return Err(Error::new("Invalid IPL3 length provided"));
     }
 
-    let mut hasher = Hasher::new();
-
-    hasher.update(ipl3);
-
-    let cic_type: CicType = hasher.finalize().into();
+    let cic_type: CicType = crc32fast::hash(ipl3).into();
 
     Ok(cic_type.into())
 }

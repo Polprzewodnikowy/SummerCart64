@@ -219,13 +219,12 @@ if __name__ == "__main__":
 
         hostname = platform.node()
         creation_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-        info = [
-            f'build system: [{hostname}]',
-            f'creation datetime: [{creation_datetime}]',
-        ]
+        update_info = '\n'.join([
+            f'build system: {hostname}',
+            f'creation datetime: {creation_datetime}',
+        ])
         if (args.git):
-            info.append(args.git)
-        update_info = ' '.join(info)
+            update_info += args.git
         print(update_info)
         update.add_update_info(update_info.encode())
 

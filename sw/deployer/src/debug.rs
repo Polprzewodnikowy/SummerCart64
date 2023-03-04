@@ -53,6 +53,12 @@ impl From<DataType> for u8 {
     }
 }
 
+impl From<DataType> for u32 {
+    fn from(value: DataType) -> Self {
+        u8::from(value) as u32
+    }
+}
+
 impl Handler {
     pub fn handle_debug_packet(&mut self, debug_packet: sc64::DebugPacket) {
         let sc64::DebugPacket { datatype, data } = debug_packet;
@@ -97,13 +103,13 @@ impl Handler {
                 println!("Invalid header length for screenshot datatype");
                 return;
             }
-            if u32::from_be_bytes(header[0..4].try_into().unwrap()) != DataType::Screenshot as u32 {
+            if u32::from_be_bytes(header[0..4].try_into().unwrap()) != DataType::Screenshot.into() {
                 println!("Invalid header datatype for screenshot datatype");
                 return;
             }
-            let pixel_format: u32 = u32::from_be_bytes(header[4..8].try_into().unwrap());
-            let width: u32 = u32::from_be_bytes(header[8..12].try_into().unwrap());
-            let height: u32 = u32::from_be_bytes(header[12..16].try_into().unwrap());
+            let pixel_format = u32::from_be_bytes(header[4..8].try_into().unwrap());
+            let width = u32::from_be_bytes(header[8..12].try_into().unwrap());
+            let height = u32::from_be_bytes(header[12..16].try_into().unwrap());
             if pixel_format != 2 && pixel_format != 4 {
                 println!("Invalid pixel format for screenshot datatype");
                 return;
@@ -141,7 +147,9 @@ impl Handler {
             let filename = &self.generate_filename("screenshot", "png");
             if let Some(error) = image.save(filename).err() {
                 println!("Error during image save: {error}");
+                return;
             }
+            println!("Wrote {width}x{height} pixels to [{filename}]");
         } else {
             println!("Got screenshot packet without header data");
         }

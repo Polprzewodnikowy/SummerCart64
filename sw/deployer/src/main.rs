@@ -451,9 +451,9 @@ fn handle_firmware_command(
             let mut firmware = vec![0u8; firmware_length as usize];
             firmware_file.read_exact(&mut firmware)?;
 
-            // TODO: print firmware metadata
-
-            println!("{}", "Sorry nothing".yellow());
+            let metadata = sc64::firmware::verify(&firmware)?;
+            println!("{}", "Firmware metadata:".bold());
+            println!("{}", metadata);
 
             Ok(())
         }
@@ -463,12 +463,16 @@ fn handle_firmware_command(
 
             let (mut backup_file, backup_name) = create_file(&args.firmware)?;
 
+            sc64.reset_state()?;
+
             let firmware = log_wait(
                 format!("Generating firmware backup, this might take a while [{backup_name}]"),
                 || sc64.backup_firmware(),
             )?;
 
-            // TODO: print firmware metadata
+            let metadata = sc64::firmware::verify(&firmware)?;
+            println!("{}", "Firmware metadata:".bold());
+            println!("{}", metadata);
 
             backup_file.write(&firmware)?;
 
@@ -480,14 +484,18 @@ fn handle_firmware_command(
 
             let (mut update_file, update_name, update_length) = open_file(&args.firmware)?;
 
-            let mut fimware = vec![0u8; update_length as usize];
-            update_file.read_exact(&mut fimware)?;
+            let mut firmware = vec![0u8; update_length as usize];
+            update_file.read_exact(&mut firmware)?;
 
-            // TODO: print firmware metadata
+            let metadata = sc64::firmware::verify(&firmware)?;
+            println!("{}", "Firmware metadata:".bold());
+            println!("{}", metadata);
+
+            sc64.reset_state()?;
 
             log_wait(
                 format!("Updating firmware, this might take a while [{update_name}]"),
-                || sc64.update_firmware(&fimware),
+                || sc64.update_firmware(&firmware),
             )?;
 
             Ok(())
