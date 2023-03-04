@@ -24,7 +24,7 @@ use self::{
 };
 use chrono::{DateTime, Local};
 use std::{
-    io::{Read, Seek},
+    io::{Read, Seek, Write},
     time::Instant,
     {cmp::min, time::Duration},
 };
@@ -411,6 +411,27 @@ impl SC64 {
         }
 
         self.memory_write_chunked(reader, address, save_length, None)
+    }
+
+    pub fn download_save<T: Write>(&mut self, writer: &mut T) -> Result<(), Error> {
+        let save_type = get_config!(self, SaveType)?;
+
+        let (address, save_length) = match save_type {
+            SaveType::None => {
+                return Err(Error::new("No save type is enabled"));
+            }
+            SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
+            SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
+            SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+        };
+
+        let mut data = self.command_memory_read(address, save_length)?;
+
+        writer.write_all(&mut data)?;
+
+        Ok(())
     }
 
     pub fn dump_memory(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {

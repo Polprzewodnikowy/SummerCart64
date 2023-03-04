@@ -38,6 +38,9 @@ enum Commands {
     /// Upload ROM (and save) to the SC64
     Upload(UploadArgs),
 
+    /// Download save and write it to file
+    DownloadSave(DownloadSaveArgs),
+
     /// Upload ROM, 64DD IPL and run disk server
     _64DD(_64DDArgs),
 
@@ -87,6 +90,12 @@ struct UploadArgs {
     /// Force TV type (ignored when used in conjunction with direct boot mode)
     #[arg(long)]
     tv: Option<TvType>,
+}
+
+#[derive(Args)]
+struct DownloadSaveArgs {
+    /// Path to the save file
+    path: PathBuf,
 }
 
 #[derive(Args)]
@@ -234,14 +243,15 @@ fn main() {
 
 fn handle_command(command: &Commands, sn: Option<String>) {
     let result = match command {
+        Commands::List => handle_list_command(),
         Commands::Upload(args) => handle_upload_command(sn, args),
+        Commands::DownloadSave(args) => handle_download_save_command(sn, args),
         Commands::_64DD(args) => handle_64dd_command(sn, args),
-        Commands::Dump(args) => handle_dump_command(sn, args),
         Commands::Debug(args) => handle_debug_command(sn, args),
+        Commands::Dump(args) => handle_dump_command(sn, args),
         Commands::Info => handle_info_command(sn),
         Commands::Set { command } => handle_set_command(sn, command),
         Commands::Firmware { command } => handle_firmware_command(sn, command),
-        Commands::List => handle_list_command(),
     };
     match result {
         Ok(()) => {}
@@ -249,13 +259,24 @@ fn handle_command(command: &Commands, sn: Option<String>) {
     };
 }
 
+fn handle_list_command() -> Result<(), sc64::Error> {
+    let devices = sc64::list_serial_devices()?;
+
+    println!("{}", "Found devices:".bold());
+    for (i, d) in devices.iter().enumerate() {
+        println!(" {i}: {}", d.sn);
+    }
+
+    Ok(())
+}
+
 fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(sn, true)?;
 
-    sc64.reset_state()?;
-
     let (rom_file_unbuffered, rom_name, rom_length) = open_file(&args.rom)?;
     let mut rom_file = BufReader::new(rom_file_unbuffered);
+
+    sc64.reset_state()?;
 
     log_wait(format!("Uploading ROM [{rom_name}]"), || {
         sc64.upload_rom(&mut rom_file, rom_length, args.no_shadow)
@@ -306,6 +327,21 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
     Ok(())
 }
 
+fn handle_download_save_command(
+    sn: Option<String>,
+    args: &DownloadSaveArgs,
+) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(sn, true)?;
+
+    let (mut file, name) = create_file(&args.path)?;
+
+    log_wait(format!("Downloading save [{name}]"), || {
+        sc64.download_save(&mut file)
+    })?;
+
+    Ok(())
+}
+
 fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64::Error> {
     let _ = (sn, args);
 
@@ -314,24 +350,7 @@ fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64:
     // TODO: print BIG warning to not use this mode together with real 64DD
 
     println!("{}", "Sorry nothing".yellow());
-
-    Ok(())
-}
-
-fn handle_dump_command(sn: Option<String>, args: &DumpArgs) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, true)?;
-
-    let (mut dump_file, dump_name) = create_file(&args.path)?;
-
-    let data = log_wait(
-        format!(
-            "Dumping from [0x{:08X}] length [0x{:X}] to [{dump_name}]",
-            args.address, args.length
-        ),
-        || sc64.dump_memory(args.address, args.length),
-    )?;
-
-    dump_file.write(&data)?;
+    println!("{}", "64DD emulation not implemented yet".red());
 
     Ok(())
 }
@@ -380,6 +399,24 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(None)?;
     }
+
+    Ok(())
+}
+
+fn handle_dump_command(sn: Option<String>, args: &DumpArgs) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(sn, true)?;
+
+    let (mut dump_file, dump_name) = create_file(&args.path)?;
+
+    let data = log_wait(
+        format!(
+            "Dumping from [0x{:08X}] length [0x{:X}] to [{dump_name}]",
+            args.address, args.length
+        ),
+        || sc64.dump_memory(args.address, args.length),
+    )?;
+
+    dump_file.write(&data)?;
 
     Ok(())
 }
@@ -507,17 +544,6 @@ fn handle_firmware_command(
             Ok(())
         }
     }
-}
-
-fn handle_list_command() -> Result<(), sc64::Error> {
-    let devices = sc64::list_serial_devices()?;
-
-    println!("{}", "Found devices:".bold());
-    for (i, d) in devices.iter().enumerate() {
-        println!(" {i}: {}", d.sn);
-    }
-
-    Ok(())
 }
 
 fn init_sc64(sn: Option<String>, check_firmware: bool) -> Result<sc64::SC64, sc64::Error> {
