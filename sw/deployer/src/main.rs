@@ -1,6 +1,6 @@
 mod debug;
 mod n64;
-pub mod sc64; // TODO: delete pub
+pub mod sc64;
 
 use chrono::Local;
 use clap::{Args, Parser, Subcommand, ValueEnum};

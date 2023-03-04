@@ -92,7 +92,7 @@ build_update () {
     if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+=$'\n'"branch: $GIT_BRANCH"; fi
     if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+=$'\n'"tag: $GIT_TAG"; fi
     if [ ! -z "${GIT_SHA}" ]; then GIT_INFO+=$'\n'"sha: $GIT_SHA"; fi
-    if [ ! -z "${GIT_MESSAGE}" ]; then GIT_INFO+=$'\n'"commit msg: $GIT_MESSAGE"; fi
+    if [ ! -z "${GIT_MESSAGE}" ]; then GIT_INFO+=$'\n'"msg: $GIT_MESSAGE"; fi
     python3 update.py \
         --git "$GIT_INFO" \
         --mcu ../controller/build/app/app.bin \
