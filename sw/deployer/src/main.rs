@@ -367,7 +367,7 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
         } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
             sc64.send_debug_packet(gdb_packet)?;
         } else {
-            // TODO: handle user input
+            debug_handler.process_user_input();
             thread::sleep(Duration::from_millis(1));
         }
     }

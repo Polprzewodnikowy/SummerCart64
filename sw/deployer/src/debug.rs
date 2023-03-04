@@ -4,7 +4,7 @@ use colored::Colorize;
 use panic_message::panic_message;
 use std::{
     fs::File,
-    io::{ErrorKind, Read, Write},
+    io::{stdin, ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
     panic,
     sync::mpsc::{channel, Receiver, Sender},
@@ -14,6 +14,7 @@ use std::{
 
 pub struct Handler {
     header: Option<Vec<u8>>,
+    line_rx: Receiver<String>,
     gdb_tx: Sender<Vec<u8>>,
     gdb_rx: Receiver<Vec<u8>>,
 }
@@ -59,7 +60,68 @@ impl From<DataType> for u32 {
     }
 }
 
+#[derive(Clone, Copy)]
+enum ScreenshotPixelFormat {
+    Rgba16,
+    Rgba32,
+}
+
+impl TryFrom<u32> for ScreenshotPixelFormat {
+    type Error = String;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            2 => Self::Rgba16,
+            4 => Self::Rgba32,
+            _ => return Err("Invalid pixel format for screenshot metadata".into()),
+        })
+    }
+}
+
+impl From<ScreenshotPixelFormat> for u32 {
+    fn from(value: ScreenshotPixelFormat) -> Self {
+        match value {
+            ScreenshotPixelFormat::Rgba16 => 2,
+            ScreenshotPixelFormat::Rgba32 => 4,
+        }
+    }
+}
+
+struct ScreenshotMetadata {
+    format: ScreenshotPixelFormat,
+    width: u32,
+    height: u32,
+}
+
+impl TryFrom<Vec<u8>> for ScreenshotMetadata {
+    type Error = String;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 16 {
+            return Err("Invalid header length for screenshot metadata".into());
+        }
+        if u32::from_be_bytes(value[0..4].try_into().unwrap()) != DataType::Screenshot.into() {
+            return Err("Invalid header datatype for screenshot metadata".into());
+        }
+        let format = u32::from_be_bytes(value[4..8].try_into().unwrap());
+        let width = u32::from_be_bytes(value[8..12].try_into().unwrap());
+        let height = u32::from_be_bytes(value[12..16].try_into().unwrap());
+        if width > 4096 || height > 4096 {
+            return Err("Invalid width or height for screenshot metadata".into());
+        }
+        Ok(ScreenshotMetadata {
+            format: format.try_into()?,
+            width,
+            height,
+        })
+    }
+}
+
 impl Handler {
+    pub fn process_user_input(&self) {
+        if let Ok(line) = self.line_rx.try_recv() {
+            print!("Line: {line}");
+        }
+    }
+
     pub fn handle_debug_packet(&mut self, debug_packet: sc64::DebugPacket) {
         let sc64::DebugPacket { datatype, data } = debug_packet;
         match datatype.into() {
@@ -98,61 +160,50 @@ impl Handler {
     }
 
     fn handle_datatype_screenshot(&mut self, data: &[u8]) {
-        if let Some(header) = self.header.take() {
-            if header.len() != 16 {
-                println!("Invalid header length for screenshot datatype");
+        let header = match self.header.take() {
+            Some(header) => header,
+            None => {
+                println!("Got screenshot packet without header data");
                 return;
             }
-            if u32::from_be_bytes(header[0..4].try_into().unwrap()) != DataType::Screenshot.into() {
-                println!("Invalid header datatype for screenshot datatype");
+        };
+        let ScreenshotMetadata {
+            format,
+            height,
+            width,
+        } = match header.try_into() {
+            Ok(data) => data,
+            Err(error) => {
+                println!("{error}");
                 return;
             }
-            let pixel_format = u32::from_be_bytes(header[4..8].try_into().unwrap());
-            let width = u32::from_be_bytes(header[8..12].try_into().unwrap());
-            let height = u32::from_be_bytes(header[12..16].try_into().unwrap());
-            if pixel_format != 2 && pixel_format != 4 {
-                println!("Invalid pixel format for screenshot datatype");
-                return;
-            }
-            if width > 4096 || height > 4096 {
-                println!("Invalid width or height for screenshot datatype");
-                return;
-            }
-            if data.len() as u32 != pixel_format * width * height {
-                println!("Data length did not match header information for screenshot datatype");
-                return;
-            }
-            let mut image = image::RgbaImage::new(width, height);
-            for (x, y, pixel) in image.enumerate_pixels_mut() {
-                let location = (x + (y * width)) as usize;
-                pixel.0 = match pixel_format {
-                    2 => {
-                        let p = &data[location..location + 2];
-                        let r = ((p[0] >> 3) & 0x1F) << 3;
-                        let g = (((p[0] & 0x07) << 2) | ((p[1] >> 6) & 0x03)) << 3;
-                        let b = ((p[1] >> 1) & 0x1F) << 3;
-                        let a = ((p[1]) & 0x01) * 255;
-                        [r, g, b, a]
-                    }
-                    4 => {
-                        let p = &data[location..location + 4];
-                        [p[0], p[1], p[2], p[3]]
-                    }
-                    _ => {
-                        println!("Unexpected pixel format for screenshot datatype");
-                        return;
-                    }
-                }
-            }
-            let filename = &self.generate_filename("screenshot", "png");
-            if let Some(error) = image.save(filename).err() {
-                println!("Error during image save: {error}");
-                return;
-            }
-            println!("Wrote {width}x{height} pixels to [{filename}]");
-        } else {
-            println!("Got screenshot packet without header data");
+        };
+        let format_size: u32 = format.into();
+        if data.len() as u32 != format_size * width * height {
+            println!("Data length did not match header data for screenshot datatype");
+            return;
         }
+        let mut image = image::RgbaImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let location = ((x + (y * width)) * format_size) as usize;
+            let p = &data[location..location + format_size as usize];
+            pixel.0 = match format {
+                ScreenshotPixelFormat::Rgba16 => {
+                    let r = ((p[0] >> 3) & 0x1F) << 3;
+                    let g = (((p[0] & 0x07) << 2) | ((p[1] >> 6) & 0x03)) << 3;
+                    let b = ((p[1] >> 1) & 0x1F) << 3;
+                    let a = ((p[1]) & 0x01) * 255;
+                    [r, g, b, a]
+                }
+                ScreenshotPixelFormat::Rgba32 => [p[0], p[1], p[2], p[3]],
+            }
+        }
+        let filename = &self.generate_filename("screenshot", "png");
+        if let Some(error) = image.save(filename).err() {
+            println!("Error during image save: {error}");
+            return;
+        }
+        println!("Wrote {width}x{height} pixels to [{filename}]");
     }
 
     fn handle_datatype_gdb(&self, data: &[u8]) {
@@ -179,8 +230,11 @@ impl Handler {
 }
 
 pub fn new(gdb_port: Option<u16>) -> Result<Handler, sc64::Error> {
+    let (line_tx, line_rx) = channel::<String>();
     let (gdb_tx, gdb_loop_rx) = channel::<Vec<u8>>();
     let (gdb_loop_tx, gdb_rx) = channel::<Vec<u8>>();
+
+    spawn(move || stdin_thread(line_tx));
 
     if let Some(port) = gdb_port {
         let listener = TcpListener::bind(format!("0.0.0.0:{port}"))
@@ -193,9 +247,21 @@ pub fn new(gdb_port: Option<u16>) -> Result<Handler, sc64::Error> {
 
     Ok(Handler {
         header: None,
+        line_rx,
         gdb_tx,
         gdb_rx,
     })
+}
+
+fn stdin_thread(line_tx: Sender<String>) {
+    loop {
+        let mut line = String::new();
+        if stdin().read_line(&mut line).is_ok() {
+            if line_tx.send(line).is_err() {
+                return;
+            }
+        }
+    }
 }
 
 fn gdb_thread(listener: TcpListener, gdb_tx: Sender<Vec<u8>>, gdb_rx: Receiver<Vec<u8>>) {
@@ -229,7 +295,7 @@ fn handle_gdb_connection(
     gdb_tx: &Sender<Vec<u8>>,
     gdb_rx: &Receiver<Vec<u8>>,
 ) {
-    const GDB_DATA_BUFFER: usize = 8 * 1024;
+    const GDB_DATA_BUFFER: usize = 64 * 1024;
 
     let mut buffer = vec![0u8; GDB_DATA_BUFFER];
 

@@ -90,7 +90,7 @@ const FIRMWARE_ADDRESS: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
 const FIRMWARE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
-const COMMAND_USB_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+const USB_WRITE_COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
@@ -226,7 +226,7 @@ impl SC64 {
                 args: [datatype as u32, data.len() as u32],
                 data: data.to_vec(),
             },
-            COMMAND_USB_WRITE_TIMEOUT,
+            USB_WRITE_COMMAND_TIMEOUT,
             true,
             false,
         )?;
