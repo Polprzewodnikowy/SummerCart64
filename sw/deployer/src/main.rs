@@ -311,6 +311,8 @@ fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64:
 
     // TODO: handle 64DD stuff
 
+    // TODO: print BIG warning to not use this mode together with real 64DD
+
     println!("{}", "Sorry nothing".yellow());
 
     Ok(())
@@ -366,8 +368,9 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
             }
         } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
             sc64.send_debug_packet(gdb_packet)?;
+        } else if let Some(debug_packet) = debug_handler.process_user_input() {
+            sc64.send_debug_packet(debug_packet)?;
         } else {
-            debug_handler.process_user_input();
             thread::sleep(Duration::from_millis(1));
         }
     }

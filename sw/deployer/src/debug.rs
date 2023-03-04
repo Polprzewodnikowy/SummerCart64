@@ -116,10 +116,67 @@ impl TryFrom<Vec<u8>> for ScreenshotMetadata {
 }
 
 impl Handler {
-    pub fn process_user_input(&self) {
+    pub fn process_user_input(&self) -> Option<sc64::DebugPacket> {
         if let Ok(line) = self.line_rx.try_recv() {
-            print!("Line: {line}");
+            if line.len() == 0 {
+                return None;
+            }
+            let mut data: Vec<u8> = Vec::new();
+            if line.matches("@").count() != 2 {
+                data.append(&mut line.as_bytes().to_vec());
+                data.append(&mut [b'\0'].to_vec());
+                return Some(sc64::DebugPacket {
+                    datatype: DataType::Text.into(),
+                    data,
+                });
+            } else {
+                let start = line.find("@").unwrap();
+                let end = line.rfind("@").unwrap();
+                let path = &line[start + 1..end];
+                if path.len() == 0 {
+                    println!("Invalid path provided");
+                    return None;
+                }
+                let mut file = match File::open(path) {
+                    Ok(file) => file,
+                    Err(error) => {
+                        println!("Couldn't open file: {error}");
+                        return None;
+                    }
+                };
+                let length = match file.metadata() {
+                    Ok(metadata) => metadata.len(),
+                    Err(error) => {
+                        println!("Couldn't get file length: {error}");
+                        return None;
+                    }
+                };
+                let mut data = vec![0u8; length as usize];
+                if let Err(error) = file.read_exact(&mut data) {
+                    println!("Couldn't read file contents: {error}");
+                    return None;
+                }
+                if line.starts_with("@") && line.ends_with("@") {
+                    return Some(sc64::DebugPacket {
+                        datatype: DataType::RawBinary.into(),
+                        data,
+                    });
+                } else {
+                    let mut combined_data: Vec<u8> = Vec::new();
+                    combined_data.append(&mut line[0..start].as_bytes().to_vec());
+                    combined_data.append(&mut [b'@'].to_vec());
+                    combined_data.append(&mut format!("{length}").into_bytes());
+                    combined_data.append(&mut [b'@'].to_vec());
+                    combined_data.append(&mut data);
+                    combined_data.append(&mut [b'\0'].to_vec());
+                    return Some(sc64::DebugPacket {
+                        datatype: DataType::Text.into(),
+                        data: combined_data,
+                    });
+                }
+            }
         }
+        None
     }
 
     pub fn handle_debug_packet(&mut self, debug_packet: sc64::DebugPacket) {
