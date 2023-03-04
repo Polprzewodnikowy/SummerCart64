@@ -9,8 +9,8 @@ pub use self::{
     error::Error,
     link::list_serial_devices,
     types::{
-        BootMode, DataPacket, DdDiskState, DdDriveType, DdMode, DebugPacket, DiskPacket, SaveType,
-        TvType,
+        BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
+        DebugPacket, DiskPacket, FpgaDebugData, McuStackUsage, SaveType, Switch, TvType,
     },
 };
 
@@ -18,8 +18,7 @@ use self::{
     cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
     link::{Command, Link},
     types::{
-        get_config, get_setting, ButtonMode, ButtonState, CicSeed, Config, ConfigId,
-        FirmwareStatus, Setting, SettingId, Switch, UpdateStatus,
+        get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
     },
     utils::{args_from_vec, datetime_from_vec, u32_from_vec, vec_from_datetime},
 };
@@ -52,6 +51,8 @@ pub struct DeviceState {
     pub rom_extended_enable: Switch,
     pub led_enable: Switch,
     pub datetime: DateTime<Local>,
+    pub fpga_debug_data: FpgaDebugData,
+    pub mcu_stack_usage: McuStackUsage,
 }
 
 const SC64_V2_IDENTIFIER: &[u8; 4] = b"SCv2";
@@ -292,6 +293,26 @@ impl SC64 {
         )?;
         Ok(FirmwareStatus::try_from(utils::u32_from_vec(&data[0..4])?)?)
     }
+
+    fn command_debug_get(&mut self) -> Result<FpgaDebugData, Error> {
+        self.link
+            .execute_command(&mut Command {
+                id: b'?',
+                args: [0, 0],
+                data: vec![],
+            })?
+            .try_into()
+    }
+
+    fn command_stack_usage_get(&mut self) -> Result<McuStackUsage, Error> {
+        self.link
+            .execute_command(&mut Command {
+                id: b'%',
+                args: [0, 0],
+                data: vec![],
+            })?
+            .try_into()
+    }
 }
 
 impl SC64 {
@@ -452,6 +473,8 @@ impl SC64 {
             rom_extended_enable: get_config!(self, RomExtendedEnable)?,
             led_enable: get_setting!(self, LedEnable)?,
             datetime: self.get_datetime()?,
+            fpga_debug_data: self.command_debug_get()?,
+            mcu_stack_usage: self.command_stack_usage_get()?,
         })
     }
 

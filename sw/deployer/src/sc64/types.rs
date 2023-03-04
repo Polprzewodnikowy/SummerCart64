@@ -733,6 +733,80 @@ impl TryFrom<u32> for UpdateStatus {
     }
 }
 
+pub struct FpgaDebugData {
+    pub last_pi_address: u32,
+    pub read_fifo_wait: bool,
+    pub read_fifo_failure: bool,
+    pub write_fifo_wait: bool,
+    pub write_fifo_failure: bool,
+}
+
+impl TryFrom<Vec<u8>> for FpgaDebugData {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() < 8 {
+            return Err(Error::new("Invalid data length for FPGA debug data"));
+        }
+        Ok(FpgaDebugData {
+            last_pi_address: u32_from_vec(&value[0..4])?,
+            read_fifo_wait: (value[7] & (1 << 0)) != 0,
+            read_fifo_failure: (value[7] & (1 << 1)) != 0,
+            write_fifo_wait: (value[7] & (1 << 2)) != 0,
+            write_fifo_failure: (value[7] & (1 << 3)) != 0,
+        })
+    }
+}
+
+impl Display for FpgaDebugData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("PI address: 0x{:08X}", self.last_pi_address))?;
+        if self.read_fifo_wait {
+            f.write_str(" RW")?;
+        }
+        if self.read_fifo_failure {
+            f.write_str(" RF")?;
+        }
+        if self.write_fifo_wait {
+            f.write_str(" WW")?;
+        }
+        if self.write_fifo_failure {
+            f.write_str(" WF")?;
+        }
+        Ok(())
+    }
+}
+
+pub struct McuStackUsage {
+    pub cic: u32,
+    pub rtc: u32,
+    pub led: u32,
+    pub gvr: u32,
+}
+
+impl TryFrom<Vec<u8>> for McuStackUsage {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() < 16 {
+            return Err(Error::new("Invalid data length for MCU stack usage"));
+        }
+        Ok(McuStackUsage {
+            cic: u32_from_vec(&value[0..4])?,
+            rtc: u32_from_vec(&value[4..8])?,
+            led: u32_from_vec(&value[8..12])?,
+            gvr: u32_from_vec(&value[12..16])?,
+        })
+    }
+}
+
+impl Display for McuStackUsage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "CIC: {}, RTC: {}, LED: {}, GVR: {}",
+            self.cic, self.rtc, self.led, self.gvr
+        ))
+    }
+}
+
 macro_rules! get_config {
     ($sc64:ident, $config:ident) => {{
         if let Config::$config(value) = $sc64.command_config_get(ConfigId::$config)? {

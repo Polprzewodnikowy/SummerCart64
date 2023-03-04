@@ -406,6 +406,8 @@ fn handle_info_command(sn: Option<String>) -> Result<(), sc64::Error> {
     println!(" Button mode:         {}", state.button_mode);
     println!(" Button state:        {}", state.button_state);
     println!(" LED blink:           {}", state.led_enable);
+    println!(" FPGA debug data:     {}", state.fpga_debug_data);
+    println!(" MCU stack usage:     {}", state.mcu_stack_usage);
 
     Ok(())
 }
