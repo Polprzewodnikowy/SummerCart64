@@ -7,7 +7,7 @@ mod utils;
 
 pub use self::{
     error::Error,
-    link::list_serial_devices,
+    link::list_local_devices,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
         DebugPacket, DiskPacket, FpgaDebugData, McuStackUsage, SaveType, Switch, TvType,
@@ -684,21 +684,15 @@ impl SC64 {
     }
 }
 
-pub fn new(sn: Option<String>) -> Result<SC64, Error> {
-    let port = match sn {
-        Some(sn) => match list_serial_devices()?.iter().find(|d| d.sn == sn) {
-            Some(device) => device.port.clone(),
-            None => {
-                return Err(Error::new(
-                    "No SC64 device found matching provided serial number",
-                ))
-            }
-        },
-        None => list_serial_devices()?[0].port.clone(),
+pub fn new_local(port: Option<String>) -> Result<SC64, Error> {
+    let port = if let Some(port) = port {
+        port
+    } else {
+        list_local_devices()?[0].port.clone()
     };
 
     let mut sc64 = SC64 {
-        link: link::new_serial(&port)?,
+        link: link::new_local(&port)?,
     };
 
     let identifier = sc64
@@ -710,4 +704,14 @@ pub fn new(sn: Option<String>) -> Result<SC64, Error> {
     }
 
     Ok(sc64)
+}
+
+pub fn new_remote(remote: String) -> Result<SC64, Error> {
+    let _ = remote;
+    Err(Error::new("Remote connection not implemented yet"))
+}
+
+pub fn new_server(port: Option<String>, bind: String) -> Result<(), Error> {
+    let _ = (port, bind);
+    Err(Error::new("SC64 server not implemented yet"))
 }

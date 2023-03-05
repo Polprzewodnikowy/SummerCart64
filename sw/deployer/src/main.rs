@@ -25,9 +25,13 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Use SC64 device matching provided serial number
-    #[arg(long)]
-    sn: Option<String>,
+    /// Connect to SC64 device on provided serial port
+    #[arg(short, long, conflicts_with = "remote")]
+    port: Option<String>,
+
+    /// Connect to SC64 device on provided remote address
+    #[arg(short, long, conflicts_with = "port")]
+    remote: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -64,6 +68,9 @@ enum Commands {
         #[command(subcommand)]
         command: FirmwareCommands,
     },
+
+    /// Expose SC64 device over network
+    Server(ServerArgs),
 }
 
 #[derive(Args)]
@@ -170,6 +177,13 @@ struct FirmwareArgs {
     firmware: PathBuf,
 }
 
+#[derive(Args)]
+struct ServerArgs {
+    /// Listen on provided address:port
+    #[arg(default_value = "127.0.0.1:9064")]
+    address: String,
+}
+
 #[derive(Clone, ValueEnum)]
 enum SaveType {
     None,
@@ -224,6 +238,11 @@ impl From<TvType> for sc64::TvType {
     }
 }
 
+enum Connection {
+    Local(Option<String>),
+    Remote(String),
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -232,7 +251,7 @@ fn main() {
         panic::set_hook(Box::new(|_| {}));
     }
 
-    match panic::catch_unwind(|| handle_command(&cli.command, cli.sn)) {
+    match panic::catch_unwind(|| handle_command(&cli.command, cli.port, cli.remote)) {
         Ok(_) => {}
         Err(payload) => {
             eprintln!("{}", panic_message(&payload).red());
@@ -241,17 +260,23 @@ fn main() {
     }
 }
 
-fn handle_command(command: &Commands, sn: Option<String>) {
+fn handle_command(command: &Commands, port: Option<String>, remote: Option<String>) {
+    let connection = if let Some(remote) = remote {
+        Connection::Remote(remote)
+    } else {
+        Connection::Local(port)
+    };
     let result = match command {
         Commands::List => handle_list_command(),
-        Commands::Upload(args) => handle_upload_command(sn, args),
-        Commands::DownloadSave(args) => handle_download_save_command(sn, args),
-        Commands::_64DD(args) => handle_64dd_command(sn, args),
-        Commands::Debug(args) => handle_debug_command(sn, args),
-        Commands::Dump(args) => handle_dump_command(sn, args),
-        Commands::Info => handle_info_command(sn),
-        Commands::Set { command } => handle_set_command(sn, command),
-        Commands::Firmware { command } => handle_firmware_command(sn, command),
+        Commands::Upload(args) => handle_upload_command(connection, args),
+        Commands::DownloadSave(args) => handle_download_save_command(connection, args),
+        Commands::_64DD(args) => handle_64dd_command(connection, args),
+        Commands::Debug(args) => handle_debug_command(connection, args),
+        Commands::Dump(args) => handle_dump_command(connection, args),
+        Commands::Info => handle_info_command(connection),
+        Commands::Set { command } => handle_set_command(connection, command),
+        Commands::Firmware { command } => handle_firmware_command(connection, command),
+        Commands::Server(args) => handle_server_command(connection, args),
     };
     match result {
         Ok(()) => {}
@@ -260,18 +285,18 @@ fn handle_command(command: &Commands, sn: Option<String>) {
 }
 
 fn handle_list_command() -> Result<(), sc64::Error> {
-    let devices = sc64::list_serial_devices()?;
+    let devices = sc64::list_local_devices()?;
 
     println!("{}", "Found devices:".bold());
     for (i, d) in devices.iter().enumerate() {
-        println!(" {i}: {}", d.sn);
+        println!(" {i}: [{}] at port [{}]", d.serial_number, d.port);
     }
 
     Ok(())
 }
 
-fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, true)?;
+fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
 
     let (rom_file_unbuffered, rom_name, rom_length) = open_file(&args.rom)?;
     let mut rom_file = BufReader::new(rom_file_unbuffered);
@@ -328,10 +353,10 @@ fn handle_upload_command(sn: Option<String>, args: &UploadArgs) -> Result<(), sc
 }
 
 fn handle_download_save_command(
-    sn: Option<String>,
+    connection: Connection,
     args: &DownloadSaveArgs,
 ) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, true)?;
+    let mut sc64 = init_sc64(connection, true)?;
 
     let (mut file, name) = create_file(&args.path)?;
 
@@ -342,8 +367,8 @@ fn handle_download_save_command(
     Ok(())
 }
 
-fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64::Error> {
-    let _ = (sn, args);
+fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), sc64::Error> {
+    let _ = (connection, args);
 
     // TODO: handle 64DD stuff
 
@@ -355,13 +380,13 @@ fn handle_64dd_command(sn: Option<String>, args: &_64DDArgs) -> Result<(), sc64:
     Ok(())
 }
 
-fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64::Error> {
+fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), sc64::Error> {
     let mut debug_handler = debug::new(args.gdb)?;
     if let Some(port) = args.gdb {
         println!("GDB TCP socket listening at [0.0.0.0:{port}]");
     }
 
-    let mut sc64 = init_sc64(sn, true)?;
+    let mut sc64 = init_sc64(connection, true)?;
 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
@@ -403,8 +428,8 @@ fn handle_debug_command(sn: Option<String>, args: &DebugArgs) -> Result<(), sc64
     Ok(())
 }
 
-fn handle_dump_command(sn: Option<String>, args: &DumpArgs) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, true)?;
+fn handle_dump_command(connection: Connection, args: &DumpArgs) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
 
     let (mut dump_file, dump_name) = create_file(&args.path)?;
 
@@ -421,8 +446,8 @@ fn handle_dump_command(sn: Option<String>, args: &DumpArgs) -> Result<(), sc64::
     Ok(())
 }
 
-fn handle_info_command(sn: Option<String>) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, false)?;
+fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
 
     let (major, minor) = sc64.check_firmware_version()?;
     let state = sc64.get_device_state()?;
@@ -453,8 +478,8 @@ fn handle_info_command(sn: Option<String>) -> Result<(), sc64::Error> {
     Ok(())
 }
 
-fn handle_set_command(sn: Option<String>, command: &SetCommands) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(sn, true)?;
+fn handle_set_command(connection: Connection, command: &SetCommands) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
 
     match command {
         SetCommands::Rtc => {
@@ -484,7 +509,7 @@ fn handle_set_command(sn: Option<String>, command: &SetCommands) -> Result<(), s
 }
 
 fn handle_firmware_command(
-    sn: Option<String>,
+    connection: Connection,
     command: &FirmwareCommands,
 ) -> Result<(), sc64::Error> {
     match command {
@@ -502,7 +527,7 @@ fn handle_firmware_command(
         }
 
         FirmwareCommands::Backup(args) => {
-            let mut sc64 = init_sc64(sn, false)?;
+            let mut sc64 = init_sc64(connection, false)?;
 
             let (mut backup_file, backup_name) = create_file(&args.firmware)?;
 
@@ -523,7 +548,7 @@ fn handle_firmware_command(
         }
 
         FirmwareCommands::Update(args) => {
-            let mut sc64 = init_sc64(sn, false)?;
+            let mut sc64 = init_sc64(connection, false)?;
 
             let (mut update_file, update_name, update_length) = open_file(&args.firmware)?;
 
@@ -546,8 +571,26 @@ fn handle_firmware_command(
     }
 }
 
-fn init_sc64(sn: Option<String>, check_firmware: bool) -> Result<sc64::SC64, sc64::Error> {
-    let mut sc64 = sc64::new(sn)?;
+fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<(), sc64::Error> {
+    let port = if let Connection::Local(port) = connection {
+        port
+    } else {
+        None
+    };
+
+    let _server = sc64::new_server(port, args.address.clone())?;
+
+    let exit = setup_exit_flag();
+    while !exit.load(Ordering::Relaxed) {}
+
+    Ok(())
+}
+
+fn init_sc64(connection: Connection, check_firmware: bool) -> Result<sc64::SC64, sc64::Error> {
+    let mut sc64 = match connection {
+        Connection::Local(port) => sc64::new_local(port),
+        Connection::Remote(remote) => sc64::new_remote(remote),
+    }?;
 
     if check_firmware {
         sc64.check_firmware_version()?;

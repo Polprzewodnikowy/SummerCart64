@@ -1,9 +1,9 @@
 use super::{error::Error, utils};
 use std::{collections::VecDeque, time::Duration};
 
-pub struct Device {
-    pub sn: String,
+pub struct LocalDevice {
     pub port: String,
+    pub serial_number: String,
 }
 
 pub struct Command {
@@ -184,33 +184,33 @@ impl Link for SerialLink {
     }
 }
 
-pub fn list_serial_devices() -> Result<Vec<Device>, Error> {
+pub fn list_local_devices() -> Result<Vec<LocalDevice>, Error> {
     const SC64_VID: u16 = 0x0403;
     const SC64_PID: u16 = 0x6014;
     const SC64_SID: &str = "SC64";
 
-    let mut devices: Vec<Device> = Vec::new();
+    let mut serial_devices: Vec<LocalDevice> = Vec::new();
 
     for device in serialport::available_ports()?.into_iter() {
         if let serialport::SerialPortType::UsbPort(info) = device.port_type {
-            let sn = info.serial_number.unwrap_or("".to_string());
-            if info.vid == SC64_VID && info.pid == SC64_PID && sn.starts_with(SC64_SID) {
-                devices.push(Device {
-                    sn,
+            let serial_number = info.serial_number.unwrap_or("".to_string());
+            if info.vid == SC64_VID && info.pid == SC64_PID && serial_number.starts_with(SC64_SID) {
+                serial_devices.push(LocalDevice {
                     port: device.port_name,
+                    serial_number,
                 });
             }
         }
     }
 
-    if devices.len() == 0 {
+    if serial_devices.len() == 0 {
         return Err(Error::new("No SC64 devices found"));
     }
 
-    return Ok(devices);
+    return Ok(serial_devices);
 }
 
-pub fn new_serial(port: &str) -> Result<Box<dyn Link>, Error> {
+pub fn new_local(port: &str) -> Result<Box<dyn Link>, Error> {
     let mut link = SerialLink {
         serial: serialport::new(port, 115_200).open()?,
         packets: VecDeque::new(),
