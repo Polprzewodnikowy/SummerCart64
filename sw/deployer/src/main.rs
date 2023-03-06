@@ -9,7 +9,7 @@ use colored::Colorize;
 use panic_message::panic_message;
 use std::{
     fs::File,
-    io::{stdout, BufReader, Read, Write},
+    io::{stdin, stdout, BufReader, Read, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -532,7 +532,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", metadata);
+            println!("{}", format!("{}", metadata).blue().to_string());
 
             Ok(())
         }
@@ -551,7 +551,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", metadata);
+            println!("{}", format!("{}", metadata).blue().to_string());
 
             backup_file.write_all(&firmware)?;
 
@@ -568,7 +568,12 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", metadata);
+            println!("{}", format!("{}", metadata).blue().to_string());
+            println!("{}", "Firmware file verification was successful".green());
+            let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
+            if answer.to_ascii_lowercase() != "y" {
+                panic!("Firmware update process aborted");
+            }
 
             sc64.reset_state()?;
 
@@ -620,6 +625,14 @@ fn log_wait<F: FnOnce() -> Result<T, E>, T, E>(message: String, operation: F) ->
         println!("error!");
     }
     result
+}
+
+fn prompt(message: String) -> String {
+    print!("{message}");
+    stdout().flush().unwrap();
+    let mut answer = String::new();
+    stdin().read_line(&mut answer).unwrap();
+    answer.trim_end().to_string()
 }
 
 fn open_file(path: &PathBuf) -> Result<(File, String, usize), sc64::Error> {
