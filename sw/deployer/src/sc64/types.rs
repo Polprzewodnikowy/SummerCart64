@@ -669,6 +669,7 @@ pub enum FirmwareStatus {
     ErrSize,
     ErrUnknownChunk,
     ErrRead,
+    ErrAddress,
 }
 
 impl Display for FirmwareStatus {
@@ -680,6 +681,7 @@ impl Display for FirmwareStatus {
             FirmwareStatus::ErrSize => "Invalid firmware size",
             FirmwareStatus::ErrUnknownChunk => "Unknown chunk in firmware",
             FirmwareStatus::ErrRead => "Firmware read error",
+            FirmwareStatus::ErrAddress => "Invalid address or length provided",
         })
     }
 }
@@ -694,6 +696,7 @@ impl TryFrom<u32> for FirmwareStatus {
             3 => Self::ErrSize,
             4 => Self::ErrUnknownChunk,
             5 => Self::ErrRead,
+            6 => Self::ErrAddress,
             _ => return Err(Error::new("Unknown firmware status code")),
         })
     }

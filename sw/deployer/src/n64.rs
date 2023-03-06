@@ -18,7 +18,7 @@ pub fn guess_save_type<T: Read + Seek>(
     let mut ed64_header = vec![0u8; 4];
 
     reader.seek(SeekFrom::Start(0x3C))?;
-    reader.read(&mut ed64_header)?;
+    reader.read_exact(&mut ed64_header)?;
 
     if &ed64_header[0..2] == b"ED" {
         return Ok((
@@ -38,7 +38,7 @@ pub fn guess_save_type<T: Read + Seek>(
     let mut pi_config = vec![0u8; 4];
 
     reader.rewind()?;
-    reader.read(&mut pi_config)?;
+    reader.read_exact(&mut pi_config)?;
 
     let endian_swapper = match &pi_config[0..4] {
         [0x37, 0x80, 0x40, 0x12] => |b: &mut [u8]| b.chunks_exact_mut(2).for_each(|c| c.swap(0, 1)),

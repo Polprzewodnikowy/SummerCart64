@@ -11,7 +11,7 @@
 
 bool flash_program (uint32_t src, uint32_t dst, uint32_t length);
 void flash_wait_busy (void);
-bool flash_erase_block (uint32_t offset);
+bool flash_erase_block (uint32_t address);
 
 
 #endif

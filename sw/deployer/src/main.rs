@@ -42,8 +42,11 @@ enum Commands {
     /// Upload ROM (and save) to the SC64
     Upload(UploadArgs),
 
-    /// Download save and write it to file
-    DownloadSave(DownloadSaveArgs),
+    /// Download specific memory region and write it to file
+    Download {
+        #[command(subcommand)]
+        command: DownloadCommands,
+    },
 
     /// Upload ROM, 64DD IPL and run disk server
     _64DD(_64DDArgs),
@@ -99,9 +102,15 @@ struct UploadArgs {
     tv: Option<TvType>,
 }
 
+#[derive(Subcommand)]
+enum DownloadCommands {
+    /// Download save and write it to file
+    Save(DownloadArgs),
+}
+
 #[derive(Args)]
-struct DownloadSaveArgs {
-    /// Path to the save file
+struct DownloadArgs {
+    /// Path to the file
     path: PathBuf,
 }
 
@@ -269,7 +278,7 @@ fn handle_command(command: &Commands, port: Option<String>, remote: Option<Strin
     let result = match command {
         Commands::List => handle_list_command(),
         Commands::Upload(args) => handle_upload_command(connection, args),
-        Commands::DownloadSave(args) => handle_download_save_command(connection, args),
+        Commands::Download { command } => handle_download_command(connection, command),
         Commands::_64DD(args) => handle_64dd_command(connection, args),
         Commands::Debug(args) => handle_debug_command(connection, args),
         Commands::Dump(args) => handle_dump_command(connection, args),
@@ -352,17 +361,21 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
     Ok(())
 }
 
-fn handle_download_save_command(
+fn handle_download_command(
     connection: Connection,
-    args: &DownloadSaveArgs,
+    command: &DownloadCommands,
 ) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let (mut file, name) = create_file(&args.path)?;
+    match command {
+        DownloadCommands::Save(args) => {
+            let (mut file, name) = create_file(&args.path)?;
 
-    log_wait(format!("Downloading save [{name}]"), || {
-        sc64.download_save(&mut file)
-    })?;
+            log_wait(format!("Downloading save [{name}]"), || {
+                sc64.download_save(&mut file)
+            })?;
+        }
+    }
 
     Ok(())
 }
@@ -391,7 +404,7 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
         println!(
-            "IS-Viewer configured and listening at offset [0x{:08X}]",
+            "IS-Viewer configured and listening at ROM offset [0x{:08X}]",
             args.isv.unwrap()
         );
     }
@@ -433,15 +446,13 @@ fn handle_dump_command(connection: Connection, args: &DumpArgs) -> Result<(), sc
 
     let (mut dump_file, dump_name) = create_file(&args.path)?;
 
-    let data = log_wait(
+    log_wait(
         format!(
             "Dumping from [0x{:08X}] length [0x{:X}] to [{dump_name}]",
             args.address, args.length
         ),
-        || sc64.dump_memory(args.address, args.length),
+        || sc64.dump_memory(&mut dump_file, args.address, args.length),
     )?;
-
-    dump_file.write(&data)?;
 
     Ok(())
 }
@@ -542,7 +553,7 @@ fn handle_firmware_command(
             println!("{}", "Firmware metadata:".bold());
             println!("{}", metadata);
 
-            backup_file.write(&firmware)?;
+            backup_file.write_all(&firmware)?;
 
             Ok(())
         }
@@ -603,7 +614,11 @@ fn log_wait<F: FnOnce() -> Result<T, E>, T, E>(message: String, operation: F) ->
     print!("{}... ", message);
     stdout().flush().unwrap();
     let result = operation();
-    println!("done");
+    if result.is_ok() {
+        println!("done");
+    } else {
+        println!("error!");
+    }
     result
 }
 

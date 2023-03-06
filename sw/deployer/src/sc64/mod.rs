@@ -84,7 +84,6 @@ const SRAM_BANKED_LENGTH: usize = 3 * 32 * 1024;
 const FLASHRAM_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
-const BOOTLOADER_LENGTH: usize = 1920 * 1024;
 
 const FIRMWARE_ADDRESS: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
 const FIRMWARE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
@@ -96,11 +95,11 @@ const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
 pub const MEMORY_LENGTH: usize = 0x0500_2980;
 
-const MEMORY_WRITE_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
+const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<Vec<u8>, Error> {
-        let identifier = self.link.execute_command(&mut Command {
+        let identifier = self.link.execute_command(&Command {
             id: b'v',
             args: [0, 0],
             data: vec![],
@@ -109,7 +108,7 @@ impl SC64 {
     }
 
     fn command_version_get(&mut self) -> Result<(u16, u16), Error> {
-        let version = self.link.execute_command(&mut Command {
+        let version = self.link.execute_command(&Command {
             id: b'V',
             args: [0, 0],
             data: vec![],
@@ -120,7 +119,7 @@ impl SC64 {
     }
 
     fn command_state_reset(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'R',
             args: [0, 0],
             data: vec![],
@@ -137,7 +136,7 @@ impl SC64 {
         let mut params: Vec<u8> = vec![];
         params.append(&mut [(disable as u8) << 0, seed].to_vec());
         params.append(&mut checksum.to_vec());
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'B',
             args: args_from_vec(&params[0..8])?,
             data: vec![],
@@ -146,7 +145,7 @@ impl SC64 {
     }
 
     fn command_config_get(&mut self, config_id: ConfigId) -> Result<Config, Error> {
-        let data = self.link.execute_command(&mut Command {
+        let data = self.link.execute_command(&Command {
             id: b'c',
             args: [config_id.into(), 0],
             data: vec![],
@@ -156,7 +155,7 @@ impl SC64 {
     }
 
     fn command_config_set(&mut self, config: Config) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'C',
             args: config.into(),
             data: vec![],
@@ -165,7 +164,7 @@ impl SC64 {
     }
 
     fn command_setting_get(&mut self, setting_id: SettingId) -> Result<Setting, Error> {
-        let data = self.link.execute_command(&mut Command {
+        let data = self.link.execute_command(&Command {
             id: b'a',
             args: [setting_id.into(), 0],
             data: vec![],
@@ -175,7 +174,7 @@ impl SC64 {
     }
 
     fn command_setting_set(&mut self, setting: Setting) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'A',
             args: setting.into(),
             data: vec![],
@@ -184,7 +183,7 @@ impl SC64 {
     }
 
     fn command_time_get(&mut self) -> Result<DateTime<Local>, Error> {
-        let data = self.link.execute_command(&mut Command {
+        let data = self.link.execute_command(&Command {
             id: b't',
             args: [0, 0],
             data: vec![],
@@ -193,7 +192,7 @@ impl SC64 {
     }
 
     fn command_time_set(&mut self, datetime: DateTime<Local>) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'T',
             args: args_from_vec(&vec_from_datetime(datetime)?[0..8])?,
             data: vec![],
@@ -202,7 +201,7 @@ impl SC64 {
     }
 
     fn command_memory_read(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
-        let data = self.link.execute_command(&mut Command {
+        let data = self.link.execute_command(&Command {
             id: b'm',
             args: [address, length as u32],
             data: vec![],
@@ -211,7 +210,7 @@ impl SC64 {
     }
 
     fn command_memory_write(&mut self, address: u32, data: &[u8]) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'M',
             args: [address, data.len() as u32],
             data: data.to_vec(),
@@ -221,7 +220,7 @@ impl SC64 {
 
     fn command_usb_write(&mut self, datatype: u8, data: &[u8]) -> Result<(), Error> {
         self.link.execute_command_raw(
-            &mut Command {
+            &Command {
                 id: b'U',
                 args: [datatype as u32, data.len() as u32],
                 data: data.to_vec(),
@@ -234,7 +233,7 @@ impl SC64 {
     }
 
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'D',
             args: [error as u32, 0],
             data: vec![],
@@ -243,7 +242,7 @@ impl SC64 {
     }
 
     fn command_flash_wait_busy(&mut self, wait: bool) -> Result<u32, Error> {
-        let erase_block_size = self.link.execute_command(&mut Command {
+        let erase_block_size = self.link.execute_command(&Command {
             id: b'p',
             args: [wait as u32, 0],
             data: vec![],
@@ -252,7 +251,7 @@ impl SC64 {
     }
 
     fn command_flash_erase_block(&mut self, address: u32) -> Result<(), Error> {
-        self.link.execute_command(&mut Command {
+        self.link.execute_command(&Command {
             id: b'P',
             args: [address, 0],
             data: vec![],
@@ -262,7 +261,7 @@ impl SC64 {
 
     fn command_firmware_backup(&mut self, address: u32) -> Result<(FirmwareStatus, u32), Error> {
         let data = self.link.execute_command_raw(
-            &mut Command {
+            &Command {
                 id: b'f',
                 args: [address, 0],
                 data: vec![],
@@ -282,7 +281,7 @@ impl SC64 {
         length: usize,
     ) -> Result<FirmwareStatus, Error> {
         let data = self.link.execute_command_raw(
-            &mut Command {
+            &Command {
                 id: b'F',
                 args: [address, length as u32],
                 data: vec![],
@@ -296,7 +295,7 @@ impl SC64 {
 
     fn command_debug_get(&mut self) -> Result<FpgaDebugData, Error> {
         self.link
-            .execute_command(&mut Command {
+            .execute_command(&Command {
                 id: b'?',
                 args: [0, 0],
                 data: vec![],
@@ -306,7 +305,7 @@ impl SC64 {
 
     fn command_stack_usage_get(&mut self) -> Result<McuStackUsage, Error> {
         self.link
-            .execute_command(&mut Command {
+            .execute_command(&Command {
                 id: b'%',
                 args: [0, 0],
                 data: vec![],
@@ -329,7 +328,8 @@ impl SC64 {
         let mut pi_config = vec![0u8; 4];
 
         reader.rewind()?;
-        reader.read(&mut pi_config)?;
+        reader.read_exact(&mut pi_config)?;
+        reader.rewind()?;
 
         let endian_swapper = match &pi_config[0..4] {
             [0x37, 0x80, 0x40, 0x12] => {
@@ -352,8 +352,6 @@ impl SC64 {
         } else {
             min(length, SDRAM_LENGTH)
         };
-
-        reader.rewind()?;
 
         self.memory_write_chunked(reader, SDRAM_ADDRESS, sdram_length, Some(endian_swapper))?;
 
@@ -427,18 +425,19 @@ impl SC64 {
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
         };
 
-        let mut data = self.command_memory_read(address, save_length)?;
-
-        writer.write_all(&mut data)?;
-
-        Ok(())
+        self.memory_read_chunked(writer, address, save_length)
     }
 
-    pub fn dump_memory(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
+    pub fn dump_memory<T: Write>(
+        &mut self,
+        writer: &mut T,
+        address: u32,
+        length: usize,
+    ) -> Result<(), Error> {
         if address + length as u32 > MEMORY_LENGTH as u32 {
             return Err(Error::new("Invalid dump address or length"));
         }
-        self.command_memory_read(address, length)
+        self.memory_read_chunked(writer, address, length)
     }
 
     pub fn calculate_cic_parameters(&mut self) -> Result<(), Error> {
@@ -637,11 +636,22 @@ impl SC64 {
         }
     }
 
-    pub fn update_bootloader(&mut self, reader: &mut dyn Read, length: usize) -> Result<(), Error> {
-        if length > BOOTLOADER_LENGTH {
-            return Err(Error::new("Bootloader length too big"));
+    fn memory_read_chunked(
+        &mut self,
+        writer: &mut dyn Write,
+        address: u32,
+        length: usize,
+    ) -> Result<(), Error> {
+        let mut memory_address = address;
+        let mut bytes_left = length;
+        while bytes_left > 0 {
+            let bytes = min(MEMORY_CHUNK_LENGTH, bytes_left);
+            let data = self.command_memory_read(memory_address, bytes)?;
+            writer.write_all(&data)?;
+            memory_address += bytes as u32;
+            bytes_left -= bytes;
         }
-        self.flash_program(reader, BOOTLOADER_ADDRESS, length, None)
+        Ok(())
     }
 
     fn memory_write_chunked(
@@ -651,13 +661,19 @@ impl SC64 {
         length: usize,
         transform: Option<fn(&mut [u8])>,
     ) -> Result<(), Error> {
-        let mut data: Vec<u8> = vec![0u8; MEMORY_WRITE_CHUNK_LENGTH];
-        for offset in (0..length).step_by(MEMORY_WRITE_CHUNK_LENGTH) {
-            let chunk = reader.read(&mut data)?;
-            if let Some(transform) = transform {
-                transform(&mut data);
+        let mut limited_reader = reader.take(length as u64);
+        let mut memory_address = address;
+        let mut data: Vec<u8> = vec![0u8; MEMORY_CHUNK_LENGTH];
+        loop {
+            let bytes = limited_reader.read(&mut data)?;
+            if bytes == 0 {
+                break;
             }
-            self.command_memory_write(address + offset as u32, &data[0..chunk])?;
+            if let Some(transform) = transform {
+                transform(&mut data[0..bytes]);
+            }
+            self.command_memory_write(memory_address, &data[0..bytes])?;
+            memory_address += bytes as u32;
         }
         Ok(())
     }

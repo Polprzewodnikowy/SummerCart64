@@ -29,10 +29,10 @@ enum DataType {
 }
 
 pub trait Link {
-    fn execute_command(&mut self, command: &mut Command) -> Result<Vec<u8>, Error>;
+    fn execute_command(&mut self, command: &Command) -> Result<Vec<u8>, Error>;
     fn execute_command_raw(
         &mut self,
-        command: &mut Command,
+        command: &Command,
         timeout: Duration,
         no_response: bool,
         ignore_error: bool,
@@ -79,20 +79,16 @@ impl SerialLink {
         Ok(())
     }
 
-    fn serial_send_command(
-        &mut self,
-        command: &mut Command,
-        timeout: Duration,
-    ) -> Result<(), Error> {
-        let mut packet: Vec<u8> = Vec::new();
-        packet.append(&mut b"CMD".to_vec());
-        packet.append(&mut [command.id].to_vec());
-        packet.append(&mut command.args[0].to_be_bytes().to_vec());
-        packet.append(&mut command.args[1].to_be_bytes().to_vec());
-        packet.append(&mut command.data);
+    fn serial_send_command(&mut self, command: &Command, timeout: Duration) -> Result<(), Error> {
+        let mut header: Vec<u8> = Vec::new();
+        header.append(&mut b"CMD".to_vec());
+        header.append(&mut [command.id].to_vec());
+        header.append(&mut command.args[0].to_be_bytes().to_vec());
+        header.append(&mut command.args[1].to_be_bytes().to_vec());
 
         self.serial.set_timeout(timeout)?;
-        self.serial.write_all(&packet)?;
+        self.serial.write_all(&header)?;
+        self.serial.write_all(&command.data)?;
         self.serial.flush()?;
 
         Ok(())
@@ -138,7 +134,7 @@ impl SerialLink {
         Ok(None)
     }
 
-    fn send_command(&mut self, command: &mut Command) -> Result<(), Error> {
+    fn send_command(&mut self, command: &Command) -> Result<(), Error> {
         self.serial_send_command(command, COMMAND_TIMEOUT)
     }
 
@@ -151,13 +147,13 @@ impl SerialLink {
 }
 
 impl Link for SerialLink {
-    fn execute_command(&mut self, command: &mut Command) -> Result<Vec<u8>, Error> {
+    fn execute_command(&mut self, command: &Command) -> Result<Vec<u8>, Error> {
         self.execute_command_raw(command, COMMAND_TIMEOUT, false, false)
     }
 
     fn execute_command_raw(
         &mut self,
-        command: &mut Command,
+        command: &Command,
         timeout: Duration,
         no_response: bool,
         ignore_error: bool,
