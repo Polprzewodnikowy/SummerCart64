@@ -404,7 +404,7 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
         println!(
-            "IS-Viewer configured and listening at ROM offset [0x{:08X}]",
+            "IS-Viewer 64 configured and listening at ROM offset [0x{:08X}]",
             args.isv.unwrap()
         );
     }

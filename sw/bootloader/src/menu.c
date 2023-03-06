@@ -41,7 +41,7 @@ static const char *fatfs_error_codes[] = {
 #define FF_CHECK(x, message, ...) { \
     fresult = x; \
     if (fresult != FR_OK) { \
-        error_display(message " [%s]:\n %s\n", __VA_ARGS__ __VA_OPT__(,) #x, fatfs_error_codes[fresult]); \
+        error_display(message ".\nReason: %s", __VA_ARGS__ __VA_OPT__(,) fatfs_error_codes[fresult]); \
     } \
 }
 
@@ -55,11 +55,11 @@ static void menu_check_load_address (void *address, size_t size) {
     void *bootloader_end = (void *) (&__bootloader_end);
 
     if ((menu_start < usable_ram_start) || (menu_end > usable_ram_end)) {
-        error_display("Incorrect menu load address/size:\n Outside of usable RAM space\n");
+        error_display("Incorrect menu load address/size.\nReason: Outside of usable RAM space\n");
     }
 
     if ((menu_start < bootloader_end) && (bootloader_start < menu_end)) {
-        error_display("Incorrect menu load address/size:\n Overlapping bootloader space\n");
+        error_display("Incorrect menu load address/size.\nReason: Overlapping bootloader space\n");
     }
 }
 
@@ -72,21 +72,21 @@ void menu_load_and_run (void) {
     UINT br;
     size_t size = ROM_MAX_LOAD_SIZE;
 
-    FF_CHECK(f_mount(&fs, "", 1), "Couldn't mount drive");
-    FF_CHECK(f_open(&fil, "sc64menu.n64", FA_READ), "Couldn't open menu file");
-    FF_CHECK(f_lseek(&fil, ROM_ENTRY_OFFSET), "Couldn't seek to entry point offset");
-    FF_CHECK(f_read(&fil, &menu, sizeof(menu), &br), "Couldn't read entry point");
-    FF_CHECK(f_lseek(&fil, ROM_CODE_OFFSET), "Couldn't seek to code start offset");
+    FF_CHECK(f_mount(&fs, "", 1), "SD card initialize error. No SD card or invalid partition table");
+    FF_CHECK(f_open(&fil, "sc64menu.n64", FA_READ), "Could not open menu executable (sc64menu.n64)");
+    FF_CHECK(f_lseek(&fil, ROM_ENTRY_OFFSET), "Could not seek to entry point offset");
+    FF_CHECK(f_read(&fil, &menu, sizeof(menu), &br), "Could not read entry point");
+    FF_CHECK(f_lseek(&fil, ROM_CODE_OFFSET), "Could not seek to code start offset");
     if ((f_size(&fil) - ROM_CODE_OFFSET) < size) {
         size = (size_t) (f_size(&fil) - ROM_CODE_OFFSET);
     }
     menu_check_load_address(menu, size);
     cache_data_hit_writeback_invalidate(menu, size);
     cache_inst_hit_invalidate(menu, size);
-    FF_CHECK(f_read(&fil, menu, size, &br), "Couldn't read menu file");
+    FF_CHECK(f_read(&fil, menu, size, &br), "Could not read menu file");
     FF_CHECK((br != size) ? FR_INT_ERR : FR_OK, "Read size is different than expected");
-    FF_CHECK(f_close(&fil), "Couldn't close menu file");
-    FF_CHECK(f_unmount(""), "Couldn't unmount drive");
+    FF_CHECK(f_close(&fil), "Could not close menu file");
+    FF_CHECK(f_unmount(""), "Could not unmount drive");
 
     deinit();
 
