@@ -7,7 +7,7 @@ mod utils;
 
 pub use self::{
     error::Error,
-    link::list_local_devices,
+    link::{list_local_devices, ServerEvent},
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
         DebugPacket, DiskPacket, FpgaDebugData, McuStackUsage, SaveType, Switch, TvType,
@@ -20,7 +20,7 @@ use self::{
     types::{
         get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
     },
-    utils::{args_from_vec, datetime_from_vec, u32_from_vec, vec_from_datetime},
+    utils::{convert_from_datetime, convert_to_datetime},
 };
 use chrono::{DateTime, Local};
 use std::{
@@ -30,7 +30,7 @@ use std::{
 };
 
 pub struct SC64 {
-    link: Box<dyn Link>,
+    link: Link,
 }
 
 pub struct DeviceState {
@@ -86,10 +86,7 @@ const FLASHRAM_LENGTH: usize = 128 * 1024;
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
 const FIRMWARE_ADDRESS: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
-const FIRMWARE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
-
-const USB_WRITE_COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
@@ -98,23 +95,33 @@ pub const MEMORY_LENGTH: usize = 0x0500_2980;
 const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
 impl SC64 {
-    fn command_identifier_get(&mut self) -> Result<Vec<u8>, Error> {
-        let identifier = self.link.execute_command(&Command {
+    fn command_identifier_get(&mut self) -> Result<[u8; 4], Error> {
+        let data = self.link.execute_command(&Command {
             id: b'v',
             args: [0, 0],
-            data: vec![],
+            data: &[],
         })?;
-        Ok(identifier)
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for identifier get command",
+            ));
+        }
+        Ok(data[0..4].try_into().unwrap())
     }
 
     fn command_version_get(&mut self) -> Result<(u16, u16), Error> {
-        let version = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&Command {
             id: b'V',
             args: [0, 0],
-            data: vec![],
+            data: &[],
         })?;
-        let major = utils::u16_from_vec(&version[0..2])?;
-        let minor = utils::u16_from_vec(&version[2..4])?;
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for version get command",
+            ));
+        }
+        let major = u16::from_be_bytes(data[0..2].try_into().unwrap());
+        let minor = u16::from_be_bytes(data[2..4].try_into().unwrap());
         Ok((major, minor))
     }
 
@@ -122,7 +129,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'R',
             args: [0, 0],
-            data: vec![],
+            data: &[],
         })?;
         Ok(())
     }
@@ -133,13 +140,14 @@ impl SC64 {
         seed: u8,
         checksum: &[u8; 6],
     ) -> Result<(), Error> {
-        let mut params: Vec<u8> = vec![];
-        params.append(&mut [(disable as u8) << 0, seed].to_vec());
-        params.append(&mut checksum.to_vec());
+        let args = [
+            u32::from_be_bytes([(disable as u8) << 0, seed, checksum[0], checksum[1]]),
+            u32::from_be_bytes([checksum[2], checksum[3], checksum[4], checksum[5]]),
+        ];
         self.link.execute_command(&Command {
             id: b'B',
-            args: args_from_vec(&params[0..8])?,
-            data: vec![],
+            args,
+            data: &[],
         })?;
         Ok(())
     }
@@ -148,9 +156,14 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'c',
             args: [config_id.into(), 0],
-            data: vec![],
+            data: &[],
         })?;
-        let value = u32_from_vec(&data[0..4])?;
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for config get command",
+            ));
+        }
+        let value = u32::from_be_bytes(data[0..4].try_into().unwrap());
         Ok((config_id, value).try_into()?)
     }
 
@@ -158,7 +171,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'C',
             args: config.into(),
-            data: vec![],
+            data: &[],
         })?;
         Ok(())
     }
@@ -167,9 +180,14 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'a',
             args: [setting_id.into(), 0],
-            data: vec![],
+            data: &[],
         })?;
-        let value = u32_from_vec(&data[0..4])?;
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for setting get command",
+            ));
+        }
+        let value = u32::from_be_bytes(data[0..4].try_into().unwrap());
         Ok((setting_id, value).try_into()?)
     }
 
@@ -177,7 +195,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'A',
             args: setting.into(),
-            data: vec![],
+            data: &[],
         })?;
         Ok(())
     }
@@ -186,16 +204,21 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b't',
             args: [0, 0],
-            data: vec![],
+            data: &[],
         })?;
-        Ok(datetime_from_vec(&data[0..8])?)
+        if data.len() != 8 {
+            return Err(Error::new(
+                "Invalid data length received for time get command",
+            ));
+        }
+        Ok(convert_to_datetime(&data[0..8].try_into().unwrap())?)
     }
 
     fn command_time_set(&mut self, datetime: DateTime<Local>) -> Result<(), Error> {
         self.link.execute_command(&Command {
             id: b'T',
-            args: args_from_vec(&vec_from_datetime(datetime)?[0..8])?,
-            data: vec![],
+            args: convert_from_datetime(datetime),
+            data: &[],
         })?;
         Ok(())
     }
@@ -204,8 +227,13 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'm',
             args: [address, length as u32],
-            data: vec![],
+            data: &[],
         })?;
+        if data.len() != length {
+            return Err(Error::new(
+                "Invalid data length received for memory read command",
+            ));
+        }
         Ok(data)
     }
 
@@ -213,7 +241,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'M',
             args: [address, data.len() as u32],
-            data: data.to_vec(),
+            data,
         })?;
         Ok(())
     }
@@ -223,9 +251,8 @@ impl SC64 {
             &Command {
                 id: b'U',
                 args: [datatype as u32, data.len() as u32],
-                data: data.to_vec(),
+                data,
             },
-            USB_WRITE_COMMAND_TIMEOUT,
             true,
             false,
         )?;
@@ -236,25 +263,31 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'D',
             args: [error as u32, 0],
-            data: vec![],
+            data: &[],
         })?;
         Ok(())
     }
 
     fn command_flash_wait_busy(&mut self, wait: bool) -> Result<u32, Error> {
-        let erase_block_size = self.link.execute_command(&Command {
+        let data = self.link.execute_command(&Command {
             id: b'p',
             args: [wait as u32, 0],
-            data: vec![],
+            data: &[],
         })?;
-        Ok(utils::u32_from_vec(&erase_block_size[0..4])?)
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for flash wait busy command",
+            ));
+        }
+        let erase_block_size = u32::from_be_bytes(data[0..4].try_into().unwrap());
+        Ok(erase_block_size)
     }
 
     fn command_flash_erase_block(&mut self, address: u32) -> Result<(), Error> {
         self.link.execute_command(&Command {
             id: b'P',
             args: [address, 0],
-            data: vec![],
+            data: &[],
         })?;
         Ok(())
     }
@@ -264,15 +297,19 @@ impl SC64 {
             &Command {
                 id: b'f',
                 args: [address, 0],
-                data: vec![],
+                data: &[],
             },
-            FIRMWARE_COMMAND_TIMEOUT,
             false,
             true,
         )?;
-        let status = FirmwareStatus::try_from(utils::u32_from_vec(&data[0..4])?)?;
-        let length = utils::u32_from_vec(&data[4..8])?;
-        Ok((status, length))
+        if data.len() != 8 {
+            return Err(Error::new(
+                "Invalid data length received for firmware backup command",
+            ));
+        }
+        let status = u32::from_be_bytes(data[0..4].try_into().unwrap());
+        let length = u32::from_be_bytes(data[4..8].try_into().unwrap());
+        Ok((status.try_into()?, length))
     }
 
     fn command_firmware_update(
@@ -284,33 +321,35 @@ impl SC64 {
             &Command {
                 id: b'F',
                 args: [address, length as u32],
-                data: vec![],
+                data: &[],
             },
-            FIRMWARE_COMMAND_TIMEOUT,
             false,
             true,
         )?;
-        Ok(FirmwareStatus::try_from(utils::u32_from_vec(&data[0..4])?)?)
+        if data.len() != 4 {
+            return Err(Error::new(
+                "Invalid data length received for firmware update command",
+            ));
+        }
+        Ok(u32::from_be_bytes(data[0..4].try_into().unwrap()).try_into()?)
     }
 
     fn command_debug_get(&mut self) -> Result<FpgaDebugData, Error> {
-        self.link
-            .execute_command(&Command {
-                id: b'?',
-                args: [0, 0],
-                data: vec![],
-            })?
-            .try_into()
+        let data = self.link.execute_command(&Command {
+            id: b'?',
+            args: [0, 0],
+            data: &[],
+        })?;
+        Ok(data.try_into()?)
     }
 
     fn command_stack_usage_get(&mut self) -> Result<McuStackUsage, Error> {
-        self.link
-            .execute_command(&Command {
-                id: b'%',
-                args: [0, 0],
-                data: vec![],
-            })?
-            .try_into()
+        let data = self.link.execute_command(&Command {
+            id: b'%',
+            args: [0, 0],
+            data: &[],
+        })?;
+        Ok(data.try_into()?)
     }
 }
 
@@ -564,6 +603,16 @@ impl SC64 {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
     }
 
+    pub fn check_device(&mut self) -> Result<(), Error> {
+        let identifier = self.command_identifier_get().map_err(|e| {
+            Error::new(format!("Couldn't get SC64 device identifier: {e}").as_str())
+        })?;
+        if &identifier != SC64_V2_IDENTIFIER {
+            return Err(Error::new("Unknown identifier received, not a SC64 device"));
+        }
+        Ok(())
+    }
+
     pub fn check_firmware_version(&mut self) -> Result<(u16, u16), Error> {
         let (major, minor) = self
             .command_version_get()
@@ -626,8 +675,9 @@ impl SC64 {
             if timeout.elapsed() > FIRMWARE_UPDATE_TIMEOUT {
                 return Err(Error::new(
                     format!(
-                        "Firmware update timeout, SC64 did not finish update in {} seconds",
-                        FIRMWARE_UPDATE_TIMEOUT.as_secs()
+                        "Firmware update timeout, SC64 did not finish update in {} seconds, last step: {}",
+                        FIRMWARE_UPDATE_TIMEOUT.as_secs(),
+                        last_update_status
                     )
                     .as_str(),
                 ));
@@ -706,28 +756,30 @@ pub fn new_local(port: Option<String>) -> Result<SC64, Error> {
     } else {
         list_local_devices()?[0].port.clone()
     };
-
     let mut sc64 = SC64 {
         link: link::new_local(&port)?,
     };
-
-    let identifier = sc64
-        .command_identifier_get()
-        .map_err(|_| Error::new("Couldn't get SC64 device identifier"))?;
-
-    if identifier != SC64_V2_IDENTIFIER {
-        return Err(Error::new("Unknown identifier received, not a SC64 device"));
-    }
-
+    sc64.check_device()?;
     Ok(sc64)
 }
 
-pub fn new_remote(remote: String) -> Result<SC64, Error> {
-    let _ = remote;
-    Err(Error::new("Remote connection not implemented yet"))
+pub fn new_remote(address: String) -> Result<SC64, Error> {
+    let mut sc64 = SC64 {
+        link: link::new_remote(&address)?,
+    };
+    sc64.check_device()?;
+    Ok(sc64)
 }
 
-pub fn new_server(port: Option<String>, bind: String) -> Result<(), Error> {
-    let _ = (port, bind);
-    Err(Error::new("SC64 server not implemented yet"))
+pub fn run_server(
+    port: Option<String>,
+    address: String,
+    event_callback: fn(ServerEvent),
+) -> Result<(), Error> {
+    let port = if let Some(port) = port {
+        port
+    } else {
+        list_local_devices()?[0].port.clone()
+    };
+    link::run_server(&port, address, event_callback)
 }

@@ -1,33 +1,6 @@
 use super::Error;
 use chrono::{DateTime, Datelike, Local, NaiveDateTime, TimeZone, Timelike};
 
-pub fn u16_from_vec(data: &[u8]) -> Result<u16, Error> {
-    if data.len() != 2 {
-        return Err(Error::new("Invalid slice length provided to u16_from_vec"));
-    }
-    let bytes = data[0..2]
-        .try_into()
-        .map_err(|_| Error::new("Couldn't convert from bytes to u16"))?;
-    Ok(u16::from_be_bytes(bytes))
-}
-
-pub fn u32_from_vec(data: &[u8]) -> Result<u32, Error> {
-    if data.len() != 4 {
-        return Err(Error::new("Invalid slice length provided to u32_from_vec"));
-    }
-    let bytes = data[0..4]
-        .try_into()
-        .map_err(|_| Error::new("Couldn't convert from bytes to u32"))?;
-    Ok(u32::from_be_bytes(bytes))
-}
-
-pub fn args_from_vec(data: &[u8]) -> Result<[u32; 2], Error> {
-    if data.len() != 8 {
-        return Err(Error::new("Invalid slice length provided to args_from_vec"));
-    }
-    Ok([u32_from_vec(&data[0..4])?, u32_from_vec(&data[4..8])?])
-}
-
 pub fn u8_from_bcd(value: u8) -> u8 {
     (((value & 0xF0) >> 4) * 10) + (value & 0x0F)
 }
@@ -36,7 +9,7 @@ pub fn bcd_from_u8(value: u8) -> u8 {
     (((value / 10) & 0x0F) << 4) | ((value % 10) & 0x0F)
 }
 
-pub fn datetime_from_vec(data: &[u8]) -> Result<DateTime<Local>, Error> {
+pub fn convert_to_datetime(data: &[u8; 8]) -> Result<DateTime<Local>, Error> {
     let hour = u8_from_bcd(data[1]);
     let minute = u8_from_bcd(data[2]);
     let second = u8_from_bcd(data[3]);
@@ -51,7 +24,7 @@ pub fn datetime_from_vec(data: &[u8]) -> Result<DateTime<Local>, Error> {
     Ok(Local.from_local_datetime(native).unwrap())
 }
 
-pub fn vec_from_datetime(datetime: DateTime<Local>) -> Result<Vec<u8>, Error> {
+pub fn convert_from_datetime(datetime: DateTime<Local>) -> [u32; 2] {
     let weekday = bcd_from_u8((datetime.weekday() as u8) + 1);
     let hour = bcd_from_u8(datetime.hour() as u8);
     let minute = bcd_from_u8(datetime.minute() as u8);
@@ -59,5 +32,8 @@ pub fn vec_from_datetime(datetime: DateTime<Local>) -> Result<Vec<u8>, Error> {
     let year = bcd_from_u8((datetime.year() - 2000) as u8);
     let month = bcd_from_u8(datetime.month() as u8);
     let day = bcd_from_u8(datetime.day() as u8);
-    Ok(vec![weekday, hour, minute, second, 0, year, month, day])
+    [
+        u32::from_be_bytes([weekday, hour, minute, second]),
+        u32::from_be_bytes([0, year, month, day]),
+    ]
 }

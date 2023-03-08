@@ -7,9 +7,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use clap_num::maybe_hex_range;
 use colored::Colorize;
 use panic_message::panic_message;
+use sc64::ServerEvent;
 use std::{
     fs::File,
-    io::{stdin, stdout, BufReader, Read, Write},
+    io::{stdin, stdout, Read, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -307,8 +308,7 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let (rom_file_unbuffered, rom_name, rom_length) = open_file(&args.rom)?;
-    let mut rom_file = BufReader::new(rom_file_unbuffered);
+    let (mut rom_file, rom_name, rom_length) = open_file(&args.rom)?;
 
     sc64.reset_state()?;
 
@@ -532,7 +532,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).blue().to_string());
+            println!("{}", format!("{}", metadata).cyan().to_string());
 
             Ok(())
         }
@@ -551,7 +551,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).blue().to_string());
+            println!("{}", format!("{}", metadata).cyan().to_string());
 
             backup_file.write_all(&firmware)?;
 
@@ -568,12 +568,17 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).blue().to_string());
+            println!("{}", format!("{}", metadata).cyan().to_string());
             println!("{}", "Firmware file verification was successful".green());
             let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
             if answer.to_ascii_lowercase() != "y" {
-                panic!("Firmware update process aborted");
+                println!("{}", "Firmware update process aborted".red());
+                return Ok(());
             }
+            println!(
+                "{}",
+                "Do not unplug SC64 from the computer, doing so might brick your device".yellow()
+            );
 
             sc64.reset_state()?;
 
@@ -594,10 +599,26 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
         None
     };
 
-    let _server = sc64::new_server(port, args.address.clone())?;
-
-    let exit = setup_exit_flag();
-    while !exit.load(Ordering::Relaxed) {}
+    sc64::run_server(port, args.address.clone(), |event| match event {
+        ServerEvent::StartedListening(address) => println!(
+            "{}: Started listening on address {}",
+            "[Server]".bold(),
+            address
+        ),
+        ServerEvent::NewConnection(peer) => {
+            println!("{}: New connection from {}", "[Server]".bold(), peer);
+        }
+        ServerEvent::Disconnected(peer) => {
+            println!("{}: Client {} disconnected", "[Server]".bold(), peer);
+        }
+        ServerEvent::Err(error) => {
+            println!(
+                "{}: Client disconnected with error: {}",
+                "[Server]".bold(),
+                error
+            );
+        }
+    })?;
 
     Ok(())
 }

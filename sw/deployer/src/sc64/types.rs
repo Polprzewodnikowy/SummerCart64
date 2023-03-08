@@ -1,4 +1,4 @@
-use super::{link::Packet, utils::u32_from_vec, Error};
+use super::{link::Packet, Error};
 use encoding_rs::EUC_JP;
 use std::fmt::Display;
 
@@ -591,7 +591,16 @@ impl TryFrom<Packet> for DataPacket {
             b'U' => Self::Debug(value.data.try_into()?),
             b'D' => Self::Disk(value.data.try_into()?),
             b'I' => Self::IsViewer(EUC_JP.decode(&value.data).0.into()),
-            b'F' => Self::UpdateStatus(u32_from_vec(&value.data[0..4])?.try_into()?),
+            b'F' => {
+                if value.data.len() != 4 {
+                    return Err(Error::new(
+                        "Incorrect data length for update status data packet",
+                    ));
+                }
+                Self::UpdateStatus(
+                    u32::from_be_bytes(value.data[0..4].try_into().unwrap()).try_into()?,
+                )
+            }
             _ => return Err(Error::new("Unknown data packet code")),
         })
     }
@@ -608,7 +617,7 @@ impl TryFrom<Vec<u8>> for DebugPacket {
         if value.len() < 4 {
             return Err(Error::new("Couldn't extract header from debug packet"));
         }
-        let header = u32_from_vec(&value[0..4])?;
+        let header = u32::from_be_bytes(value[0..4].try_into().unwrap());
         let datatype = ((header >> 24) & 0xFF) as u8;
         let length = (header & 0x00FFFFFF) as usize;
         let data = value[4..].to_vec();
@@ -630,9 +639,9 @@ impl TryFrom<Vec<u8>> for DiskPacket {
         if value.len() < 12 {
             return Err(Error::new("Couldn't extract block info from disk packet"));
         }
-        let command = u32_from_vec(&value[0..4])?;
-        let address = u32_from_vec(&value[4..8])?;
-        let track_head_block = u32_from_vec(&value[8..12])?;
+        let command = u32::from_be_bytes(value[0..4].try_into().unwrap());
+        let address = u32::from_be_bytes(value[4..8].try_into().unwrap());
+        let track_head_block = u32::from_be_bytes(value[8..12].try_into().unwrap());
         let disk_block = DiskBlock {
             address,
             track: (track_head_block >> 2) & 0xFFF,
@@ -678,7 +687,7 @@ impl Display for FirmwareStatus {
             FirmwareStatus::Ok => "OK",
             FirmwareStatus::ErrToken => "Invalid firmware header",
             FirmwareStatus::ErrChecksum => "Invalid chunk checksum",
-            FirmwareStatus::ErrSize => "Invalid firmware size",
+            FirmwareStatus::ErrSize => "Invalid chunk size",
             FirmwareStatus::ErrUnknownChunk => "Unknown chunk in firmware",
             FirmwareStatus::ErrRead => "Firmware read error",
             FirmwareStatus::ErrAddress => "Invalid address or length provided",
@@ -747,11 +756,11 @@ pub struct FpgaDebugData {
 impl TryFrom<Vec<u8>> for FpgaDebugData {
     type Error = Error;
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() < 8 {
+        if value.len() != 8 {
             return Err(Error::new("Invalid data length for FPGA debug data"));
         }
         Ok(FpgaDebugData {
-            last_pi_address: u32_from_vec(&value[0..4])?,
+            last_pi_address: u32::from_be_bytes(value[0..4].try_into().unwrap()),
             read_fifo_wait: (value[7] & (1 << 0)) != 0,
             read_fifo_failure: (value[7] & (1 << 1)) != 0,
             write_fifo_wait: (value[7] & (1 << 2)) != 0,
@@ -789,14 +798,14 @@ pub struct McuStackUsage {
 impl TryFrom<Vec<u8>> for McuStackUsage {
     type Error = Error;
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() < 16 {
+        if value.len() != 16 {
             return Err(Error::new("Invalid data length for MCU stack usage"));
         }
         Ok(McuStackUsage {
-            cic: u32_from_vec(&value[0..4])?,
-            rtc: u32_from_vec(&value[4..8])?,
-            led: u32_from_vec(&value[8..12])?,
-            gvr: u32_from_vec(&value[12..16])?,
+            cic: u32::from_be_bytes(value[0..4].try_into().unwrap()),
+            rtc: u32::from_be_bytes(value[4..8].try_into().unwrap()),
+            led: u32::from_be_bytes(value[8..12].try_into().unwrap()),
+            gvr: u32::from_be_bytes(value[12..16].try_into().unwrap()),
         })
     }
 }
