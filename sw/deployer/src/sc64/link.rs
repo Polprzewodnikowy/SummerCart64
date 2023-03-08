@@ -417,7 +417,9 @@ fn server_accept_connection(
     event_callback: fn(ServerEvent),
     stream: &mut TcpStream,
 ) -> Result<(), Error> {
-    stream.set_nonblocking(true)?;
+    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+
     let peer = stream.peer_addr()?.to_string();
 
     let mut serial_backend = new_serial_backend(port)?;
@@ -430,8 +432,11 @@ fn server_accept_connection(
     event_callback(ServerEvent::NewConnection(peer.clone()));
 
     loop {
+        stream.set_nonblocking(true)?;
         match stream.read_exact(&mut buffer) {
             Ok(()) => {
+                stream.set_nonblocking(false)?;
+
                 let data_type: DataType = u32::from_be_bytes(buffer).try_into()?;
 
                 if !matches!(data_type, DataType::Command) {
@@ -465,6 +470,7 @@ fn server_accept_connection(
                     event_callback(ServerEvent::Disconnected(peer.clone()));
                     return Ok(());
                 }
+                stream.set_nonblocking(false)?;
             }
         }
         if let Some(response) =
