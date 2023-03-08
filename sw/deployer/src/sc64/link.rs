@@ -382,8 +382,8 @@ pub fn list_local_devices() -> Result<Vec<LocalDevice>, Error> {
 }
 
 pub enum ServerEvent {
-    StartedListening(String),
-    NewConnection(String),
+    Listening(String),
+    Connection(String),
     Disconnected(String),
     Err(String),
 }
@@ -395,9 +395,7 @@ pub fn run_server(
 ) -> Result<(), Error> {
     let listener = TcpListener::bind(address)?;
 
-    event_callback(ServerEvent::StartedListening(
-        listener.local_addr()?.to_string(),
-    ));
+    event_callback(ServerEvent::Listening(listener.local_addr()?.to_string()));
 
     for stream in listener.incoming() {
         match stream {
@@ -429,7 +427,7 @@ fn server_accept_connection(
 
     let mut buffer = [0u8; 4];
 
-    event_callback(ServerEvent::NewConnection(peer.clone()));
+    event_callback(ServerEvent::Connection(peer.clone()));
 
     loop {
         stream.set_nonblocking(true)?;

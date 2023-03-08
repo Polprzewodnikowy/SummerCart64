@@ -62,6 +62,7 @@ jobs:
 
           - os: ubuntu-latest
             linux-packages: libudev-dev
+            rust-flags: -C target-feature=+crt-static
             executable: sc64deployer
             name: sc64-deployer-linux
             options: -czf
@@ -96,6 +97,8 @@ jobs:
       - name: Build deployer
         run: cargo b -r
         working-directory: sw/deployer
+        env:
+          RUSTFLAGS: ${{ matrix.rust-flags }}
 
       - name: Package executable
         run: |
