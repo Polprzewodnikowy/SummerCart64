@@ -63,6 +63,7 @@ jobs:
           - os: ubuntu-latest
             linux-packages: libudev-dev
             rust-flags: -C target-feature=+crt-static
+            rust-options: --target x86_64-unknown-linux-gnu
             executable: sc64deployer
             name: sc64-deployer-linux
             options: -czf
@@ -95,7 +96,7 @@ jobs:
           sudo apt-get -y install ${{ matrix.linux-packages }}
 
       - name: Build deployer
-        run: cargo b -r
+        run: cargo b -r ${{ matrix.rust-options }}
         working-directory: sw/deployer
         env:
           RUSTFLAGS: ${{ matrix.rust-flags }}
