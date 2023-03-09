@@ -10,7 +10,7 @@ pub enum SaveType {
     Sram128kB,
 }
 
-const HASH_CHUNK_LENGTH: usize = 256 * 1024;
+const HASH_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
 pub fn guess_save_type<T: Read + Seek>(
     reader: &mut T,

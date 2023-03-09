@@ -145,13 +145,13 @@ class JedecFile:
 
 
 class SC64UpdateData:
-    __UPDATE_TOKEN = b'SC64 Update v2.0'
+    __UPDATE_TOKEN              = b'SC64 Update v2.0'
 
-    __CHUNK_ID_UPDATE_INFO = 1
-    __CHUNK_ID_MCU_DATA = 2
-    __CHUNK_ID_FPGA_DATA = 3
-    __CHUNK_ID_BOOTLOADER_DATA = 4
-    __CHUNK_ID_PRIMER_DATA = 5
+    __CHUNK_ID_UPDATE_INFO      = 1
+    __CHUNK_ID_MCU_DATA         = 2
+    __CHUNK_ID_FPGA_DATA        = 3
+    __CHUNK_ID_BOOTLOADER_DATA  = 4
+    __CHUNK_ID_PRIMER_DATA      = 5
 
     __data = b''
 

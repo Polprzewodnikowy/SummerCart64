@@ -397,10 +397,8 @@ bool cfg_update_setting (uint32_t *args) {
     return false;
 }
 
-bool cfg_set_rom_write_enable (bool value) {
-    uint32_t scr = fpga_reg_get(REG_CFG_SCR);
+void cfg_set_rom_write_enable (bool value) {
     cfg_change_scr_bits(CFG_SCR_ROM_WRITE_ENABLED, value);
-    return (scr & CFG_SCR_ROM_WRITE_ENABLED);
 }
 
 save_type_t cfg_get_save_type (void) {

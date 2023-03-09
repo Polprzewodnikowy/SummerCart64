@@ -281,7 +281,9 @@ static void usb_rx_process (void) {
                 break;
 
             case 'U':
-                if ((p.read_length > 0) && usb_dma_ready()) {
+                if (p.rx_args[1] == 0) {
+                    p.rx_state = RX_STATE_IDLE;
+                } else if ((p.read_length > 0) && usb_dma_ready()) {
                     uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
                     if (!p.rx_dma_running) {
                         fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
@@ -295,9 +297,6 @@ static void usb_rx_process (void) {
                         p.read_length -= length;
                         p.read_address += length;
                         p.read_ready = true;
-                        if (p.rx_args[1] == 0) {
-                            p.rx_state = RX_STATE_IDLE;
-                        }
                     }
                 }
                 break;
@@ -328,19 +327,17 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 break;
 
-            case 'f': {
-                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
+            case 'f':
+                cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_backup(p.rx_args[0], &p.response_info.data[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_error = (p.response_info.data[0] != UPDATE_OK);
                 p.response_info.data_length = 8;
-                cfg_set_rom_write_enable(rom_write_enable_restore);
                 break;
-            }
 
-            case 'F': {
-                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
+            case 'F':
+                cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_prepare(p.rx_args[0], p.rx_args[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
@@ -349,10 +346,8 @@ static void usb_rx_process (void) {
                     p.response_info.done_callback = update_start;
                 } else {
                     p.response_error = true;
-                    cfg_set_rom_write_enable(rom_write_enable_restore);
                 }
                 break;
-            }
 
             case '?':
                 p.rx_state = RX_STATE_IDLE;

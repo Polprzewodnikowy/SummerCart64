@@ -5,16 +5,15 @@ set -e
 PACKAGE_FILE_NAME="sc64-extra"
 
 TOP_FILES=(
-    "./sw/pc/primer.py"
-    "./sw/pc/requirements.txt"
-    "./sw/pc/sc64.py"
-    "./sw/update/sc64-firmware.bin"
+    "./fw/ftdi/ft232h_config.xml"
+    "./sw/tools/primer.py"
+    "./sw/tools/requirements.txt"
+    "./sw/tools/sc64-firmware.bin"
 )
 
 FILES=(
     "./assets/*"
     "./docs/*"
-    "./fw/ftdi/ft232h_config.xml"
     "./hw/pcb/sc64_hw_v2.0a_bom.html"
     "./hw/pcb/sc64v2.kicad_pcb"
     "./hw/pcb/sc64v2.kicad_pro"
@@ -84,7 +83,7 @@ build_update () {
     build_controller
     build_fpga
 
-    pushd sw/update > /dev/null
+    pushd sw/tools > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
         rm -f ./sc64-firmware.bin
     fi
@@ -117,7 +116,7 @@ build_release () {
     zip -j -r $PACKAGE ${TOP_FILES[@]}
     zip -r $PACKAGE ${FILES[@]}
 
-    cp sw/update/sc64-firmware.bin ./sc64-firmware${SC64_VERSION}.bin
+    cp sw/tools/sc64-firmware.bin ./sc64-firmware${SC64_VERSION}.bin
 
     BUILT_RELEASE=true
 }
