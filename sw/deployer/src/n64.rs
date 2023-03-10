@@ -1,4 +1,7 @@
+use include_flate::flate;
 use std::io::{Error, Read, Seek, SeekFrom};
+
+flate!(static MUPEN64PLUS_INI: str from "data/mupen64plus.ini");
 
 pub enum SaveType {
     None,
@@ -67,8 +70,7 @@ pub fn guess_save_type<T: Read + Seek>(
 
     let hash = hex::encode_upper(hasher.compute().0);
 
-    let database_ini = include_str!("../data/mupen64plus.ini");
-    let database = ini::Ini::load_from_str(database_ini)
+    let database = ini::Ini::load_from_str(MUPEN64PLUS_INI.as_str())
         .expect("Error during mupen64plus.ini parse operation");
     if let Some(section) = database.section(Some(hash)) {
         let save_type = section.get("SaveType").map_or(SaveType::None, |t| match t {
