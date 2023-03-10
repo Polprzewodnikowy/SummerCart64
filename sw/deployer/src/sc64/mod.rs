@@ -109,20 +109,21 @@ impl SC64 {
         Ok(data[0..4].try_into().unwrap())
     }
 
-    fn command_version_get(&mut self) -> Result<(u16, u16), Error> {
+    fn command_version_get(&mut self) -> Result<(u16, u16, u32), Error> {
         let data = self.link.execute_command(&Command {
             id: b'V',
             args: [0, 0],
             data: &[],
         })?;
-        if data.len() != 4 {
+        if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for version get command",
             ));
         }
         let major = u16::from_be_bytes(data[0..2].try_into().unwrap());
         let minor = u16::from_be_bytes(data[2..4].try_into().unwrap());
-        Ok((major, minor))
+        let revision = u32::from_be_bytes(data[4..8].try_into().unwrap());
+        Ok((major, minor, revision))
     }
 
     fn command_state_reset(&mut self) -> Result<(), Error> {
@@ -613,8 +614,8 @@ impl SC64 {
         Ok(())
     }
 
-    pub fn check_firmware_version(&mut self) -> Result<(u16, u16), Error> {
-        let (major, minor) = self
+    pub fn check_firmware_version(&mut self) -> Result<(u16, u16, u32), Error> {
+        let (major, minor, revision) = self
             .command_version_get()
             .map_err(|_| Error::new("Outdated SC64 firmware version, please update firmware"))?;
         if major != SUPPORTED_MAJOR_VERSION || minor < SUPPORTED_MINOR_VERSION {
@@ -622,7 +623,7 @@ impl SC64 {
                 "Unsupported SC64 firmware version, please update firmware",
             ));
         }
-        Ok((major, minor))
+        Ok((major, minor, revision))
     }
 
     pub fn reset_state(&mut self) -> Result<(), Error> {

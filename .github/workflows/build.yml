@@ -25,7 +25,7 @@ jobs:
         id: version
         with:
           pattern: '\/'
-          string: '-${{ github.ref_name }}'
+          string: '${{ github.ref_name }}'
           replace-with: '-'
 
       - name: Build firmware
@@ -36,18 +36,18 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sc64-pkg${{ steps.version.outputs.replaced }}
+          name: sc64-pkg-${{ steps.version.outputs.replaced }}
           path: |
-            sc64-extra${{ steps.version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.version.outputs.replaced }}.bin
+            sc64-extra-${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sc64-extra${{ steps.version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.version.outputs.replaced }}.bin
+            sc64-extra-${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
   build-deployer:
     strategy:
@@ -84,7 +84,7 @@ jobs:
         id: version
         with:
           pattern: '\/'
-          string: '-${{ github.ref_name }}'
+          string: '${{ github.ref_name }}'
           replace-with: '-'
 
       - name: Install linux packages
@@ -101,18 +101,18 @@ jobs:
         run: |
           mkdir package
           cd target/release
-          tar ${{ matrix.options }} ../../package/${{ matrix.name }}${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+          tar ${{ matrix.options }} ../../package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
         working-directory: sw/deployer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.name }}${{ steps.version.outputs.replaced }}
-          path: sw/deployer/package/${{ matrix.name }}${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
+          name: ${{ matrix.name }}-${{ steps.version.outputs.replaced }}
+          path: sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sw/deployer/package/${{ matrix.name }}${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
+            sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}

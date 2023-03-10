@@ -460,12 +460,12 @@ fn handle_dump_command(connection: Connection, args: &DumpArgs) -> Result<(), sc
 fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let (major, minor) = sc64.check_firmware_version()?;
+    let (major, minor, revision) = sc64.check_firmware_version()?;
     let state = sc64.get_device_state()?;
     let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S %Z");
 
     println!("{}", "SC64 information and current state:".bold());
-    println!(" Firmware version:    v{}.{}", major, minor);
+    println!(" Firmware version:    v{}.{}.{}", major, minor, revision);
     println!(" RTC datetime:        {}", datetime);
     println!(" Boot mode:           {}", state.boot_mode);
     println!(" Save type:           {}", state.save_type);

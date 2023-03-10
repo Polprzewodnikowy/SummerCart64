@@ -2,13 +2,15 @@
 
 set -e
 
+SC64_VERSION=${SC64_VERSION:-"none"}
+
 PACKAGE_FILE_NAME="sc64-extra"
 
 TOP_FILES=(
     "./fw/ftdi/ft232h_config.xml"
     "./sw/tools/primer.py"
     "./sw/tools/requirements.txt"
-    "./sw/tools/sc64-firmware.bin"
+    "./sc64-firmware-${SC64_VERSION}.bin"
 )
 
 FILES=(
@@ -85,9 +87,10 @@ build_update () {
 
     pushd sw/tools > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        rm -f ./sc64-firmware.bin
+        rm -f ../../sc64-firmware-*.bin
     fi
     GIT_INFO=""
+    if [ ! -z "${SC64_VERSION}" ]; then GIT_INFO+=$'\n'"ver: $SC64_VERSION"; fi
     if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+=$'\n'"branch: $GIT_BRANCH"; fi
     if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+=$'\n'"tag: $GIT_TAG"; fi
     if [ ! -z "${GIT_SHA}" ]; then GIT_INFO+=$'\n'"sha: $GIT_SHA"; fi
@@ -98,7 +101,7 @@ build_update () {
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \
         --primer ../controller/build/primer/primer.bin \
-        sc64-firmware.bin
+        ../../sc64-firmware-${SC64_VERSION}.bin
     popd > /dev/null
 
     BUILT_UPDATE=true
@@ -109,14 +112,12 @@ build_release () {
 
     build_update
 
-    if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
-        rm -f "./${PACKAGE_FILE_NAME}.zip"
+    if [ -e "./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip" ]; then
+        rm -f ./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip
     fi
-    PACKAGE="./${PACKAGE_FILE_NAME}${SC64_VERSION}.zip"
+    PACKAGE="./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip"
     zip -j -r $PACKAGE ${TOP_FILES[@]}
     zip -r $PACKAGE ${FILES[@]}
-
-    cp sw/tools/sc64-firmware.bin ./sc64-firmware${SC64_VERSION}.bin
 
     BUILT_RELEASE=true
 }

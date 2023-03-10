@@ -191,8 +191,8 @@ static void usb_rx_process (void) {
             case 'V':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.data_length = 4;
-                p.response_info.data[0] = version_firmware();
+                p.response_info.data_length = 8;
+                version_firmware(&p.response_info.data[0], &p.response_info.data[1]);
                 break;
 
             case 'R':

@@ -470,7 +470,7 @@ void cfg_process (void) {
                 break;
 
             case 'V':
-                args[0] = version_firmware();
+                version_firmware(&args[0], &args[1]);
                 break;
 
             case 'c':
