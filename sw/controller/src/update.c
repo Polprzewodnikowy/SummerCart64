@@ -6,6 +6,9 @@
 #include "vendor.h"
 
 
+#define SDRAM_ADDRESS       (0x00000000UL)
+#define SDRAM_LENGTH        (64 * 1024 * 1024)
+
 #define UPDATE_MAGIC_START  (0x54535055UL)
 #define BOOTLOADER_ADDRESS  (0x04E00000UL)
 #define BOOTLOADER_LENGTH   (0x001E0000UL)
@@ -191,6 +194,10 @@ update_error_t update_backup (uint32_t address, uint32_t *length) {
     uint32_t fpga_length;
     uint32_t bootloader_length;
 
+    if (address >= (SDRAM_ADDRESS + SDRAM_LENGTH)) {
+        return UPDATE_ERROR_ADDRESS;
+    }
+
     *length = update_write_token(&address);
 
     *length += update_prepare_chunk(&address, CHUNK_ID_MCU_DATA);
@@ -214,6 +221,10 @@ update_error_t update_backup (uint32_t address, uint32_t *length) {
     }
     *length += update_finalize_chunk(&address, bootloader_length);
 
+    if ((address + *length) > (SDRAM_ADDRESS + SDRAM_LENGTH)) {
+        return UPDATE_ERROR_ADDRESS;
+    }
+
     return UPDATE_OK;
 }
 
@@ -222,6 +233,13 @@ update_error_t update_prepare (uint32_t address, uint32_t length) {
     chunk_id_t id;
     uint32_t data_address;
     uint32_t data_length;
+
+    if ((address >= (SDRAM_ADDRESS + SDRAM_LENGTH)) || (length > SDRAM_LENGTH)) {
+        return UPDATE_ERROR_ADDRESS;
+    }
+    if (end_address > (SDRAM_ADDRESS + SDRAM_LENGTH)) {
+        return UPDATE_ERROR_ADDRESS;
+    }
 
     if (update_check_token(&address)) {
         return UPDATE_ERROR_TOKEN;

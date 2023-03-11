@@ -8,10 +8,10 @@
 
 
 bool flash_program (uint32_t src, uint32_t dst, uint32_t length) {
-    if (((src + length) >= FLASH_ADDRESS) && (src < (FLASH_ADDRESS + FLASH_SIZE))) {
+    if (((src + length) > FLASH_ADDRESS) && (src < (FLASH_ADDRESS + FLASH_SIZE))) {
         return true;
     }
-    if ((dst < FLASH_ADDRESS) || ((dst + length) >= (FLASH_ADDRESS + FLASH_SIZE))) {
+    if ((dst < FLASH_ADDRESS) || ((dst + length) > (FLASH_ADDRESS + FLASH_SIZE))) {
         return true;
     }
     while (length > 0) {
@@ -29,15 +29,18 @@ void flash_wait_busy (void) {
     fpga_mem_read(FLASH_ADDRESS, 2, dummy);
 }
 
-bool flash_erase_block (uint32_t offset) {
-    if ((offset % FLASH_ERASE_BLOCK_SIZE) != 0) {
+bool flash_erase_block (uint32_t address) {
+    if ((address % FLASH_ERASE_BLOCK_SIZE) != 0) {
         return true;
     }
-    offset &= (FLASH_SIZE - 1);
+    if ((address < FLASH_ADDRESS) || (address >= (FLASH_ADDRESS + FLASH_SIZE))) {
+        return true;
+    }
+    address &= (FLASH_SIZE - 1);
     for (int i = 0; i < (FLASH_ERASE_BLOCK_SIZE / ERASE_BLOCK_SIZE); i++) {
-        fpga_reg_set(REG_FLASH_SCR, offset);
+        fpga_reg_set(REG_FLASH_SCR, address);
         while (fpga_reg_get(REG_FLASH_SCR) & FLASH_SCR_BUSY);
-        offset += ERASE_BLOCK_SIZE;
+        address += ERASE_BLOCK_SIZE;
     }
     flash_wait_busy();
     return false;

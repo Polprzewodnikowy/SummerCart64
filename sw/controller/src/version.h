@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 
-uint32_t version_firmware (void);
+void version_firmware (uint32_t *version, uint32_t *revision);
 
 
 #endif

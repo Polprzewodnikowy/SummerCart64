@@ -2,19 +2,20 @@
 
 set -e
 
+SC64_VERSION=${SC64_VERSION:-"none"}
+
 PACKAGE_FILE_NAME="sc64-extra"
 
 TOP_FILES=(
-    "./sw/pc/primer.py"
-    "./sw/pc/requirements.txt"
-    "./sw/pc/sc64.py"
-    "./sw/update/sc64-firmware.bin"
+    "./fw/ftdi/ft232h_config.xml"
+    "./sw/tools/primer.py"
+    "./sw/tools/requirements.txt"
+    "./sc64-firmware-${SC64_VERSION}.bin"
 )
 
 FILES=(
     "./assets/*"
     "./docs/*"
-    "./fw/ftdi/ft232h_config.xml"
     "./hw/pcb/sc64_hw_v2.0a_bom.html"
     "./hw/pcb/sc64v2.kicad_pcb"
     "./hw/pcb/sc64v2.kicad_pro"
@@ -84,23 +85,23 @@ build_update () {
     build_controller
     build_fpga
 
-    pushd sw/update > /dev/null
+    pushd sw/tools > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
-        rm -f ./sc64-firmware.bin
+        rm -f ../../sc64-firmware-*.bin
     fi
     GIT_INFO=""
-    if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+="branch: [$GIT_BRANCH] "; fi
-    if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+="tag: [$GIT_TAG] "; fi
-    if [ ! -z "${GIT_SHA}" ]; then GIT_INFO+="sha: [$GIT_SHA] "; fi
-    if [ ! -z "${GIT_MESSAGE}" ]; then GIT_INFO+="message: [$GIT_MESSAGE] "; fi
-    GIT_INFO=$(echo "$GIT_INFO" | xargs)
+    if [ ! -z "${SC64_VERSION}" ]; then GIT_INFO+=$'\n'"ver: $SC64_VERSION"; fi
+    if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+=$'\n'"branch: $GIT_BRANCH"; fi
+    if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+=$'\n'"tag: $GIT_TAG"; fi
+    if [ ! -z "${GIT_SHA}" ]; then GIT_INFO+=$'\n'"sha: $GIT_SHA"; fi
+    if [ ! -z "${GIT_MESSAGE}" ]; then GIT_INFO+=$'\n'"msg: $GIT_MESSAGE"; fi
     python3 update.py \
         --git "$GIT_INFO" \
         --mcu ../controller/build/app/app.bin \
         --fpga ../../fw/project/lcmxo2/impl1/sc64_impl1.jed \
         --boot ../bootloader/build/bootloader.bin \
         --primer ../controller/build/primer/primer.bin \
-        sc64-firmware.bin
+        ../../sc64-firmware-${SC64_VERSION}.bin
     popd > /dev/null
 
     BUILT_UPDATE=true
@@ -111,14 +112,12 @@ build_release () {
 
     build_update
 
-    if [ -e "./${PACKAGE_FILE_NAME}.zip" ]; then
-        rm -f "./${PACKAGE_FILE_NAME}.zip"
+    if [ -e "./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip" ]; then
+        rm -f ./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip
     fi
-    PACKAGE="./${PACKAGE_FILE_NAME}${SC64_VERSION}.zip"
+    PACKAGE="./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip"
     zip -j -r $PACKAGE ${TOP_FILES[@]}
     zip -r $PACKAGE ${FILES[@]}
-
-    cp sw/update/sc64-firmware.bin ./sc64-firmware${SC64_VERSION}.bin
 
     BUILT_RELEASE=true
 }

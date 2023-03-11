@@ -1,10 +1,12 @@
 #include "version.h"
 
 
-#define VERSION_MAJOR   (2)
-#define VERSION_MINOR   (12)
+#define VERSION_MAJOR       (2)
+#define VERSION_MINOR       (12)
+#define VERSION_REVISION    (1)
 
 
-uint32_t version_firmware (void) {
-    return ((VERSION_MAJOR << 16) | (VERSION_MINOR));
+void version_firmware (uint32_t *version, uint32_t *revision) {
+    *version = ((VERSION_MAJOR << 16) | (VERSION_MINOR));
+    *revision = VERSION_REVISION;
 }
