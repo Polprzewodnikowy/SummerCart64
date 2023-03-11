@@ -1,6 +1,6 @@
 [package]
 name = "sc64deployer"
-version = "2.12.1"
+version = "2.14.0"
 edition = "2021"
 authors = ["Polprzewodnikowy"]
 description = "SC64 loader and control software"
