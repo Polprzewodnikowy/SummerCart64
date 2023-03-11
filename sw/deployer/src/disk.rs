@@ -58,7 +58,7 @@ macro_rules! zone {
     };
 }
 
-const DISK_ZONES: [DiskZone; 16] = [
+const ZONE_MAPPING: [DiskZone; 16] = [
     zone!(0, 232, 158, 0),
     zone!(0, 216, 158, 158),
     zone!(0, 208, 149, 316),
@@ -67,17 +67,17 @@ const DISK_ZONES: [DiskZone; 16] = [
     zone!(0, 160, 149, 763),
     zone!(0, 144, 149, 912),
     zone!(0, 128, 114, 1061),
-    zone!(1, 216, 158, 157),
-    zone!(1, 208, 158, 315),
-    zone!(1, 192, 149, 464),
-    zone!(1, 176, 149, 613),
-    zone!(1, 160, 149, 762),
-    zone!(1, 144, 149, 911),
-    zone!(1, 128, 149, 1060),
-    zone!(1, 112, 114, 1174),
+    zone!(1, 216, 158, 0),
+    zone!(1, 208, 158, 158),
+    zone!(1, 192, 149, 316),
+    zone!(1, 176, 149, 465),
+    zone!(1, 160, 149, 614),
+    zone!(1, 144, 149, 763),
+    zone!(1, 128, 149, 912),
+    zone!(1, 112, 114, 1061),
 ];
 
-const DISK_VZONE_TO_PZONE: [[usize; 16]; 7] = [
+const VZONE_TO_PZONE: [[usize; 16]; 7] = [
     [0, 1, 2, 9, 8, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10],
     [0, 1, 2, 3, 10, 9, 8, 4, 5, 6, 7, 15, 14, 13, 12, 11],
     [0, 1, 2, 3, 4, 11, 10, 9, 8, 5, 6, 7, 15, 14, 13, 12],
@@ -86,6 +86,8 @@ const DISK_VZONE_TO_PZONE: [[usize; 16]; 7] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 14, 13, 12, 11, 10, 9, 8, 15],
     [0, 1, 2, 3, 4, 5, 6, 7, 15, 14, 13, 12, 11, 10, 9, 8],
 ];
+
+const ROM_ZONES: [usize; 7] = [5, 7, 9, 11, 13, 15, 16];
 
 struct Mapping {
     lba: usize,
@@ -162,51 +164,47 @@ pub fn open(path: &str) -> Result<Disk, Error> {
 
 pub fn open_multiple(paths: &[String]) -> Result<Vec<Disk>, Error> {
     let mut disks: Vec<Disk> = Vec::new();
-
     for path in paths {
         let disk = open(path)?;
         disks.push(disk);
     }
-
     if !disks.windows(2).all(|d| d[0].format == d[1].format) {
         return Err(Error::new("Disk format mismatch"));
     }
-
     Ok(disks)
 }
 
 fn load_ndd(file: &mut File) -> Result<(Format, HashMap<usize, Mapping>), Error> {
     let mut disk_format: Option<Format> = None;
-    let mut disk_type: u8 = 0;
+    let mut disk_type: usize = 0;
     let mut sys_data = vec![0u8; SYSTEM_SECTOR_LENGTH];
-    let mut bad_lba: Vec<usize> = Vec::new();
+    let mut bad_lbas: Vec<usize> = Vec::new();
 
     for info in SYSTEM_AREA {
-        bad_lba.clear();
+        bad_lbas.clear();
         for &lba in info.sys_lba {
             let data = load_sys_lba(file, lba)?;
             if verify_sys_lba(&data, info.sector_length) {
                 if (data[4] != 0x10) || ((data[5] & 0xF0) != 0x10) {
-                    bad_lba.push(lba);
+                    bad_lbas.push(lba);
                 } else {
                     disk_format = Some(info.format);
-                    disk_type = data[5] & 0x0F;
+                    disk_type = (data[5] & 0x0F) as usize;
                     sys_data = data[0..SYSTEM_SECTOR_LENGTH].to_vec();
                 }
             } else {
-                bad_lba.push(lba);
+                bad_lbas.push(lba);
             }
         }
         if disk_format.is_some() {
-            bad_lba.append(&mut info.bad_lba.to_vec());
+            bad_lbas.append(&mut info.bad_lba.to_vec());
             break;
         }
     }
-
     if disk_format.is_none() {
         return Err(Error::new("Provided 64DD disk file is not valid"));
     }
-    if disk_type >= DISK_VZONE_TO_PZONE.len() as u8 {
+    if disk_type >= VZONE_TO_PZONE.len() {
         return Err(Error::new("Unknown disk type"));
     }
 
@@ -215,18 +213,17 @@ fn load_ndd(file: &mut File) -> Result<(Format, HashMap<usize, Mapping>), Error>
         let data = load_sys_lba(file, lba)?;
         let valid = verify_sys_lba(&data, SYSTEM_SECTOR_LENGTH);
         if !valid {
-            bad_lba.push(lba);
+            bad_lbas.push(lba);
         }
         id_lba_valid |= valid;
     }
-
     if !id_lba_valid {
         return Err(Error::new("No valid ID LBA found"));
     }
 
     let mut zone_bad_tracks: Vec<Vec<usize>> = Vec::new();
 
-    for (zone, info) in DISK_ZONES.iter().enumerate() {
+    for (zone, info) in ZONE_MAPPING.iter().enumerate() {
         let mut bad_tracks: Vec<usize> = Vec::new();
         let start = if zone == 0 { 0 } else { sys_data[0x07 + zone] };
         let stop = sys_data[0x07 + zone + 1];
@@ -241,60 +238,47 @@ fn load_ndd(file: &mut File) -> Result<(Format, HashMap<usize, Mapping>), Error>
 
     let mut mapping = HashMap::new();
 
-    let mut current_lba: usize = 0;
+    let mut lba: usize = 0;
+    let mut offset: usize = 0;
     let mut starting_block: usize = 0;
-    let mut file_offset: usize = 0;
 
-    for zone in DISK_VZONE_TO_PZONE[disk_type as usize] {
+    for (vzone, &pzone) in VZONE_TO_PZONE[disk_type].iter().enumerate() {
         let DiskZone {
             head,
             sector_length,
             tracks,
             track_offset,
-        } = DISK_ZONES[zone];
+        } = ZONE_MAPPING[pzone];
 
-        let mut track = track_offset;
+        let zone_tracks: Box<dyn Iterator<Item = usize>> = if head == 0 {
+            Box::new(0..tracks)
+        } else {
+            Box::new((0..tracks).rev())
+        };
 
-        for zone_track in 0..tracks {
-            let current_zone_track = if head == 0 {
-                zone_track
-            } else {
-                (tracks - 1) - zone_track
-            };
-
-            if zone_bad_tracks[zone].contains(&current_zone_track) {
-                track = if head == 0 {
-                    track + 1
-                } else {
-                    track.saturating_sub(1)
-                };
-                continue;
-            }
-
-            for block in 0..BLOCKS_PER_TRACK {
-                let location = track << 2 | head << 1 | (starting_block ^ block);
-                let length = sector_length * SECTORS_PER_BLOCK;
-                if !bad_lba.contains(&current_lba) {
-                    mapping.insert(
-                        location,
-                        Mapping {
-                            lba: current_lba,
-                            offset: file_offset,
-                            length,
-                            writable: true,
-                        },
-                    );
+        for zone_track in zone_tracks {
+            if !zone_bad_tracks[pzone].contains(&zone_track) {
+                for block in 0..BLOCKS_PER_TRACK {
+                    let track = track_offset + zone_track;
+                    let location = (track << 2) | (head << 1) | (starting_block ^ block);
+                    let length = sector_length * SECTORS_PER_BLOCK;
+                    if !bad_lbas.contains(&lba) {
+                        let writable = vzone >= ROM_ZONES[disk_type];
+                        mapping.insert(
+                            location,
+                            Mapping {
+                                lba,
+                                offset,
+                                length,
+                                writable,
+                            },
+                        );
+                    }
+                    lba += 1;
+                    offset += length;
                 }
-                file_offset += length;
-                current_lba += 1;
+                starting_block ^= 1;
             }
-
-            track = if head == 0 {
-                track + 1
-            } else {
-                track.saturating_sub(1)
-            };
-            starting_block ^= 1;
         }
     }
 

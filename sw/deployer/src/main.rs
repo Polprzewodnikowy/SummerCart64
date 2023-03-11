@@ -501,14 +501,14 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                     if let Some(ref mut disk) = selected_disk {
                         let reply_packet = match packet.kind {
                             sc64::DiskPacketKind::Read => {
-                                print!("[R]");
+                                print!("{}", "[R]".cyan());
                                 disk.read_block(track, head, block)?.map(|data| {
                                     packet.info.set_data(&data);
                                     packet
                                 })
                             }
                             sc64::DiskPacketKind::Write => {
-                                print!("[W]");
+                                print!("{}", "[W]".yellow());
                                 let data = &packet.info.data;
                                 disk.write_block(track, head, block, data)?.map(|_| packet)
                             }
