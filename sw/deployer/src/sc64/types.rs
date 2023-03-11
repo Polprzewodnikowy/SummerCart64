@@ -628,9 +628,14 @@ impl TryFrom<Vec<u8>> for DebugPacket {
     }
 }
 
-pub enum DiskPacket {
-    ReadBlock(DiskBlock),
-    WriteBlock(DiskBlock),
+pub enum DiskPacketKind {
+    Read,
+    Write,
+}
+
+pub struct DiskPacket {
+    pub kind: DiskPacketKind,
+    pub info: DiskBlock,
 }
 
 impl TryFrom<Vec<u8>> for DiskPacket {
@@ -650,8 +655,14 @@ impl TryFrom<Vec<u8>> for DiskPacket {
             data: value[12..].to_vec(),
         };
         Ok(match command {
-            1 => Self::ReadBlock(disk_block),
-            2 => Self::WriteBlock(disk_block),
+            1 => DiskPacket {
+                kind: DiskPacketKind::Read,
+                info: disk_block,
+            },
+            2 => DiskPacket {
+                kind: DiskPacketKind::Write,
+                info: disk_block,
+            },
             _ => return Err(Error::new("Unknown disk packet command code")),
         })
     }

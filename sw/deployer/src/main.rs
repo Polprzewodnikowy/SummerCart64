@@ -1,13 +1,13 @@
 mod debug;
+mod disk;
 mod n64;
-pub mod sc64;
+mod sc64;
 
 use chrono::Local;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use clap_num::maybe_hex_range;
 use colored::Colorize;
 use panic_message::panic_message;
-use sc64::ServerEvent;
 use std::{
     fs::File,
     io::{stdin, stdout, Read, Write},
@@ -27,7 +27,7 @@ struct Cli {
     command: Commands,
 
     /// Connect to SC64 device on provided serial port
-    #[arg(short, long, conflicts_with = "remote")]
+    #[arg(short, long)]
     port: Option<String>,
 
     /// Connect to SC64 device on provided remote address
@@ -49,7 +49,7 @@ enum Commands {
         command: DownloadCommands,
     },
 
-    /// Upload ROM, 64DD IPL and run disk server
+    /// Upload ROM (and save), 64DD IPL then run disk server
     _64DD(_64DDArgs),
 
     /// Enter debug mode
@@ -58,7 +58,7 @@ enum Commands {
     /// Dump data from arbitrary location in SC64 memory space
     Dump(DumpArgs),
 
-    /// Print information about SC64 device
+    /// Print information about connected SC64 device
     Info,
 
     /// Update persistent settings on SC64 device
@@ -98,8 +98,8 @@ struct UploadArgs {
     #[arg(short, long)]
     no_shadow: bool,
 
-    /// Force TV type (ignored when used in conjunction with direct boot mode)
-    #[arg(long)]
+    /// Force TV type
+    #[arg(long, conflicts_with = "direct")]
     tv: Option<TvType>,
 }
 
@@ -117,19 +117,32 @@ struct DownloadArgs {
 
 #[derive(Args)]
 struct _64DDArgs {
-    /// Path to the ROM file
-    #[arg(short, long)]
-    rom: Option<PathBuf>,
-
     /// Path to the 64DD IPL file
     ddipl: PathBuf,
 
     /// Path to the 64DD disk file (.ndd format, can be specified multiple times)
+    #[arg(required = true)]
     disk: Vec<PathBuf>,
+
+    /// Path to the ROM file
+    #[arg(short, long)]
+    rom: Option<PathBuf>,
+
+    /// Path to the save file
+    #[arg(short, long, requires = "rom")]
+    save: Option<PathBuf>,
+
+    /// Override autodetected save type
+    #[arg(short = 't', long, requires = "rom")]
+    save_type: Option<SaveType>,
 
     /// Use direct boot mode (skip bootloader)
     #[arg(short, long)]
     direct: bool,
+
+    /// Force TV type
+    #[arg(long, conflicts_with = "direct")]
+    tv: Option<TvType>,
 }
 
 #[derive(Args)]
@@ -308,9 +321,9 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let (mut rom_file, rom_name, rom_length) = open_file(&args.rom)?;
-
     sc64.reset_state()?;
+
+    let (mut rom_file, rom_name, rom_length) = open_file(&args.rom)?;
 
     log_wait(format!("Uploading ROM [{rom_name}]"), || {
         sc64.upload_rom(&mut rom_file, rom_length, args.no_shadow)
@@ -325,7 +338,6 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
         };
         save_type.into()
     };
-
     let save_type: sc64::SaveType = save.into();
     println!("Save type set to [{save_type}]");
     sc64.set_save_type(save_type)?;
@@ -347,13 +359,9 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
     sc64.set_boot_mode(boot_mode)?;
 
     if let Some(tv) = args.tv.clone() {
-        if args.direct {
-            println!("TV type ignored due to direct boot mode being enabled");
-        } else {
-            let tv_type: sc64::TvType = tv.into();
-            println!("TV type set to [{tv_type}]");
-            sc64.set_tv_type(tv_type)?;
-        }
+        let tv_type: sc64::TvType = tv.into();
+        println!("TV type set to [{tv_type}]");
+        sc64.set_tv_type(tv_type)?;
     }
 
     sc64.calculate_cic_parameters()?;
@@ -381,25 +389,178 @@ fn handle_download_command(
 }
 
 fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), sc64::Error> {
-    let _ = (connection, args);
+    const MAX_ROM_LENGTH: usize = 32 * 1024 * 1024;
 
-    // TODO: handle 64DD stuff
+    let mut sc64 = init_sc64(connection, true)?;
 
-    // TODO: print BIG warning to not use this mode together with real 64DD
+    println!(
+        "{} {} {}",
+        "[WARNING]:".bold().bright_yellow(),
+        "Do not use this mode when real 64DD accessory is connected to the N64.".bright_yellow(),
+        "This might permanently damage either 64DD or SC64.".bright_yellow()
+    );
 
-    println!("{}", "Sorry nothing".yellow());
-    println!("{}", "64DD emulation not implemented yet".red());
+    sc64.reset_state()?;
+
+    if let Some(rom) = &args.rom {
+        let (mut rom_file, rom_name, rom_length) = open_file(rom)?;
+        if rom_length > MAX_ROM_LENGTH {
+            return Err(sc64::Error::new("ROM file size too big for 64DD mode"));
+        }
+        log_wait(format!("Uploading ROM [{rom_name}]"), || {
+            sc64.upload_rom(&mut rom_file, rom_length, false)
+        })?;
+
+        let save: SaveType = if let Some(save_type) = args.save_type.clone() {
+            save_type
+        } else {
+            let (save_type, title) = n64::guess_save_type(&mut rom_file)?;
+            if let Some(title) = title {
+                println!("ROM title: {title}");
+            };
+            save_type.into()
+        };
+        let save_type: sc64::SaveType = save.into();
+        println!("Save type set to [{save_type}]");
+        sc64.set_save_type(save_type)?;
+
+        if args.save.is_some() {
+            let (mut save_file, save_name, save_length) = open_file(&args.save.as_ref().unwrap())?;
+
+            log_wait(format!("Uploading save [{save_name}]"), || {
+                sc64.upload_save(&mut save_file, save_length)
+            })?;
+        }
+    }
+
+    let (mut ddipl_file, ddipl_name, ddipl_length) = open_file(&args.ddipl)?;
+
+    log_wait(format!("Uploading DDIPL [{ddipl_name}]"), || {
+        sc64.upload_ddipl(&mut ddipl_file, ddipl_length)
+    })?;
+
+    let boot_mode = if args.rom.is_some() {
+        if args.direct {
+            sc64::BootMode::DirectRom
+        } else {
+            sc64::BootMode::Rom
+        }
+    } else {
+        if args.direct {
+            sc64::BootMode::DirectDdIpl
+        } else {
+            sc64::BootMode::DdIpl
+        }
+    };
+    println!("Boot mode set to [{boot_mode}]");
+    sc64.set_boot_mode(boot_mode)?;
+
+    if let Some(tv) = args.tv.clone() {
+        let tv_type: sc64::TvType = tv.into();
+        println!("TV type set to [{tv_type}]");
+        sc64.set_tv_type(tv_type)?;
+    }
+
+    sc64.calculate_cic_parameters()?;
+
+    let disk_paths: Vec<String> = args
+        .disk
+        .iter()
+        .map(|path| path.to_string_lossy().to_string())
+        .collect();
+    let disk_names: Vec<String> = args
+        .disk
+        .iter()
+        .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+        .collect();
+
+    let mut disks = disk::open_multiple(&disk_paths)?;
+    let mut selected_disk_index: usize = 0;
+    let mut selected_disk: Option<&mut disk::Disk> = None;
+
+    let drive_type = match disks[0].get_format() {
+        disk::Format::Retail => sc64::DdDriveType::Retail,
+        disk::Format::Development => sc64::DdDriveType::Development,
+    };
+
+    sc64.configure_64dd(sc64::DdMode::Full, drive_type)?;
+
+    println!(
+        "{}",
+        "Press button on the SC64 device to cycle through provided disks".bold()
+    );
+
+    let exit = setup_exit_flag();
+    while !exit.load(Ordering::Relaxed) {
+        if let Some(data_packet) = sc64.receive_data_packet()? {
+            match data_packet {
+                sc64::DataPacket::Disk(mut packet) => {
+                    let track = packet.info.track;
+                    let head = packet.info.head;
+                    let block = packet.info.block;
+                    if let Some(ref mut disk) = selected_disk {
+                        let reply_packet = match packet.kind {
+                            sc64::DiskPacketKind::Read => {
+                                print!("[R]");
+                                disk.read_block(track, head, block)?.map(|data| {
+                                    packet.info.set_data(&data);
+                                    packet
+                                })
+                            }
+                            sc64::DiskPacketKind::Write => {
+                                print!("[W]");
+                                let data = &packet.info.data;
+                                disk.write_block(track, head, block, data)?.map(|_| packet)
+                            }
+                        };
+                        let lba = if let Some(lba) = disk.get_lba(track, head, block) {
+                            format!("{lba}")
+                        } else {
+                            "Invalid".to_string()
+                        };
+                        let message = format!(" {track:4}:{head}:{block} / LBA: {lba}");
+                        if reply_packet.is_some() {
+                            println!("{}", message.green());
+                        } else {
+                            println!("{}", message.red());
+                        }
+                        sc64.reply_disk_packet(reply_packet)?;
+                    } else {
+                        sc64.reply_disk_packet(None)?;
+                    }
+                }
+                sc64::DataPacket::Button => {
+                    if selected_disk.is_some() {
+                        sc64.set_64dd_disk_state(sc64::DdDiskState::Ejected)?;
+                        selected_disk = None;
+                        println!("64DD disk ejected [{}]", disk_names[selected_disk_index]);
+                    } else {
+                        selected_disk_index += 1;
+                        if selected_disk_index >= disks.len() {
+                            selected_disk_index = 0;
+                        }
+                        selected_disk = Some(&mut disks[selected_disk_index]);
+                        sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
+                        println!("64DD disk inserted [{}]", disk_names[selected_disk_index]);
+                    }
+                }
+                _ => {}
+            }
+        } else {
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
 
     Ok(())
 }
 
 fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
+
     let mut debug_handler = debug::new(args.gdb)?;
     if let Some(port) = args.gdb {
         println!("GDB TCP socket listening at [0.0.0.0:{port}]");
     }
-
-    let mut sc64 = init_sc64(connection, true)?;
 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
@@ -600,16 +761,16 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
     };
 
     sc64::run_server(port, args.address.clone(), |event| match event {
-        ServerEvent::Listening(address) => {
+        sc64::ServerEvent::Listening(address) => {
             println!("{}: Listening on address [{}]", "[Server]".bold(), address)
         }
-        ServerEvent::Connection(peer) => {
+        sc64::ServerEvent::Connection(peer) => {
             println!("{}: New connection from [{}]", "[Server]".bold(), peer);
         }
-        ServerEvent::Disconnected(peer) => {
+        sc64::ServerEvent::Disconnected(peer) => {
             println!("{}: Client disconnected [{}]", "[Server]".bold(), peer);
         }
-        ServerEvent::Err(error) => {
+        sc64::ServerEvent::Err(error) => {
             println!(
                 "{}: Client disconnected with error: {}",
                 "[Server]".bold(),

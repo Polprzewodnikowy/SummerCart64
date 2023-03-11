@@ -90,9 +90,9 @@ Second, program FPGA, microcontroller and bootloader:
  4. Check in device manager which port number `COMx` is assigned to serial adapter
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter)
  6. Locate `primer.py` script in root folder
- 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64-firmware.bin`
+ 7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64-firmware-{version}.bin`
  8. Run `pip3 install -r requirements.txt` to install required python packages
- 9. Run `python3 primer.py COMx sc64-firmware.bin` (replace `COMx` with port located in step **4**)
+ 9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**)
  10. Follow the instructions on the screen
  11. Wait until programming process has finished (**DO NOT STOP PROGRAMMING PROCESS OR DISCONNECT SC64 BOARD FROM PC**, doing so might irrecoverably break programming through UART header and you would need to program FPGA and/or microcontroller with separate dedicated programming interfaces through *Tag-Connect* connector on the PCB)
 
@@ -107,4 +107,4 @@ Congratulations! Your SC64 flashcart should be ready for use!
 This issue can be attributed to incorrectly programmed FT232H EEPROM in the first programming step.
 Check again in `FT_PROG` application if device was configured properly.
 Once FPGA and microcontroller has been programmed successfully `primer.py` script needs to be run in special mode.
-Please use command `python3 primer.py COMx sc64-firmware.bin --bootloader-only` to try programming bootloader again.
+Please use command `python3 primer.py COMx sc64-firmware-{version}.bin --bootloader-only` to try programming bootloader again.

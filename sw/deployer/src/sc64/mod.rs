@@ -10,7 +10,8 @@ pub use self::{
     link::{list_local_devices, ServerEvent},
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiskPacket, FpgaDebugData, McuStackUsage, SaveType, Switch, TvType,
+        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType, Switch,
+        TvType,
     },
 };
 
@@ -550,6 +551,7 @@ impl SC64 {
         self.command_config_set(Config::DdSdEnable(Switch::Off))?;
         self.command_config_set(Config::DdDriveType(drive_type))?;
         self.command_config_set(Config::DdDiskState(DdDiskState::Ejected))?;
+        self.command_config_set(Config::ButtonMode(ButtonMode::UsbPacket))?;
         Ok(())
     }
 
@@ -587,11 +589,11 @@ impl SC64 {
 
     pub fn reply_disk_packet(&mut self, disk_packet: Option<DiskPacket>) -> Result<(), Error> {
         if let Some(packet) = disk_packet {
-            match packet {
-                DiskPacket::ReadBlock(disk_block) => {
-                    self.command_memory_write(disk_block.address, &disk_block.data)?;
+            match packet.kind {
+                DiskPacketKind::Read => {
+                    self.command_memory_write(packet.info.address, &packet.info.data)?;
                 }
-                DiskPacket::WriteBlock(_) => {}
+                DiskPacketKind::Write => {}
             }
             self.command_dd_set_block_ready(false)?;
         } else {
