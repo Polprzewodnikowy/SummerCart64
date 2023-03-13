@@ -762,19 +762,31 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
 
     sc64::run_server(port, args.address.clone(), |event| match event {
         sc64::ServerEvent::Listening(address) => {
-            println!("{}: Listening on address [{}]", "[Server]".bold(), address)
+            println!(
+                "{}: Listening on address [{}]",
+                "[Server]".bold(),
+                address.bright_blue()
+            )
         }
-        sc64::ServerEvent::Connection(peer) => {
-            println!("{}: New connection from [{}]", "[Server]".bold(), peer);
+        sc64::ServerEvent::Connected(peer) => {
+            println!(
+                "{}: New connection from [{}]",
+                "[Server]".bold(),
+                peer.bright_green()
+            );
         }
         sc64::ServerEvent::Disconnected(peer) => {
-            println!("{}: Client disconnected [{}]", "[Server]".bold(), peer);
+            println!(
+                "{}: Client disconnected [{}]",
+                "[Server]".bold(),
+                peer.green()
+            );
         }
         sc64::ServerEvent::Err(error) => {
             println!(
-                "{}: Client disconnected with error: {}",
+                "{}: Client disconnected - server error: {}",
                 "[Server]".bold(),
-                error
+                error.red()
             );
         }
     })?;
