@@ -61,7 +61,7 @@ jobs:
             extension: zip
 
           - os: ubuntu-latest
-            # linux-packages: libudev-dev
+            linux-packages: libudev-dev
             executable: sc64deployer
             name: sc64-deployer-linux
             options: -czf

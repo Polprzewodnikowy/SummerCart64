@@ -21,7 +21,7 @@ md5 = "0.7.0"
 panic-message = "0.3.0"
 rust-ini = "0.18.0"
 serial2 = "0.1.7"
-serialport = { version = "4.2.0", default-features = false }
+serialport = "4.2.0"
 
 [profile.release]
 lto = true
