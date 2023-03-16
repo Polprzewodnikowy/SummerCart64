@@ -117,7 +117,7 @@ impl Serial {
                 Ok(0) => return Err(Error::new("Unexpected end of serial data")),
                 Ok(bytes) => position += bytes,
                 Err(error) => match error.kind() {
-                    ErrorKind::Interrupted | ErrorKind::TimedOut => {
+                    ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock => {
                         if !block && position == 0 {
                             return Ok(None);
                         }
@@ -243,7 +243,7 @@ impl TcpBackend {
                 Ok(0) => return Err(Error::new("Unexpected end of stream data")),
                 Ok(bytes) => position += bytes,
                 Err(error) => match error.kind() {
-                    ErrorKind::Interrupted | ErrorKind::TimedOut => {
+                    ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock => {
                         if !block && position == 0 {
                             return Ok(None);
                         }
@@ -618,7 +618,7 @@ fn server_stream_thread(
                 Ok(0) => return Ok(()),
                 Ok(bytes) => header_position += bytes,
                 Err(error) => match error.kind() {
-                    ErrorKind::Interrupted | ErrorKind::TimedOut => {}
+                    ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock => {}
                     _ => return Err(error.into()),
                 },
             }
