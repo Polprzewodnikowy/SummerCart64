@@ -617,13 +617,15 @@ impl SC64 {
     }
 
     pub fn check_firmware_version(&mut self) -> Result<(u16, u16, u32), Error> {
+        let unsupported_version_message = format!(
+            "Unsupported SC64 firmware version, minimum supported version: {}.{}.x",
+            SUPPORTED_MAJOR_VERSION, SUPPORTED_MINOR_VERSION
+        );
         let (major, minor, revision) = self
             .command_version_get()
-            .map_err(|_| Error::new("Outdated SC64 firmware version, please update firmware"))?;
+            .map_err(|_| Error::new(unsupported_version_message.as_str()))?;
         if major != SUPPORTED_MAJOR_VERSION || minor < SUPPORTED_MINOR_VERSION {
-            return Err(Error::new(
-                "Unsupported SC64 firmware version, please update firmware",
-            ));
+            return Err(Error::new(unsupported_version_message.as_str()));
         }
         Ok((major, minor, revision))
     }

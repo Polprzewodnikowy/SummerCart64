@@ -16,8 +16,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
-    {panic, process, thread},
+    {panic, process},
 };
 
 #[derive(Parser)]
@@ -483,11 +482,14 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         disk::Format::Development => sc64::DdDriveType::Development,
     };
 
-    sc64.configure_64dd(sc64::DdMode::Full, drive_type)?;
+    let dd_mode = sc64::DdMode::Full;
+    println!("64DD mode set to [{dd_mode} / {drive_type}]");
+    sc64.configure_64dd(dd_mode, drive_type)?;
 
     println!(
-        "{}",
-        "Press button on the SC64 device to cycle through provided disks".bold()
+        "{}: {}",
+        "[64DD]".bold(),
+        "Press button on the SC64 device to cycle through provided disks".bright_purple()
     );
 
     let exit = setup_exit_flag();
@@ -499,30 +501,30 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                     let head = packet.info.head;
                     let block = packet.info.block;
                     if let Some(ref mut disk) = selected_disk {
-                        let reply_packet = match packet.kind {
-                            sc64::DiskPacketKind::Read => {
-                                print!("{}", "[R]".cyan());
+                        let (reply_packet, rw) = match packet.kind {
+                            sc64::DiskPacketKind::Read => (
                                 disk.read_block(track, head, block)?.map(|data| {
                                     packet.info.set_data(&data);
                                     packet
-                                })
-                            }
-                            sc64::DiskPacketKind::Write => {
-                                print!("{}", "[W]".yellow());
-                                let data = &packet.info.data;
-                                disk.write_block(track, head, block, data)?.map(|_| packet)
-                            }
+                                }),
+                                "[R]".cyan(),
+                            ),
+                            sc64::DiskPacketKind::Write => (
+                                disk.write_block(track, head, block, &packet.info.data)?
+                                    .map(|_| packet),
+                                "[W]".yellow(),
+                            ),
                         };
                         let lba = if let Some(lba) = disk.get_lba(track, head, block) {
                             format!("{lba}")
                         } else {
                             "Invalid".to_string()
                         };
-                        let message = format!(" {track:4}:{head}:{block} / LBA: {lba}");
+                        let message = format!("{track:4}:{head}:{block} / LBA: {lba}");
                         if reply_packet.is_some() {
-                            println!("{}", message.green());
+                            println!("{}: {} {}", "[64DD]".bold(), rw, message.green());
                         } else {
-                            println!("{}", message.red());
+                            println!("{}: {} {}", "[64DD]".bold(), rw, message.red());
                         }
                         sc64.reply_disk_packet(reply_packet)?;
                     } else {
@@ -533,7 +535,11 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                     if selected_disk.is_some() {
                         sc64.set_64dd_disk_state(sc64::DdDiskState::Ejected)?;
                         selected_disk = None;
-                        println!("64DD disk ejected [{}]", disk_names[selected_disk_index]);
+                        println!(
+                            "{}: Disk ejected [{}]",
+                            "[64DD]".bold(),
+                            disk_names[selected_disk_index].green()
+                        );
                     } else {
                         selected_disk_index += 1;
                         if selected_disk_index >= disks.len() {
@@ -541,15 +547,19 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                         }
                         selected_disk = Some(&mut disks[selected_disk_index]);
                         sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
-                        println!("64DD disk inserted [{}]", disk_names[selected_disk_index]);
+                        println!(
+                            "{}: Disk inserted [{}]",
+                            "[64DD]".bold(),
+                            disk_names[selected_disk_index].bright_green()
+                        );
                     }
                 }
                 _ => {}
             }
-        } else {
-            thread::sleep(Duration::from_millis(1));
         }
     }
+
+    sc64.reset_state()?;
 
     Ok(())
 }
@@ -558,25 +568,25 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
     let mut sc64 = init_sc64(connection, true)?;
 
     let mut debug_handler = debug::new(args.gdb)?;
-    if let Some(port) = args.gdb {
-        println!("GDB TCP socket listening at [0.0.0.0:{port}]");
-    }
 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
         println!(
-            "IS-Viewer 64 configured and listening at ROM offset [0x{:08X}]",
-            args.isv.unwrap()
+            "{}: Listening on ROM offset [{}]",
+            "[IS-Viewer 64]".bold(),
+            format!("0x{:08X}", args.isv.unwrap())
+                .to_string()
+                .bright_blue()
         );
     }
 
-    println!("{}", "Debug mode started".bold());
+    println!("{}: Started", "[Debug]".bold());
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
             match data_packet {
-                sc64::DataPacket::IsViewer(message) => {
+                sc64::DataPacket::IsViewer64(message) => {
                     print!("{message}")
                 }
                 sc64::DataPacket::Debug(debug_packet) => {
@@ -588,16 +598,15 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
             sc64.send_debug_packet(gdb_packet)?;
         } else if let Some(debug_packet) = debug_handler.process_user_input() {
             sc64.send_debug_packet(debug_packet)?;
-        } else {
-            thread::sleep(Duration::from_millis(1));
         }
     }
 
-    println!("{}", "Debug mode ended".bold());
-
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(None)?;
+        println!("{}: Stopped listening", "[IS-Viewer 64]".bold());
     }
+
+    println!("{}: Stopped", "[Debug]".bold());
 
     Ok(())
 }

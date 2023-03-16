@@ -579,7 +579,7 @@ pub enum DataPacket {
     Button,
     Debug(DebugPacket),
     Disk(DiskPacket),
-    IsViewer(String),
+    IsViewer64(String),
     UpdateStatus(UpdateStatus),
 }
 
@@ -590,7 +590,7 @@ impl TryFrom<Packet> for DataPacket {
             b'B' => Self::Button,
             b'U' => Self::Debug(value.data.try_into()?),
             b'D' => Self::Disk(value.data.try_into()?),
-            b'I' => Self::IsViewer(EUC_JP.decode(&value.data).0.into()),
+            b'I' => Self::IsViewer64(EUC_JP.decode(&value.data).0.into()),
             b'F' => {
                 if value.data.len() != 4 {
                     return Err(Error::new(
