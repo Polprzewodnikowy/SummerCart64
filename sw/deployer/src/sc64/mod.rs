@@ -2,12 +2,14 @@ mod cic;
 mod error;
 pub mod firmware;
 mod link;
+mod server;
 mod types;
 mod utils;
 
 pub use self::{
     error::Error,
-    link::{list_local_devices, ServerEvent},
+    link::list_local_devices,
+    server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
         DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType, Switch,
@@ -786,5 +788,5 @@ pub fn run_server(
     } else {
         list_local_devices()?[0].port.clone()
     };
-    link::run_server(&port, address, event_callback)
+    server::run_server(&port, address, event_callback)
 }
