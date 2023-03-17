@@ -489,7 +489,9 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     println!(
         "{}: {}",
         "[64DD]".bold(),
-        "Press button on the SC64 device to cycle through provided disks".bright_purple()
+        "Press button on the SC64 device to cycle through provided disks"
+            .bold()
+            .bright_green()
     );
 
     let exit = setup_exit_flag();
@@ -507,12 +509,12 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                                     packet.info.set_data(&data);
                                     packet
                                 }),
-                                "[R]".cyan(),
+                                "[R]".bright_blue(),
                             ),
                             sc64::DiskPacketKind::Write => (
                                 disk.write_block(track, head, block, &packet.info.data)?
                                     .map(|_| packet),
-                                "[W]".yellow(),
+                                "[W]".bright_yellow(),
                             ),
                         };
                         let lba = if let Some(lba) = disk.get_lba(track, head, block) {
@@ -645,7 +647,6 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" ROM write:           {}", state.rom_write_enable);
     println!(" ROM shadow:          {}", state.rom_shadow_enable);
     println!(" ROM extended:        {}", state.rom_extended_enable);
-    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" 64DD mode:           {}", state.dd_mode);
     println!(" 64DD SD card mode:   {}", state.dd_sd_enable);
     println!(" 64DD drive type:     {}", state.dd_drive_type);
@@ -653,6 +654,7 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" Button mode:         {}", state.button_mode);
     println!(" Button state:        {}", state.button_state);
     println!(" LED blink:           {}", state.led_enable);
+    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" FPGA debug data:     {}", state.fpga_debug_data);
     println!(" MCU stack usage:     {}", state.mcu_stack_usage);
 
@@ -702,7 +704,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
 
             Ok(())
         }
@@ -712,8 +714,6 @@ fn handle_firmware_command(
 
             let (mut backup_file, backup_name) = create_file(&args.firmware)?;
 
-            sc64.reset_state()?;
-
             let firmware = log_wait(
                 format!("Generating firmware backup, this might take a while [{backup_name}]"),
                 || sc64.backup_firmware(),
@@ -721,7 +721,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
 
             backup_file.write_all(&firmware)?;
 
@@ -738,7 +738,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
             println!("{}", "Firmware file verification was successful".green());
             let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
             if answer.to_ascii_lowercase() != "y" {
@@ -749,8 +749,6 @@ fn handle_firmware_command(
                 "{}",
                 "Do not unplug SC64 from the computer, doing so might brick your device".yellow()
             );
-
-            sc64.reset_state()?;
 
             log_wait(
                 format!("Updating firmware, this might take a while [{update_name}]"),
@@ -821,9 +819,9 @@ fn log_wait<F: FnOnce() -> Result<T, E>, T, E>(message: String, operation: F) ->
     stdout().flush().unwrap();
     let result = operation();
     if result.is_ok() {
-        println!("done");
+        println!("{}", "done".bold().bright_green());
     } else {
-        println!("error!");
+        println!("{}", "error!".bold().bright_red());
     }
     result
 }

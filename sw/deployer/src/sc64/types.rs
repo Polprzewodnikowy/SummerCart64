@@ -782,7 +782,7 @@ impl TryFrom<Vec<u8>> for FpgaDebugData {
 
 impl Display for FpgaDebugData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("PI address: 0x{:08X}", self.last_pi_address))?;
+        f.write_fmt(format_args!("Last PI address: 0x{:08X}", self.last_pi_address))?;
         if self.read_fifo_wait {
             f.write_str(" RW")?;
         }

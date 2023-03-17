@@ -96,7 +96,7 @@ impl Serial {
         let mut position = 0;
         let length = buffer.len();
         while position < length {
-            if timeout.elapsed() > Duration::from_secs(5) {
+            if timeout.elapsed() > Duration::from_secs(10) {
                 return Err(Error::new("Serial read timeout"));
             }
             match self.serial.read(&mut buffer[position..length]) {
@@ -179,7 +179,7 @@ impl Serial {
 
 pub fn new_serial(port: &str) -> Result<Serial, Error> {
     let mut serial = SerialPort::open(port, 115_200)?;
-    serial.set_write_timeout(Duration::from_secs(5))?;
+    serial.set_write_timeout(Duration::from_secs(10))?;
     serial.set_read_timeout(Duration::from_millis(10))?;
     let backend = Serial { serial };
     backend.reset()?;
