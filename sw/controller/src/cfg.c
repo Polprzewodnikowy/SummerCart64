@@ -628,7 +628,7 @@ void cfg_process (void) {
                     return;
                 }
                 writeback_load_sector_table(args[0]);
-                writeback_enable();
+                writeback_enable(WRITEBACK_SD);
                 break;
 
             case 'K':

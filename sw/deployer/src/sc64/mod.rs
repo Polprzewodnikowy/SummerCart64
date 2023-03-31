@@ -12,8 +12,8 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType, Switch,
-        TvType,
+        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType,
+        SaveWriteback, Switch, TvType,
     },
 };
 
@@ -267,6 +267,15 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'D',
             args: [error as u32, 0],
+            data: &[],
+        })?;
+        Ok(())
+    }
+
+    fn command_writeback_enable(&mut self) -> Result<(), Error> {
+        self.link.execute_command(&Command {
+            id: b'W',
+            args: [0, 0],
             data: &[],
         })?;
         Ok(())
@@ -578,6 +587,16 @@ impl SC64 {
         } else {
             self.command_config_set(Config::RomWriteEnable(Switch::Off))?;
             self.command_config_set(Config::IsvAddress(0))?;
+        }
+        Ok(())
+    }
+
+    pub fn set_save_writeback(&mut self, enabled: bool) -> Result<(), Error> {
+        if enabled {
+            self.command_writeback_enable()?;
+        } else {
+            let save_type = get_config!(self, SaveType)?;
+            self.set_save_type(save_type)?;
         }
         Ok(())
     }

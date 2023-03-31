@@ -580,6 +580,7 @@ pub enum DataPacket {
     Debug(DebugPacket),
     Disk(DiskPacket),
     IsViewer64(String),
+    SaveWriteback(SaveWriteback),
     UpdateStatus(UpdateStatus),
 }
 
@@ -591,6 +592,7 @@ impl TryFrom<Packet> for DataPacket {
             b'U' => Self::Debug(value.data.try_into()?),
             b'D' => Self::Disk(value.data.try_into()?),
             b'I' => Self::IsViewer64(EUC_JP.decode(&value.data).0.into()),
+            b'S' => Self::SaveWriteback(value.data.try_into()?),
             b'F' => {
                 if value.data.len() != 4 {
                     return Err(Error::new(
@@ -679,6 +681,25 @@ pub struct DiskBlock {
 impl DiskBlock {
     pub fn set_data(&mut self, data: &[u8]) {
         self.data = data.to_vec();
+    }
+}
+
+pub struct SaveWriteback {
+    pub save: SaveType,
+    pub data: Vec<u8>,
+}
+
+impl TryFrom<Vec<u8>> for SaveWriteback {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() < 4 {
+            return Err(Error::new(
+                "Couldn't extract save info from save writeback packet",
+            ));
+        }
+        let save: SaveType = u32::from_be_bytes(value[0..4].try_into().unwrap()).try_into()?;
+        let data = value[4..].to_vec();
+        Ok(SaveWriteback { save, data })
     }
 }
 
@@ -782,7 +803,10 @@ impl TryFrom<Vec<u8>> for FpgaDebugData {
 
 impl Display for FpgaDebugData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Last PI address: 0x{:08X}", self.last_pi_address))?;
+        f.write_fmt(format_args!(
+            "Last PI address: 0x{:08X}",
+            self.last_pi_address
+        ))?;
         if self.read_fifo_wait {
             f.write_str(" RW")?;
         }

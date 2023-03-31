@@ -115,6 +115,8 @@ impl TryFrom<Vec<u8>> for ScreenshotMetadata {
     }
 }
 
+const MAX_FILE_LENGTH: u64 = 8 * 1024 * 1024;
+
 impl Handler {
     pub fn process_user_input(&self) -> Option<sc64::DebugPacket> {
         if let Ok(line) = self.line_rx.try_recv() {
@@ -151,6 +153,10 @@ impl Handler {
                         return None;
                     }
                 };
+                if length > MAX_FILE_LENGTH {
+                    println!("File too big ({length} bytes), exceeding max size of {MAX_FILE_LENGTH} bytes");
+                    return None;
+                }
                 let mut data = vec![0u8; length as usize];
                 if let Err(error) = file.read_exact(&mut data) {
                     println!("Couldn't read file contents: {error}");
@@ -202,9 +208,9 @@ impl Handler {
         match File::create(filename) {
             Ok(mut file) => {
                 if let Err(error) = file.write_all(data) {
-                    println!("Error during raw binary save: {error}");
+                    println!("Error during raw binary write: {error}");
                 }
-                println!("Wrote {} bytes to [{}]", data.len(), filename);
+                println!("Wrote [{}] bytes to [{}]", data.len(), filename);
             }
             Err(error) => {
                 println!("Error during raw binary file creation: {error}");
@@ -267,6 +273,37 @@ impl Handler {
         self.gdb_tx.send(data.to_vec()).ok();
     }
 
+    pub fn handle_save_writeback(
+        &self,
+        save_writeback: sc64::SaveWriteback,
+        path: &Option<PathBuf>,
+    ) {
+        let filename = &if let Some(path) = path {
+            path.to_string_lossy().to_string()
+        } else {
+            self.generate_filename(
+                "save",
+                match save_writeback.save {
+                    sc64::SaveType::Eeprom4k | sc64::SaveType::Eeprom16k => "eep",
+                    sc64::SaveType::Sram | sc64::SaveType::SramBanked => "srm",
+                    sc64::SaveType::Flashram => "fla",
+                    _ => "sav",
+                },
+            )
+        };
+        match File::create(filename) {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(&save_writeback.data) {
+                    println!("Error during save write: {error}");
+                }
+                println!("Wrote [{}] save to [{}]", save_writeback.save, filename);
+            }
+            Err(error) => {
+                println!("Error during save writeback file creation: {error}");
+            }
+        }
+    }
+
     fn generate_filename(&self, prefix: &str, extension: &str) -> String {
         format!(
             "{prefix}-{}.{extension}",
@@ -314,7 +351,7 @@ fn stdin_thread(line_tx: Sender<String>) {
     loop {
         let mut line = String::new();
         if stdin().read_line(&mut line).is_ok() {
-            if line_tx.send(line).is_err() {
+            if line_tx.send(line.trim_end().to_string()).is_err() {
                 return;
             }
         }

@@ -146,6 +146,10 @@ struct _64DDArgs {
 
 #[derive(Args)]
 struct DebugArgs {
+    /// Path to the save file to use by the save writeback mechanism
+    #[arg(short, long)]
+    save: Option<PathBuf>,
+
     /// Enable IS-Viewer64 and set listening address at ROM offset (in most cases it's fixed at 0x03FF0000)
     #[arg(long, value_name = "offset", value_parser = |s: &str| maybe_hex_range::<u32>(s, 0x00000004, 0x03FF0000))]
     isv: Option<u32>,
@@ -581,6 +585,7 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                 .bright_blue()
         );
     }
+    sc64.set_save_writeback(true)?;
 
     println!("{}: Started", "[Debug]".bold());
 
@@ -594,6 +599,9 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                 sc64::DataPacket::Debug(debug_packet) => {
                     debug_handler.handle_debug_packet(debug_packet)
                 }
+                sc64::DataPacket::SaveWriteback(save_writeback) => {
+                    debug_handler.handle_save_writeback(save_writeback, &args.save);
+                }
                 _ => {}
             }
         } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
@@ -603,6 +611,7 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
         }
     }
 
+    sc64.set_save_writeback(false)?;
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(None)?;
         println!("{}: Stopped listening", "[IS-Viewer 64]".bold());
