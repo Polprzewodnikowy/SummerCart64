@@ -3,8 +3,8 @@ mod error;
 pub mod firmware;
 mod link;
 mod server;
+mod time;
 mod types;
-mod utils;
 
 pub use self::{
     error::Error,
@@ -20,10 +20,10 @@ pub use self::{
 use self::{
     cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
     link::{Command, Link},
+    time::{convert_from_datetime, convert_to_datetime},
     types::{
         get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
     },
-    utils::{convert_from_datetime, convert_to_datetime},
 };
 use chrono::{DateTime, Local};
 use std::{
@@ -83,8 +83,9 @@ const EEPROM_ADDRESS: u32 = 0x0500_2000;
 const EEPROM_4K_LENGTH: usize = 512;
 const EEPROM_16K_LENGTH: usize = 2 * 1024;
 const SRAM_LENGTH: usize = 32 * 1024;
-const SRAM_BANKED_LENGTH: usize = 3 * 32 * 1024;
 const FLASHRAM_LENGTH: usize = 128 * 1024;
+const SRAM_BANKED_LENGTH: usize = 3 * 32 * 1024;
+const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
@@ -450,8 +451,9 @@ impl SC64 {
             SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
             SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
-            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
         };
 
         if length != save_length {
@@ -473,8 +475,9 @@ impl SC64 {
             SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
             SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
-            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
         };
 
         self.memory_read_chunked(writer, address, save_length)

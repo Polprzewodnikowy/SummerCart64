@@ -14,6 +14,7 @@
 #define SRAM_LENGTH                 (32 * 1024)
 #define FLASHRAM_LENGTH             (128 * 1024)
 #define SRAM_BANKED_LENGTH          (3 * 32 * 1024)
+#define SRAM_1M_LENGTH              (128 * 1024)
 #define WRITEBACK_DELAY_TICKS       (100)
 
 
@@ -52,6 +53,10 @@ static save_type_t writeback_get_address_length (uint32_t *address, uint32_t *le
         case SAVE_TYPE_SRAM_BANKED:
             *address = SRAM_FLASHRAM_ADDRESS;
             *length = SRAM_BANKED_LENGTH;
+            break;
+        case SAVE_TYPE_SRAM_1M:
+            *address = SRAM_FLASHRAM_ADDRESS;
+            *length = SRAM_1M_LENGTH;
             break;
         default:
             *address = 0;

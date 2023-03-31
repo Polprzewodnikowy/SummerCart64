@@ -59,7 +59,8 @@ typedef enum {
     SAVE_TYPE_EEPROM_16K = 2,
     SAVE_TYPE_SRAM = 3,
     SAVE_TYPE_FLASHRAM = 4,
-    SAVE_TYPE_SRAM_BANKED = 5
+    SAVE_TYPE_SRAM_BANKED = 5,
+    SAVE_TYPE_SRAM_1M = 6
 } sc64_save_type_t;
 
 typedef enum {

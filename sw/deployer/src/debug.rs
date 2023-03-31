@@ -7,6 +7,7 @@ use std::{
     io::{stdin, ErrorKind, Read, Write},
     net::{TcpListener, TcpStream},
     panic,
+    path::PathBuf,
     sync::mpsc::{channel, Receiver, Sender},
     thread::{sleep, spawn},
     time::Duration,
@@ -285,7 +286,9 @@ impl Handler {
                 "save",
                 match save_writeback.save {
                     sc64::SaveType::Eeprom4k | sc64::SaveType::Eeprom16k => "eep",
-                    sc64::SaveType::Sram | sc64::SaveType::SramBanked => "srm",
+                    sc64::SaveType::Sram | sc64::SaveType::SramBanked | sc64::SaveType::Sram1m => {
+                        "srm"
+                    }
                     sc64::SaveType::Flashram => "fla",
                     _ => "sav",
                 },
