@@ -103,7 +103,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'v',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -117,7 +117,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'V',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 8 {
             return Err(Error::new(
@@ -134,7 +134,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'R',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -152,7 +152,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'B',
             args,
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -161,7 +161,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'c',
             args: [config_id.into(), 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -176,7 +176,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'C',
             args: config.into(),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -185,7 +185,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'a',
             args: [setting_id.into(), 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -200,7 +200,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'A',
             args: setting.into(),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -209,7 +209,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b't',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 8 {
             return Err(Error::new(
@@ -223,7 +223,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'T',
             args: convert_from_datetime(datetime),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -232,7 +232,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'm',
             args: [address, length as u32],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != length {
             return Err(Error::new(
@@ -246,7 +246,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'M',
             args: [address, data.len() as u32],
-            data,
+            data: data.to_vec(),
         })?;
         Ok(())
     }
@@ -256,7 +256,7 @@ impl SC64 {
             &Command {
                 id: b'U',
                 args: [datatype as u32, data.len() as u32],
-                data,
+                data: data.to_vec(),
             },
             true,
             false,
@@ -268,7 +268,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'D',
             args: [error as u32, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -277,7 +277,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'W',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -286,7 +286,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'p',
             args: [wait as u32, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -301,7 +301,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'P',
             args: [address, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -311,7 +311,7 @@ impl SC64 {
             &Command {
                 id: b'f',
                 args: [address, 0],
-                data: &[],
+                data: vec![],
             },
             false,
             true,
@@ -335,7 +335,7 @@ impl SC64 {
             &Command {
                 id: b'F',
                 args: [address, length as u32],
-                data: &[],
+                data: vec![],
             },
             false,
             true,
@@ -352,7 +352,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'?',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(data.try_into()?)
     }
@@ -361,7 +361,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'%',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(data.try_into()?)
     }

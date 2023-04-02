@@ -51,7 +51,7 @@ pub fn run_server(
 }
 
 enum Event {
-    Command((u8, [u32; 2], Vec<u8>)),
+    Command(Command),
     Response(Response),
     Packet(Packet),
     KeepAlive,
@@ -114,12 +114,8 @@ fn server_process_events(
 ) -> Result<(), Error> {
     for event in event_receiver.into_iter() {
         match event {
-            Event::Command((id, args, data)) => {
-                serial_writer.send_command(&Command {
-                    id,
-                    args,
-                    data: &data,
-                })?;
+            Event::Command(command) => {
+                serial_writer.send_command(&command)?;
             }
             Event::Response(response) => {
                 stream_writer.write_all(&u32::to_be_bytes(DataType::Response.into()))?;
@@ -188,10 +184,12 @@ fn server_stream_thread(
         }
 
         let mut buffer = [0u8; 4];
-        let mut id = [0u8; 1];
+        let mut id_buffer = [0u8; 1];
         let mut args = [0u32; 2];
 
-        stream_reader.read_exact(&mut id)?;
+        stream_reader.read_exact(&mut id_buffer)?;
+        let id = id_buffer[0];
+
         stream_reader.read_exact(&mut buffer)?;
         args[0] = u32::from_be_bytes(buffer);
         stream_reader.read_exact(&mut buffer)?;
@@ -202,8 +200,10 @@ fn server_stream_thread(
         let mut data = vec![0u8; command_data_length];
         stream_reader.read_exact(&mut data)?;
 
-        let event = Event::Command((id[0], args, data));
-        if event_sender.send(event).is_err() {
+        if event_sender
+            .send(Event::Command(Command { id, args, data }))
+            .is_err()
+        {
             break;
         }
     }
@@ -222,15 +222,13 @@ fn server_serial_thread(
         let response = serial_reader.process_incoming_data(DataType::Packet, &mut packets)?;
 
         if let Some(response) = response {
-            let event = Event::Response(response);
-            if event_sender.send(event).is_err() {
+            if event_sender.send(Event::Response(response)).is_err() {
                 break;
             }
         }
 
         if let Some(packet) = packets.pop_front() {
-            let event = Event::Packet(packet);
-            if event_sender.send(event).is_err() {
+            if event_sender.send(Event::Packet(packet)).is_err() {
                 break;
             }
         }
@@ -245,8 +243,7 @@ fn server_keepalive_thread(event_sender: Sender<Event>, exit_flag: Arc<AtomicBoo
     while !exit_flag.load(Ordering::Relaxed) {
         if keepalive.elapsed() >= Duration::from_secs(5) {
             keepalive = Instant::now();
-            let event = Event::KeepAlive;
-            if event_sender.send(event).is_err() {
+            if event_sender.send(Event::KeepAlive).is_err() {
                 break;
             }
         } else {

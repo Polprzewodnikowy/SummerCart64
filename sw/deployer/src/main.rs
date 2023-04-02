@@ -504,22 +504,22 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
             match data_packet {
-                sc64::DataPacket::Disk(mut packet) => {
-                    let track = packet.info.track;
-                    let head = packet.info.head;
-                    let block = packet.info.block;
+                sc64::DataPacket::DiskRequest(mut disk_packet) => {
+                    let track = disk_packet.info.track;
+                    let head = disk_packet.info.head;
+                    let block = disk_packet.info.block;
                     if let Some(ref mut disk) = selected_disk {
-                        let (reply_packet, rw) = match packet.kind {
+                        let (reply_packet, rw) = match disk_packet.kind {
                             sc64::DiskPacketKind::Read => (
                                 disk.read_block(track, head, block)?.map(|data| {
-                                    packet.info.set_data(&data);
-                                    packet
+                                    disk_packet.info.set_data(&data);
+                                    disk_packet
                                 }),
                                 "[R]".bright_blue(),
                             ),
                             sc64::DiskPacketKind::Write => (
-                                disk.write_block(track, head, block, &packet.info.data)?
-                                    .map(|_| packet),
+                                disk.write_block(track, head, block, &disk_packet.info.data)?
+                                    .map(|_| disk_packet),
                                 "[W]".bright_yellow(),
                             ),
                         };
@@ -595,11 +595,11 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
             match data_packet {
-                sc64::DataPacket::IsViewer64(message) => {
-                    print!("{message}")
+                sc64::DataPacket::DebugData(debug_packet) => {
+                    debug_handler.handle_debug_packet(debug_packet);
                 }
-                sc64::DataPacket::Debug(debug_packet) => {
-                    debug_handler.handle_debug_packet(debug_packet)
+                sc64::DataPacket::IsViewer64(message) => {
+                    debug_handler.handle_is_viewer_64(message);
                 }
                 sc64::DataPacket::SaveWriteback(save_writeback) => {
                     debug_handler.handle_save_writeback(save_writeback, &args.save);

@@ -39,10 +39,10 @@ impl TryFrom<u32> for DataType {
     }
 }
 
-pub struct Command<'a> {
+pub struct Command {
     pub id: u8,
     pub args: [u32; 2],
-    pub data: &'a [u8],
+    pub data: Vec<u8>,
 }
 
 pub struct Response {

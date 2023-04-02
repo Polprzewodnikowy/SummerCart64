@@ -1,5 +1,4 @@
 use super::{link::Packet, Error};
-use encoding_rs::EUC_JP;
 use std::fmt::Display;
 
 #[derive(Clone, Copy)]
@@ -581,9 +580,9 @@ impl From<Setting> for [u32; 2] {
 
 pub enum DataPacket {
     Button,
-    Debug(DebugPacket),
-    Disk(DiskPacket),
-    IsViewer64(String),
+    DebugData(DebugPacket),
+    DiskRequest(DiskPacket),
+    IsViewer64(Vec<u8>),
     SaveWriteback(SaveWriteback),
     UpdateStatus(UpdateStatus),
 }
@@ -593,9 +592,9 @@ impl TryFrom<Packet> for DataPacket {
     fn try_from(value: Packet) -> Result<Self, Self::Error> {
         Ok(match value.id {
             b'B' => Self::Button,
-            b'U' => Self::Debug(value.data.try_into()?),
-            b'D' => Self::Disk(value.data.try_into()?),
-            b'I' => Self::IsViewer64(EUC_JP.decode(&value.data).0.into()),
+            b'U' => Self::DebugData(value.data.try_into()?),
+            b'D' => Self::DiskRequest(value.data.try_into()?),
+            b'I' => Self::IsViewer64(value.data),
             b'S' => Self::SaveWriteback(value.data.try_into()?),
             b'F' => {
                 if value.data.len() != 4 {
