@@ -37,33 +37,6 @@ static io32_t *boot_get_device_base (boot_info_t *info) {
     return device_base_address;
 }
 
-static bool boot_get_tv_type (boot_info_t *info) {
-    io32_t *base = boot_get_device_base(info);
-
-    char region = ((pi_io_read(&base[15]) >> 8) & 0xFF);
-
-    switch (region) {
-        case 'P':
-        case 'U':
-            info->tv_type = BOOT_TV_TYPE_PAL;
-            break;
-
-        case 'E':
-        case 'J':
-            info->tv_type = BOOT_TV_TYPE_NTSC;
-            break;
-
-        case 'B':
-            info->tv_type = BOOT_TV_TYPE_MPAL;
-            break;
-
-        default:
-            return false;
-    }
-
-    return true;
-}
-
 static bool boot_get_cic_seed (boot_info_t *info) {
     io32_t *base = boot_get_device_base(info);
 
@@ -83,11 +56,9 @@ static bool boot_get_cic_seed (boot_info_t *info) {
     return false;
 }
 
-void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed) {
-    if (detect_tv_type) {
-        if (!boot_get_tv_type(info)) {
-            info->tv_type = OS_INFO->tv_type;
-        }
+void boot (boot_info_t *info, bool detect_cic_seed) {
+    if (info->tv_type == BOOT_TV_TYPE_PASSTHROUGH) {
+        info->tv_type = OS_INFO->tv_type;
     }
 
     if (detect_cic_seed) {

@@ -159,10 +159,10 @@ type: *enum* | default: `3`
 - `0` - PAL TV type will be used
 - `1` - NTSC TV type will be used
 - `2` - MPAL TV type will be used
-- `3` - TV type will be autodetected
+- `3` - Console native TV type will be used
 
 Use this setting to force specific TV type.
-By setting value `3` bootloader will try to guess TV type from loaded ROM header.
+By setting value `3` bootloader will passthrough TV type native to the console.
 This setting is not used when **BOOT_MODE** is set to `3` or `4` (direct boot).
 
 ---

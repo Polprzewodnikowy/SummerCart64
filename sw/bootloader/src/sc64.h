@@ -64,14 +64,14 @@ typedef enum {
 } sc64_save_type_t;
 
 typedef enum {
-    CIC_SEED_UNKNOWN = 0xFFFF
+    CIC_SEED_AUTO = 0xFFFF
 } sc64_cic_seed_t;
 
 typedef enum {
     TV_TYPE_PAL = 0,
     TV_TYPE_NTSC = 1,
     TV_TYPE_MPAL = 2,
-    TV_TYPE_UNKNOWN = 3
+    TV_TYPE_PASSTHROUGH = 3
 } sc64_tv_type_t;
 
 typedef enum {

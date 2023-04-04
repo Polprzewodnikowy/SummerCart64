@@ -340,7 +340,7 @@ pub enum TvType {
     PAL,
     NTSC,
     MPAL,
-    Auto,
+    Passthrough,
 }
 
 impl Display for TvType {
@@ -349,7 +349,7 @@ impl Display for TvType {
             Self::PAL => "PAL",
             Self::NTSC => "NTSC",
             Self::MPAL => "MPAL",
-            Self::Auto => "Auto",
+            Self::Passthrough => "Passthrough",
         })
     }
 }
@@ -361,7 +361,7 @@ impl TryFrom<u32> for TvType {
             0 => Self::PAL,
             1 => Self::NTSC,
             2 => Self::MPAL,
-            3 => Self::Auto,
+            3 => Self::Passthrough,
             _ => return Err(Error::new("Unknown TV type code")),
         })
     }
@@ -373,7 +373,7 @@ impl From<TvType> for u32 {
             TvType::PAL => 0,
             TvType::NTSC => 1,
             TvType::MPAL => 2,
-            TvType::Auto => 3,
+            TvType::Passthrough => 3,
         }
     }
 }

@@ -54,14 +54,14 @@ typedef enum {
 } boot_mode_t;
 
 typedef enum {
-    CIC_SEED_UNKNOWN = 0xFFFF
+    CIC_SEED_AUTO = 0xFFFF
 } cic_seed_t;
 
 typedef enum {
     TV_TYPE_PAL = 0,
     TV_TYPE_NTSC = 1,
     TV_TYPE_MPAL = 2,
-    TV_TYPE_UNKNOWN = 3
+    TV_TYPE_PASSTHROUGH = 3
 } tv_type_t;
 
 typedef enum {
@@ -340,7 +340,7 @@ bool cfg_update (uint32_t *args) {
             p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);
             break;
         case CFG_ID_TV_TYPE:
-            if (args[1] > TV_TYPE_UNKNOWN) {
+            if (args[1] > TV_TYPE_PASSTHROUGH) {
                 return true;
             }
             p.tv_type = (tv_type_t) (args[1] & 0x03);
@@ -443,8 +443,8 @@ void cfg_reset_state (void) {
     dd_set_disk_state(DD_DISK_STATE_EJECTED);
     dd_set_sd_mode(false);
     isv_set_address(0);
-    p.cic_seed = CIC_SEED_UNKNOWN;
-    p.tv_type = TV_TYPE_UNKNOWN;
+    p.cic_seed = CIC_SEED_AUTO;
+    p.tv_type = TV_TYPE_PASSTHROUGH;
     p.boot_mode = BOOT_MODE_MENU;
 }
 
