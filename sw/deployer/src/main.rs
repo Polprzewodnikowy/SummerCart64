@@ -154,9 +154,9 @@ struct DebugArgs {
     #[arg(long, value_name = "offset", value_parser = |s: &str| maybe_hex_range::<u32>(s, 0x00000004, 0x03FF0000))]
     isv: Option<u32>,
 
-    /// Expose TCP socket port for GDB debugging
-    #[arg(long, value_name = "port", value_parser = clap::value_parser!(u16).range(1..))]
-    gdb: Option<u16>,
+    /// Use EUC-JP encoding for text printing
+    #[arg(long)]
+    euc_jp: bool,
 }
 
 #[derive(Args)]
@@ -575,7 +575,11 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let mut debug_handler = debug::new(args.gdb)?;
+    let mut debug_handler = debug::new();
+
+    if args.euc_jp {
+        debug_handler.set_text_encoding(debug::Encoding::EUCJP);
+    }
 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
@@ -599,15 +603,13 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                     debug_handler.handle_debug_packet(debug_packet);
                 }
                 sc64::DataPacket::IsViewer64(message) => {
-                    debug_handler.handle_is_viewer_64(message);
+                    debug_handler.handle_is_viewer_64(&message);
                 }
                 sc64::DataPacket::SaveWriteback(save_writeback) => {
                     debug_handler.handle_save_writeback(save_writeback, &args.save);
                 }
                 _ => {}
             }
-        } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
-            sc64.send_debug_packet(gdb_packet)?;
         } else if let Some(debug_packet) = debug_handler.process_user_input() {
             sc64.send_debug_packet(debug_packet)?;
         }

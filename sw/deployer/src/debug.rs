@@ -2,23 +2,23 @@ use crate::sc64;
 use chrono::Local;
 use colored::Colorize;
 use encoding_rs::EUC_JP;
-use panic_message::panic_message;
 use std::{
     fs::File,
-    io::{stdin, ErrorKind, Read, Write},
-    net::{TcpListener, TcpStream},
-    panic,
+    io::{stdin, Read, Write},
     path::PathBuf,
     sync::mpsc::{channel, Receiver, Sender},
-    thread::{sleep, spawn},
-    time::Duration,
+    thread::spawn,
 };
+
+pub enum Encoding {
+    UTF8,
+    EUCJP,
+}
 
 pub struct Handler {
     header: Option<Vec<u8>>,
     line_rx: Receiver<String>,
-    gdb_tx: Sender<Vec<u8>>,
-    gdb_rx: Receiver<Vec<u8>>,
+    encoding: Encoding,
 }
 
 enum DataType {
@@ -26,7 +26,6 @@ enum DataType {
     RawBinary,
     Header,
     Screenshot,
-    GDB,
     Unknown,
 }
 
@@ -37,7 +36,6 @@ impl From<u8> for DataType {
             0x02 => Self::RawBinary,
             0x03 => Self::Header,
             0x04 => Self::Screenshot,
-            0xDB => Self::GDB,
             _ => Self::Unknown,
         }
     }
@@ -50,7 +48,6 @@ impl From<DataType> for u8 {
             DataType::RawBinary => 0x02,
             DataType::Header => 0x03,
             DataType::Screenshot => 0x04,
-            DataType::GDB => 0xDB,
             DataType::Unknown => 0xFF,
         }
     }
@@ -139,6 +136,10 @@ macro_rules! stop {
 const MAX_PACKET_LENGTH: usize = 8 * 1024 * 1024;
 
 impl Handler {
+    pub fn set_text_encoding(&mut self, encoding: Encoding) {
+        self.encoding = encoding;
+    }
+
     pub fn process_user_input(&self) -> Option<sc64::DebugPacket> {
         let line = match self.line_rx.try_recv() {
             Ok(line) => {
@@ -219,13 +220,12 @@ impl Handler {
             DataType::RawBinary => self.handle_datatype_raw_binary(&data),
             DataType::Header => self.handle_datatype_header(&data),
             DataType::Screenshot => self.handle_datatype_screenshot(&data),
-            DataType::GDB => self.handle_datatype_gdb(&data),
             _ => error!("Received unknown debug packet datatype: 0x{datatype:02X}"),
         }
     }
 
-    pub fn handle_is_viewer_64(&self, message: Vec<u8>) {
-        print!("{}", EUC_JP.decode(&message).0)
+    pub fn handle_is_viewer_64(&self, data: &[u8]) {
+        self.print_text(data);
     }
 
     pub fn handle_save_writeback(
@@ -259,19 +259,8 @@ impl Handler {
         }
     }
 
-    pub fn receive_gdb_packet(&self) -> Option<sc64::DebugPacket> {
-        if let Some(data) = self.gdb_rx.try_recv().ok() {
-            Some(sc64::DebugPacket {
-                datatype: DataType::GDB.into(),
-                data,
-            })
-        } else {
-            None
-        }
-    }
-
     fn handle_datatype_text(&self, data: &[u8]) {
-        print!("{}", String::from_utf8_lossy(data));
+        self.print_text(data);
     }
 
     fn handle_datatype_raw_binary(&self, data: &[u8]) {
@@ -330,8 +319,21 @@ impl Handler {
         success!("Wrote {width}x{height} pixels to [{filename}]");
     }
 
-    fn handle_datatype_gdb(&self, data: &[u8]) {
-        self.gdb_tx.send(data.to_vec()).ok();
+    fn print_text(&self, data: &[u8]) {
+        match self.encoding {
+            Encoding::UTF8 => print!("{}", String::from_utf8_lossy(&data)),
+            Encoding::EUCJP => print!("{}", EUC_JP.decode(&data).0),
+        }
+    }
+}
+
+pub fn new() -> Handler {
+    let (line_tx, line_rx) = channel::<String>();
+    spawn(move || stdin_thread(line_tx));
+    Handler {
+        header: None,
+        line_rx,
+        encoding: Encoding::UTF8,
     }
 }
 
@@ -364,30 +366,6 @@ fn generate_filename(prefix: &str, extension: &str) -> String {
     )
 }
 
-pub fn new(gdb_port: Option<u16>) -> Result<Handler, sc64::Error> {
-    let (line_tx, line_rx) = channel::<String>();
-    let (gdb_tx, gdb_loop_rx) = channel::<Vec<u8>>();
-    let (gdb_loop_tx, gdb_rx) = channel::<Vec<u8>>();
-
-    spawn(move || stdin_thread(line_tx));
-
-    if let Some(port) = gdb_port {
-        let listener = TcpListener::bind(format!("0.0.0.0:{port}"))
-            .map_err(|_| sc64::Error::new("Couldn't open GDB TCP socket port"))?;
-        listener.set_nonblocking(true).map_err(|_| {
-            sc64::Error::new("Couldn't set GDB TCP socket listener as non-blocking")
-        })?;
-        spawn(move || gdb_thread(listener, gdb_loop_tx, gdb_loop_rx));
-    }
-
-    Ok(Handler {
-        header: None,
-        line_rx,
-        gdb_tx,
-        gdb_rx,
-    })
-}
-
 fn stdin_thread(line_tx: Sender<String>) {
     loop {
         let mut line = String::new();
@@ -396,79 +374,5 @@ fn stdin_thread(line_tx: Sender<String>) {
                 return;
             }
         }
-    }
-}
-
-fn gdb_thread(listener: TcpListener, gdb_tx: Sender<Vec<u8>>, gdb_rx: Receiver<Vec<u8>>) {
-    match panic::catch_unwind(|| gdb_loop(listener, gdb_tx, gdb_rx)) {
-        Ok(_) => {}
-        Err(payload) => {
-            eprintln!("{}", panic_message(&payload).red());
-        }
-    };
-}
-
-fn gdb_loop(listener: TcpListener, gdb_tx: Sender<Vec<u8>>, gdb_rx: Receiver<Vec<u8>>) {
-    for tcp_stream in listener.incoming() {
-        match tcp_stream {
-            Ok(mut stream) => {
-                handle_gdb_connection(&mut stream, &gdb_tx, &gdb_rx);
-            }
-            Err(error) => {
-                if error.kind() == ErrorKind::WouldBlock {
-                    sleep(Duration::from_millis(1));
-                } else {
-                    panic!("{error}");
-                }
-            }
-        }
-    }
-}
-
-fn handle_gdb_connection(
-    stream: &mut TcpStream,
-    gdb_tx: &Sender<Vec<u8>>,
-    gdb_rx: &Receiver<Vec<u8>>,
-) {
-    const GDB_DATA_BUFFER: usize = 64 * 1024;
-
-    let mut buffer = vec![0u8; GDB_DATA_BUFFER];
-
-    let peer = stream.peer_addr().unwrap();
-
-    println!("[GDB]: New connection ({peer})");
-
-    loop {
-        match stream.read(&mut buffer) {
-            Ok(length) => {
-                if length > 0 {
-                    gdb_tx.send(buffer[0..length].to_vec()).ok();
-                    continue;
-                } else {
-                    println!("[GDB]: Connection closed ({peer})");
-                    break;
-                }
-            }
-            Err(e) => {
-                if e.kind() != ErrorKind::WouldBlock {
-                    println!("[GDB]: Connection closed ({peer}), read IO error: {e}");
-                    break;
-                }
-            }
-        }
-
-        if let Ok(data) = gdb_rx.try_recv() {
-            match stream.write_all(&data) {
-                Ok(()) => {
-                    continue;
-                }
-                Err(e) => {
-                    println!("[GDB]: Connection closed ({peer}), write IO error: {e}");
-                    break;
-                }
-            }
-        }
-
-        sleep(Duration::from_millis(1));
     }
 }
