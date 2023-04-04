@@ -528,7 +528,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                         } else {
                             "Invalid".to_string()
                         };
-                        let message = format!("{track:4}:{head}:{block} / LBA: {lba}");
+                        let message = format!("{track:4}:{head}:{block} | LBA: {lba}");
                         if reply_packet.is_some() {
                             println!("{}: {} {}", "[64DD]".bold(), rw, message.green());
                         } else {
