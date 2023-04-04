@@ -16,8 +16,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
-    {panic, process, thread},
+    {panic, process},
 };
 
 #[derive(Parser)]
@@ -147,13 +146,17 @@ struct _64DDArgs {
 
 #[derive(Args)]
 struct DebugArgs {
+    /// Path to the save file to use by the save writeback mechanism
+    #[arg(short, long)]
+    save: Option<PathBuf>,
+
     /// Enable IS-Viewer64 and set listening address at ROM offset (in most cases it's fixed at 0x03FF0000)
     #[arg(long, value_name = "offset", value_parser = |s: &str| maybe_hex_range::<u32>(s, 0x00000004, 0x03FF0000))]
     isv: Option<u32>,
 
-    /// Expose TCP socket port for GDB debugging
-    #[arg(long, value_name = "port", value_parser = clap::value_parser!(u16).range(1..))]
-    gdb: Option<u16>,
+    /// Use EUC-JP encoding for text printing
+    #[arg(long)]
+    euc_jp: bool,
 }
 
 #[derive(Args)]
@@ -214,6 +217,7 @@ enum SaveType {
     Eeprom16k,
     Sram,
     SramBanked,
+    Sram1m,
     Flashram,
 }
 
@@ -225,8 +229,8 @@ impl From<n64::SaveType> for SaveType {
             n64::SaveType::Eeprom16k => Self::Eeprom16k,
             n64::SaveType::Sram => Self::Sram,
             n64::SaveType::SramBanked => Self::SramBanked,
+            n64::SaveType::Sram1m => Self::Sram1m,
             n64::SaveType::Flashram => Self::Flashram,
-            n64::SaveType::Sram128kB => Self::Sram,
         }
     }
 }
@@ -239,6 +243,7 @@ impl From<SaveType> for sc64::SaveType {
             SaveType::Eeprom16k => Self::Eeprom16k,
             SaveType::Sram => Self::Sram,
             SaveType::SramBanked => Self::SramBanked,
+            SaveType::Sram1m => Self::Sram1m,
             SaveType::Flashram => Self::Flashram,
         }
     }
@@ -483,46 +488,51 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         disk::Format::Development => sc64::DdDriveType::Development,
     };
 
-    sc64.configure_64dd(sc64::DdMode::Full, drive_type)?;
+    let dd_mode = sc64::DdMode::Full;
+    println!("64DD mode set to [{dd_mode} / {drive_type}]");
+    sc64.configure_64dd(dd_mode, drive_type)?;
 
     println!(
-        "{}",
-        "Press button on the SC64 device to cycle through provided disks".bold()
+        "{}: {}",
+        "[64DD]".bold(),
+        "Press button on the SC64 device to cycle through provided disks"
+            .bold()
+            .bright_green()
     );
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
             match data_packet {
-                sc64::DataPacket::Disk(mut packet) => {
-                    let track = packet.info.track;
-                    let head = packet.info.head;
-                    let block = packet.info.block;
+                sc64::DataPacket::DiskRequest(mut disk_packet) => {
+                    let track = disk_packet.info.track;
+                    let head = disk_packet.info.head;
+                    let block = disk_packet.info.block;
                     if let Some(ref mut disk) = selected_disk {
-                        let reply_packet = match packet.kind {
-                            sc64::DiskPacketKind::Read => {
-                                print!("{}", "[R]".cyan());
+                        let (reply_packet, rw) = match disk_packet.kind {
+                            sc64::DiskPacketKind::Read => (
                                 disk.read_block(track, head, block)?.map(|data| {
-                                    packet.info.set_data(&data);
-                                    packet
-                                })
-                            }
-                            sc64::DiskPacketKind::Write => {
-                                print!("{}", "[W]".yellow());
-                                let data = &packet.info.data;
-                                disk.write_block(track, head, block, data)?.map(|_| packet)
-                            }
+                                    disk_packet.info.set_data(&data);
+                                    disk_packet
+                                }),
+                                "[R]".bright_blue(),
+                            ),
+                            sc64::DiskPacketKind::Write => (
+                                disk.write_block(track, head, block, &disk_packet.info.data)?
+                                    .map(|_| disk_packet),
+                                "[W]".bright_yellow(),
+                            ),
                         };
                         let lba = if let Some(lba) = disk.get_lba(track, head, block) {
                             format!("{lba}")
                         } else {
                             "Invalid".to_string()
                         };
-                        let message = format!(" {track:4}:{head}:{block} / LBA: {lba}");
+                        let message = format!("{track:4}:{head}:{block} | LBA: {lba}");
                         if reply_packet.is_some() {
-                            println!("{}", message.green());
+                            println!("{}: {} {}", "[64DD]".bold(), rw, message.green());
                         } else {
-                            println!("{}", message.red());
+                            println!("{}: {} {}", "[64DD]".bold(), rw, message.red());
                         }
                         sc64.reply_disk_packet(reply_packet)?;
                     } else {
@@ -533,7 +543,11 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                     if selected_disk.is_some() {
                         sc64.set_64dd_disk_state(sc64::DdDiskState::Ejected)?;
                         selected_disk = None;
-                        println!("64DD disk ejected [{}]", disk_names[selected_disk_index]);
+                        println!(
+                            "{}: Disk ejected [{}]",
+                            "[64DD]".bold(),
+                            disk_names[selected_disk_index].green()
+                        );
                     } else {
                         selected_disk_index += 1;
                         if selected_disk_index >= disks.len() {
@@ -541,15 +555,19 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                         }
                         selected_disk = Some(&mut disks[selected_disk_index]);
                         sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
-                        println!("64DD disk inserted [{}]", disk_names[selected_disk_index]);
+                        println!(
+                            "{}: Disk inserted [{}]",
+                            "[64DD]".bold(),
+                            disk_names[selected_disk_index].bright_green()
+                        );
                     }
                 }
                 _ => {}
             }
-        } else {
-            thread::sleep(Duration::from_millis(1));
         }
     }
+
+    sc64.reset_state()?;
 
     Ok(())
 }
@@ -557,47 +575,53 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let mut debug_handler = debug::new(args.gdb)?;
-    if let Some(port) = args.gdb {
-        println!("GDB TCP socket listening at [0.0.0.0:{port}]");
+    let mut debug_handler = debug::new();
+
+    if args.euc_jp {
+        debug_handler.set_text_encoding(debug::Encoding::EUCJP);
     }
 
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(args.isv)?;
         println!(
-            "IS-Viewer 64 configured and listening at ROM offset [0x{:08X}]",
-            args.isv.unwrap()
+            "{}: Listening on ROM offset [{}]",
+            "[IS-Viewer 64]".bold(),
+            format!("0x{:08X}", args.isv.unwrap())
+                .to_string()
+                .bright_blue()
         );
     }
+    sc64.set_save_writeback(true)?;
 
-    println!("{}", "Debug mode started".bold());
+    println!("{}: Started", "[Debug]".bold());
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
             match data_packet {
-                sc64::DataPacket::IsViewer(message) => {
-                    print!("{message}")
+                sc64::DataPacket::DebugData(debug_packet) => {
+                    debug_handler.handle_debug_packet(debug_packet);
                 }
-                sc64::DataPacket::Debug(debug_packet) => {
-                    debug_handler.handle_debug_packet(debug_packet)
+                sc64::DataPacket::IsViewer64(message) => {
+                    debug_handler.handle_is_viewer_64(&message);
+                }
+                sc64::DataPacket::SaveWriteback(save_writeback) => {
+                    debug_handler.handle_save_writeback(save_writeback, &args.save);
                 }
                 _ => {}
             }
-        } else if let Some(gdb_packet) = debug_handler.receive_gdb_packet() {
-            sc64.send_debug_packet(gdb_packet)?;
         } else if let Some(debug_packet) = debug_handler.process_user_input() {
             sc64.send_debug_packet(debug_packet)?;
-        } else {
-            thread::sleep(Duration::from_millis(1));
         }
     }
 
-    println!("{}", "Debug mode ended".bold());
-
+    sc64.set_save_writeback(false)?;
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(None)?;
+        println!("{}: Stopped listening", "[IS-Viewer 64]".bold());
     }
+
+    println!("{}: Stopped", "[Debug]".bold());
 
     Ok(())
 }
@@ -636,7 +660,6 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" ROM write:           {}", state.rom_write_enable);
     println!(" ROM shadow:          {}", state.rom_shadow_enable);
     println!(" ROM extended:        {}", state.rom_extended_enable);
-    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" 64DD mode:           {}", state.dd_mode);
     println!(" 64DD SD card mode:   {}", state.dd_sd_enable);
     println!(" 64DD drive type:     {}", state.dd_drive_type);
@@ -644,6 +667,7 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" Button mode:         {}", state.button_mode);
     println!(" Button state:        {}", state.button_state);
     println!(" LED blink:           {}", state.led_enable);
+    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" FPGA debug data:     {}", state.fpga_debug_data);
     println!(" MCU stack usage:     {}", state.mcu_stack_usage);
 
@@ -693,7 +717,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
 
             Ok(())
         }
@@ -703,8 +727,6 @@ fn handle_firmware_command(
 
             let (mut backup_file, backup_name) = create_file(&args.firmware)?;
 
-            sc64.reset_state()?;
-
             let firmware = log_wait(
                 format!("Generating firmware backup, this might take a while [{backup_name}]"),
                 || sc64.backup_firmware(),
@@ -712,7 +734,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
 
             backup_file.write_all(&firmware)?;
 
@@ -729,7 +751,7 @@ fn handle_firmware_command(
 
             let metadata = sc64::firmware::verify(&firmware)?;
             println!("{}", "Firmware metadata:".bold());
-            println!("{}", format!("{}", metadata).cyan().to_string());
+            println!("{}", format!("{}", metadata).bright_blue().to_string());
             println!("{}", "Firmware file verification was successful".green());
             let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
             if answer.to_ascii_lowercase() != "y" {
@@ -740,8 +762,6 @@ fn handle_firmware_command(
                 "{}",
                 "Do not unplug SC64 from the computer, doing so might brick your device".yellow()
             );
-
-            sc64.reset_state()?;
 
             log_wait(
                 format!("Updating firmware, this might take a while [{update_name}]"),
@@ -762,19 +782,31 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
 
     sc64::run_server(port, args.address.clone(), |event| match event {
         sc64::ServerEvent::Listening(address) => {
-            println!("{}: Listening on address [{}]", "[Server]".bold(), address)
+            println!(
+                "{}: Listening on address [{}]",
+                "[Server]".bold(),
+                address.bright_blue()
+            )
         }
-        sc64::ServerEvent::Connection(peer) => {
-            println!("{}: New connection from [{}]", "[Server]".bold(), peer);
+        sc64::ServerEvent::Connected(peer) => {
+            println!(
+                "{}: New connection from [{}]",
+                "[Server]".bold(),
+                peer.bright_green()
+            );
         }
         sc64::ServerEvent::Disconnected(peer) => {
-            println!("{}: Client disconnected [{}]", "[Server]".bold(), peer);
+            println!(
+                "{}: Client disconnected [{}]",
+                "[Server]".bold(),
+                peer.green()
+            );
         }
         sc64::ServerEvent::Err(error) => {
             println!(
-                "{}: Client disconnected with error: {}",
+                "{}: Client disconnected - server error: {}",
                 "[Server]".bold(),
-                error
+                error.red()
             );
         }
     })?;
@@ -800,9 +832,9 @@ fn log_wait<F: FnOnce() -> Result<T, E>, T, E>(message: String, operation: F) ->
     stdout().flush().unwrap();
     let result = operation();
     if result.is_ok() {
-        println!("done");
+        println!("{}", "done".bold().bright_green());
     } else {
-        println!("error!");
+        println!("{}", "error!".bold().bright_red());
     }
     result
 }

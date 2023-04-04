@@ -2,26 +2,28 @@ mod cic;
 mod error;
 pub mod firmware;
 mod link;
+mod server;
+mod time;
 mod types;
-mod utils;
 
 pub use self::{
     error::Error,
-    link::{list_local_devices, ServerEvent},
+    link::list_local_devices,
+    server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType, Switch,
-        TvType,
+        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType,
+        SaveWriteback, Switch, TvType,
     },
 };
 
 use self::{
     cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
     link::{Command, Link},
+    time::{convert_from_datetime, convert_to_datetime},
     types::{
         get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
     },
-    utils::{convert_from_datetime, convert_to_datetime},
 };
 use chrono::{DateTime, Local};
 use std::{
@@ -81,8 +83,9 @@ const EEPROM_ADDRESS: u32 = 0x0500_2000;
 const EEPROM_4K_LENGTH: usize = 512;
 const EEPROM_16K_LENGTH: usize = 2 * 1024;
 const SRAM_LENGTH: usize = 32 * 1024;
-const SRAM_BANKED_LENGTH: usize = 3 * 32 * 1024;
 const FLASHRAM_LENGTH: usize = 128 * 1024;
+const SRAM_BANKED_LENGTH: usize = 3 * 32 * 1024;
+const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
@@ -100,7 +103,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'v',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -114,7 +117,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'V',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 8 {
             return Err(Error::new(
@@ -131,7 +134,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'R',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -149,7 +152,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'B',
             args,
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -158,7 +161,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'c',
             args: [config_id.into(), 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -173,7 +176,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'C',
             args: config.into(),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -182,7 +185,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'a',
             args: [setting_id.into(), 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -197,7 +200,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'A',
             args: setting.into(),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -206,7 +209,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b't',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 8 {
             return Err(Error::new(
@@ -220,7 +223,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'T',
             args: convert_from_datetime(datetime),
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -229,7 +232,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'm',
             args: [address, length as u32],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != length {
             return Err(Error::new(
@@ -243,7 +246,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'M',
             args: [address, data.len() as u32],
-            data,
+            data: data.to_vec(),
         })?;
         Ok(())
     }
@@ -253,7 +256,7 @@ impl SC64 {
             &Command {
                 id: b'U',
                 args: [datatype as u32, data.len() as u32],
-                data,
+                data: data.to_vec(),
             },
             true,
             false,
@@ -265,7 +268,16 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'D',
             args: [error as u32, 0],
-            data: &[],
+            data: vec![],
+        })?;
+        Ok(())
+    }
+
+    fn command_writeback_enable(&mut self) -> Result<(), Error> {
+        self.link.execute_command(&Command {
+            id: b'W',
+            args: [0, 0],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -274,7 +286,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'p',
             args: [wait as u32, 0],
-            data: &[],
+            data: vec![],
         })?;
         if data.len() != 4 {
             return Err(Error::new(
@@ -289,7 +301,7 @@ impl SC64 {
         self.link.execute_command(&Command {
             id: b'P',
             args: [address, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(())
     }
@@ -299,7 +311,7 @@ impl SC64 {
             &Command {
                 id: b'f',
                 args: [address, 0],
-                data: &[],
+                data: vec![],
             },
             false,
             true,
@@ -323,7 +335,7 @@ impl SC64 {
             &Command {
                 id: b'F',
                 args: [address, length as u32],
-                data: &[],
+                data: vec![],
             },
             false,
             true,
@@ -340,7 +352,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'?',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(data.try_into()?)
     }
@@ -349,7 +361,7 @@ impl SC64 {
         let data = self.link.execute_command(&Command {
             id: b'%',
             args: [0, 0],
-            data: &[],
+            data: vec![],
         })?;
         Ok(data.try_into()?)
     }
@@ -439,8 +451,9 @@ impl SC64 {
             SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
             SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
-            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
         };
 
         if length != save_length {
@@ -462,8 +475,9 @@ impl SC64 {
             SaveType::Eeprom4k => (EEPROM_ADDRESS, EEPROM_4K_LENGTH),
             SaveType::Eeprom16k => (EEPROM_ADDRESS, EEPROM_16K_LENGTH),
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
-            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
+            SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
+            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
         };
 
         self.memory_read_chunked(writer, address, save_length)
@@ -580,6 +594,16 @@ impl SC64 {
         Ok(())
     }
 
+    pub fn set_save_writeback(&mut self, enabled: bool) -> Result<(), Error> {
+        if enabled {
+            self.command_writeback_enable()?;
+        } else {
+            let save_type = get_config!(self, SaveType)?;
+            self.set_save_type(save_type)?;
+        }
+        Ok(())
+    }
+
     pub fn receive_data_packet(&mut self) -> Result<Option<DataPacket>, Error> {
         if let Some(packet) = self.link.receive_packet()? {
             return Ok(Some(packet.try_into()?));
@@ -617,13 +641,15 @@ impl SC64 {
     }
 
     pub fn check_firmware_version(&mut self) -> Result<(u16, u16, u32), Error> {
+        let unsupported_version_message = format!(
+            "Unsupported SC64 firmware version, minimum supported version: {}.{}.x",
+            SUPPORTED_MAJOR_VERSION, SUPPORTED_MINOR_VERSION
+        );
         let (major, minor, revision) = self
             .command_version_get()
-            .map_err(|_| Error::new("Outdated SC64 firmware version, please update firmware"))?;
+            .map_err(|_| Error::new(unsupported_version_message.as_str()))?;
         if major != SUPPORTED_MAJOR_VERSION || minor < SUPPORTED_MINOR_VERSION {
-            return Err(Error::new(
-                "Unsupported SC64 firmware version, please update firmware",
-            ));
+            return Err(Error::new(unsupported_version_message.as_str()));
         }
         Ok((major, minor, revision))
     }
@@ -784,5 +810,5 @@ pub fn run_server(
     } else {
         list_local_devices()?[0].port.clone()
     };
-    link::run_server(&port, address, event_callback)
+    server::run_server(&port, address, event_callback)
 }

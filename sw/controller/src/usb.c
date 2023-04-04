@@ -8,6 +8,7 @@
 #include "update.h"
 #include "usb.h"
 #include "version.h"
+#include "writeback.h"
 
 
 #define BOOTLOADER_ADDRESS  (0x04E00000UL)
@@ -303,6 +304,12 @@ static void usb_rx_process (void) {
 
             case 'D':
                 dd_set_block_ready(p.rx_args[0] == 0);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
+            case 'W':
+                writeback_enable(WRITEBACK_USB);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;

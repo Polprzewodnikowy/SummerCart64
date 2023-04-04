@@ -13,18 +13,14 @@
 #define TEXT_COLOR              (0xFFFFFFFFUL)
 #define LINE_SPACING            (2)
 
+#define VI_CR                   (VI_CR_PIXEL_ADVANCE_1 | VI_CR_PIXEL_ADVANCE_0 | VI_CR_ANTIALIAS_1 | VI_CR_ANTIALIAS_0 | VI_CR_TYPE_32)
+
 
 static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((section(".framebuffer, \"aw\", %nobits#")));
 static int char_x;
 static int char_y;
 static const vi_regs_t vi_config[] = {{
-    .CR = (
-        VI_CR_PIXEL_ADVANCE_1 |
-        VI_CR_PIXEL_ADVANCE_0 |
-        VI_CR_ANTIALIAS_1 |
-        VI_CR_ANTIALIAS_0 |
-        VI_CR_TYPE_32
-    ),
+    .CR = VI_CR,
     .H_WIDTH = SCREEN_WIDTH,
     .V_INTR = 0x000003FF,
     .CURR_LINE = 0x00000000,
@@ -38,13 +34,7 @@ static const vi_regs_t vi_config[] = {{
     .H_SCALE = 0x00000400,
     .V_SCALE = 0x00000400,
 }, {
-    .CR = (
-        VI_CR_PIXEL_ADVANCE_1 |
-        VI_CR_PIXEL_ADVANCE_0 |
-        VI_CR_ANTIALIAS_1 |
-        VI_CR_ANTIALIAS_0 |
-        VI_CR_TYPE_32
-    ),
+    .CR = VI_CR,
     .H_WIDTH = SCREEN_WIDTH,
     .V_INTR = 0x000003FF,
     .CURR_LINE = 0x00000000,
@@ -57,7 +47,21 @@ static const vi_regs_t vi_config[] = {{
     .COLOR_BURST = 0x000E0204,
     .H_SCALE = 0x00000400,
     .V_SCALE = 0x00000400,
-}};
+}, {
+    .CR = VI_CR,
+    .H_WIDTH = SCREEN_WIDTH,
+    .V_INTR = 0x000003FF,
+    .CURR_LINE = 0x00000000,
+    .TIMING = 0x04651E39,
+    .V_SYNC = 0x0000020D,
+    .H_SYNC = 0x00040C11,
+    .H_SYNC_LEAP = 0x0C190C1A,
+    .H_LIMITS = 0x006C02EC,
+    .V_LIMITS = 0x002501FF,
+    .COLOR_BURST = 0x000E0204,
+    .H_SCALE = 0x00000400,
+    .V_SCALE = 0x00000400,
+}};     
 
 
 static void display_decompress_background (uint32_t *background) {

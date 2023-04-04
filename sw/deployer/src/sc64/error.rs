@@ -17,7 +17,7 @@ impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "SC64 error: {}", self.description.as_str())
+        write!(f, "{}", self.description.as_str())
     }
 }
 

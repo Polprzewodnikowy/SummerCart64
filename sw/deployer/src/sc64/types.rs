@@ -1,5 +1,4 @@
 use super::{link::Packet, Error};
-use encoding_rs::EUC_JP;
 use std::fmt::Display;
 
 #[derive(Clone, Copy)]
@@ -253,6 +252,7 @@ pub enum SaveType {
     Sram,
     Flashram,
     SramBanked,
+    Sram1m,
 }
 
 impl Display for SaveType {
@@ -261,9 +261,10 @@ impl Display for SaveType {
             Self::None => "None",
             Self::Eeprom4k => "EEPROM 4k",
             Self::Eeprom16k => "EEPROM 16k",
-            Self::Sram => "SRAM",
-            Self::SramBanked => "SRAM banked",
-            Self::Flashram => "FlashRAM",
+            Self::Sram => "SRAM 256k",
+            Self::SramBanked => "SRAM 768k",
+            Self::Flashram => "FlashRAM 1M",
+            Self::Sram1m => "SRAM 1M",
         })
     }
 }
@@ -278,6 +279,7 @@ impl TryFrom<u32> for SaveType {
             3 => Self::Sram,
             4 => Self::Flashram,
             5 => Self::SramBanked,
+            6 => Self::Sram1m,
             _ => return Err(Error::new("Unknown save type code")),
         })
     }
@@ -292,6 +294,7 @@ impl From<SaveType> for u32 {
             SaveType::Sram => 3,
             SaveType::Flashram => 4,
             SaveType::SramBanked => 5,
+            SaveType::Sram1m => 6,
         }
     }
 }
@@ -337,7 +340,7 @@ pub enum TvType {
     PAL,
     NTSC,
     MPAL,
-    Auto,
+    Passthrough,
 }
 
 impl Display for TvType {
@@ -346,7 +349,7 @@ impl Display for TvType {
             Self::PAL => "PAL",
             Self::NTSC => "NTSC",
             Self::MPAL => "MPAL",
-            Self::Auto => "Auto",
+            Self::Passthrough => "Passthrough",
         })
     }
 }
@@ -358,7 +361,7 @@ impl TryFrom<u32> for TvType {
             0 => Self::PAL,
             1 => Self::NTSC,
             2 => Self::MPAL,
-            3 => Self::Auto,
+            3 => Self::Passthrough,
             _ => return Err(Error::new("Unknown TV type code")),
         })
     }
@@ -370,7 +373,7 @@ impl From<TvType> for u32 {
             TvType::PAL => 0,
             TvType::NTSC => 1,
             TvType::MPAL => 2,
-            TvType::Auto => 3,
+            TvType::Passthrough => 3,
         }
     }
 }
@@ -577,9 +580,10 @@ impl From<Setting> for [u32; 2] {
 
 pub enum DataPacket {
     Button,
-    Debug(DebugPacket),
-    Disk(DiskPacket),
-    IsViewer(String),
+    DebugData(DebugPacket),
+    DiskRequest(DiskPacket),
+    IsViewer64(Vec<u8>),
+    SaveWriteback(SaveWriteback),
     UpdateStatus(UpdateStatus),
 }
 
@@ -588,9 +592,10 @@ impl TryFrom<Packet> for DataPacket {
     fn try_from(value: Packet) -> Result<Self, Self::Error> {
         Ok(match value.id {
             b'B' => Self::Button,
-            b'U' => Self::Debug(value.data.try_into()?),
-            b'D' => Self::Disk(value.data.try_into()?),
-            b'I' => Self::IsViewer(EUC_JP.decode(&value.data).0.into()),
+            b'U' => Self::DebugData(value.data.try_into()?),
+            b'D' => Self::DiskRequest(value.data.try_into()?),
+            b'I' => Self::IsViewer64(value.data),
+            b'S' => Self::SaveWriteback(value.data.try_into()?),
             b'F' => {
                 if value.data.len() != 4 {
                     return Err(Error::new(
@@ -679,6 +684,25 @@ pub struct DiskBlock {
 impl DiskBlock {
     pub fn set_data(&mut self, data: &[u8]) {
         self.data = data.to_vec();
+    }
+}
+
+pub struct SaveWriteback {
+    pub save: SaveType,
+    pub data: Vec<u8>,
+}
+
+impl TryFrom<Vec<u8>> for SaveWriteback {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() < 4 {
+            return Err(Error::new(
+                "Couldn't extract save info from save writeback packet",
+            ));
+        }
+        let save: SaveType = u32::from_be_bytes(value[0..4].try_into().unwrap()).try_into()?;
+        let data = value[4..].to_vec();
+        Ok(SaveWriteback { save, data })
     }
 }
 
@@ -782,7 +806,10 @@ impl TryFrom<Vec<u8>> for FpgaDebugData {
 
 impl Display for FpgaDebugData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("PI address: 0x{:08X}", self.last_pi_address))?;
+        f.write_fmt(format_args!(
+            "Last PI address: 0x{:08X}",
+            self.last_pi_address
+        ))?;
         if self.read_fifo_wait {
             f.write_str(" RW")?;
         }
