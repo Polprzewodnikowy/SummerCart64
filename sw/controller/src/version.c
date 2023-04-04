@@ -2,7 +2,7 @@
 
 
 #define VERSION_MAJOR       (2)
-#define VERSION_MINOR       (14)
+#define VERSION_MINOR       (15)
 #define VERSION_REVISION    (0)
 
 

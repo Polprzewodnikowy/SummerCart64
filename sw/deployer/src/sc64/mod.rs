@@ -61,7 +61,7 @@ pub struct DeviceState {
 const SC64_V2_IDENTIFIER: &[u8; 4] = b"SCv2";
 
 const SUPPORTED_MAJOR_VERSION: u16 = 2;
-const SUPPORTED_MINOR_VERSION: u16 = 14;
+const SUPPORTED_MINOR_VERSION: u16 = 15;
 
 const SDRAM_ADDRESS: u32 = 0x0000_0000;
 const SDRAM_LENGTH: usize = 64 * 1024 * 1024;
