@@ -5,19 +5,22 @@
 #include "flash.h"
 #include "fpga.h"
 #include "rtc.h"
+#include "timer.h"
 #include "update.h"
 #include "usb.h"
 #include "version.h"
 #include "writeback.h"
 
 
-#define BOOTLOADER_ADDRESS  (0x04E00000UL)
-#define BOOTLOADER_LENGTH   (1920 * 1024)
+#define BOOTLOADER_ADDRESS          (0x04E00000UL)
+#define BOOTLOADER_LENGTH           (1920 * 1024)
 
-#define MEMORY_LENGTH       (0x05002980UL)
+#define MEMORY_LENGTH               (0x05002980UL)
 
-#define RX_FLUSH_ADDRESS    (0x07F00000UL)
-#define RX_FLUSH_LENGTH     (1 * 1024 * 1024)
+#define RX_FLUSH_ADDRESS            (0x07F00000UL)
+#define RX_FLUSH_LENGTH             (1 * 1024 * 1024)
+
+#define DEBUG_WRITE_TIMEOUT_TICKS   (100)
 
 
 enum rx_state {
@@ -48,6 +51,9 @@ struct process {
     usb_tx_info_t tx_info;
     uint32_t tx_token;
     bool tx_dma_running;
+
+    bool flush_response;
+    bool flush_packet;
 
     bool response_pending;
     bool response_error;
@@ -161,11 +167,16 @@ static void usb_rx_process (void) {
             p.rx_state = RX_STATE_ARGS;
             p.rx_counter = 0;
             p.rx_dma_running = false;
+            p.flush_response = false;
+            p.flush_packet = false;
             p.response_error = false;
             p.response_info.cmd = p.rx_cmd;
             p.response_info.data_length = 0;
             p.response_info.dma_length = 0;
             p.response_info.done_callback = NULL;
+            if (p.rx_cmd == 'U') {
+                timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
+            }
         }
     }
 
@@ -268,6 +279,7 @@ static void usb_rx_process (void) {
                     if (!p.rx_dma_running) {
                         if (usb_validate_address_length(p.rx_args[0], p.rx_args[1], true)) {
                             p.rx_state = RX_STATE_FLUSH;
+                            p.flush_response = true;
                         } else {
                             fpga_reg_set(REG_USB_DMA_ADDRESS, p.rx_args[0]);
                             fpga_reg_set(REG_USB_DMA_LENGTH, p.rx_args[1]);
@@ -284,20 +296,26 @@ static void usb_rx_process (void) {
             case 'U':
                 if (p.rx_args[1] == 0) {
                     p.rx_state = RX_STATE_IDLE;
-                } else if ((p.read_length > 0) && usb_dma_ready()) {
-                    uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
-                    if (!p.rx_dma_running) {
-                        fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
-                        fpga_reg_set(REG_USB_DMA_LENGTH, length);
-                        fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
-                        p.rx_dma_running = true;
-                        p.read_ready = false;
-                    } else {
-                        p.rx_args[1] -= length;
-                        p.rx_dma_running = false;
-                        p.read_length -= length;
-                        p.read_address += length;
-                        p.read_ready = true;
+                } else if (usb_dma_ready()) {
+                    if (p.read_length > 0) {
+                        uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
+                        if (!p.rx_dma_running) {
+                            fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
+                            fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                            fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                            p.rx_dma_running = true;
+                            p.read_ready = false;
+                        } else {
+                            p.rx_args[1] -= length;
+                            p.rx_dma_running = false;
+                            p.read_length -= length;
+                            p.read_address += length;
+                            p.read_ready = true;
+                            timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
+                        }
+                    } else if (timer_get(TIMER_ID_USB) == 0) {
+                        p.rx_state = RX_STATE_FLUSH;
+                        p.flush_packet = true;
                     }
                 }
                 break;
@@ -390,9 +408,19 @@ static void usb_rx_process (void) {
                 fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
                 p.rx_args[1] -= length;
             } else {
-                p.rx_state = RX_STATE_IDLE;
-                p.response_pending = true;
-                p.response_error = true;
+                if (p.flush_response) {
+                    p.rx_state = RX_STATE_IDLE;
+                    p.response_pending = true;
+                    p.response_error = true;
+                } else if (p.flush_packet) {
+                    usb_tx_info_t packet_info;
+                    usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
+                    if (usb_enqueue_packet(&packet_info)) {
+                        p.rx_state = RX_STATE_IDLE;
+                    }
+                } else {
+                    p.rx_state = RX_STATE_IDLE;
+                }
             }
         }
     }
