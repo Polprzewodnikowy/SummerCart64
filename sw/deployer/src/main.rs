@@ -48,7 +48,7 @@ enum Commands {
         command: DownloadCommands,
     },
 
-    /// Upload ROM (and save), 64DD IPL then run disk server
+    /// Upload ROM (and save), 64DD IPL then run disk/debug server
     _64DD(_64DDArgs),
 
     /// Enter debug mode
@@ -127,7 +127,7 @@ struct _64DDArgs {
     #[arg(short, long)]
     rom: Option<PathBuf>,
 
-    /// Path to the save file
+    /// Path to the save file (also used by save writeback mechanism)
     #[arg(short, long, requires = "rom")]
     save: Option<PathBuf>,
 
@@ -398,11 +398,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 
     let mut sc64 = init_sc64(connection, true)?;
 
+    let mut debug_handler = debug::new();
+
     println!(
-        "{} {} {}",
-        "[WARNING]:".bold().bright_yellow(),
-        "Do not use this mode when real 64DD accessory is connected to the N64.".bright_yellow(),
-        "This might permanently damage either 64DD or SC64.".bright_yellow()
+        "{}\n{}\n{}",
+        "========== [WARNING] ==========".bold().bright_yellow(),
+        "Do not use this mode when real 64DD accessory is connected to the N64".bright_yellow(),
+        "Doing so might permanently damage either N64, 64DD or SC64".bright_yellow()
     );
 
     sc64.reset_state()?;
@@ -478,10 +480,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         .iter()
         .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
         .collect();
-
     let mut disks = disk::open_multiple(&disk_paths)?;
-    let mut selected_disk_index: usize = 0;
-    let mut selected_disk: Option<&mut disk::Disk> = None;
 
     let drive_type = match disks[0].get_format() {
         disk::Format::Retail => sc64::DdDriveType::Retail,
@@ -495,10 +494,21 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     println!(
         "{}: {}",
         "[64DD]".bold(),
-        "Press button on the SC64 device to cycle through provided disks"
+        "Press button on the back of SC64 device to cycle through provided disks"
             .bold()
             .bright_green()
     );
+
+    let mut selected_disk_index: usize = 0;
+    let mut selected_disk = Some(&mut disks[selected_disk_index]);
+    println!(
+        "{}: Disk inserted [{}]",
+        "[64DD]".bold(),
+        disk_names[selected_disk_index].bright_green()
+    );
+    sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
+
+    sc64.set_save_writeback(true)?;
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
@@ -554,16 +564,27 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                             selected_disk_index = 0;
                         }
                         selected_disk = Some(&mut disks[selected_disk_index]);
-                        sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
                         println!(
                             "{}: Disk inserted [{}]",
                             "[64DD]".bold(),
                             disk_names[selected_disk_index].bright_green()
                         );
+                        sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
                     }
+                }
+                sc64::DataPacket::DebugData(debug_packet) => {
+                    debug_handler.handle_debug_packet(debug_packet);
+                }
+                sc64::DataPacket::SaveWriteback(save_writeback) => {
+                    debug_handler.handle_save_writeback(save_writeback, &args.save);
+                }
+                sc64::DataPacket::DataFlushed => {
+                    debug_handler.handle_data_flushed();
                 }
                 _ => {}
             }
+        } else if let Some(debug_packet) = debug_handler.process_user_input() {
+            sc64.send_debug_packet(debug_packet)?;
         }
     }
 
@@ -607,6 +628,9 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                 }
                 sc64::DataPacket::SaveWriteback(save_writeback) => {
                     debug_handler.handle_save_writeback(save_writeback, &args.save);
+                }
+                sc64::DataPacket::DataFlushed => {
+                    debug_handler.handle_data_flushed();
                 }
                 _ => {}
             }

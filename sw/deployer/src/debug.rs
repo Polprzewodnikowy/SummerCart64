@@ -26,6 +26,7 @@ enum DataType {
     RawBinary,
     Header,
     Screenshot,
+    Heartbeat,
     Unknown,
 }
 
@@ -36,6 +37,7 @@ impl From<u8> for DataType {
             0x02 => Self::RawBinary,
             0x03 => Self::Header,
             0x04 => Self::Screenshot,
+            0x05 => Self::Heartbeat,
             _ => Self::Unknown,
         }
     }
@@ -48,6 +50,7 @@ impl From<DataType> for u8 {
             DataType::RawBinary => 0x02,
             DataType::Header => 0x03,
             DataType::Screenshot => 0x04,
+            DataType::Heartbeat => 0x05,
             DataType::Unknown => 0xFF,
         }
     }
@@ -114,6 +117,26 @@ impl TryFrom<Vec<u8>> for ScreenshotMetadata {
     }
 }
 
+struct Heartbeat {
+    usb_protocol: u16,
+    version: u16,
+}
+
+impl TryFrom<&[u8]> for Heartbeat {
+    type Error = String;
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < 4 {
+            return Err("Invalid heartbeat data length".into());
+        }
+        let usb_protocol = u16::from_be_bytes(value[0..2].try_into().unwrap());
+        let version = u16::from_be_bytes(value[2..4].try_into().unwrap());
+        Ok(Heartbeat {
+            usb_protocol,
+            version,
+        })
+    }
+}
+
 macro_rules! success {
     ($($a: tt)*) => {
         println!("{}", format!($($a)*).bright_blue());
@@ -134,6 +157,7 @@ macro_rules! stop {
 }
 
 const MAX_PACKET_LENGTH: usize = 8 * 1024 * 1024;
+const SUPPORTED_USB_PROTOCOL_VERSION: u16 = 2;
 
 impl Handler {
     pub fn set_text_encoding(&mut self, encoding: Encoding) {
@@ -195,6 +219,7 @@ impl Handler {
                     }
                 }
             }
+            data.append(&mut b"\0".to_vec());
             sc64::DebugPacket {
                 datatype: DataType::Text.into(),
                 data,
@@ -220,6 +245,7 @@ impl Handler {
             DataType::RawBinary => self.handle_datatype_raw_binary(&data),
             DataType::Header => self.handle_datatype_header(&data),
             DataType::Screenshot => self.handle_datatype_screenshot(&data),
+            DataType::Heartbeat => self.handle_datatype_heartbeat(&data),
             _ => error!("Received unknown debug packet datatype: 0x{datatype:02X}"),
         }
     }
@@ -252,11 +278,16 @@ impl Handler {
             Ok(mut file) => {
                 if let Err(error) = file.write_all(&save_writeback.data) {
                     error!("Couldn't write save [{filename}]: {error}");
+                } else {
+                    success!("Wrote [{}] save to [{filename}]", save_writeback.save);
                 }
-                success!("Wrote [{}] save to [{filename}]", save_writeback.save);
             }
             Err(error) => error!("Couldn't create save writeback file [{filename}]: {error}"),
         }
+    }
+
+    pub fn handle_data_flushed(&self) {
+        error!("Debug data write dropped due to timeout");
     }
 
     fn handle_datatype_text(&self, data: &[u8]) {
@@ -269,8 +300,9 @@ impl Handler {
             Ok(mut file) => {
                 if let Err(error) = file.write_all(data) {
                     error!("Couldn't write raw binary [{filename}]: {error}");
+                } else {
+                    success!("Wrote [{}] bytes to [{filename}]", data.len());
                 }
-                success!("Wrote [{}] bytes to [{filename}]", data.len());
             }
             Err(error) => error!("Couldn't create raw binary file [{filename}]: {error}"),
         }
@@ -317,6 +349,23 @@ impl Handler {
             return error!("Couldn't save screenshot [{filename}]: {error}");
         }
         success!("Wrote {width}x{height} pixels to [{filename}]");
+    }
+
+    fn handle_datatype_heartbeat(&mut self, data: &[u8]) {
+        let Heartbeat {
+            usb_protocol,
+            version,
+        } = match data.try_into() {
+            Ok(heartbeat) => heartbeat,
+            Err(error) => return error!("Error while parsing heartbeat datatype: {error}"),
+        };
+        if usb_protocol > SUPPORTED_USB_PROTOCOL_VERSION {
+            return error!("Unsupported USB protocol version: {usb_protocol}");
+        }
+        match version {
+            1 => {}
+            _ => return error!("Unsupported USB heartbeat version: {version}"),
+        }
     }
 
     fn print_text(&self, data: &[u8]) {

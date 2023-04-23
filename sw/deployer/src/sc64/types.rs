@@ -580,6 +580,7 @@ impl From<Setting> for [u32; 2] {
 
 pub enum DataPacket {
     Button,
+    DataFlushed,
     DebugData(DebugPacket),
     DiskRequest(DiskPacket),
     IsViewer64(Vec<u8>),
@@ -592,6 +593,7 @@ impl TryFrom<Packet> for DataPacket {
     fn try_from(value: Packet) -> Result<Self, Self::Error> {
         Ok(match value.id {
             b'B' => Self::Button,
+            b'G' => Self::DataFlushed,
             b'U' => Self::DebugData(value.data.try_into()?),
             b'D' => Self::DiskRequest(value.data.try_into()?),
             b'I' => Self::IsViewer64(value.data),
