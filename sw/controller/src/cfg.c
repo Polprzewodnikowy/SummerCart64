@@ -79,6 +79,8 @@ typedef enum {
     SD_CARD_OP_INIT = 1,
     SD_CARD_OP_GET_STATUS = 2,
     SD_CARD_OP_GET_INFO = 3,
+    SD_CARD_OP_BYTE_SWAP_ON = 4,
+    SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
 
 typedef enum {
@@ -571,6 +573,18 @@ void cfg_process (void) {
                             return;
                         }
                         if (sd_card_get_info(args[0])) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    case SD_CARD_OP_BYTE_SWAP_ON:
+                        if (sd_set_byte_swap(true)) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    case SD_CARD_OP_BYTE_SWAP_OFF:
+                        if (sd_set_byte_swap(false)) {
                             cfg_set_error(CFG_ERROR_SD_CARD);
                             return;
                         }

@@ -4,6 +4,7 @@ interface dma_scb ();
     logic stop;
     logic busy;
     logic direction;
+    logic byte_swap;
     logic [26:0] starting_address;
     logic [26:0] transfer_length;
 
@@ -12,6 +13,7 @@ interface dma_scb ();
         output stop,
         input busy,
         output direction,
+        output byte_swap,
         output starting_address,
         output transfer_length
     );
@@ -21,6 +23,7 @@ interface dma_scb ();
         input stop,
         output busy,
         input direction,
+        input byte_swap,
         input starting_address,
         input transfer_length
     );
@@ -209,7 +212,11 @@ module memory_dma (
                 if (mem_bus.write) begin
                     if (rx_buffer_valid) begin
                         mem_bus.request <= 1'b1;
-                        mem_bus.wdata <= rx_buffer;
+                        if (dma_scb.byte_swap) begin
+                            mem_bus.wdata <= {rx_buffer[7:0], rx_buffer[15:8]};
+                        end else begin
+                            mem_bus.wdata <= rx_buffer;
+                        end
                     end
                 end else begin
                     if (tx_buffer_ready) begin
