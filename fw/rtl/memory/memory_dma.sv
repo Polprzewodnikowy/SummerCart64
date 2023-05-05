@@ -64,6 +64,7 @@ module memory_dma (
 
     // RX FIFO controller
 
+    logic [1:0] rx_wmask;
     logic rx_rdata_pop;
     logic rx_rdata_shift;
     logic rx_rdata_valid;
@@ -91,11 +92,11 @@ module memory_dma (
 
         if (dma_start) begin
             if (dma_scb.starting_address[0]) begin
-                mem_bus.wmask <= 2'b01;
+                rx_wmask <= 2'b01;
                 rx_buffer_counter <= 2'd1;
                 rx_buffer_valid_counter <= 2'd1;
             end else begin
-                mem_bus.wmask <= 2'b11;
+                rx_wmask <= 2'b11;
                 rx_buffer_counter <= 2'd0;
                 rx_buffer_valid_counter <= 2'd0;
             end
@@ -106,16 +107,21 @@ module memory_dma (
         end
 
         if (rx_rdata_shift || rx_rdata_valid) begin
-            rx_buffer <= {rx_buffer[7:0], fifo_bus.rx_rdata};
+            if (dma_scb.byte_swap) begin
+                rx_buffer <= {fifo_bus.rx_rdata, rx_buffer[15:8]};
+            end else begin
+                rx_buffer <= {rx_buffer[7:0], fifo_bus.rx_rdata};
+            end
             rx_buffer_valid_counter <= rx_buffer_valid_counter + 1'd1;
             if (remaining == 27'd0 && rx_buffer_counter == 2'd1) begin
-                mem_bus.wmask <= 2'b10;
+                rx_wmask <= 2'b10;
                 rx_rdata_shift <= 1'b1;
                 rx_buffer_counter <= rx_buffer_counter + 1'd1;
             end
         end
 
         if (rx_buffer_valid && !mem_bus.request) begin
+            rx_wmask <= 2'b11;
             rx_buffer_counter <= 2'd0;
             rx_buffer_valid_counter <= 2'd0;
         end
@@ -212,11 +218,8 @@ module memory_dma (
                 if (mem_bus.write) begin
                     if (rx_buffer_valid) begin
                         mem_bus.request <= 1'b1;
-                        if (dma_scb.byte_swap) begin
-                            mem_bus.wdata <= {rx_buffer[7:0], rx_buffer[15:8]};
-                        end else begin
-                            mem_bus.wdata <= rx_buffer;
-                        end
+                        mem_bus.wmask <= rx_wmask;
+                        mem_bus.wdata <= rx_buffer;
                     end
                 end else begin
                     if (tx_buffer_ready) begin
