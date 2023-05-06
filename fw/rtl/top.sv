@@ -45,7 +45,12 @@ module top (
     input mcu_clk,
     input mcu_cs,
     input mcu_mosi,
-    output mcu_miso
+    output mcu_miso,
+
+    // Unused I/O
+    output n64_cic_clk,
+    output n64_cic_dq,
+    output n64_video_sync
 );
 
     logic clk;
@@ -263,5 +268,12 @@ module top (
 
         .vendor_scb(vendor_scb)
     );
+
+
+    // Unused I/O
+
+    assign n64_cic_clk = 1'bZ;
+    assign n64_cic_dq = 1'bZ;
+    assign n64_video_sync = 1'bZ;
 
 endmodule
