@@ -8,6 +8,7 @@ PACKAGE_FILE_NAME="sc64-extra"
 
 TOP_FILES=(
     "./fw/ftdi/ft232h_config.xml"
+    "./fw/project/lcmxo2/impl1/fpga_max_frequency.txt"
     "./sw/tools/primer.py"
     "./sw/tools/requirements.txt"
     "./sc64-firmware-${SC64_VERSION}.bin"
@@ -90,6 +91,7 @@ build_update () {
         rm -f ../../sc64-firmware-*.bin
     fi
     GIT_INFO=""
+    GIT_INFO+=$'\n'"freq: $(cat ../../fw/project/lcmxo2/impl1/fpga_max_frequency.txt)"
     if [ ! -z "${SC64_VERSION}" ]; then GIT_INFO+=$'\n'"ver: $SC64_VERSION"; fi
     if [ ! -z "${GIT_BRANCH}" ]; then GIT_INFO+=$'\n'"branch: $GIT_BRANCH"; fi
     if [ ! -z "${GIT_TAG}" ]; then GIT_INFO+=$'\n'"tag: $GIT_TAG"; fi
