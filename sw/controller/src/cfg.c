@@ -178,7 +178,7 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
-    if (save_type > SAVE_TYPE_SRAM_BANKED) {
+    if (save_type > SAVE_TYPE_SRAM_1M) {
         return true;
     }
 
@@ -637,6 +637,10 @@ void cfg_process (void) {
                     return;
                 }
                 dd_set_sd_info(args[0], args[1]);
+                break;
+
+            case 'w':
+                args[0] = writeback_pending();
                 break;
 
             case 'W':

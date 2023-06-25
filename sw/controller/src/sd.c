@@ -424,6 +424,10 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
         return true;
     }
 
+    if (p.byte_swap && ((address % 2) != 0)) {
+        return true;
+    }
+
     if (!p.card_type_block) {
         sector *= SD_SECTOR_SIZE;
     }
