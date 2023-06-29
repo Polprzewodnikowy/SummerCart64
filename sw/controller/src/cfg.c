@@ -79,6 +79,8 @@ typedef enum {
     SD_CARD_OP_INIT = 1,
     SD_CARD_OP_GET_STATUS = 2,
     SD_CARD_OP_GET_INFO = 3,
+    SD_CARD_OP_BYTE_SWAP_ON = 4,
+    SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
 
 typedef enum {
@@ -176,7 +178,7 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
-    if (save_type > SAVE_TYPE_SRAM_BANKED) {
+    if (save_type > SAVE_TYPE_SRAM_1M) {
         return true;
     }
 
@@ -575,6 +577,18 @@ void cfg_process (void) {
                             return;
                         }
                         break;
+                    case SD_CARD_OP_BYTE_SWAP_ON:
+                        if (sd_set_byte_swap(true)) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    case SD_CARD_OP_BYTE_SWAP_OFF:
+                        if (sd_set_byte_swap(false)) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
                     default:
                         cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                         return;
@@ -623,6 +637,10 @@ void cfg_process (void) {
                     return;
                 }
                 dd_set_sd_info(args[0], args[1]);
+                break;
+
+            case 'w':
+                args[0] = writeback_pending();
                 break;
 
             case 'W':

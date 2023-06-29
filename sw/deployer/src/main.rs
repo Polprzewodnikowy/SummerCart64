@@ -157,6 +157,10 @@ struct DebugArgs {
     /// Use EUC-JP encoding for text printing
     #[arg(long)]
     euc_jp: bool,
+
+    /// Do not enable save writeback via USB
+    #[arg(long)]
+    no_writeback: bool
 }
 
 #[derive(Args)]
@@ -612,7 +616,9 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                 .bright_blue()
         );
     }
-    sc64.set_save_writeback(true)?;
+    if !args.no_writeback {
+        sc64.set_save_writeback(true)?;
+    }
 
     println!("{}: Started", "[Debug]".bold());
 
@@ -639,7 +645,9 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
         }
     }
 
-    sc64.set_save_writeback(false)?;
+    if !args.no_writeback {
+        sc64.set_save_writeback(false)?;
+    }
     if args.isv.is_some() {
         sc64.configure_is_viewer_64(None)?;
         println!("{}: Stopped listening", "[IS-Viewer 64]".bold());

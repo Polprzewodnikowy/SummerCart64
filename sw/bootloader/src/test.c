@@ -57,6 +57,9 @@ static void test_sd_card (void) {
     if (card_status & SD_CARD_STATUS_50MHZ_MODE) {
         display_printf("SD card runs at 50 MHz clock speed\n");
     }
+    if (card_status & SD_CARD_STATUS_BYTE_SWAP) {
+        display_printf("SD card read byte swap is enabled\n");
+    }
 
     if (sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) {
         display_printf("SD card get info error!\n");

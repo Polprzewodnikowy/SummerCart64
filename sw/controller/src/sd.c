@@ -7,6 +7,7 @@
 
 
 #define SD_INIT_BUFFER_ADDRESS          (0x05002800UL)
+#define BYTE_SWAP_ADDRESS_END           (0x05000000UL)
 
 #define CMD6_ARG_CHECK_HS               (0x00FFFFF1UL)
 #define CMD6_ARG_SWITCH_HS              (0x80FFFFF1UL)
@@ -67,6 +68,7 @@ struct process {
     uint8_t csd[16];
     uint8_t cid[16];
     volatile bool timeout;
+    bool byte_swap;
 };
 
 
@@ -178,6 +180,9 @@ static void sd_dat_prepare (uint32_t address, uint32_t count, dat_mode_t mode) {
     if (mode == DAT_READ) {
         sd_dat |= SD_DAT_START_READ;
         sd_dma_scr |= DMA_SCR_DIRECTION;
+        if (p.byte_swap && (address < BYTE_SWAP_ADDRESS_END)) {
+            sd_dma_scr |= DMA_SCR_BYTE_SWAP;
+        }
     } else {
         sd_dat |= SD_DAT_START_WRITE;
     }
@@ -216,6 +221,8 @@ bool sd_card_init (void) {
     uint32_t arg;
     uint32_t rsp;
     uint16_t tmp;
+
+    p.byte_swap = false;
 
     if (p.card_initialized) {
         return false;
@@ -336,6 +343,7 @@ bool sd_card_init (void) {
 void sd_card_deinit (void) {
     if (p.card_initialized) {
         p.card_initialized = false;
+        p.byte_swap = false;
         sd_set_clock(CLOCK_400KHZ);
         sd_cmd(0, 0, RSP_NONE, NULL);
         sd_set_clock(CLOCK_STOP);
@@ -348,11 +356,13 @@ bool sd_card_is_inserted (void) {
 
 uint32_t sd_card_get_status (void) {
     uint32_t scr = fpga_reg_get(REG_SD_SCR);
+    uint32_t byte_swap = p.byte_swap ? 1 : 0;
     uint32_t clock_mode_50mhz = ((scr & SD_SCR_CLOCK_MODE_MASK) == SD_SCR_CLOCK_MODE_50MHZ) ? 1 : 0;
     uint32_t card_type_block = p.card_type_block ? 1 : 0;
     uint32_t card_initialized = p.card_initialized ? 1 : 0;
     uint32_t card_inserted = (scr & SD_SCR_CARD_INSERTED) ? 1 : 0;
     return (
+        (byte_swap << 4) |
         (clock_mode_50mhz << 3) |
         (card_type_block << 2) |
         (card_initialized << 1) |
@@ -368,6 +378,14 @@ bool sd_card_get_info (uint32_t address) {
     address += sizeof(p.csd);
     fpga_mem_write(address, sizeof(p.cid), p.cid);
     address += sizeof(p.cid);
+    return false;
+}
+
+bool sd_set_byte_swap (bool enabled) {
+    if (!p.card_initialized) {
+        return true;
+    }
+    p.byte_swap = enabled;
     return false;
 }
 
@@ -403,6 +421,10 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
 bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     if (!p.card_initialized || (count == 0)) {
+        return true;
+    }
+
+    if (p.byte_swap && ((address % 2) != 0)) {
         return true;
     }
 
@@ -463,11 +485,12 @@ bool sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32_t cou
 
 void sd_init (void) {
     p.card_initialized = false;
+    p.byte_swap = false;
     sd_set_clock(CLOCK_STOP);
 }
 
 void sd_process (void) {
-    if (!sd_card_is_inserted()) {
+    if (p.card_initialized && !sd_card_is_inserted()) {
         sd_card_deinit();
     }
 }

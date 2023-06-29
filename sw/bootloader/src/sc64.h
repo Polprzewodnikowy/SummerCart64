@@ -86,6 +86,7 @@ typedef enum {
     SD_CARD_STATUS_INITIALIZED = (1 << 1),
     SD_CARD_STATUS_TYPE_BLOCK = (1 << 2),
     SD_CARD_STATUS_50MHZ_MODE = (1 << 3),
+    SD_CARD_STATUS_BYTE_SWAP = (1 << 4),
 } sc64_sd_card_status_t;
 
 typedef struct {
@@ -143,6 +144,7 @@ bool sc64_sd_card_init (void);
 bool sc64_sd_card_deinit (void);
 sc64_sd_card_status_t sc64_sd_card_get_status (void);
 bool sc64_sd_card_get_info (void *address);
+bool sc64_sd_set_byte_swap (bool enabled);
 bool sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
 bool sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
 bool sc64_dd_set_sd_disk_info (void *address, uint32_t length);

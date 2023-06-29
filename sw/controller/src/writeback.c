@@ -124,6 +124,10 @@ void writeback_disable (void) {
     timer_set(TIMER_ID_WRITEBACK, 0);
 }
 
+bool writeback_pending (void) {
+    return p.enabled && p.pending;
+}
+
 void writeback_init (void) {
     p.enabled = false;
     p.pending = false;

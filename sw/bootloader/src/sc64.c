@@ -52,6 +52,8 @@ typedef enum {
     SD_CARD_OP_INIT = 1,
     SD_CARD_OP_GET_STATUS = 2,
     SD_CARD_OP_GET_INFO = 3,
+    SD_CARD_OP_BYTE_SWAP_ON = 4,
+    SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
 
 
@@ -229,6 +231,14 @@ sc64_sd_card_status_t sc64_sd_card_get_status (void) {
 
 bool sc64_sd_card_get_info (void *address) {
     uint32_t args[2] = { (uint32_t) (address), SD_CARD_OP_GET_INFO };
+    if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
+        return true;
+    }
+    return false;
+}
+
+bool sc64_sd_set_byte_swap (bool enabled) {
+    uint32_t args[2] = { (uint32_t) (NULL), enabled ? SD_CARD_OP_BYTE_SWAP_ON : SD_CARD_OP_BYTE_SWAP_OFF };
     if (sc64_execute_cmd(SC64_CMD_SD_CARD_OP, args, NULL)) {
         return true;
     }
