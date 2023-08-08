@@ -23,12 +23,13 @@ SECTIONS {
         *(.framebuffer .framebuffer.*)
     } > framebuffer
 
-    .text : SUBALIGN(4) {
+    .text : SUBALIGN(8) {
         *(.text.entry_handler)
         *(.text .text.* .gnu.linkonce.t.*)
         *(.assets .assets.*)
         *(.rodata .rodata.* .gnu.linkonce.r.*)
         *(.data .data.* .gnu.linkonce.d.*)
+        . = ALIGN(8);
         _gp = . + 0x8000;
         *(.sdata .sdata.* .gnu.linkonce.s.*)
         *(.lit8 .lit4)

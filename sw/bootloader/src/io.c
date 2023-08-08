@@ -26,6 +26,27 @@ void cache_inst_hit_invalidate (void *address, size_t length) {
     cache_operation(HIT_INVALIDATE_I, CACHE_LINE_SIZE_I, address, length);
 }
 
+uint32_t c0_count (void) {
+    uint32_t value;
+    asm volatile (
+        "mfc0 %[value], $9 \n" :
+        [value] "=r" (value)
+    );
+    return value;
+}
+
+void delay_ms (int ms) {
+    uint64_t start = c0_count();
+    uint64_t end = start + (ms * ((93750000 / 2) / 1000));
+    uint64_t current;
+    do {
+        current = c0_count();
+        if (current < start) {
+            current += 0x100000000ULL;
+        }
+    } while (current < end);
+}
+
 uint32_t cpu_io_read (io32_t *address) {
     io32_t *uncached = UNCACHED(address);
     uint32_t value = *uncached;
@@ -35,6 +56,15 @@ uint32_t cpu_io_read (io32_t *address) {
 void cpu_io_write (io32_t *address, uint32_t value) {
     io32_t *uncached = UNCACHED(address);
     *uncached = value;
+}
+
+void pi_io_config (uint8_t page_size, uint8_t latency, uint8_t pulse_width, uint8_t release) {
+    for (int domain = 0; domain < 2; domain += 1) {
+        cpu_io_write(&PI->DOM[domain].PGS, page_size);
+        cpu_io_write(&PI->DOM[domain].LAT, latency);
+        cpu_io_write(&PI->DOM[domain].PWD, pulse_width);
+        cpu_io_write(&PI->DOM[domain].RLS, release);
+    }
 }
 
 uint32_t pi_busy (void) {

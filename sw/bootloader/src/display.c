@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include "display.h"
 #include "font.h"
@@ -19,6 +20,7 @@
 static io32_t display_framebuffer[SCREEN_WIDTH * SCREEN_HEIGHT] __attribute__((section(".framebuffer, \"aw\", %nobits#")));
 static int char_x;
 static int char_y;
+static bool vi_configured = false;
 static const vi_regs_t vi_config[] = {{
     .CR = VI_CR,
     .H_WIDTH = SCREEN_WIDTH,
@@ -99,6 +101,22 @@ static void display_draw_character (char c) {
         return;
     }
 
+    if (c == '\b') {
+        char_x -= FONT_WIDTH;
+        for (int i = 0; i < (FONT_WIDTH * FONT_HEIGHT); i++) {
+            int c_x = char_x + (i % FONT_WIDTH);
+            int c_y = char_y + (i / FONT_WIDTH);
+
+            if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (SCREEN_HEIGHT - BORDER_HEIGHT))) {
+                continue;
+            }
+
+            int screen_offset = c_x + (c_y * SCREEN_WIDTH);
+            cpu_io_write(&display_framebuffer[screen_offset], BACKGROUND_COLOR);
+        }
+        return;
+    }
+
     if ((char_x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
         char_x = BORDER_WIDTH;
         char_y += FONT_HEIGHT + LINE_SPACING;
@@ -113,7 +131,7 @@ static void display_draw_character (char c) {
         int c_y = char_y + (i / FONT_WIDTH);
 
         if ((c_x >= (SCREEN_WIDTH - BORDER_WIDTH)) || (c_y >= (SCREEN_HEIGHT - BORDER_HEIGHT))) {
-            break;
+            continue;
         }
 
         if (font_data[c - ' '][i / 8] & (1 << (i % 8))) {
@@ -133,8 +151,6 @@ static void display_draw_string (const char *s) {
 
 
 void display_init (uint32_t *background) {
-    const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
-
     char_x = BORDER_WIDTH;
     char_y = BORDER_HEIGHT;
 
@@ -144,20 +160,26 @@ void display_init (uint32_t *background) {
         display_clear_background();
     }
 
-    cpu_io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
-    cpu_io_write(&VI->H_WIDTH, cfg->H_WIDTH);
-    cpu_io_write(&VI->V_INTR, cfg->V_INTR);
-    cpu_io_write(&VI->CURR_LINE, cfg->CURR_LINE);
-    cpu_io_write(&VI->TIMING, cfg->TIMING);
-    cpu_io_write(&VI->V_SYNC, cfg->V_SYNC);
-    cpu_io_write(&VI->H_SYNC, cfg->H_SYNC);
-    cpu_io_write(&VI->H_SYNC_LEAP, cfg->H_SYNC_LEAP);
-    cpu_io_write(&VI->H_LIMITS, cfg->H_LIMITS);
-    cpu_io_write(&VI->V_LIMITS, cfg->V_LIMITS);
-    cpu_io_write(&VI->COLOR_BURST, cfg->COLOR_BURST);
-    cpu_io_write(&VI->H_SCALE, cfg->H_SCALE);
-    cpu_io_write(&VI->V_SCALE, cfg->V_SCALE);
-    cpu_io_write(&VI->CR, cfg->CR);
+    if (!vi_configured) {
+        vi_configured = true;
+
+        const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
+
+        cpu_io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
+        cpu_io_write(&VI->H_WIDTH, cfg->H_WIDTH);
+        cpu_io_write(&VI->V_INTR, cfg->V_INTR);
+        cpu_io_write(&VI->CURR_LINE, cfg->CURR_LINE);
+        cpu_io_write(&VI->TIMING, cfg->TIMING);
+        cpu_io_write(&VI->V_SYNC, cfg->V_SYNC);
+        cpu_io_write(&VI->H_SYNC, cfg->H_SYNC);
+        cpu_io_write(&VI->H_SYNC_LEAP, cfg->H_SYNC_LEAP);
+        cpu_io_write(&VI->H_LIMITS, cfg->H_LIMITS);
+        cpu_io_write(&VI->V_LIMITS, cfg->V_LIMITS);
+        cpu_io_write(&VI->COLOR_BURST, cfg->COLOR_BURST);
+        cpu_io_write(&VI->H_SCALE, cfg->H_SCALE);
+        cpu_io_write(&VI->V_SCALE, cfg->V_SCALE);
+        cpu_io_write(&VI->CR, cfg->CR);
+    }
 }
 
 void display_vprintf (const char *fmt, va_list args) {
