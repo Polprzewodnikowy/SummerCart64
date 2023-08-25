@@ -13,65 +13,65 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fw-hw-sw:
+  build-firmware:
     runs-on: ubuntu-latest
 
     steps:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
-      - name: Set SC64 version
+      - name: Set package version
         uses: frabert/replace-string-action@v2
-        id: sc64version
+        id: version
         with:
           pattern: '\/'
-          string: '-${{ github.ref_name }}'
+          string: '${{ github.ref_name }}'
           replace-with: '-'
 
-      - name: Build everything
+      - name: Build firmware
         run: ./docker_build.sh release --force-clean
         env:
-          SC64_VERSION: ${{ steps.sc64version.outputs.replaced }}
+          SC64_VERSION: ${{ steps.version.outputs.replaced }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: sc64-pkg${{ steps.sc64version.outputs.replaced }}
+          name: sc64-pkg-${{ steps.version.outputs.replaced }}
           path: |
-            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
+            sc64-extra-${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sc64-extra${{ steps.sc64version.outputs.replaced }}.zip
-            sc64-firmware${{ steps.sc64version.outputs.replaced }}.bin
+            sc64-extra-${{ steps.version.outputs.replaced }}.zip
+            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
-  build-sc64-py:
+  build-deployer:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
-            pyinstaller-build-options: --target-arch=64bit
-            pyinstaller-options: --onefile --console --icon ../../assets/sc64_logo_256_256.png
-            package-name: sc64-windows
-            package-options: -c -a -f
-            package-extension: zip
+            executable: sc64deployer.exe
+            name: sc64-deployer-windows
+            options: -c -a -f
+            extension: zip
 
           - os: ubuntu-latest
-            pyinstaller-options: --onefile
-            package-name: sc64-linux
-            package-options: -czf
-            package-extension: tar.gz
+            linux-packages: libudev-dev
+            executable: sc64deployer
+            name: sc64-deployer-linux
+            options: -czf
+            extension: tar.gz
 
           - os: macos-latest
-            pyinstaller-options: --onedir --console --icon ../../assets/sc64_logo_256_256.png
-            package-name: sc64-macos
-            package-options: -czf
-            package-extension: tgz
+            executable: sc64deployer
+            name: sc64-deployer-macos
+            options: -czf
+            extension: tgz
 
     runs-on: ${{ matrix.os }}
 
@@ -79,61 +79,40 @@ jobs:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v3
 
-      - name: Set SC64 version
+      - name: Set package version
         uses: frabert/replace-string-action@v2
-        id: sc64version
+        id: version
         with:
           pattern: '\/'
-          string: '-${{ github.ref_name }}'
+          string: '${{ github.ref_name }}'
           replace-with: '-'
 
-      - name: Setup python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Download pyinstaller repository
-        uses: actions/checkout@v3
-        with:
-          repository: 'pyinstaller/pyinstaller'
-          ref: 'v5.8.0'
-          path: pyinstaller
-
-      - name: Compile and install pyinstaller
+      - name: Install linux packages
+        if: matrix.linux-packages
         run: |
-          pip3 uninstall pyinstaller
-          pip3 install wheel
-          pushd bootloader
-          python3 ./waf all ${{ matrix.pyinstaller-build-options }}
-          popd
-          pip3 install .
-        working-directory: pyinstaller
+          sudo apt-get update
+          sudo apt-get -y install ${{ matrix.linux-packages }}
 
-      - name: Install sc64.py requirements
-        run: pip3 install -r requirements.txt
-        working-directory: sw/pc
-
-      - name: Create sc64.py executable
-        run: python3 -m PyInstaller --clean ${{ matrix.pyinstaller-options }} sc64.py
-        working-directory: sw/pc
+      - name: Build deployer
+        run: cargo b -r
+        working-directory: sw/deployer
 
       - name: Package executable
         run: |
           mkdir package
-          pushd dist
-          tar ${{ matrix.package-options }} ../package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }} *
-          popd
-        working-directory: sw/pc
+          cd target/release
+          tar ${{ matrix.options }} ../../package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+        working-directory: sw/deployer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}
-          path: sw/pc/package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }}
+          name: ${{ matrix.name }}-${{ steps.version.outputs.replaced }}
+          path: sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sw/pc/package/${{ matrix.package-name }}${{ steps.sc64version.outputs.replaced }}.${{ matrix.package-extension }}
+            sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}

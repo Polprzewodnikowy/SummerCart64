@@ -12,7 +12,8 @@ typedef enum {
     SAVE_TYPE_EEPROM_16K = 2,
     SAVE_TYPE_SRAM = 3,
     SAVE_TYPE_FLASHRAM = 4,
-    SAVE_TYPE_SRAM_BANKED = 5
+    SAVE_TYPE_SRAM_BANKED = 5,
+    SAVE_TYPE_SRAM_1M = 6,
 } save_type_t;
 
 
@@ -21,7 +22,7 @@ bool cfg_query (uint32_t *args);
 bool cfg_update (uint32_t *args);
 bool cfg_query_setting (uint32_t *args);
 bool cfg_update_setting (uint32_t *args);
-bool cfg_set_rom_write_enable (bool value);
+void cfg_set_rom_write_enable (bool value);
 save_type_t cfg_get_save_type (void);
 void cfg_get_time (uint32_t *args);
 void cfg_set_time (uint32_t *args);

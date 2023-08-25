@@ -92,6 +92,7 @@ typedef enum {
 #define DMA_SCR_STOP                    (1 << 1)
 #define DMA_SCR_DIRECTION               (1 << 2)
 #define DMA_SCR_BUSY                    (1 << 3)
+#define DMA_SCR_BYTE_SWAP               (1 << 4)
 
 #define CFG_SCR_BOOTLOADER_ENABLED      (1 << 0)
 #define CFG_SCR_BOOTLOADER_SKIP         (1 << 1)

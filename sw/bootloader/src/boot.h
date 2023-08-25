@@ -20,6 +20,7 @@ typedef enum {
     BOOT_TV_TYPE_PAL = 0,
     BOOT_TV_TYPE_NTSC = 1,
     BOOT_TV_TYPE_MPAL = 2,
+    BOOT_TV_TYPE_PASSTHROUGH = 3,
 } boot_tv_type_t;
 
 
@@ -31,7 +32,7 @@ typedef struct {
 } boot_info_t;
 
 
-void boot (boot_info_t *info, bool detect_tv_type, bool detect_cic_seed);
+void boot (boot_info_t *info, bool detect_cic_seed);
 
 
 #endif

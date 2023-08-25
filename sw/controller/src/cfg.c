@@ -54,14 +54,14 @@ typedef enum {
 } boot_mode_t;
 
 typedef enum {
-    CIC_SEED_UNKNOWN = 0xFFFF
+    CIC_SEED_AUTO = 0xFFFF
 } cic_seed_t;
 
 typedef enum {
     TV_TYPE_PAL = 0,
     TV_TYPE_NTSC = 1,
     TV_TYPE_MPAL = 2,
-    TV_TYPE_UNKNOWN = 3
+    TV_TYPE_PASSTHROUGH = 3
 } tv_type_t;
 
 typedef enum {
@@ -79,6 +79,8 @@ typedef enum {
     SD_CARD_OP_INIT = 1,
     SD_CARD_OP_GET_STATUS = 2,
     SD_CARD_OP_GET_INFO = 3,
+    SD_CARD_OP_BYTE_SWAP_ON = 4,
+    SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
 
 typedef enum {
@@ -176,7 +178,7 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
-    if (save_type > SAVE_TYPE_SRAM_BANKED) {
+    if (save_type > SAVE_TYPE_SRAM_1M) {
         return true;
     }
 
@@ -209,6 +211,9 @@ static bool cfg_set_save_type (save_type_t save_type) {
             break;
         case SAVE_TYPE_SRAM_BANKED:
             cfg_change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_ENABLED, true);
+            break;
+        case SAVE_TYPE_SRAM_1M:
+            cfg_change_scr_bits(CFG_SCR_SRAM_ENABLED, true);
             break;
         default:
             save_type = SAVE_TYPE_NONE;
@@ -337,7 +342,7 @@ bool cfg_update (uint32_t *args) {
             p.cic_seed = (cic_seed_t) (args[1] & 0xFFFF);
             break;
         case CFG_ID_TV_TYPE:
-            if (args[1] > TV_TYPE_UNKNOWN) {
+            if (args[1] > TV_TYPE_PASSTHROUGH) {
                 return true;
             }
             p.tv_type = (tv_type_t) (args[1] & 0x03);
@@ -397,10 +402,8 @@ bool cfg_update_setting (uint32_t *args) {
     return false;
 }
 
-bool cfg_set_rom_write_enable (bool value) {
-    uint32_t scr = fpga_reg_get(REG_CFG_SCR);
+void cfg_set_rom_write_enable (bool value) {
     cfg_change_scr_bits(CFG_SCR_ROM_WRITE_ENABLED, value);
-    return (scr & CFG_SCR_ROM_WRITE_ENABLED);
 }
 
 save_type_t cfg_get_save_type (void) {
@@ -442,8 +445,8 @@ void cfg_reset_state (void) {
     dd_set_disk_state(DD_DISK_STATE_EJECTED);
     dd_set_sd_mode(false);
     isv_set_address(0);
-    p.cic_seed = CIC_SEED_UNKNOWN;
-    p.tv_type = TV_TYPE_UNKNOWN;
+    p.cic_seed = CIC_SEED_AUTO;
+    p.tv_type = TV_TYPE_PASSTHROUGH;
     p.boot_mode = BOOT_MODE_MENU;
 }
 
@@ -472,7 +475,7 @@ void cfg_process (void) {
                 break;
 
             case 'V':
-                args[0] = version_firmware();
+                version_firmware(&args[0], &args[1]);
                 break;
 
             case 'c':
@@ -574,6 +577,18 @@ void cfg_process (void) {
                             return;
                         }
                         break;
+                    case SD_CARD_OP_BYTE_SWAP_ON:
+                        if (sd_set_byte_swap(true)) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
+                    case SD_CARD_OP_BYTE_SWAP_OFF:
+                        if (sd_set_byte_swap(false)) {
+                            cfg_set_error(CFG_ERROR_SD_CARD);
+                            return;
+                        }
+                        break;
                     default:
                         cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                         return;
@@ -624,13 +639,17 @@ void cfg_process (void) {
                 dd_set_sd_info(args[0], args[1]);
                 break;
 
+            case 'w':
+                args[0] = writeback_pending();
+                break;
+
             case 'W':
                 if (cfg_translate_address(&args[0], WRITEBACK_SECTOR_TABLE_SIZE, (SDRAM | BRAM))) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
                 writeback_load_sector_table(args[0]);
-                writeback_enable();
+                writeback_enable(WRITEBACK_SD);
                 break;
 
             case 'K':

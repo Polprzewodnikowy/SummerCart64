@@ -145,13 +145,13 @@ class JedecFile:
 
 
 class SC64UpdateData:
-    __UPDATE_TOKEN = b'SC64 Update v2.0'
+    __UPDATE_TOKEN              = b'SC64 Update v2.0'
 
-    __CHUNK_ID_UPDATE_INFO = 1
-    __CHUNK_ID_MCU_DATA = 2
-    __CHUNK_ID_FPGA_DATA = 3
-    __CHUNK_ID_BOOTLOADER_DATA = 4
-    __CHUNK_ID_PRIMER_DATA = 5
+    __CHUNK_ID_UPDATE_INFO      = 1
+    __CHUNK_ID_MCU_DATA         = 2
+    __CHUNK_ID_FPGA_DATA        = 3
+    __CHUNK_ID_BOOTLOADER_DATA  = 4
+    __CHUNK_ID_PRIMER_DATA      = 5
 
     __data = b''
 
@@ -219,13 +219,12 @@ if __name__ == "__main__":
 
         hostname = platform.node()
         creation_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-        info = [
-            f'build system: [{hostname}]',
-            f'creation datetime: [{creation_datetime}]',
-        ]
+        update_info = '\n'.join([
+            f'builder: {hostname}',
+            f'created: {creation_datetime}',
+        ])
         if (args.git):
-            info.append(args.git)
-        update_info = ' '.join(info)
+            update_info += args.git
         print(update_info)
         update.add_update_info(update_info.encode())
 

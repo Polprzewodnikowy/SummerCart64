@@ -364,6 +364,7 @@ module mcu_top (
     logic bootloader_skip;
 
     assign n64_scb.cfg_identifier = 32'h53437632;
+    assign usb_dma_scb.byte_swap = 1'b0;
 
     logic dd_bm_ack;
 
@@ -577,7 +578,8 @@ module mcu_top (
 
                 REG_SD_DMA_SCR: begin
                     reg_rdata <= {
-                        28'd0,
+                        27'd0,
+                        sd_dma_scb.byte_swap,
                         sd_dma_scb.busy,
                         sd_dma_scb.direction,
                         2'b00
@@ -855,11 +857,10 @@ module mcu_top (
                 end
 
                 REG_SD_DMA_SCR: begin
-                    {
-                        sd_dma_scb.direction,
-                        sd_dma_scb.stop,
-                        sd_dma_scb.start
-                    } <= reg_wdata[2:0];
+                    sd_dma_scb.byte_swap <= reg_wdata[4];
+                    sd_dma_scb.direction <= reg_wdata[2];
+                    sd_dma_scb.stop <= reg_wdata[1];
+                    sd_dma_scb.start <= reg_wdata[0];
                 end
 
                 REG_DD_SCR: begin

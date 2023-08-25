@@ -1,6 +1,7 @@
 #include <string.h>
 #include "ff.h"
 #include "diskio.h"
+#include "../error.h"
 #include "../io.h"
 #include "../sc64.h"
 
@@ -15,7 +16,12 @@ DSTATUS disk_status (BYTE pdrv) {
     }
 
     DSTATUS status = 0;
-    sc64_sd_card_status_t sd_card_status = sc64_sd_card_get_status();
+    sc64_error_t error;
+    sc64_sd_card_status_t sd_card_status;
+
+    if ((error = sc64_sd_card_get_status(&sd_card_status)) != SC64_OK) {
+        error_display("Could not get SD card status: %d", error);
+    }
 
     if (!(sd_card_status & SD_CARD_STATUS_INSERTED)) {
         status |= STA_NODISK;
@@ -47,7 +53,7 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
         while (count > 0) {
             uint32_t blocks = ((count > BUFFER_BLOCKS_MAX) ? BUFFER_BLOCKS_MAX : count);
             size_t length = (blocks * SD_SECTOR_SIZE);
-            if (sc64_sd_read_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks)) {
+            if (sc64_sd_read_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks) != SC64_OK) {
                 return RES_ERROR;
             }
             if (((uint32_t) (buff) % 8) == 0) {
@@ -61,7 +67,7 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
             count -= blocks;
         }
     } else {
-        if (sc64_sd_read_sectors(physical_address, sector, count)) {
+        if (sc64_sd_read_sectors(physical_address, sector, count) != SC64_OK) {
             return RES_ERROR;
         }
     }
@@ -85,7 +91,7 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
                 memcpy(aligned_buffer, buff, length);
                 pi_dma_write((io32_t *) (SC64_BUFFERS->BUFFER), aligned_buffer, length);
             }
-            if (sc64_sd_write_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks)) {
+            if (sc64_sd_write_sectors((uint32_t *) (SC64_BUFFERS->BUFFER), sector, blocks) != SC64_OK) {
                 return RES_ERROR;
             }
             buff += length;
@@ -93,7 +99,7 @@ DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
             count -= blocks;
         }
     } else {
-        if (sc64_sd_write_sectors(physical_address, sector, count)) {
+        if (sc64_sd_write_sectors(physical_address, sector, count) != SC64_OK) {
             return RES_ERROR;
         }
     }
@@ -112,8 +118,13 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void *buff) {
 }
 
 DWORD get_fattime(void) {
+    sc64_error_t error;
     sc64_rtc_time_t t;
-    sc64_get_time(&t);
+
+    if ((error = sc64_get_time(&t)) != SC64_OK) {
+        error_display("Command TIME_GET failed: %d", error);
+    }
+
     return (
         ((FROM_BCD(t.year) + 20) << 25) |
         (FROM_BCD(t.month) << 21) |

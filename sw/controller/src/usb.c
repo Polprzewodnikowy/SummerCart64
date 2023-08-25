@@ -5,15 +5,29 @@
 #include "flash.h"
 #include "fpga.h"
 #include "rtc.h"
+#include "timer.h"
 #include "update.h"
 #include "usb.h"
 #include "version.h"
+#include "writeback.h"
+
+
+#define BOOTLOADER_ADDRESS          (0x04E00000UL)
+#define BOOTLOADER_LENGTH           (1920 * 1024)
+
+#define MEMORY_LENGTH               (0x05002980UL)
+
+#define RX_FLUSH_ADDRESS            (0x07F00000UL)
+#define RX_FLUSH_LENGTH             (1 * 1024 * 1024)
+
+#define DEBUG_WRITE_TIMEOUT_TICKS   (100)
 
 
 enum rx_state {
     RX_STATE_IDLE,
     RX_STATE_ARGS,
     RX_STATE_DATA,
+    RX_STATE_FLUSH,
 };
 
 enum tx_state {
@@ -37,6 +51,9 @@ struct process {
     usb_tx_info_t tx_info;
     uint32_t tx_token;
     bool tx_dma_running;
+
+    bool flush_response;
+    bool flush_packet;
 
     bool response_pending;
     bool response_error;
@@ -129,17 +146,37 @@ static bool usb_rx_cmd (uint8_t *cmd) {
     return false;
 }
 
+static bool usb_validate_address_length (uint32_t address, uint32_t length, bool exclude_bootloader) {
+    if ((address >= MEMORY_LENGTH) || (length > MEMORY_LENGTH)) {
+        return true;
+    }
+    if ((address + length) > MEMORY_LENGTH) {
+        return true;
+    }
+    if (exclude_bootloader) {
+        if (((address + length) > BOOTLOADER_ADDRESS) && (address < (BOOTLOADER_ADDRESS + BOOTLOADER_LENGTH))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void usb_rx_process (void) {
     if (p.rx_state == RX_STATE_IDLE) {
         if (!p.response_pending && usb_rx_cmd(&p.rx_cmd)) {
             p.rx_state = RX_STATE_ARGS;
             p.rx_counter = 0;
             p.rx_dma_running = false;
+            p.flush_response = false;
+            p.flush_packet = false;
             p.response_error = false;
             p.response_info.cmd = p.rx_cmd;
             p.response_info.data_length = 0;
             p.response_info.dma_length = 0;
             p.response_info.done_callback = NULL;
+            if (p.rx_cmd == 'U') {
+                timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
+            }
         }
     }
 
@@ -166,8 +203,8 @@ static void usb_rx_process (void) {
             case 'V':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.data_length = 4;
-                p.response_info.data[0] = version_firmware();
+                p.response_info.data_length = 8;
+                version_firmware(&p.response_info.data[0], &p.response_info.data[1]);
                 break;
 
             case 'R':
@@ -229,17 +266,26 @@ static void usb_rx_process (void) {
             case 'm':
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.dma_address = p.rx_args[0];
-                p.response_info.dma_length = p.rx_args[1];
+                if (usb_validate_address_length(p.rx_args[0], p.rx_args[1], false)) {
+                    p.response_error = true;
+                } else {
+                    p.response_info.dma_address = p.rx_args[0];
+                    p.response_info.dma_length = p.rx_args[1];
+                }
                 break;
 
             case 'M':
                 if (usb_dma_ready()) {
                     if (!p.rx_dma_running) {
-                        fpga_reg_set(REG_USB_DMA_ADDRESS, p.rx_args[0]);
-                        fpga_reg_set(REG_USB_DMA_LENGTH, p.rx_args[1]);
-                        fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
-                        p.rx_dma_running = true;
+                        if (usb_validate_address_length(p.rx_args[0], p.rx_args[1], true)) {
+                            p.rx_state = RX_STATE_FLUSH;
+                            p.flush_response = true;
+                        } else {
+                            fpga_reg_set(REG_USB_DMA_ADDRESS, p.rx_args[0]);
+                            fpga_reg_set(REG_USB_DMA_LENGTH, p.rx_args[1]);
+                            fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                            p.rx_dma_running = true;
+                        }
                     } else {
                         p.rx_state = RX_STATE_IDLE;
                         p.response_pending = true;
@@ -248,28 +294,40 @@ static void usb_rx_process (void) {
                 break;
 
             case 'U':
-                if ((p.read_length > 0) && usb_dma_ready()) {
-                    uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
-                    if (!p.rx_dma_running) {
-                        fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
-                        fpga_reg_set(REG_USB_DMA_LENGTH, length);
-                        fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
-                        p.rx_dma_running = true;
-                        p.read_ready = false;
-                    } else {
-                        p.rx_args[1] -= length;
-                        p.read_length -= length;
-                        p.read_address += length;
-                        p.read_ready = true;
-                        if (p.rx_args[1] == 0) {
-                            p.rx_state = RX_STATE_IDLE;
+                if (p.rx_args[1] == 0) {
+                    p.rx_state = RX_STATE_IDLE;
+                } else if (usb_dma_ready()) {
+                    if (p.read_length > 0) {
+                        uint32_t length = (p.read_length > p.rx_args[1]) ? p.rx_args[1] : p.read_length;
+                        if (!p.rx_dma_running) {
+                            fpga_reg_set(REG_USB_DMA_ADDRESS, p.read_address);
+                            fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                            fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                            p.rx_dma_running = true;
+                            p.read_ready = false;
+                        } else {
+                            p.rx_args[1] -= length;
+                            p.rx_dma_running = false;
+                            p.read_length -= length;
+                            p.read_address += length;
+                            p.read_ready = true;
+                            timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
                         }
+                    } else if (timer_get(TIMER_ID_USB) == 0) {
+                        p.rx_state = RX_STATE_FLUSH;
+                        p.flush_packet = true;
                     }
                 }
                 break;
 
             case 'D':
                 dd_set_block_ready(p.rx_args[0] == 0);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
+            case 'W':
+                writeback_enable(WRITEBACK_USB);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;
@@ -285,24 +343,26 @@ static void usb_rx_process (void) {
                 break;
 
             case 'P':
-                p.response_error = flash_erase_block(p.rx_args[0]);
+                if (usb_validate_address_length(p.rx_args[0], FLASH_ERASE_BLOCK_SIZE, true)) {
+                    p.response_error = true;
+                } else {
+                    p.response_error = flash_erase_block(p.rx_args[0]);
+                }
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;
 
-            case 'f': {
-                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
+            case 'f':
+                cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_backup(p.rx_args[0], &p.response_info.data[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_error = (p.response_info.data[0] != UPDATE_OK);
                 p.response_info.data_length = 8;
-                cfg_set_rom_write_enable(rom_write_enable_restore);
                 break;
-            }
 
-            case 'F': {
-                bool rom_write_enable_restore = cfg_set_rom_write_enable(false);
+            case 'F':
+                cfg_set_rom_write_enable(false);
                 p.response_info.data[0] = update_prepare(p.rx_args[0], p.rx_args[1]);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
@@ -311,10 +371,8 @@ static void usb_rx_process (void) {
                     p.response_info.done_callback = update_start;
                 } else {
                     p.response_error = true;
-                    cfg_set_rom_write_enable(rom_write_enable_restore);
                 }
                 break;
-            }
 
             case '?':
                 p.rx_state = RX_STATE_IDLE;
@@ -336,8 +394,34 @@ static void usb_rx_process (void) {
                 p.response_pending = true;
                 p.response_error = true;
                 p.response_info.data_length = 4;
-                p.response_info.data[0] = 0xFF;
+                p.response_info.data[0] = 0xFFFFFFFF;
                 break;
+        }
+    }
+
+    if (p.rx_state == RX_STATE_FLUSH) {
+        if (usb_dma_ready()) {
+            if (p.rx_args[1] != 0) {
+                uint32_t length = (p.rx_args[1] > RX_FLUSH_LENGTH) ? RX_FLUSH_LENGTH : p.rx_args[1];
+                fpga_reg_set(REG_USB_DMA_ADDRESS, RX_FLUSH_ADDRESS);
+                fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                p.rx_args[1] -= length;
+            } else {
+                if (p.flush_response) {
+                    p.rx_state = RX_STATE_IDLE;
+                    p.response_pending = true;
+                    p.response_error = true;
+                } else if (p.flush_packet) {
+                    usb_tx_info_t packet_info;
+                    usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
+                    if (usb_enqueue_packet(&packet_info)) {
+                        p.rx_state = RX_STATE_IDLE;
+                    }
+                } else {
+                    p.rx_state = RX_STATE_IDLE;
+                }
+            }
         }
     }
 }

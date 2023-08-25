@@ -24,6 +24,7 @@
 | `M` | **MEMORY_WRITE**       | address      | length       | data | ---              | Write data to specified memory address                        |
 | `U` | **USB_WRITE**          | type         | length       | data | N/A              | Send data to be received by app running on N64 (no response!) |
 | `D` | **DD_SET_BLOCK_READY** | success      | ---          | ---  | ---              | Notify flashcart about 64DD block readiness                   |
+| `W` | **WRITEBACK_ENABLE**   | ---          | ---          | ---  | ---              | Enable save writeback through USB packet                      |
 | `p` | **FLASH_WAIT_BUSY**    | wait         | ---          | ---  | erase_block_size | Wait until flash ready / Get flash block erase size           |
 | `P` | **FLASH_ERASE_BLOCK**  | address      | ---          | ---  | ---              | Start flash block erase                                       |
 | `f` | **FIRMWARE_BACKUP**    | address      | ---          | ---  | status/length    | Backup firmware to specified memory address                   |

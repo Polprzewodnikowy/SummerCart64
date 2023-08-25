@@ -5,3 +5,4 @@ hw/pcb/*.html linguist-generated
 sw/bootloader/src/fatfs/* linguist-vendored
 sw/bootloader/src/fatfs/diskio.c -linguist-vendored
 sw/controller/inc/* linguist-vendored
+sw/deployer/data/* linguist-vendored

@@ -21,7 +21,7 @@ typedef enum {
     CFG_ID_ROM_WRITE_ENABLE,
     CFG_ID_ROM_SHADOW_ENABLE,
     CFG_ID_DD_MODE,
-    CFG_ID_ISV_ENABLE,
+    CFG_ID_ISV_ADDRESS,
     CFG_ID_BOOT_MODE,
     CFG_ID_SAVE_TYPE,
     CFG_ID_CIC_SEED,
@@ -59,19 +59,31 @@ typedef enum {
     SAVE_TYPE_EEPROM_16K = 2,
     SAVE_TYPE_SRAM = 3,
     SAVE_TYPE_FLASHRAM = 4,
-    SAVE_TYPE_SRAM_BANKED = 5
+    SAVE_TYPE_SRAM_BANKED = 5,
+    SAVE_TYPE_SRAM_1M = 6
 } sc64_save_type_t;
 
 typedef enum {
-    CIC_SEED_UNKNOWN = 0xFFFF
+    CIC_SEED_AUTO = 0xFFFF
 } sc64_cic_seed_t;
 
 typedef enum {
     TV_TYPE_PAL = 0,
     TV_TYPE_NTSC = 1,
     TV_TYPE_MPAL = 2,
-    TV_TYPE_UNKNOWN = 3
+    TV_TYPE_PASSTHROUGH = 3
 } sc64_tv_type_t;
+
+typedef enum {
+    DRIVE_TYPE_RETAIL,
+    DRIVE_TYPE_DEVELOPMENT,
+} sc64_drive_type_t;
+
+typedef enum {
+    DISK_STATE_EJECTED,
+    DISK_STATE_INSERTED,
+    DISK_STATE_CHANGED,
+} sc64_disk_state_t;
 
 typedef enum {
     BUTTON_MODE_NONE,
@@ -79,13 +91,6 @@ typedef enum {
     BUTTON_MODE_USB_PACKET,
     BUTTON_MODE_DD_DISK_SWAP,
 } sc64_button_mode_t;
-
-typedef enum {
-    SD_CARD_STATUS_INSERTED = (1 << 0),
-    SD_CARD_STATUS_INITIALIZED = (1 << 1),
-    SD_CARD_STATUS_TYPE_BLOCK = (1 << 2),
-    SD_CARD_STATUS_50MHZ_MODE = (1 << 3),
-} sc64_sd_card_status_t;
 
 typedef struct {
     sc64_boot_mode_t boot_mode;
@@ -103,6 +108,14 @@ typedef struct {
     uint8_t year;
 } sc64_rtc_time_t;
 
+typedef enum {
+    SD_CARD_STATUS_INSERTED = (1 << 0),
+    SD_CARD_STATUS_INITIALIZED = (1 << 1),
+    SD_CARD_STATUS_TYPE_BLOCK = (1 << 2),
+    SD_CARD_STATUS_50MHZ_MODE = (1 << 3),
+    SD_CARD_STATUS_BYTE_SWAP = (1 << 4),
+} sc64_sd_card_status_t;
+
 
 typedef struct {
     volatile uint8_t BUFFER[8192];
@@ -115,8 +128,6 @@ typedef struct {
 #define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
 
 
-sc64_error_t sc64_get_error (void);
-
 void sc64_unlock (void);
 void sc64_lock (void);
 bool sc64_check_presence (void);
@@ -124,33 +135,43 @@ bool sc64_check_presence (void);
 bool sc64_irq_pending (void);
 void sc64_irq_clear (void);
 
-uint32_t sc64_get_config (sc64_cfg_id_t id);
-void sc64_set_config (sc64_cfg_id_t id, uint32_t value);
-uint32_t sc64_get_setting (sc64_setting_id_t id);
-void sc64_set_setting (sc64_setting_id_t id, uint32_t value);
-void sc64_get_boot_info (sc64_boot_info_t *info);
+sc64_error_t sc64_get_identifier (uint32_t *identifier);
+sc64_error_t sc64_get_version (uint16_t *major, uint16_t *minor, uint32_t *revision);
 
-void sc64_get_time (sc64_rtc_time_t *t);
-void sc64_set_time (sc64_rtc_time_t *t);
+sc64_error_t sc64_get_config (sc64_cfg_id_t id, uint32_t *value);
+sc64_error_t sc64_set_config (sc64_cfg_id_t id, uint32_t value);
+sc64_error_t sc64_get_setting (sc64_setting_id_t id, uint32_t *value);
+sc64_error_t sc64_set_setting (sc64_setting_id_t id, uint32_t value);
+sc64_error_t sc64_get_boot_info (sc64_boot_info_t *info);
 
-bool sc64_usb_read_ready (uint8_t *type, uint32_t *length);
-bool sc64_usb_read (void *address, uint32_t length);
-bool sc64_usb_write_ready (void);
-bool sc64_usb_write (void *address, uint8_t type, uint32_t length);
+sc64_error_t sc64_get_time (sc64_rtc_time_t *t);
+sc64_error_t sc64_set_time (sc64_rtc_time_t *t);
 
-bool sc64_sd_card_init (void);
-bool sc64_sd_card_deinit (void);
-sc64_sd_card_status_t sc64_sd_card_get_status (void);
-bool sc64_sd_card_get_info (void *address);
-bool sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
-bool sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
-bool sc64_dd_set_sd_disk_info (void *address, uint32_t length);
-bool sc64_writeback_enable (void *address);
+sc64_error_t sc64_usb_get_status (bool *reset_state, bool *cable_unplugged);
+sc64_error_t sc64_usb_read_info (uint8_t *type, uint32_t *length);
+sc64_error_t sc64_usb_read_busy (bool *read_busy);
+sc64_error_t sc64_usb_write_busy (bool *write_busy);
+sc64_error_t sc64_usb_read (void *address, uint32_t length);
+sc64_error_t sc64_usb_write (void *address, uint8_t type, uint32_t length);
 
-bool sc64_flash_program (void *address, uint32_t length);
-void sc64_flash_wait_busy (void);
-uint32_t sc64_flash_get_erase_block_size (void);
-bool sc64_flash_erase_block (void *address);
+sc64_error_t sc64_sd_card_init (void);
+sc64_error_t sc64_sd_card_deinit (void);
+sc64_error_t sc64_sd_card_get_status (sc64_sd_card_status_t *sd_card_status);
+sc64_error_t sc64_sd_card_get_info (void *address);
+sc64_error_t sc64_sd_set_byte_swap (bool enabled);
+sc64_error_t sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
+sc64_error_t sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
+
+sc64_error_t sc64_dd_set_sd_info (void *address, uint32_t length);
+
+sc64_error_t sc64_writeback_pending (bool *pending);
+sc64_error_t sc64_writeback_enable (void *address);
+sc64_error_t sc64_writeback_disable (void);
+
+sc64_error_t sc64_flash_program (void *address, uint32_t length);
+sc64_error_t sc64_flash_wait_busy (void);
+sc64_error_t sc64_flash_get_erase_block_size (size_t *erase_block_size);
+sc64_error_t sc64_flash_erase_block (void *address);
 
 
 #endif

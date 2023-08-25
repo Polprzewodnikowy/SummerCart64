@@ -7,10 +7,13 @@
 
 
 void main (void) {
+    sc64_error_t error;
     boot_info_t boot_info;
     sc64_boot_info_t sc64_boot_info;
 
-    sc64_get_boot_info(&sc64_boot_info);
+    if ((error = sc64_get_boot_info(&sc64_boot_info)) != SC64_OK) {
+        error_display("Could not obtain boot info: %d", error);
+    }
 
     switch (sc64_boot_info.boot_mode) {
         case BOOT_MODE_MENU:
@@ -30,14 +33,12 @@ void main (void) {
             break;
     }
 
-    bool detect_tv_type = (sc64_boot_info.tv_type == TV_TYPE_UNKNOWN);
-    bool detect_cic_seed = (sc64_boot_info.cic_seed == CIC_SEED_UNKNOWN);
-
     boot_info.reset_type = OS_INFO->reset_type;
     boot_info.tv_type = sc64_boot_info.tv_type;
     boot_info.cic_seed = (sc64_boot_info.cic_seed & 0xFF);
+    bool detect_cic_seed = (sc64_boot_info.cic_seed == CIC_SEED_AUTO);
 
     deinit();
 
-    boot(&boot_info, detect_tv_type, detect_cic_seed);
+    boot(&boot_info, detect_cic_seed);
 }

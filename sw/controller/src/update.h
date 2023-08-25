@@ -13,6 +13,7 @@ typedef enum {
     UPDATE_ERROR_SIZE,
     UPDATE_ERROR_UNKNOWN_CHUNK,
     UPDATE_ERROR_READ,
+    UPDATE_ERROR_ADDRESS,
 } update_error_t;
 
 
