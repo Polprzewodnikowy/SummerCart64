@@ -3,6 +3,7 @@
 #include "init.h"
 #include "io.h"
 #include "menu.h"
+#include "sc64.h"
 
 
 extern const void __bootloader_start __attribute__((section(".data")));
@@ -65,6 +66,19 @@ static void menu_check_load_address (void *address, size_t size) {
 
 
 void menu_load_and_run (void) {
+    sc64_error_t error;
+    bool writeback_pending;
+
+    do {
+        if ((error = sc64_writeback_pending(&writeback_pending)) != SC64_OK) {
+            error_display("Command WRITEBACK_PENDING failed: %d", error);
+        }
+    } while (writeback_pending);
+
+    if ((error = sc64_writeback_disable()) != SC64_OK) {
+        error_display("Could not disable writeback: %d", error);
+    }
+
     void (* menu)(void);
     FRESULT fresult;
     FATFS fs;

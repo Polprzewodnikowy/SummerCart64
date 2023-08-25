@@ -254,8 +254,11 @@ typedef struct {
 #define OS_INFO_RESET_TYPE_NMI      (1)
 
 
+uint32_t c0_count (void);
+void delay_ms (int ms);
 uint32_t cpu_io_read (io32_t *address);
 void cpu_io_write (io32_t *address, uint32_t value);
+void pi_io_config (uint8_t page_size, uint8_t latency, uint8_t pulse_width, uint8_t release);
 uint32_t pi_busy (void);
 uint32_t pi_io_read (io32_t *address);
 void pi_io_write (io32_t *address, uint32_t value);

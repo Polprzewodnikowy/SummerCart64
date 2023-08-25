@@ -7,10 +7,13 @@
 
 
 void main (void) {
+    sc64_error_t error;
     boot_info_t boot_info;
     sc64_boot_info_t sc64_boot_info;
 
-    sc64_get_boot_info(&sc64_boot_info);
+    if ((error = sc64_get_boot_info(&sc64_boot_info)) != SC64_OK) {
+        error_display("Could not obtain boot info: %d", error);
+    }
 
     switch (sc64_boot_info.boot_mode) {
         case BOOT_MODE_MENU:
