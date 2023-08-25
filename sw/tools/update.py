@@ -226,7 +226,7 @@ if __name__ == "__main__":
         if (args.git):
             update_info += args.git
         print(update_info)
-        update.add_update_info(update_info.encode())
+        update.add_update_info(update_info.encode(errors='replace'))
 
         if (args.mcu):
             with open(args.mcu, 'rb+') as f:
