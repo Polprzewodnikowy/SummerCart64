@@ -137,6 +137,11 @@ impl TryFrom<&[u8]> for Heartbeat {
     }
 }
 
+pub enum UserInput {
+    Packet(sc64::DebugPacket),
+    EOF,
+}
+
 macro_rules! success {
     ($($a: tt)*) => {
         println!("{}", format!($($a)*).bright_blue());
@@ -164,17 +169,22 @@ impl Handler {
         self.encoding = encoding;
     }
 
-    pub fn process_user_input(&self) -> Option<sc64::DebugPacket> {
-        let line = match self.line_rx.try_recv() {
+    pub fn process_user_input(&self) -> Option<UserInput> {
+        let raw_line = match self.line_rx.try_recv() {
             Ok(line) => {
                 if line.len() == 0 {
-                    return None;
+                    return Some(UserInput::EOF);
                 } else {
                     line
                 }
             }
             Err(_) => return None,
         };
+
+        let line = raw_line.trim_end();
+        if line.len() == 0 {
+            return None;
+        }
 
         let token_count = line.matches("@").count();
 
@@ -235,7 +245,7 @@ impl Handler {
             );
         }
 
-        Some(packet)
+        Some(UserInput::Packet(packet))
     }
 
     pub fn handle_debug_packet(&mut self, debug_packet: sc64::DebugPacket) {
@@ -419,7 +429,7 @@ fn stdin_thread(line_tx: Sender<String>) {
     loop {
         let mut line = String::new();
         if stdin().read_line(&mut line).is_ok() {
-            if line_tx.send(line.trim_end().to_string()).is_err() {
+            if line_tx.send(line.to_string()).is_err() {
                 return;
             }
         }

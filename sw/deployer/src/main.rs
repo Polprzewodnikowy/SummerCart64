@@ -120,7 +120,6 @@ struct _64DDArgs {
     ddipl: PathBuf,
 
     /// Path to the 64DD disk file (.ndd format, can be specified multiple times)
-    #[arg(required = true)]
     disk: Vec<PathBuf>,
 
     /// Path to the ROM file
@@ -405,10 +404,11 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     let mut debug_handler = debug::new();
 
     println!(
-        "{}\n{}\n{}",
+        "{}\n{}\n{}\n{}",
         "========== [WARNING] ==========".bold().bright_yellow(),
         "Do not use this mode when real 64DD accessory is connected to the N64".bright_yellow(),
-        "Doing so might permanently damage either N64, 64DD or SC64".bright_yellow()
+        "Doing so might permanently damage either N64, 64DD or SC64".bright_yellow(),
+        "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin".bright_green()
     );
 
     sc64.reset_state()?;
@@ -474,6 +474,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 
     sc64.calculate_cic_parameters()?;
 
+    if args.disk.len() == 0 {
+        let dd_mode = sc64::DdMode::DdIpl;
+        println!("64DD mode set to [{dd_mode}]");
+        sc64.configure_64dd(dd_mode, None)?;
+        return Ok(())
+    }
+
     let disk_paths: Vec<String> = args
         .disk
         .iter()
@@ -493,7 +500,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 
     let dd_mode = sc64::DdMode::Full;
     println!("64DD mode set to [{dd_mode} / {drive_type}]");
-    sc64.configure_64dd(dd_mode, drive_type)?;
+    sc64.configure_64dd(dd_mode, Some(drive_type))?;
 
     println!(
         "{}: {}",
@@ -587,8 +594,11 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
                 }
                 _ => {}
             }
-        } else if let Some(debug_packet) = debug_handler.process_user_input() {
-            sc64.send_debug_packet(debug_packet)?;
+        } else if let Some(user_input) = debug_handler.process_user_input() {
+            match user_input {
+                debug::UserInput::Packet(debug_packet) => sc64.send_debug_packet(debug_packet)?,
+                debug::UserInput::EOF => break,
+            }
         }
     }
 
@@ -640,8 +650,11 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
                 }
                 _ => {}
             }
-        } else if let Some(debug_packet) = debug_handler.process_user_input() {
-            sc64.send_debug_packet(debug_packet)?;
+        } else if let Some(user_input) = debug_handler.process_user_input() {
+            match user_input {
+                debug::UserInput::Packet(debug_packet) => sc64.send_debug_packet(debug_packet)?,
+                debug::UserInput::EOF => break
+            }
         }
     }
 

@@ -559,13 +559,15 @@ impl SC64 {
     pub fn configure_64dd(
         &mut self,
         dd_mode: DdMode,
-        drive_type: DdDriveType,
+        drive_type: Option<DdDriveType>,
     ) -> Result<(), Error> {
         self.command_config_set(Config::DdMode(dd_mode))?;
-        self.command_config_set(Config::DdSdEnable(Switch::Off))?;
-        self.command_config_set(Config::DdDriveType(drive_type))?;
-        self.command_config_set(Config::DdDiskState(DdDiskState::Ejected))?;
-        self.command_config_set(Config::ButtonMode(ButtonMode::UsbPacket))?;
+        if let Some(drive_type) = drive_type {
+            self.command_config_set(Config::DdSdEnable(Switch::Off))?;
+            self.command_config_set(Config::DdDriveType(drive_type))?;
+            self.command_config_set(Config::DdDiskState(DdDiskState::Ejected))?;
+            self.command_config_set(Config::ButtonMode(ButtonMode::UsbPacket))?;
+        }
         Ok(())
     }
 
