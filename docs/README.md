@@ -1,15 +1,12 @@
-# SC64 - an open source Nintendo 64 flashcart
-
-[<img src="../assets/sc64_logo_256_160.png" />](../assets/sc64_logo_256_160.png)
-
----
+# <p style="text-align: center;">SummerCart64 - a fully open source Nintendo 64 flashcart</p>
+[<p style="text-align: center;"><img src="../assets/sc64_logo.svg" /></p>](../assets/sc64_logo.svg)
 
 ## Documentation
 
 - [Quick startup guide](./00_quick_startup_guide.md)
 - [Memory map](./01_memory_map.md)
-- [USB commands](./02_usb_commands.md)
-- [N64 commands](./03_n64_commands.md)
+- [N64 commands](./02_n64_commands.md)
+- [USB interface](./03_usb_interface.md)
 - [Config options](./04_config_options.md)
-- [FW/SW building](./05_fw_sw_building.md)
-- [Manufacturing guidelines](./06_manufacturing_guidelines.md)
+- [FW and SW info](./05_fw_and_sw_info.md)
+- [Build guide](./06_build_guide.md)

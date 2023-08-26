@@ -1,15 +1,16 @@
-- [First time setup](#first-time-setup)
+- [First time setup on PC](#first-time-setup-on-pc)
 - [Firmware backup/update](#firmware-backupupdate)
-- [Uploading game and/or save](#uploading-game-andor-save)
-- [Downloading save](#downloading-save)
-- [Running 64DD games](#running-64dd-games)
+- [Running menu in standalone mode](#running-menu-in-standalone-mode)
+- [Uploading game and/or save from PC](#uploading-game-andor-save-from-pc)
+- [Downloading save to PC](#downloading-save-to-pc)
+- [Running 64DD games from PC](#running-64dd-games-from-pc)
 - [Direct boot option](#direct-boot-option)
-- [Debug terminal](#debug-terminal)
+- [Debug terminal on PC](#debug-terminal-on-pc)
 - [LED blink patters](#led-blink-patters)
 
 ---
 
-## First time setup
+## First time setup on PC
 
 **Windows platform: replace `./sc64deployer` in examples below with `sc64deployer.exe`**
 
@@ -35,7 +36,15 @@ To print firmware metadata run `./sc64deployer firmware info sc64-firmware-{vers
 
 ---
 
-## Uploading game and/or save
+## Running menu in standalone mode
+
+Menu, as known from 64drive or EverDrive-64, is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
+Download latest version from [here](https://github.com/Polprzewodnikowy/N64FlashcartMenu/releases) and put `sc64menu.n64` file in the root directory of the SD card.
+When N64 is powered on menu is automatically loaded from the SD card. Supported file system formats are FAT32 and exFAT.
+
+---
+
+## Uploading game and/or save from PC
 
 `./sc64deployer upload path_to_rom.n64 --save-type eeprom4k --save path_to_save.sav`
 
@@ -46,7 +55,7 @@ Arguments `--save-type` and/or `--save` can be omitted if game doesn't require a
 
 ---
 
-## Downloading save
+## Downloading save to PC
 
 `./sc64deployer download save path_to_save.sav`
 
@@ -55,7 +64,7 @@ Command will raise error when no save type is currently enabled in the SC64 devi
 
 ---
 
-## Running 64DD games
+## Running 64DD games from PC
 
 64DD games require DDIPL ROM and disk images.
 To run disk game type `./sc64deployer 64dd path_to_ddipl.n64 path_to_disk_1.ndd path_to_disk_2.ndd`.
@@ -81,7 +90,7 @@ TV type cannot be forced when direct boot mode is enabled.
 
 ---
 
-## Debug terminal
+## Debug terminal on PC
 
 `sc64deployer` application supports UNFLoader protocol and has same functionality implemented as aforementioned program.
 Type `./sc64deployer debug` to activate it.

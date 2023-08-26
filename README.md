@@ -1,8 +1,5 @@
-# SC64 - an open source Nintendo 64 flashcart
-
-[<img src="assets/sc64_logo_256_160.png" />](assets/sc64_logo_256_160.png)
-
----
+# <p style="text-align: center;">SummerCart64 - a fully open source Nintendo 64 flashcart</p>
+[<p style="text-align: center;"><img src="assets/sc64_logo.svg" /></p>](assets/sc64_logo.svg)
 
 ## Features
  - 64 MiB SDRAM memory for game and save data
@@ -29,38 +26,31 @@
 
 - [Quick startup guide](./docs/00_quick_startup_guide.md)
 - [Memory map](./docs/01_memory_map.md)
-- [USB commands](./docs/02_usb_commands.md)
-- [N64 commands](./docs/03_n64_commands.md)
+- [N64 commands](./docs/02_n64_commands.md)
+- [USB interface](./docs/03_usb_interface.md)
 - [Config options](./docs/04_config_options.md)
-- [FW/SW building](./docs/05_fw_sw_building.md)
-- [Manufacturing guidelines](./docs/06_manufacturing_guidelines.md)
-
----
-
-## How do I get one?
-
-I've prepared all necessary manufacturing files on [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
-Full disclosure: for every order made through this link I will receive 10% of PCB manufacturing and PCB assembly service cost. This is a great way of supporting further project development.
-
-<a href="https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html"><img src="https://www.pcbway.com/project/img/images/frompcbway-1220.png" alt="PCB from PCBWay" /></a>
-
-If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
-
----
-
-## Where's menu?
-
-Menu, as known from 64drive or EverDrive-64, is currently under development. Progress can be tracked in [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu) repository.
-Ambitious goal of this software is to target every flashcart available on the market. However, main focus for now is getting at least basic UI running on the SC64.
+- [FW and SW info](./docs/05_fw_and_sw_info.md)
+- [Build guide](./docs/06_build_guide.md)
 
 ---
 
 ## Help / Q&A
 
-For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCollection/discussions) tab in GitHub repository.
-Do not use my e-mail for these questions, as I want to have a centralized knowledge base accessible for everyone interested in this project.
+For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab in GitHub repository.
+Using discussions tab is highly encouraged as it allows to have centralized knowledge database accessible for everyone interested in this project.
 
-I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux#5558` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCollection/discussions) tab is a preferred option. **Discord is not a replacement for contact form in any way.**
+I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab is a preferred option.
+
+---
+
+## How do I get one?
+
+One option is to ask in `#summer-cart-64` channel on [N64brew](https://discord.gg/WqFgNWf) Discord server if someone is making a group order.
+
+If you want to order it yourself then I've prepared all necessary manufacturing files on [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
+Full disclosure: for every order made through this link I will receive 10% of PCB manufacturing and PCB assembly service cost. This is a great way of supporting further project development.
+
+If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
 
 ---
 
@@ -73,6 +63,8 @@ I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korg
 ## Finished example
 
 [<img src="assets/sc64_finished_example.jpg" alt="SC64 finished example" width="800" />](assets/sc64_finished_example.jpg)
+[<img src="assets/sc64_pcb_front.jpg" alt="SC64 PCB front" width="800" />](assets/sc64_pcb_front.jpg)
+[<img src="assets/sc64_pcb_back.jpg" alt="SC64 PCB back" width="800" />](assets/sc64_pcb_back.jpg)
 
 ---
 

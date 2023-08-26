@@ -6,6 +6,7 @@
   - [**Putting it together**](#putting-it-together)
   - [**Initial programming**](#initial-programming)
   - [**Troubleshooting**](#troubleshooting)
+    - [*`primer.py` threw error on `Bootloader -> SC64 FLASH` step*](#primerpy-threw-error-on-bootloader---sc64-flash-step)
 
 ---
 
@@ -28,10 +29,12 @@ Please download latest release before proceeding with the instructions.
 
 ### **PCB requirements**
 
-  - Thickness: 1.2 mm
-  - At least ENIG plating or better
+***Before ordering PCBs make sure you select correct options listed below:***
+
+  - PCB thickness: 1.2 mm
+  - Surface finish (plating): ENIG (Hard gold for edge connector is recommended but it's very expensive)
   - PCB contains edge connector: yes
-  - Beveled edge connector: yes, 45°
+  - Beveled edge connector: yes, 45° (other angles also should work OK)
 
 ---
 
@@ -66,7 +69,7 @@ You can skip this step if PCB assembly service was used in previous steps.
 For initial programming you are going to need a PC and a USB to UART (serial) adapter (3.3V signaling is required).
 These steps assume you are using modern Windows OS (version 10 or higher).
 
-As for software here's list of required applications:
+As for software, here's list of required applications:
  - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software
  - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py`
 
@@ -102,7 +105,7 @@ Congratulations! Your SC64 flashcart should be ready for use!
 
 ### **Troubleshooting**
 
-*`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
+#### *`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
 
 This issue can be attributed to incorrectly programmed FT232H EEPROM in the first programming step.
 Check again in `FT_PROG` application if device was configured properly.

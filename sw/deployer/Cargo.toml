@@ -3,7 +3,7 @@ name = "sc64deployer"
 version = "2.16.0"
 edition = "2021"
 authors = ["Polprzewodnikowy"]
-description = "SC64 loader and control software"
+description = "SummerCart64 loader and control software"
 documentation = "https://github.com/Polprzewodnikowy/SummerCart64"
 
 [dependencies]
