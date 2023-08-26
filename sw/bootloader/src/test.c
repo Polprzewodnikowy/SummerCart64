@@ -190,7 +190,7 @@ static void test_sdram (void) {
         for (int offset = 0; offset < SDRAM_SIZE; offset += BUFFER_SIZE) {
             if (!patterns[pattern].constant) {
                 for (int i = 0; i < BUFFER_SIZE / sizeof(uint32_t); i++) {
-                    *UNCACHED(&w_buffer[i]) = (rand() << 31) | rand();
+                    w_buffer[i] = (rand() << 31) | rand();
                 }
             }
 
@@ -199,12 +199,12 @@ static void test_sdram (void) {
             pi_dma_read((io32_t *) (SDRAM_ADDRESS + offset), r_buffer, BUFFER_SIZE);
 
             for (int i = 0; i < BUFFER_SIZE / sizeof(uint32_t); i++) {
-                if (*UNCACHED(&w_buffer[i]) != *UNCACHED(&r_buffer[i])) {
+                if (w_buffer[i] != r_buffer[i]) {
                     display_printf(
                         "\nMISMATCH: [0x%08X]: 0x%08X (R) != 0x%08X (W)\n",
                         SDRAM_ADDRESS + offset,
-                        *UNCACHED(&r_buffer[i]),
-                        *UNCACHED(&w_buffer[i])
+                        r_buffer[i],
+                        w_buffer[i]
                     );
                     while (true);
                 }
