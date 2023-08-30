@@ -18,15 +18,16 @@ This mapping is used internally by FPGA/μC and when accessing flashcart from US
 | section             | base          | size             | access | device   |
 | ------------------- | ------------- | ---------------- | ------ | -------- |
 | SDRAM               | `0x0000_0000` | 64 MiB           | RW     | SDRAM    |
-| Flash               | `0x0400_0000` | 16 MiB           | RW     | Flash    |
+| Flash [1]           | `0x0400_0000` | 16 MiB           | RW/R   | Flash    |
 | Data buffer         | `0x0500_0000` | 8 kiB            | RW     | BlockRAM |
 | EEPROM              | `0x0500_2000` | 2 kiB            | RW     | BlockRAM |
 | 64DD buffer         | `0x0500_2800` | 256 bytes        | RW     | BlockRAM |
-| FlashRAM buffer [1] | `0x0500_2900` | 128 bytes        | R      | BlockRAM |
-| N/A [2]             | `0x0500_2980` | to `0x07FF_FFFF` | R      | N/A      |
+| FlashRAM buffer [2] | `0x0500_2900` | 128 bytes        | R      | BlockRAM |
+| N/A [3]             | `0x0500_2980` | to `0x07FF_FFFF` | R      | N/A      |
 
- - Note [1]: Due to BlockRAM usage optimization this section is read only.
- - Note [2]: Read returns `0`. Maximum accessibe address space is 128 MiB.
+ - Note [1]: Flash memory region `0x04E0_0000` - `0x04FD_FFFF` is write protected as it contains N64 bootloader. This section can be overwritten only via firmware update process.
+ - Note [2]: Due to BlockRAM usage optimization this section is read only.
+ - Note [3]: Read returns `0`. Maximum accessibe address space is 128 MiB.
 
 ---
 
