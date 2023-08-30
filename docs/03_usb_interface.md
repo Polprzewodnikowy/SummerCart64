@@ -31,6 +31,18 @@
   - [`T`: **TIME\_SET**](#t-time_set)
     - [`arg0` (time\_0)](#arg0-time_0)
     - [`arg1` (time\_1)](#arg1-time_1)
+  - [`m`: **MEMORY\_READ**](#m-memory_read)
+    - [`arg0` (address)](#arg0-address)
+    - [`arg1` (length)](#arg1-length)
+    - [`response` (data)](#response-data)
+  - [`M`: **MEMORY\_WRITE**](#m-memory_write)
+    - [`arg0` (address)](#arg0-address-1)
+    - [`arg1` (length)](#arg1-length-1)
+    - [`data` (data)](#data-data)
+  - [`U`: **USB\_WRITE**](#u-usb_write)
+    - [`arg0` (type)](#arg0-type)
+    - [`arg1` (length)](#arg1-length-2)
+    - [`data` (data)](#data-data-1)
 - [Asynchronous packets](#asynchronous-packets)
 
 ---
@@ -131,9 +143,9 @@ Available packet IDs are listed in the [asynchronous packets](#asynchronous-pack
 | `A` | [**SETTING_SET**](#a-setting_set)       | setting_id   | setting_value | ---  | ---              | Set persistent setting option                                 |
 | `t` | [**TIME_GET**](#t-time_get)             | ---          | ---           | ---  | time             | Get current RTC value                                         |
 | `T` | [**TIME_SET**](#t-time_set)             | time_0       | time_1        | ---  | ---              | Set new RTC value                                             |
-| `m` | **MEMORY_READ**                         | address      | length        | ---  | data             | Read data from specified memory address                       |
-| `M` | **MEMORY_WRITE**                        | address      | length        | data | ---              | Write data to specified memory address                        |
-| `U` | **USB_WRITE**                           | type         | length        | data | N/A              | Send data to be received by app running on N64 (no response!) |
+| `m` | [**MEMORY_READ**](#m-memory_read)       | address      | length        | ---  | data             | Read data from specified memory address                       |
+| `M` | [**MEMORY_WRITE**](#m-memory_write)     | address      | length        | data | ---              | Write data to specified memory address                        |
+| `U` | [**USB_WRITE**](#u-usb_write)           | type         | length        | data | N/A              | Send data to be received by app running on N64 (no response!) |
 | `D` | **DD_SET_BLOCK_READY**                  | success      | ---           | ---  | ---              | Notify flashcart about 64DD block readiness                   |
 | `W` | **WRITEBACK_ENABLE**                    | ---          | ---           | ---  | ---              | Enable save writeback through USB packet                      |
 | `p` | **FLASH_WAIT_BUSY**                     | wait         | ---           | ---  | erase_block_size | Wait until flash ready / Get flash block erase size           |
@@ -333,6 +345,85 @@ Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decima
 _This command does not send response data._
 
 Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decimal) format.
+
+---
+
+### `m`: **MEMORY_READ**
+
+**Read data from specified memory address**
+
+#### `arg0` (address)
+| bits     | description             |
+| -------- | ----------------------- |
+| `[31:0]` | Starting memory address |
+
+#### `arg1` (length)
+| bits     | description                             |
+| -------- | --------------------------------------- |
+| `[31:0]` | Number of bytes to read from the memory |
+
+#### `response` (data)
+| offset | type            | description     |
+| ------ | --------------- | --------------- |
+| `0`    | uint8_t[length] | Memory contents |
+
+Reads bytes from the specified memory address. Please refer to the [internal memory map](./01_memory_map.md) for available memory ranges.
+
+---
+
+### `M`: **MEMORY_WRITE**
+
+**Write data to specified memory address**
+
+#### `arg0` (address)
+| bits     | description             |
+| -------- | ----------------------- |
+| `[31:0]` | Starting memory address |
+
+#### `arg1` (length)
+| bits     | description                            |
+| -------- | -------------------------------------- |
+| `[31:0]` | Number of bytes to write to the memory |
+
+#### `data` (data)
+| offset | type            | description                 |
+| ------ | --------------- | --------------------------- |
+| `0`    | uint8_t[length] | Data to write to the memory |
+
+_This command does not send response data._
+
+Writes bytes to the specified memory address. Please refer to the [internal memory map](./01_memory_map.md) for available memory ranges.
+
+---
+
+### `U`: **USB_WRITE**
+
+**Send data to be received by app running on N64 (no response!)**
+
+#### `arg0` (type)
+| bits     | description |
+| -------- | ----------- |
+| `[31:8]` | _Unused_    |
+| `[7:0]`  | Datatype    |
+
+#### `arg1` (length)
+| bits     | description |
+| -------- | ----------- |
+| `[31:0]` | Data length |
+
+#### `data` (data)
+| offset | type            | description    |
+| ------ | --------------- | -------------- |
+| `0`    | uint8_t[length] | Arbitrary data |
+
+_This command does not send response data._
+_This command does not send `RSP`/`ERR` packet response!_
+
+This command notifies N64 that data is waiting to be acknowledged.
+If N64 side doesn't acknowledge data via [`m` **USB_READ**](./02_n64_commands.md) N64 command within 1 second then data is flushed and [`G` **DATA_FLUSHED**](#asynchronous-packets) asynchronous packet is sent to the PC.
+If N64 acknowledge the request, then data is written to the flashcart memory to address specified in [`m` **USB_READ**](./02_n64_commands.md) N64 command.
+
+---
 
 ## Asynchronous packets
 
