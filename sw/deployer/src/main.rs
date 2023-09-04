@@ -159,7 +159,11 @@ struct DebugArgs {
 
     /// Do not enable save writeback via USB
     #[arg(long)]
-    no_writeback: bool
+    no_writeback: bool,
+
+    /// List of commands to send after connecting to the SC64, semicolon separated (;)
+    #[arg(long)]
+    init: Option<String>,
 }
 
 #[derive(Args)]
@@ -408,7 +412,8 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         "========== [WARNING] ==========".bold().bright_yellow(),
         "Do not use this mode when real 64DD accessory is connected to the N64".bright_yellow(),
         "Doing so might permanently damage either N64, 64DD or SC64".bright_yellow(),
-        "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin".bright_green()
+        "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin"
+            .bright_green()
     );
 
     sc64.reset_state()?;
@@ -478,7 +483,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         let dd_mode = sc64::DdMode::DdIpl;
         println!("64DD mode set to [{dd_mode}]");
         sc64.configure_64dd(dd_mode, None)?;
-        return Ok(())
+        return Ok(());
     }
 
     let disk_paths: Vec<String> = args
@@ -632,6 +637,13 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
 
     println!("{}: Started", "[Debug]".bold());
 
+    if let Some(init) = args.init.clone() {
+        for command in init.split(";") {
+            println!("{}: {}", "[Init]".bold(), command);
+            debug_handler.send_external_input(command);
+        }
+    }
+
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
         if let Some(data_packet) = sc64.receive_data_packet()? {
@@ -653,7 +665,7 @@ fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), 
         } else if let Some(user_input) = debug_handler.process_user_input() {
             match user_input {
                 debug::UserInput::Packet(debug_packet) => sc64.send_debug_packet(debug_packet)?,
-                debug::UserInput::EOF => break
+                debug::UserInput::EOF => break,
             }
         }
     }

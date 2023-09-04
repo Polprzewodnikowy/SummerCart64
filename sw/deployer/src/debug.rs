@@ -18,6 +18,7 @@ pub enum Encoding {
 pub struct Handler {
     header: Option<Vec<u8>>,
     line_rx: Receiver<String>,
+    external_line_tx: Sender<String>,
     encoding: Encoding,
 }
 
@@ -167,6 +168,10 @@ const SUPPORTED_USB_PROTOCOL_VERSION: u16 = 2;
 impl Handler {
     pub fn set_text_encoding(&mut self, encoding: Encoding) {
         self.encoding = encoding;
+    }
+
+    pub fn send_external_input(&self, input: &str) {
+        self.external_line_tx.send(input.to_string()).unwrap();
     }
 
     pub fn process_user_input(&self) -> Option<UserInput> {
@@ -388,10 +393,14 @@ impl Handler {
 
 pub fn new() -> Handler {
     let (line_tx, line_rx) = channel::<String>();
+    let external_line_tx = line_tx.clone();
+
     spawn(move || stdin_thread(line_tx));
+
     Handler {
         header: None,
         line_rx,
+        external_line_tx,
         encoding: Encoding::UTF8,
     }
 }
