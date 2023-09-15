@@ -41,12 +41,12 @@ entry_handler:
     la $sp, _sp
 
 bss_init:
-	la $a0, _sbss
-	la $a1, _ebss
+    la $a0, _sbss
+    la $a1, _ebss
 1:
-	sd $zero, 0($a0)
-	addiu $a0, 8
-	bltu $a0, $a1, 1b
+    sd $zero, 0($a0)
+    addiu $a0, 8
+    bltu $a0, $a1, 1b
 
     la $t0, init
     jalr $t0

@@ -3,6 +3,7 @@
 
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 
@@ -96,7 +97,7 @@ typedef struct {
     sc64_boot_mode_t boot_mode;
     sc64_cic_seed_t cic_seed;
     sc64_tv_type_t tv_type;
-} sc64_boot_info_t;
+} sc64_boot_params_t;
 
 typedef struct {
     uint8_t second;
@@ -142,7 +143,7 @@ sc64_error_t sc64_get_config (sc64_cfg_id_t id, uint32_t *value);
 sc64_error_t sc64_set_config (sc64_cfg_id_t id, uint32_t value);
 sc64_error_t sc64_get_setting (sc64_setting_id_t id, uint32_t *value);
 sc64_error_t sc64_set_setting (sc64_setting_id_t id, uint32_t value);
-sc64_error_t sc64_get_boot_info (sc64_boot_info_t *info);
+sc64_error_t sc64_get_boot_params (sc64_boot_params_t *params);
 
 sc64_error_t sc64_get_time (sc64_rtc_time_t *t);
 sc64_error_t sc64_set_time (sc64_rtc_time_t *t);
@@ -162,7 +163,7 @@ sc64_error_t sc64_sd_set_byte_swap (bool enabled);
 sc64_error_t sc64_sd_read_sectors (void *address, uint32_t sector, uint32_t count);
 sc64_error_t sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t count);
 
-sc64_error_t sc64_dd_set_sd_info (void *address, uint32_t length);
+sc64_error_t sc64_set_disk_mapping (void *address, uint32_t length);
 
 sc64_error_t sc64_writeback_pending (bool *pending);
 sc64_error_t sc64_writeback_enable (void *address);

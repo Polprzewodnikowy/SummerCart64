@@ -10,7 +10,7 @@ typedef volatile uint8_t io8_t;
 typedef volatile uint32_t io32_t;
 
 
-#define	ALIGN(value, align)         (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
+#define ALIGN(value, align)         (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
 
 #define PHYSICAL(address)           ((typeof(address)) (((io32_t) (address)) & (0x1FFFFFFFUL)))
 #define UNCACHED(address)           ((typeof(address)) (((io32_t) (address)) | (0xA0000000UL)))
@@ -38,6 +38,8 @@ typedef struct {
     io32_t DMA_FULL;
     io32_t DMA_BUSY;
     io32_t SEMAPHORE;
+    io32_t __reserved[0xFFF8];
+    io32_t PC;
 } sp_regs_t;
 
 #define SP_BASE                     (0x04040000UL)
@@ -155,6 +157,8 @@ typedef struct {
 #define VI_CR_PIXEL_ADVANCE_2       (1 << 14)
 #define VI_CR_PIXEL_ADVANCE_3       (1 << 15)
 #define VI_CR_DITHER_FILTER_ON      (1 << 16)
+
+#define VI_CURR_LINE_FIELD          (1 << 0)
 
 
 typedef struct {

@@ -8,37 +8,40 @@
 
 void main (void) {
     sc64_error_t error;
-    boot_info_t boot_info;
-    sc64_boot_info_t sc64_boot_info;
+    sc64_boot_params_t sc64_boot_params;
 
-    if ((error = sc64_get_boot_info(&sc64_boot_info)) != SC64_OK) {
+    if ((error = sc64_get_boot_params(&sc64_boot_params)) != SC64_OK) {
         error_display("Could not obtain boot info: %d", error);
     }
 
-    switch (sc64_boot_info.boot_mode) {
+    boot_params_t boot_params;
+
+    boot_params.reset_type = OS_INFO->reset_type;
+    boot_params.tv_type = sc64_boot_params.tv_type;
+    boot_params.cic_seed = (sc64_boot_params.cic_seed & 0xFF);
+    boot_params.detect_cic_seed = (sc64_boot_params.cic_seed == CIC_SEED_AUTO);
+
+    switch (sc64_boot_params.boot_mode) {
         case BOOT_MODE_MENU:
-            menu_load_and_run();
+            menu_load();
+            boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
+            boot_params.reset_type = BOOT_RESET_TYPE_NMI;
             break;
 
         case BOOT_MODE_ROM:
-            boot_info.device_type = BOOT_DEVICE_TYPE_ROM;
+            boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
             break;
 
         case BOOT_MODE_DDIPL:
-            boot_info.device_type = BOOT_DEVICE_TYPE_DD;
+            boot_params.device_type = BOOT_DEVICE_TYPE_64DD;
             break;
 
         default:
-            error_display("Unknown boot mode selected [%d]\n", sc64_boot_info.boot_mode);
+            error_display("Unknown boot mode selected [%d]\n", sc64_boot_params.boot_mode);
             break;
     }
 
-    boot_info.reset_type = OS_INFO->reset_type;
-    boot_info.tv_type = sc64_boot_info.tv_type;
-    boot_info.cic_seed = (sc64_boot_info.cic_seed & 0xFF);
-    bool detect_cic_seed = (sc64_boot_info.cic_seed == CIC_SEED_AUTO);
-
     deinit();
 
-    boot(&boot_info, detect_cic_seed);
+    boot(&boot_params);
 }

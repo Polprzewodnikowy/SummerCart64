@@ -636,7 +636,7 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                dd_set_sd_info(args[0], args[1]);
+                dd_set_disk_mapping(args[0], args[1]);
                 break;
 
             case 'w':

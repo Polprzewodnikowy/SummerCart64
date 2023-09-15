@@ -2,7 +2,7 @@
 #define MENU_H__
 
 
-void menu_load_and_run (void);
+void menu_load (void);
 
 
 #endif

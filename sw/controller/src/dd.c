@@ -22,6 +22,9 @@
 
 #define DD_SPIN_UP_TIME             (2000)
 
+#define DD_THB_UNMAPPED             (0xFFFFFFFF)
+#define DD_THB_WRITABLE_FLAG        (1 << 31)
+
 
 typedef enum {
     DD_CMD_SEEK_READ                = 0x01,
@@ -100,7 +103,7 @@ static uint16_t dd_track_head_block (void) {
     return (track | head | block);
 }
 
-static uint32_t dd_fill_sd_sector_table (uint32_t index, uint32_t *sector_table) {
+static uint32_t dd_fill_sd_sector_table (uint32_t index, uint32_t *sector_table, bool is_write) {
     uint32_t tmp;
     sd_disk_info_t info = p.sd_disk_info[p.sd_current_disk];
     if (info.thb_table_address == 0xFFFFFFFF) {
@@ -109,9 +112,13 @@ static uint32_t dd_fill_sd_sector_table (uint32_t index, uint32_t *sector_table)
     uint32_t thb_entry_address = (info.thb_table_address + (index * sizeof(uint32_t)));
     fpga_mem_read(thb_entry_address, sizeof(uint32_t), (uint8_t *) (&tmp));
     uint32_t start_offset = SWAP32(tmp);
-    if (start_offset == 0xFFFFFFFF) {
+    if (start_offset == DD_THB_UNMAPPED) {
         return 0;
     }
+    if (is_write && ((start_offset & DD_THB_WRITABLE_FLAG) == 0)) {
+        return 0;
+    }
+    start_offset &= ~(DD_THB_WRITABLE_FLAG);
     p.block_offset = (start_offset % SD_SECTOR_SIZE);
     uint32_t block_length = ((p.sector_info.sector_size + 1) * DD_BLOCK_DATA_SECTORS_NUM);
     uint32_t end_offset = ((start_offset + block_length) - 1);
@@ -130,7 +137,7 @@ static bool dd_block_read_request (void) {
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
         uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
-        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
+        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, false);
         bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_read_sectors);
         dd_set_block_ready(!error);
     } else {
@@ -152,7 +159,7 @@ static bool dd_block_write_request (void) {
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
         uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
-        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table);
+        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, true);
         bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_write_sectors);
         dd_set_block_ready(!error);
     } else {
@@ -244,7 +251,7 @@ void dd_set_sd_mode (bool value) {
     p.sd_mode = value;
 }
 
-void dd_set_sd_info (uint32_t address, uint32_t length) {
+void dd_set_disk_mapping (uint32_t address, uint32_t length) {
     sd_disk_info_t info;
     length /= sizeof(info);
     p.sd_current_disk = 0;
@@ -289,7 +296,7 @@ void dd_init (void) {
     p.drive_type = DD_DRIVE_TYPE_RETAIL;
     p.sd_mode = false;
     p.sd_current_disk = 0;
-    dd_set_sd_info(0, 0);
+    dd_set_disk_mapping(0, 0);
 }
 
 void dd_process (void) {

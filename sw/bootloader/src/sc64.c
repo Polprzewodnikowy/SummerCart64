@@ -42,7 +42,7 @@ typedef enum {
     CMD_ID_SD_SECTOR_SET        = 'I',
     CMD_ID_SD_READ              = 's',
     CMD_ID_SD_WRITE             = 'S',
-    CMD_ID_DD_SD_INFO           = 'D',
+    CMD_ID_DISK_MAPPING_SET     = 'D',
     CMD_ID_WRITEBACK_PENDING    = 'w',
     CMD_ID_WRITEBACK_SD_INFO    = 'W',
     CMD_ID_FLASH_PROGRAM        = 'K',
@@ -174,24 +174,29 @@ sc64_error_t sc64_set_setting (sc64_setting_id_t id, uint32_t value) {
     return sc64_execute_cmd(&cmd);
 }
 
-sc64_error_t sc64_get_boot_info (sc64_boot_info_t *info) {
+sc64_error_t sc64_get_boot_params (sc64_boot_params_t *params) {
     sc64_error_t error;
     uint32_t value;
 
     if ((error = sc64_get_config(CFG_ID_BOOT_MODE, &value)) != SC64_OK) {
         return error;
     }
-    info->boot_mode = value;
+    params->boot_mode = value;
 
-    if ((error = sc64_get_config(CFG_ID_CIC_SEED, &value)) != SC64_OK) {
-        return error;
-    }
-    info->cic_seed = value;
+    if (params->boot_mode != BOOT_MODE_MENU) {
+        if ((error = sc64_get_config(CFG_ID_CIC_SEED, &value)) != SC64_OK) {
+            return error;
+        }
+        params->cic_seed = value;
 
-    if ((error = sc64_get_config(CFG_ID_TV_TYPE, &value)) != SC64_OK) {
-        return error;
+        if ((error = sc64_get_config(CFG_ID_TV_TYPE, &value)) != SC64_OK) {
+            return error;
+        }
+        params->tv_type = value;
+    } else {
+        params->cic_seed = CIC_SEED_AUTO;
+        params->tv_type = TV_TYPE_PASSTHROUGH;
     }
-    info->tv_type = value;
 
     return SC64_OK;
 }
@@ -361,9 +366,9 @@ sc64_error_t sc64_sd_write_sectors (void *address, uint32_t sector, uint32_t cou
 }
 
 
-sc64_error_t sc64_dd_set_sd_info (void *address, uint32_t length) {
+sc64_error_t sc64_set_disk_mapping (void *address, uint32_t length) {
     sc64_cmd_t cmd = {
-        .id = CMD_ID_DD_SD_INFO,
+        .id = CMD_ID_DISK_MAPPING_SET,
         .arg = { (uint32_t) (address), length }
     };
     return sc64_execute_cmd(&cmd);

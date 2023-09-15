@@ -9,10 +9,6 @@ ENTRY(entry_handler)
 __exception_stack_size = 8k;
 __stack_size = 16k;
 
-__bootloader_start = ORIGIN(ram);
-__bootloader_size = LENGTH(ram);
-__bootloader_end = __bootloader_start + __bootloader_size;
-
 SECTIONS {
     .boot : {
         KEEP(*(.text.rom_header));

@@ -28,9 +28,9 @@ SRC_FILES = \
 	init.c \
 	interrupt.c \
 	io.c \
-	ipl2.S \
 	main.c \
 	menu.c \
+	reboot.S \
 	sc64.c \
 	syscalls.c \
 	test.c \

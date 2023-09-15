@@ -8,7 +8,7 @@
 
 typedef enum {
     BOOT_DEVICE_TYPE_ROM = 0,
-    BOOT_DEVICE_TYPE_DD = 1,
+    BOOT_DEVICE_TYPE_64DD = 1,
 } boot_device_type_t;
 
 typedef enum {
@@ -29,10 +29,11 @@ typedef struct {
     boot_reset_type_t reset_type;
     boot_tv_type_t tv_type;
     uint8_t cic_seed;
-} boot_info_t;
+    bool detect_cic_seed;
+} boot_params_t;
 
 
-void boot (boot_info_t *info, bool detect_cic_seed);
+void boot (boot_params_t *params);
 
 
 #endif
