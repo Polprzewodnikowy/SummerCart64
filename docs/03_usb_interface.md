@@ -44,6 +44,20 @@
     - [`arg1` (length)](#arg1-length-2)
     - [`data` (data)](#data-data-1)
 - [Asynchronous packets](#asynchronous-packets)
+  - [`B`: **BUTTON**](#b-button)
+  - [`U`: **DATA**](#u-data)
+    - [`data` (data)](#data-data-2)
+  - [`G`: **DATA\_FLUSHED**](#g-data_flushed)
+  - [`D`: **DISK\_REQUEST**](#d-disk_request)
+    - [`data` (disk\_info/block\_data)](#data-disk_infoblock_data)
+    - [Fields details](#fields-details)
+  - [`I`: **IS\_VIEWER\_64**](#i-is_viewer_64)
+    - [`data` (text)](#data-text)
+  - [`S`: **SAVE\_WRITEBACK**](#s-save_writeback)
+    - [`data` (save\_contents)](#data-save_contents)
+  - [`F`: **UPDATE\_STATUS**](#f-update_status)
+    - [`data` (progress)](#data-progress)
+    - [Fields details](#fields-details-1)
 
 ---
 
@@ -109,7 +123,7 @@ General structure of packet:
 | ------ | -------------------- | ---------------------- |
 | `0`    | char[3]              | `RSP`/`ERR` identifier |
 | `3`    | char[1]              | Command ID             |
-| `4`    | uint32_t             | Data length            |
+| `4`    | uint32_t             | Response data length   |
 | `8`    | uint8_t[data_length] | Response data (if any) |
 
 `RSP`/`ERR` packet is sent as a response to the command sent by the PC.
@@ -122,7 +136,7 @@ General structure of packet:
 | ------ | -------------------- | -------------------- |
 | `0`    | char[3]              | `PKT` identifier     |
 | `3`    | char[1]              | Packet ID            |
-| `4`    | uint32_t             | Data length          |
+| `4`    | uint32_t             | Packet data length   |
 | `8`    | uint8_t[data_length] | Packet data (if any) |
 
 Available packet IDs are listed in the [asynchronous packets](#asynchronous-packets) section.
@@ -417,22 +431,147 @@ Writes bytes to the specified memory address. Please refer to the [internal memo
 | `0`    | uint8_t[length] | Arbitrary data |
 
 _This command does not send response data._
+
 _This command does not send `RSP`/`ERR` packet response!_
 
 This command notifies N64 that data is waiting to be acknowledged.
-If N64 side doesn't acknowledge data via [`m` **USB_READ**](./02_n64_commands.md) N64 command within 1 second then data is flushed and [`G` **DATA_FLUSHED**](#asynchronous-packets) asynchronous packet is sent to the PC.
+If N64 side doesn't acknowledge data via [`m` **USB_READ**](./02_n64_commands.md#m-usb_read) N64 command within 1 second then data is flushed and [`G` **DATA_FLUSHED**](#asynchronous-packets) asynchronous packet is sent to the PC.
 If N64 acknowledge the request, then data is written to the flashcart memory to address specified in [`m` **USB_READ**](./02_n64_commands.md) N64 command.
 
 ---
 
 ## Asynchronous packets
 
-| id  | name                   | data                 | description                                 |
-| --- | ---------------------- | -------------------- | ------------------------------------------- |
-| `B` | [**BUTTON**]()         | ---                  | Button on the back of the SC64 was pressed  |
-| `G` | [**DATA_FLUSHED**]()   | ---                  | Data from `USB_WRITE` command was discarded |
-| `U` | [**DEBUG_DATA**]()     | debug_data           | Data sent from the N64                      |
-| `D` | [**DISK_REQUEST**]()   | disk_info/block_data | 64DD disk block R/W request                 |
-| `I` | [**IS_VIEWER_64**]()   | text                 | IS-Viewer 64 `printf` text                  |
-| `S` | [**SAVE_WRITEBACK**]() | save_contents        | Flushed save data                           |
-| `F` | [**UPDATE_STATUS**]()  | progress             | Firmware update progress                    |
+| id  | name                                    | data                 | description                                                           |
+| --- | --------------------------------------- | -------------------- | --------------------------------------------------------------------- |
+| `B` | [**BUTTON**](#b-button)                 | ---                  | Button on the back of the SC64 was pressed                            |
+| `U` | [**DATA**](#u-data)                     | data                 | Data sent from the N64                                                |
+| `G` | [**DATA_FLUSHED**](#g-data_flushed)     | ---                  | Data from [`U` **USB_WRITE**](#u-usb_write) USB command was discarded |
+| `D` | [**DISK_REQUEST**](#d-disk_request)     | disk_info/block_data | 64DD disk block R/W request                                           |
+| `I` | [**IS_VIEWER_64**](#i-is_viewer_64)     | text                 | IS-Viewer 64 `printf` text                                            |
+| `S` | [**SAVE_WRITEBACK**](#s-save_writeback) | save_contents        | Flushed save data                                                     |
+| `F` | [**UPDATE_STATUS**](#f-update_status)   | progress             | Firmware update progress                                              |
+
+---
+
+### `B`: **BUTTON**
+
+**Button on the back of the SC64 was pressed**
+
+This packet is sent only when [**BUTTON_MODE**](./04_config_options.md#13-button_mode) config option is set to value "`2` - Button press sends USB packet".
+
+_This packet does not send additional data._
+
+---
+
+### `U`: **DATA**
+
+**Data sent from the N64**
+
+This packet is sent when N64 command [**USB_WRITE**](./02_n64_commands.md#m-usb-write) is executed.
+
+#### `data` (data)
+| offset | type                 | description |
+| ------ | -------------------- | ----------- |
+| `0`    | uint8_t              | Datatype    |
+| `1`    | uint24_t             | Data length |
+| `4`    | uint8_t[data_length] | Packet data |
+
+---
+
+### `G`: **DATA_FLUSHED**
+
+**Data from [`U` **USB_WRITE**](#u-usb_write) USB command was discarded**
+
+This packet is sent only when data sent with USB command [`U` **USB_WRITE**](#u-usb_write) was not acknowledged by the N64 side with [`m` **USB_READ**](./02_n64_commands.md#m-usb_read) within 1 second time limit.
+
+_This packet does not send additional data._
+
+---
+
+### `D`: **DISK_REQUEST**
+
+**64DD disk block R/W request**
+
+This packet is sent when 64DD mode is set to pass R/W requests to the USB interface with [**DD_SD_ENABLE**](./04_config_options.md#9-dd_sd_enable) config option.
+Every disk request packet must be acknowledged by the PC side with [`D` **DD_SET_BLOCK_READY**](#d-dd_set_block_ready) USB command.
+
+#### `data` (disk_info/block_data)
+| offset | type                        | description                                          |
+| ------ | --------------------------- | ---------------------------------------------------- |
+| `0`    | uint32_t                    | Disk command                                         |
+| `4`    | uint32_t                    | Memory address                                       |
+| `8`    | uint32_t                    | Disk track/head/block                                |
+| `12`   | uint8_t[packet_length - 12] | Data to be written to the 64DD disk block (optional) |
+
+#### Fields details
+
+**Disk command**:
+| value | description                    |
+| ----- | ------------------------------ |
+| `1`   | Read data from 64DD disk block |
+| `2`   | Write data to 64DD disk block  |
+
+**Memory address**:
+
+Internal SC64 address where data is expected to be written for read command
+
+**Disk track/head/block**:
+| bits      | description |
+| --------- | ----------- |
+| `[31:13]` | _Unused_    |
+| `[12:2]`  | Track       |
+| `[1]`     | Head        |
+| `[0]`     | Block       |
+
+---
+
+### `I`: **IS_VIEWER_64**
+
+**IS-Viewer 64 `printf` text**
+
+This packet is sent when IS-Viewer 64 module is enabled in the SC64 with [**ISV_ADDRESS**](./04_config_options.md#4-isv_address) config option, and data is written to the IS-Viewer 64 buffer.
+
+#### `data` (text)
+| offset | type                   | description |
+| ------ | ---------------------- | ----------- |
+| `0`    | uint8_t[packet_length] | Text        |
+
+---
+
+### `S`: **SAVE_WRITEBACK**
+
+**Flushed save data**
+
+This packet is sent when save writeback module is enabled and set to send data to the USB interface with [`W` **WRITEBACK_ENABLE**](#w-writeback_enable) USB command.
+Save data is flushed after 1 second delay from the last write to the save region by the app/game running on the N64.
+
+#### `data` (save_contents)
+| offset | type                       | description                                                                              |
+| ------ | -------------------------- | ---------------------------------------------------------------------------------------- |
+| `0`    | uint32_t                   | Save type (same as in [**SAVE_TYPE**](./04_config_options.md#6-save_type) config option) |
+| `4`    | uint8_t[packet_length - 4] | Save data                                                                                |
+
+---
+
+### `F`: **UPDATE_STATUS**
+
+**Firmware update progress**
+
+This packet is sent during firmware update process to indicate progress and errors.
+
+#### `data` (progress)
+| offset | type     | description |
+| ------ | -------- | ----------- |
+| `0`    | uint32_t | Progress    |
+
+#### Fields details
+
+**Progress**:
+| value  | description                                             |
+| ------ | ------------------------------------------------------- |
+| `1`    | Update process has started flashing MCU software        |
+| `2`    | Update process has started flashing FPGA firmware       |
+| `3`    | Update process has started flashing bootloader software |
+| `0x80` | Firmware update process was successful                  |
+| `0xFF` | Error encountered during firmware update process        |
