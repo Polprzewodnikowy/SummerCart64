@@ -70,19 +70,20 @@ For initial programming you are going to need a PC and a USB to UART (serial) ad
 These steps assume you are using modern Windows OS (version 10 or higher).
 
 As for software, here's list of required applications:
- - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software
- - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py`
+ - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software.
+ - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py`.
+ - This repository.
 
 Programming must be done in specific order for `primer.py` script to work correctly.
 
 First, program FT232H EEPROM:
- 1. Connect SC64 board to the PC with USB-C cable
- 2. Locate FT232H EEPROM template `ft232h_config.xml`
- 3. Launch `FT_PROG` software
- 4. Click on `Scan and parse` if no device has shown up
- 5. Right click on SC64 device and choose `Apply Template -> From File`
- 6. Select previously located `ft232h_config.xml`
- 7. Right click on SC64 device and choose `Program Device`
+ 1. Connect SC64 board to the PC with USB-C cable.
+ 2. Locate FT232H EEPROM template `ft232h_config.xml` from the `fw/ftdi/` directory.
+ 3. Launch `FT_PROG` software.
+ 4. Click on `Scan and parse` if no device has shown up.
+ 5. Right click on SC64 device and choose `Apply Template -> From File`.
+ 6. Select previously located `ft232h_config.xml`.
+ 7. Right click on SC64 device and choose `Program Device`.
 
 Your SC64 should be ready for next programming step.
 
