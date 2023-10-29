@@ -96,7 +96,7 @@ Second, program FPGA, microcontroller and bootloader:
  3. Connect serial adapter to the PC.
  4. Check in device manager which port number `COMx` is assigned to serial adapter.
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter).
- 6. Locate `primer.py` script in root folder.
+ 6. Locate `primer.py` script in `sw/tools` folder
  7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64-firmware-{version}.bin`.
  8. Run `pip3 install -r requirements.txt` to install required python packages.
  9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**).
