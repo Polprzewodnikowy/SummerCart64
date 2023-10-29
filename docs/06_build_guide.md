@@ -72,7 +72,7 @@ These steps assume you are using modern Windows OS (version 10 or higher).
 As for software, here's list of required applications:
  - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software.
  - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py`.
- - This repository.
+ - This repository (downloaded to your computer).
 
 Programming must be done in specific order for `primer.py` script to work correctly.
 
