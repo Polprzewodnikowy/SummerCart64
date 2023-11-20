@@ -66,12 +66,12 @@ You can skip this step if PCB assembly service was used in previous steps.
 
 **Please read the following instructions carefully before proceeding with programming.**
 
-For initial programming you are going to need a PC and a USB to UART (serial) adapter (3.3V signaling is required).
+For initial programming you are going to need a PC and a USB to UART (serial) adapter (3.3V signaling is required, e.g. TTL-232R-3V3).
 These steps assume you are using modern Windows OS (version 10 or higher).
 
 As for software, here's list of required applications:
  - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software
- - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py`
+ - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py` (windows install: check option add python to PATH)
 
 Programming must be done in specific order for `primer.py` script to work correctly.
 
@@ -88,14 +88,14 @@ Your SC64 should be ready for next programming step.
 
 Second, program FPGA, microcontroller and bootloader:
  1. Disconnect SC64 board from power (unplug USB-C cable)
- 2. Connect serial adapter to `TX/RX/GND` pads marked on the PCB
+ 2. Connect serial UART/TTL adapter to `TX/RX/GND` pads marked on the PCB. Cross connection TX -> RX, RX -> TX!
  3. Connect serial adapter to the PC
  4. Check in device manager which port number `COMx` is assigned to serial adapter
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter)
  6. Locate `primer.py` script in root folder
  7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64-firmware-{version}.bin`
  8. Run `pip3 install -r requirements.txt` to install required python packages
- 9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**)
+ 9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**). On Windows it's python instead of python3.
  10. Follow the instructions on the screen
  11. Wait until programming process has finished (**DO NOT STOP PROGRAMMING PROCESS OR DISCONNECT SC64 BOARD FROM PC**, doing so might irrecoverably break programming through UART header and you would need to program FPGA and/or microcontroller with separate dedicated programming interfaces through *Tag-Connect* connector on the PCB)
 
