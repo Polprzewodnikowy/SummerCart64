@@ -55,6 +55,8 @@ typedef enum {
     REG_VENDOR_DATA,
     REG_DEBUG_0,
     REG_DEBUG_1,
+    REG_CIC_0,
+    REG_CIC_1,
 } fpga_reg_t;
 
 
@@ -185,6 +187,13 @@ typedef enum {
 #define DD_HEAD_MASK                    (0x1000)
 #define DD_HEAD_TRACK_MASK              (DD_HEAD_MASK | DD_TRACK_MASK)
 #define DD_HEAD_TRACK_INDEX_LOCK        (1 << 13)
+
+#define CIC_SEED_BIT                    (16)
+#define CIC_REGION                      (1 << 24)
+#define CIC_64DD_MODE                   (1 << 25)
+#define CIC_DISABLED                    (1 << 26)
+#define CIC_INVALID_REGION_DETECTED     (1 << 27)
+#define CIC_INVALID_REGION_RESET        (1 << 28)
 
 
 uint8_t fpga_id_get (void);

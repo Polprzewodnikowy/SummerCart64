@@ -1,4 +1,4 @@
-TOOLCHAIN = mips64-elf-
+TOOLCHAIN = $(N64_INST)/bin/mips64-elf-
 CC = $(TOOLCHAIN)gcc
 CXX = $(TOOLCHAIN)g++
 OBJCOPY = $(TOOLCHAIN)objcopy

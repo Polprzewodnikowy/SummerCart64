@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <stm32g0xx.h>
 #include "task.h"
@@ -8,18 +9,9 @@
 #define TASK_STACK_FILL_VALUE   (0xDEADBEEF)
 
 
-typedef enum {
-    TASK_FLAG_NONE  = 0,
-    TASK_FLAG_READY = (1 << 0),
-    TASK_FLAG_RESET = (1 << 1),
-} task_flags_t;
-
-
 typedef struct {
-    uint32_t initial_pc;
-    uint32_t initial_sp;
-    uint32_t sp;
-    task_flags_t flags;
+    volatile uint32_t sp;
+    volatile bool ready;
 } task_t;
 
 
@@ -28,40 +20,19 @@ static volatile task_id_t task_current = 0;
 
 
 static void task_exit (void) {
-    task_table[task_current].flags = TASK_FLAG_NONE;
-    task_yield();
-    while (1);
-}
-
-static void task_initialize (task_id_t id) {
-    task_t *task = &task_table[id];
-    uint32_t *sp = ((uint32_t *) (task->initial_sp));
-    *--sp = TASK_INITIAL_XPSR;
-    *--sp = task->initial_pc;
-    *--sp = ((uint32_t) (task_exit));
-    for (int i = 0; i < 13; i++) {
-        *--sp = 0;
+    while (1) {
+        task_yield();
     }
-    task->sp = ((uint32_t) (sp));
-}
-
-static void task_reset (task_id_t id) {
-    task_table[id].flags &= ~(TASK_FLAG_RESET);
-    task_initialize(id);
 }
 
 static uint32_t task_switch_context (uint32_t sp) {
     task_table[task_current].sp = sp;
 
     for (task_id_t id = 0; id < __TASK_ID_MAX; id++) {
-        if (task_table[id].flags & TASK_FLAG_READY) {
+        if (task_table[id].ready) {
             task_current = id;
             break;
         }
-    }
-
-    if (task_table[task_current].flags & TASK_FLAG_RESET) {
-        task_reset(task_current);
     }
 
     return task_table[task_current].sp;
@@ -73,26 +44,30 @@ void task_create (task_id_t id, void (*code)(void), void *stack, size_t stack_si
         for (size_t i = 0; i < stack_size; i += sizeof(uint32_t)) {
             (*(uint32_t *) (stack + i)) = TASK_STACK_FILL_VALUE;
         }
+        uint32_t *sp =  ((uint32_t *) ((uint32_t) (stack) + stack_size));
+        *--sp = TASK_INITIAL_XPSR;
+        *--sp = (uint32_t) (code);
+        *--sp = ((uint32_t) (task_exit));
+        for (int i = 0; i < 13; i++) {
+            *--sp = 0;
+        }
         task_t *task = &task_table[id];
-        task->initial_pc = (uint32_t) (code);
-        task->initial_sp = (((uint32_t) (stack)) + stack_size);
-        task->flags = TASK_FLAG_READY;
-        task_initialize(id);
+        task->sp = ((uint32_t) (sp));
+        task->ready = true;
     }
 }
 
 void task_yield (void) {
-    task_table[task_current].flags &= ~(TASK_FLAG_READY);
+    __disable_irq();
+    task_table[task_current].ready = false;
+    __enable_irq();
     TASK_CONTEXT_SWITCH();
 }
 
 void task_set_ready (task_id_t id) {
-    task_table[id].flags |= TASK_FLAG_READY;
-    TASK_CONTEXT_SWITCH();
-}
-
-void task_set_ready_and_reset (task_id_t id) {
-    task_table[id].flags |= (TASK_FLAG_RESET | TASK_FLAG_READY);
+    __disable_irq();
+    task_table[id].ready = true;
+    __enable_irq();
     TASK_CONTEXT_SWITCH();
 }
 

@@ -14,6 +14,9 @@ module top (
     input n64_si_clk,
     inout n64_si_dq,
 
+    input n64_cic_clk,
+    inout n64_cic_dq,
+
     input usb_pwrsav,
     output usb_clk,
     output usb_cs,
@@ -48,8 +51,6 @@ module top (
     output mcu_miso,
 
     // Unused I/O
-    output n64_cic_clk,
-    output n64_cic_dq,
     output n64_video_sync
 );
 
@@ -137,7 +138,10 @@ module top (
         .n64_pi_ad(n64_pi_ad),
 
         .n64_si_clk(n64_si_clk),
-        .n64_si_dq(n64_si_dq)
+        .n64_si_dq(n64_si_dq),
+
+        .n64_cic_clk(n64_cic_clk),
+        .n64_cic_dq(n64_cic_dq)
     );
 
 
@@ -272,8 +276,6 @@ module top (
 
     // Unused I/O
 
-    assign n64_cic_clk = 1'bZ;
-    assign n64_cic_dq = 1'bZ;
     assign n64_video_sync = 1'bZ;
 
 endmodule

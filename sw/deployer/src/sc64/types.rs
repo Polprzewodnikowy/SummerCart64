@@ -852,9 +852,12 @@ impl TryFrom<Vec<u8>> for McuStackUsage {
 
 impl Display for McuStackUsage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.cic > 0 {
+            f.write_fmt(format_args!("CIC: {}, ", self.cic))?;
+        }
         f.write_fmt(format_args!(
-            "CIC: {}, RTC: {}, LED: {}, GVR: {}",
-            self.cic, self.rtc, self.led, self.gvr
+            "RTC: {}, LED: {}, GVR: {}",
+            self.rtc, self.led, self.gvr
         ))
     }
 }

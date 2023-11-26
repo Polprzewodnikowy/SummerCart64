@@ -358,7 +358,9 @@ module mcu_top (
         REG_VENDOR_SCR,
         REG_VENDOR_DATA,
         REG_DEBUG_0,
-        REG_DEBUG_1
+        REG_DEBUG_1,
+        REG_CIC_0,
+        REG_CIC_1
     } reg_address_e;
 
     logic bootloader_skip;
@@ -367,6 +369,8 @@ module mcu_top (
     assign usb_dma_scb.byte_swap = 1'b0;
 
     logic dd_bm_ack;
+
+    logic cic_invalid_region;
 
 
     // Register read logic
@@ -649,6 +653,22 @@ module mcu_top (
                         n64_scb.pi_debug[35:32]
                     };
                 end
+
+                REG_CIC_0: begin
+                    reg_rdata <= {
+                        4'd0,
+                        cic_invalid_region,
+                        n64_scb.cic_disabled,
+                        n64_scb.cic_64dd_mode,
+                        n64_scb.cic_region,
+                        n64_scb.cic_seed,
+                        n64_scb.cic_checksum[47:32]
+                    };
+                end
+
+                REG_CIC_1: begin
+                    reg_rdata <= n64_scb.cic_checksum[31:0];
+                end
             endcase
         end
     end
@@ -705,6 +725,10 @@ module mcu_top (
             dd_bm_ack <= 1'b1;
         end
 
+        if (n64_scb.cic_invalid_region) begin
+            cic_invalid_region <= 1'b1;
+        end
+
         if (reset) begin
             mcu_int <= 1'b0;
             sd_scb.clock_mode <= 2'd0;
@@ -723,6 +747,12 @@ module mcu_top (
             flash_scb.erase_pending <= 1'b0;
             dd_bm_ack <= 1'b0;
             n64_scb.rtc_wdata_valid <= 1'b0;
+            cic_invalid_region <= 1'b0;
+            n64_scb.cic_disabled <= 1'b0;
+            n64_scb.cic_64dd_mode <= 1'b0;
+            n64_scb.cic_region <= 1'b0;
+            n64_scb.cic_seed <= 8'h3F;
+            n64_scb.cic_checksum <= 48'hA536C0F1D859;
         end else if (reg_write) begin
             case (address)
                 REG_MEM_ADDRESS: begin
@@ -899,6 +929,21 @@ module mcu_top (
 
                 REG_VENDOR_DATA: begin
                     vendor_scb.data_wdata <= reg_wdata;
+                end
+
+                REG_CIC_0: begin
+                    if (reg_wdata[28]) begin
+                        cic_invalid_region <= 1'b0;
+                    end
+                    n64_scb.cic_disabled <= reg_wdata[26];
+                    n64_scb.cic_64dd_mode <= reg_wdata[25];
+                    n64_scb.cic_region <= reg_wdata[24];
+                    n64_scb.cic_seed <= reg_wdata[23:16];
+                    n64_scb.cic_checksum[47:32] <= reg_wdata[15:0];
+                end
+
+                REG_CIC_1: begin
+                    n64_scb.cic_checksum[31:0] <= reg_wdata;
                 end
             endcase
         end

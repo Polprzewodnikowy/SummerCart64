@@ -55,6 +55,13 @@ interface n64_scb ();
 
     logic [15:0] save_count;
 
+    logic cic_invalid_region;
+    logic cic_disabled;
+    logic cic_64dd_mode;
+    logic cic_region;
+    logic [7:0] cic_seed;
+    logic [47:0] cic_checksum;
+
     logic pi_sdram_active;
     logic pi_flash_active;
     logic [35:0] pi_debug;
@@ -97,6 +104,13 @@ interface n64_scb ();
         output cfg_identifier,
 
         input save_count,
+
+        input cic_invalid_region,
+        output cic_disabled,
+        output cic_64dd_mode,
+        output cic_region,
+        output cic_seed,
+        output cic_checksum,
 
         input pi_debug
     );
@@ -203,6 +217,15 @@ interface n64_scb ();
         input flashram_done,
 
         output save_count
+    );
+
+    modport cic (
+        output cic_invalid_region,
+        input cic_disabled,
+        input cic_64dd_mode,
+        input cic_region,
+        input cic_seed,
+        input cic_checksum
     );
 
     modport arbiter (

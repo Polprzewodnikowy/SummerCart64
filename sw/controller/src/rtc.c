@@ -48,6 +48,7 @@ static rtc_settings_t rtc_settings = {
     .led_enabled    = true,
 };
 static volatile bool rtc_settings_pending = false;
+static volatile bool rtc_initialized = false;
 
 static const uint8_t rtc_regs_bit_mask[7] = {
     0b01111111,
@@ -199,8 +200,14 @@ static void rtc_init (void) {
         rtc_write(RTC_ADDRESS_SRAM_VERSION, (uint8_t *) (&settings_version), 4);
         rtc_write_settings();
     }
+
+    rtc_initialized = true;
 }
 
+
+bool rtc_is_initialized (void) {
+    return rtc_initialized;
+}
 
 bool rtc_get_time (rtc_time_t *time) {
     bool vaild;
