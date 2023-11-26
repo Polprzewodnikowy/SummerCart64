@@ -12,7 +12,7 @@ init_stack_pointer:
 init_bss:
     la t5, _sbss
     la t6, _ebss
-    beq a0, a1, 2f
+    beq t5, t6, 2f
 1:
     sw zero, 0(t5)
     addi t5, t5, 4
