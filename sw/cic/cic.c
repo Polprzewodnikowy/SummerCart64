@@ -171,7 +171,7 @@ static void cic_write_seed (void) {
     cic_encode_round(0x0A);
     cic_encode_round(0x0A);
 
-    uint32_t timeout = 100000;
+    uint32_t timeout = 10000;
     do {
         if (timeout == 0) {
             CIC_NOTIFY_INVALID_REGION();
@@ -326,7 +326,7 @@ static void cic_x105_mode (void) {
 }
 
 static void cic_soft_reset (void) {
-    volatile uint32_t timeout = 100000;
+    volatile uint32_t timeout = 119050; // ~500 ms delay, measured on real hardware
     CIC_CLK_WAIT_LOW();
     while ((timeout--) && CIC_IS_RUNNING());
     cic_write(0);
