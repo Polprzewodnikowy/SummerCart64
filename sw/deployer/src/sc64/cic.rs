@@ -3,74 +3,7 @@ use super::Error;
 pub const IPL3_OFFSET: u32 = 0x40;
 pub const IPL3_LENGTH: usize = 0xFC0;
 
-enum CicType {
-    _5101,
-    _6101,
-    _7102,
-    X102,
-    X103,
-    X105,
-    X106,
-    _5167,
-    NDXJ0,
-    NDDJ0,
-    NDDJ1,
-    NDDJ2,
-    NDDE0,
-}
-
-impl From<u32> for CicType {
-    fn from(value: u32) -> Self {
-        match value {
-            0x587BD543 => CicType::_5101,
-            0x6170A4A1 => CicType::_6101,
-            0x009E9EA3 => CicType::_7102,
-            0x90BB6CB5 => CicType::X102,
-            0x0B050EE0 => CicType::X103,
-            0x98BC2C86 => CicType::X105,
-            0xACC8580A => CicType::X106,
-            0x0E018159 => CicType::_5167,
-            0x10C68B18 => CicType::NDXJ0,
-            0xBC605D0A => CicType::NDDJ0,
-            0x502C4466 => CicType::NDDJ1,
-            0x0C965795 => CicType::NDDJ2,
-            0x8FEBA21E => CicType::NDDE0,
-            _ => CicType::X102,
-        }
-    }
-}
-
-impl From<CicType> for u8 {
-    fn from(value: CicType) -> Self {
-        match value {
-            CicType::_5101 => 0xAC,
-            CicType::_6101 => 0x3F,
-            CicType::_7102 => 0x3F,
-            CicType::X102 => 0x3F,
-            CicType::X103 => 0x78,
-            CicType::X105 => 0x91,
-            CicType::X106 => 0x85,
-            CicType::_5167 => 0xDD,
-            CicType::NDXJ0 => 0xDD,
-            CicType::NDDJ0 => 0xDD,
-            CicType::NDDJ1 => 0xDD,
-            CicType::NDDJ2 => 0xDD,
-            CicType::NDDE0 => 0xDE,
-        }
-    }
-}
-
-pub fn guess_ipl3_seed(ipl3: &[u8]) -> Result<u8, Error> {
-    if ipl3.len() < IPL3_LENGTH {
-        return Err(Error::new("Invalid IPL3 length provided"));
-    }
-
-    let cic_type: CicType = crc32fast::hash(ipl3).into();
-
-    Ok(cic_type.into())
-}
-
-pub fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<[u8; 6], Error> {
+fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<u64, Error> {
     if ipl3.len() < IPL3_LENGTH {
         return Err(Error::new("Invalid IPL3 length provided"));
     }
@@ -209,12 +142,37 @@ pub fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<[u8; 6], Error> 
     let sum = checksum(final_buffer[0], final_buffer[1], 16);
     let xor = final_buffer[3] ^ final_buffer[2];
 
-    Ok([
-        (sum >> 8) as u8,
-        (sum >> 0) as u8,
-        (xor >> 24) as u8,
-        (xor >> 16) as u8,
-        (xor >> 8) as u8,
-        (xor >> 0) as u8,
-    ])
+    let checksum = (((sum & 0xFFFF) as u64) << 32) | (xor as u64);
+
+    Ok(checksum)
+}
+
+pub fn sign_ipl3(ipl3: &[u8]) -> Result<(u8, u64), Error> {
+    let known_seed_checksum_pairs = [
+        (0xAC, 0x5930D81014DAu64), // 5101
+        (0xDD, 0x083C6C77E0B1u64), // 5167
+        (0x3F, 0x45CC73EE317Au64), // 6101
+        (0x3F, 0x44160EC5D9AFu64), // 7102
+        (0x3F, 0xA536C0F1D859u64), // 6102/7102
+        (0x78, 0x586FD4709867u64), // 6103/7103
+        (0x91, 0x8618A45BC2D3u64), // 6105/7105
+        (0x85, 0x2BBAD4E6EB74u64), // 6106/7106
+        (0xDD, 0x6EE8D9E84970u64), // NDXJ0
+        (0xDD, 0x6C216495C8B9u64), // NDDJ0
+        (0xDD, 0xE27F43BA93ACu64), // NDDJ1
+        (0xDD, 0x32B294E2AB90u64), // NDDJ2
+        (0xDE, 0x05BA2EF0A5F1u64), // NDDE0
+    ];
+
+    for (seed, checksum) in known_seed_checksum_pairs {
+        if calculate_ipl3_checksum(ipl3, seed)? == checksum {
+            return Ok((seed, checksum));
+        }
+    }
+
+    // Unknown IPL3 detected, sign it with arbitrary seed (CIC6102/7101 value is used here)
+    const DEFAULT_SEED: u8 = 0x3F;
+    let checksum = calculate_ipl3_checksum(ipl3, DEFAULT_SEED)?;
+
+    Ok((DEFAULT_SEED, checksum))
 }
