@@ -20,9 +20,9 @@ fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<u64, Error> {
     let add = |a1: u32, a2: u32| u32::wrapping_add(a1, a2);
     let sub = |a1: u32, a2: u32| u32::wrapping_sub(a1, a2);
     let mul = |a1: u32, a2: u32| u32::wrapping_mul(a1, a2);
-    let lsh = |a: u32, s: u32| if s >= 32 { 0 } else { u32::wrapping_shl(a, s) };
-    let rsh = |a: u32, s: u32| if s >= 32 { 0 } else { u32::wrapping_shr(a, s) };
-    let checksum = |a0: u32, a1: u32, a2: u32| {
+    let rol = |a: u32, s: u32| u32::rotate_left(a, s);
+    let ror = |a: u32, s: u32| u32::rotate_right(a, s);
+    let sum = |a0: u32, a1: u32, a2: u32| {
         let prod = (a0 as u64).wrapping_mul(if a1 == 0 { a2 as u64 } else { a1 as u64 });
         let hi = ((prod >> 32) & 0xFFFFFFFF) as u32;
         let lo = (prod & 0xFFFFFFFF) as u32;
@@ -32,117 +32,80 @@ fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<u64, Error> {
 
     let init = add(mul(MAGIC, seed as u32), 1) ^ get(0);
 
-    let mut buffer = vec![init; 16];
+    let mut buf = vec![init; 16];
 
     for i in 1..=1008 as u32 {
-        let data_prev = get(i.saturating_sub(2));
-        let data_curr = get(i - 1);
+        let prev = get(i.saturating_sub(2));
+        let data = get(i - 1);
 
-        buffer[0] = add(buffer[0], checksum(sub(1007, i), data_curr, i));
-        buffer[1] = checksum(buffer[1], data_curr, i);
-        buffer[2] = buffer[2] ^ data_curr;
-        buffer[3] = add(buffer[3], checksum(add(data_curr, 5), MAGIC, i));
-
-        let shift = data_prev & 0x1F;
-        let data_left = lsh(data_curr, 32 - shift);
-        let data_right = rsh(data_curr, shift);
-        let b4_shifted = data_left | data_right;
-        buffer[4] = add(buffer[4], b4_shifted);
-
-        let shift = rsh(data_prev, 27);
-        let data_left = lsh(data_curr, shift);
-        let data_right = rsh(data_curr, 32 - shift);
-        let b5_shifted = data_left | data_right;
-        buffer[5] = add(buffer[5], b5_shifted);
-
-        if data_curr < buffer[6] {
-            buffer[6] = add(buffer[3], buffer[6]) ^ add(data_curr, i);
+        buf[0] = add(buf[0], sum(sub(1007, i), data, i));
+        buf[1] = sum(buf[1], data, i);
+        buf[2] = buf[2] ^ data;
+        buf[3] = add(buf[3], sum(add(data, 5), MAGIC, i));
+        buf[4] = add(buf[4], ror(data, prev & 0x1F));
+        buf[5] = add(buf[5], rol(data, prev >> 27));
+        buf[6] = if data < buf[6] {
+            add(buf[3], buf[6]) ^ add(data, i)
         } else {
-            buffer[6] = add(buffer[4], data_curr) ^ buffer[6];
-        }
-
-        let shift = data_prev & 0x1F;
-        let data_left = lsh(data_curr, shift);
-        let data_right = rsh(data_curr, 32 - shift);
-        buffer[7] = checksum(buffer[7], data_left | data_right, i);
-
-        let shift = rsh(data_prev, 27);
-        let data_left = lsh(data_curr, 32 - shift);
-        let data_right = rsh(data_curr, shift);
-        buffer[8] = checksum(buffer[8], data_left | data_right, i);
-
-        if data_prev < data_curr {
-            buffer[9] = checksum(buffer[9], data_curr, i)
+            add(buf[4], data) ^ buf[6]
+        };
+        buf[7] = sum(buf[7], rol(data, prev & 0x1F), i);
+        buf[8] = sum(buf[8], ror(data, prev >> 27), i);
+        buf[9] = if prev < data {
+            sum(buf[9], data, i)
         } else {
-            buffer[9] = add(buffer[9], data_curr);
-        }
+            add(buf[9], data)
+        };
 
         if i == 1008 {
             break;
         }
 
-        let data_next = get(i);
+        let next = get(i);
 
-        buffer[10] = checksum(add(buffer[10], data_curr), data_next, i);
-        buffer[11] = checksum(buffer[11] ^ data_curr, data_next, i);
-        buffer[12] = add(buffer[12], buffer[8] ^ data_curr);
-
-        let shift = data_curr & 0x1F;
-        let data_left = lsh(data_curr, 32 - shift);
-        let data_right = rsh(data_curr, shift);
-        let tmp = data_left | data_right;
-        let shift = data_next & 0x1F;
-        let data_left = lsh(data_next, 32 - shift);
-        let data_right = rsh(data_next, shift);
-        buffer[13] = add(buffer[13], add(tmp, data_left | data_right));
-
-        let shift = data_curr & 0x1F;
-        let data_left = lsh(data_next, 32 - shift);
-        let data_right = rsh(data_next, shift);
-        let sum = checksum(buffer[14], b4_shifted, i);
-        buffer[14] = checksum(sum, data_left | data_right, i);
-
-        let shift = rsh(data_curr, 27);
-        let data_left = lsh(data_next, shift);
-        let data_right = rsh(data_next, 32 - shift);
-        let sum = checksum(buffer[15], b5_shifted, i);
-        buffer[15] = checksum(sum, data_left | data_right, i);
+        buf[10] = sum(add(buf[10], data), next, i);
+        buf[11] = sum(buf[11] ^ data, next, i);
+        buf[12] = add(buf[12], buf[8] ^ data);
+        buf[13] = add(buf[13], add(ror(data, data & 0x1F), ror(next, next & 0x1F)));
+        buf[14] = sum(
+            sum(buf[14], ror(data, prev & 0x1F), i),
+            ror(next, data & 0x1F),
+            i,
+        );
+        buf[15] = sum(
+            sum(buf[15], rol(data, prev >> 27), i),
+            rol(next, data >> 27),
+            i,
+        );
     }
 
-    let mut final_buffer = vec![buffer[0]; 4];
+    let mut final_buf = vec![buf[0]; 4];
 
     for i in 0..16 as u32 {
-        let data = buffer[i as usize];
+        let data = buf[i as usize];
 
-        let shift = data & 0x1F;
-        let data_left = lsh(data, 32 - shift);
-        let data_right = rsh(data, shift);
-        let b0_shifted = add(final_buffer[0], data_left | data_right);
-        final_buffer[0] = b0_shifted;
-
-        if data < b0_shifted {
-            final_buffer[1] = add(final_buffer[1], data);
+        final_buf[0] = add(final_buf[0], ror(data, data & 0x1F));
+        final_buf[1] = if data < final_buf[0] {
+            add(final_buf[1], data)
         } else {
-            final_buffer[1] = checksum(final_buffer[1], data, i);
-        }
-
-        if rsh(data & 0x02, 1) == (data & 0x01) {
-            final_buffer[2] = add(final_buffer[2], data);
+            sum(final_buf[1], data, i)
+        };
+        final_buf[2] = if ((data & 0x02) >> 1) == (data & 0x01) {
+            add(final_buf[2], data)
         } else {
-            final_buffer[2] = checksum(final_buffer[2], data, i);
-        }
-
-        if (data & 0x01) == 0x01 {
-            final_buffer[3] = final_buffer[3] ^ data;
+            sum(final_buf[2], data, i)
+        };
+        final_buf[3] = if (data & 0x01) == 0x01 {
+            final_buf[3] ^ data
         } else {
-            final_buffer[3] = checksum(final_buffer[3], data, i);
-        }
+            sum(final_buf[3], data, i)
+        };
     }
 
-    let sum = checksum(final_buffer[0], final_buffer[1], 16);
-    let xor = final_buffer[3] ^ final_buffer[2];
+    let final_sum = sum(final_buf[0], final_buf[1], 16);
+    let final_xor = final_buf[3] ^ final_buf[2];
 
-    let checksum = (((sum & 0xFFFF) as u64) << 32) | (xor as u64);
+    let checksum = (((final_sum & 0xFFFF) as u64) << 32) | (final_xor as u64);
 
     Ok(checksum)
 }

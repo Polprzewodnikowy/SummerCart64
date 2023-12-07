@@ -16,7 +16,7 @@ void main (void) {
 
     boot_params_t boot_params;
 
-    boot_params.reset_type = OS_INFO->reset_type;
+    boot_params.reset_type = BOOT_RESET_TYPE_COLD;
     boot_params.tv_type = sc64_boot_params.tv_type;
     boot_params.cic_seed = (sc64_boot_params.cic_seed & 0xFF);
     boot_params.detect_cic_seed = (sc64_boot_params.cic_seed == CIC_SEED_AUTO);

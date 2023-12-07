@@ -13,6 +13,7 @@ SECTIONS {
     .boot : {
         KEEP(*(.text.rom_header));
         KEEP(*(.text.ipl3));
+        . = ALIGN(4k);
     } > rom
 
     .framebuffer (NOLOAD) : SUBALIGN(64) {

@@ -19,7 +19,7 @@ BUILD_DIR = build
 SRC_FILES = \
 	startup.S \
 	boot.c \
-	crc32.c \
+	cic.c \
 	display.c \
 	error.c \
 	exception.c \

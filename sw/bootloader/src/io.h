@@ -247,8 +247,6 @@ typedef struct {
     uint32_t version;
     uint32_t mem_size;
     uint8_t app_nmi_buffer[64];
-    uint32_t __reserved_1[37];
-    uint32_t mem_size_6105;
 } os_info_t;
 
 #define OS_INFO_BASE                (0x80000300UL)

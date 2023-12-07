@@ -2,8 +2,9 @@
 
 
 .section .text.rom_header, "a", %progbits
-.type rom_header, %object
+
 rom_header:
+    .type rom_header, %object
 
 header_pi_config:
     .word 0x80371240
@@ -26,15 +27,17 @@ header_text_info:
     .org 0x40, 0x00
 
 
-.section .text.ipl3, "a", %progbits
-.type ipl3, %object
+.section .text.ipl3, "ax", %progbits
+
 ipl3:
+    .type ipl3, %function
     .incbin "header", 0x40
 
 
 .section .text.entry_handler, "ax", %progbits
-.type entry_handler, %function
+
 entry_handler:
+    .type entry_handler, %function
     .global entry_handler
 
     la $gp, _gp
