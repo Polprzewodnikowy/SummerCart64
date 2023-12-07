@@ -1,7 +1,6 @@
 MEMORY {
+    ram (rwx)           : org = 0x80000400, len = 1M
     framebuffer (rw)    : org = 0x8026A000, len = 600k
-    ram (rwx)           : org = 0x80300000, len = 1M
-    rom (r)             : org = 0xB0000000, len = 1028k
 }
 
 ENTRY(entry_handler)
@@ -10,16 +9,6 @@ __exception_stack_size = 8k;
 __stack_size = 16k;
 
 SECTIONS {
-    .boot : {
-        KEEP(*(.text.rom_header));
-        KEEP(*(.text.ipl3));
-        . = ALIGN(4k);
-    } > rom
-
-    .framebuffer (NOLOAD) : SUBALIGN(64) {
-        *(.framebuffer .framebuffer.*)
-    } > framebuffer
-
     .text : SUBALIGN(8) {
         *(.text.entry_handler)
         *(.text .text.* .gnu.linkonce.t.*)
@@ -30,17 +19,15 @@ SECTIONS {
         _gp = . + 0x8000;
         *(.sdata .sdata.* .gnu.linkonce.s.*)
         *(.lit8 .lit4)
-    } > ram AT > rom
+    } > ram
 
     .bss : {
         . = ALIGN(8);
-        _sbss = .;
         *(.sbss .sbss.* .gnu.linkonce.sb.*)
         *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
         . = ALIGN(8);
-        _ebss = .;
     } > ram
 
     _sheap = .;
@@ -52,6 +39,10 @@ SECTIONS {
 
     . += __stack_size;
     _sp = .;
+
+    .framebuffer (NOLOAD) : SUBALIGN(64) {
+        *(.framebuffer .framebuffer.*)
+    } > framebuffer
 
     /DISCARD/ : {
         *(.MIPS.*)

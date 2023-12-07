@@ -26,6 +26,8 @@ void main (void) {
             menu_load();
             boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
             boot_params.reset_type = BOOT_RESET_TYPE_NMI;
+            boot_params.cic_seed = 0x3F;
+            boot_params.detect_cic_seed = false;
             break;
 
         case BOOT_MODE_ROM:

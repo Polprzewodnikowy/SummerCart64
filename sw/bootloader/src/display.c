@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "display.h"
 #include "font.h"
+#include "init.h"
 #include "io.h"
 
 
@@ -163,7 +164,7 @@ void display_init (uint32_t *background) {
     if (!vi_configured) {
         vi_configured = true;
 
-        const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
+        const vi_regs_t *cfg = &vi_config[__tv_type];
 
         cpu_io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
         cpu_io_write(&VI->H_WIDTH, cfg->H_WIDTH);

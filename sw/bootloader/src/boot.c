@@ -1,5 +1,6 @@
 #include "boot.h"
 #include "cic.h"
+#include "init.h"
 #include "io.h"
 #include "vr4300.h"
 
@@ -29,7 +30,20 @@ static void boot_detect_cic_seed (boot_params_t *params) {
 
 void boot (boot_params_t *params) {
     if (params->tv_type == BOOT_TV_TYPE_PASSTHROUGH) {
-        params->tv_type = OS_INFO->tv_type;
+        switch (__tv_type) {
+            case INIT_TV_TYPE_PAL:
+                params->tv_type = BOOT_TV_TYPE_PAL;
+                break;
+            case INIT_TV_TYPE_NTSC:
+                params->tv_type = BOOT_TV_TYPE_NTSC;
+                break;
+            case INIT_TV_TYPE_MPAL:
+                params->tv_type = BOOT_TV_TYPE_MPAL;
+                break;
+            default:
+                params->tv_type = BOOT_TV_TYPE_NTSC;
+                break;
+        }
     }
 
     if (params->detect_cic_seed) {
