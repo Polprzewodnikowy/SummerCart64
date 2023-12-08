@@ -1,6 +1,7 @@
 MEMORY {
+    exception (rx)      : org = 0x80000000, len = 0x400
     ram (rwx)           : org = 0x80000400, len = 1M
-    framebuffer (rw)    : org = 0x8026A000, len = 600k
+    framebuffer (rw)    : org = 0x8016A000, len = 600k
 }
 
 ENTRY(entry_handler)
@@ -9,6 +10,10 @@ __exception_stack_size = 8k;
 __stack_size = 16k;
 
 SECTIONS {
+    .exception : {
+        KEEP(*(.text.exception_vector));
+    } > exception
+
     .text : SUBALIGN(8) {
         *(.text.entry_handler)
         *(.text .text.* .gnu.linkonce.t.*)

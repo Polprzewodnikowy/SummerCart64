@@ -16,8 +16,6 @@ void init (init_tv_type_t tv_type, init_reset_type_t reset_type) {
     __tv_type = tv_type;
     __reset_type = reset_type;
 
-    exception_install();
-
     sc64_unlock();
 
     if (!sc64_check_presence()) {

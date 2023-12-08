@@ -81,9 +81,10 @@ $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 	@$(OBJDUMP) -S $@ > $(BUILD_DIR)/bootloader.lst
 
 $(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf
-	@$(STRIP) -s $<
-	@$(N64_ELFCOMPRESS) -c 2 -o $(dir $<) $<
-	@$(N64_TOOL) --title "SC64 bootloader" --output $@ --align 256 $<
+	@cp $< $<.stripped
+	@$(STRIP) -s $<.stripped
+	@$(N64_ELFCOMPRESS) -c 2 -o $(dir $<) $<.stripped
+	@$(N64_TOOL) --title "SC64 bootloader" --output $@ --align 256 $<.stripped
 
 all: $(BUILD_DIR)/bootloader.bin
 
