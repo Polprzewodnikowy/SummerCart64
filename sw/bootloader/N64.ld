@@ -1,7 +1,5 @@
 MEMORY {
-    exception (rx)      : org = 0x80000000, len = 0x400
-    ram (rwx)           : org = 0x80000400, len = 1M
-    framebuffer (rw)    : org = 0x8016A000, len = 600k
+    ram (rwx) : org = 0x80000000, len = 2M
 }
 
 ENTRY(entry_handler)
@@ -10,11 +8,8 @@ __exception_stack_size = 8k;
 __stack_size = 16k;
 
 SECTIONS {
-    .exception : {
-        KEEP(*(.text.exception_vector));
-    } > exception
-
     .text : SUBALIGN(8) {
+        KEEP(*(.text.exception_vector));
         *(.text.entry_handler)
         *(.text .text.* .gnu.linkonce.t.*)
         *(.assets .assets.*)
@@ -32,6 +27,8 @@ SECTIONS {
         *(.scommon .scommon.*)
         *(.bss .bss.* .gnu.linkonce.b.*)
         *(COMMON)
+        . = ALIGN(64);
+        *(.framebuffer)
         . = ALIGN(8);
     } > ram
 
@@ -44,10 +41,6 @@ SECTIONS {
 
     . += __stack_size;
     _sp = .;
-
-    .framebuffer (NOLOAD) : SUBALIGN(64) {
-        *(.framebuffer .framebuffer.*)
-    } > framebuffer
 
     /DISCARD/ : {
         *(.MIPS.*)
