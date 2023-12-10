@@ -47,10 +47,10 @@ if __name__ == '__main__':
 
     try:
         source_asset = Image.open(asset_input)
-        converted_asset = source_asset.convert('RGBA').tobytes()
+        converted_asset = source_asset.convert('RGB').tobytes()
 
         if (asset_compress):
-            converted_asset = compress(converted_asset)
+            converted_asset = compress(converted_asset, step_size=3)
 
         final_asset = open(asset_output, 'wb')
         final_asset.write(converted_asset)
