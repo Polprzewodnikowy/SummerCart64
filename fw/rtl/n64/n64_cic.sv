@@ -103,7 +103,7 @@ module n64_cic (
     end
 
     initial begin
-        $readmemh("../../../sw/cic/cic.mem", ram);
+        $readmemh("../../../sw/cic/build/cic.mem", ram);
     end
 
 

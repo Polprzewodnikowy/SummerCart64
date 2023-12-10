@@ -20,14 +20,15 @@ CFLAGS=" \
 
 case "$1" in
     all)
-        ${TOOLCHAIN}gcc $CFLAGS -T cic.ld -o cic.elf startup.S cic.c
+        mkdir -p ./build
+        ${TOOLCHAIN}gcc $CFLAGS -T cic.ld -o ./build/cic.elf startup.S cic.c
         echo "Size of cic:"
-        ${TOOLCHAIN}size -B -d cic.elf
-        ${TOOLCHAIN}objdump -S -D cic.elf > cic.lst
-        ${TOOLCHAIN}objcopy -O binary cic.elf cic.bin
-        python3 ./convert.py cic.bin cic.mem
+        ${TOOLCHAIN}size -B -d ./build/cic.elf
+        ${TOOLCHAIN}objdump -S -D ./build/cic.elf > ./build/cic.lst
+        ${TOOLCHAIN}objcopy -O binary ./build/cic.elf ./build/cic.bin
+        python3 ./convert.py ./build/cic.bin ./build/cic.mem
         ;;
     clean)
-        rm -f cic.elf cic.lst cic.bin cic.mem
+        rm -rf ./build/*
         ;;
 esac
