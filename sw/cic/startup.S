@@ -7,6 +7,7 @@ init_stack_pointer:
     .option push
     .option norelax
     la sp, _sp
+    la gp, _gp
     .option pop
 
 init_bss:
