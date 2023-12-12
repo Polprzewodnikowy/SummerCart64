@@ -193,6 +193,7 @@ trait Backend {
         data_type: DataType,
         packets: &mut VecDeque<Packet>,
     ) -> Result<Option<Response>, Error>;
+    fn close(&self) {}
 }
 
 struct SerialBackend {
@@ -221,6 +222,7 @@ fn new_serial_backend(port: &str) -> Result<SerialBackend, Error> {
 }
 
 struct TcpBackend {
+    stream: TcpStream,
     reader: BufReader<TcpStream>,
     writer: BufWriter<TcpStream>,
 }
@@ -332,6 +334,10 @@ impl Backend for TcpBackend {
 
         Ok(None)
     }
+
+    fn close(&self) {
+        self.stream.shutdown(std::net::Shutdown::Both).ok();
+    }
 }
 
 fn new_tcp_backend(address: &str) -> Result<TcpBackend, Error> {
@@ -349,7 +355,11 @@ fn new_tcp_backend(address: &str) -> Result<TcpBackend, Error> {
     };
     let reader = BufReader::new(stream.try_clone()?);
     let writer = BufWriter::new(stream.try_clone()?);
-    Ok(TcpBackend { reader, writer })
+    Ok(TcpBackend {
+        stream,
+        reader,
+        writer,
+    })
 }
 
 pub struct Link {
@@ -407,6 +417,12 @@ impl Link {
             }
         }
         Ok(self.packets.pop_front())
+    }
+}
+
+impl Drop for Link {
+    fn drop(&mut self) {
+        self.backend.close();
     }
 }
 
