@@ -12,6 +12,9 @@ typedef enum {
 } cic_region_t;
 
 
+static bool cic_initialized = false;
+
+
 static void cic_irq_reset_falling (void) {
     led_clear_error(LED_ERROR_CIC);
 }
@@ -65,18 +68,26 @@ void cic_set_dd_mode (bool enabled) {
 
 
 void cic_init (void) {
-    while (!rtc_is_initialized());
-    cic_reset_parameters();
     hw_gpio_irq_setup(GPIO_ID_N64_RESET, GPIO_IRQ_FALLING, cic_irq_reset_falling);
 }
 
 
 void cic_process (void) {
+    if (!cic_initialized) {
+        if (rtc_is_initialized()) {
+            cic_reset_parameters();
+            cic_initialized = true;
+        } else {
+            return;
+        }
+    }
+
     uint32_t cic_config_0 = fpga_reg_get(REG_CIC_0);
 
     if (cic_config_0 & CIC_INVALID_REGION_DETECTED) {
         cic_config_0 ^= CIC_REGION;
-        fpga_reg_set(REG_CIC_0, (cic_config_0 | CIC_INVALID_REGION_RESET));
+        cic_config_0 |= CIC_INVALID_REGION_RESET;
+        fpga_reg_set(REG_CIC_0, cic_config_0);
 
         if (cic_config_0 & CIC_REGION) {
             rtc_set_region(REGION_PAL);

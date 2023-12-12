@@ -200,8 +200,6 @@ static void rtc_init (void) {
         rtc_write(RTC_ADDRESS_SRAM_VERSION, (uint8_t *) (&settings_version), 4);
         rtc_write_settings();
     }
-
-    rtc_initialized = true;
 }
 
 
@@ -274,6 +272,8 @@ void rtc_task (void) {
 
     rtc_read_region();
     rtc_read_settings();
+
+    rtc_initialized = true;
 
     while (1) {
         if (rtc_time_pending) {
