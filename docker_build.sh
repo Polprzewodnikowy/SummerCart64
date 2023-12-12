@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.7"
+BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.8"
 
 pushd $(dirname $0) > /dev/null
 

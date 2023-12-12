@@ -84,7 +84,7 @@ $(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf
 	@cp $< $<.stripped
 	@$(STRIP) -s $<.stripped
 	@cp $<.stripped $<.compressed
-	@$(N64_ELFCOMPRESS) -c 0 -o $(dir $<) $<.compressed
+	@$(N64_ELFCOMPRESS) -c 2 -o $(dir $<) $<.compressed
 	@$(N64_TOOL) --title "SC64 bootloader" --output $@ --align 256 $<.compressed
 
 all: $(BUILD_DIR)/bootloader.bin
