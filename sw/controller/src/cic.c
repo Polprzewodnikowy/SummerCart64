@@ -38,14 +38,11 @@ void cic_reset_parameters (void) {
 }
 
 void cic_set_parameters (uint32_t *args) {
-    cic_region_t region = rtc_get_region();
-
     uint32_t cic_config_0 = args[0] & (0x00FFFFFF);
     uint32_t cic_config_1 = args[1];
 
-    if (region == REGION_PAL) {
-        cic_config_0 |= CIC_REGION;
-    }
+    cic_config_0 |= fpga_reg_get(REG_CIC_0) & (CIC_64DD_MODE | CIC_REGION);
+
     if (args[0] & (1 << 24)) {
         cic_config_0 |= CIC_DISABLED;
     }
