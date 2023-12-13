@@ -113,9 +113,6 @@ cic_type_t cic_detect (uint8_t *ipl3) {
     switch (cic_calculate_ipl3_checksum(ipl3, 0x91)) {
         case 0x8618A45BC2D3ULL: return CIC_x105;        // 6105 / 7105
     }
-    switch (cic_calculate_ipl3_checksum(ipl3, 0xAC)) {
-        case 0x5930D81014DAULL: return CIC_5101;        // Aleck 64
-    }
     switch (cic_calculate_ipl3_checksum(ipl3, 0xDD)) {
         case 0x6EE8D9E84970ULL: return CIC_8401;        // NDXJ0
         case 0x6C216495C8B9ULL: return CIC_8301;        // NDDJ0

@@ -112,7 +112,6 @@ fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<u64, Error> {
 
 pub fn sign_ipl3(ipl3: &[u8]) -> Result<(u8, u64), Error> {
     let known_seed_checksum_pairs = [
-        (0xAC, 0x5930D81014DAu64), // 5101
         (0xDD, 0x083C6C77E0B1u64), // 5167
         (0x3F, 0x45CC73EE317Au64), // 6101
         (0x3F, 0x44160EC5D9AFu64), // 7102
