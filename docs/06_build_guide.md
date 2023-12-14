@@ -79,6 +79,12 @@ You will require the following applications and packages:
 
 **Programming must be done in specific order for `primer.py` script to work correctly.**
 
+Preparations:
+ 1. Install FT_PROG.
+ 2. Install Python 3.
+ 3. Unpack `sc64-extra-{version}.zip` into a folder.
+ 4. Open terminal and navigate to the folder you've unpacked SC64 files.
+
 First, program the ***FT232H EEPROM***:
  1. Connect the SC64 board to your PC with a USB-C cable.
  2. Locate FT232H EEPROM template `ft232h_config.xml` from the `fw/ftdi/` directory.
@@ -96,10 +102,10 @@ Second, program FPGA, microcontroller and bootloader:
  3. Connect serial adapter to the PC.
  4. Check in device manager which port number `COMx` is assigned to serial adapter.
  5. Connect SC64 board to the PC with USB-C cable (***IMPORTANT:*** connect it to the same computer as serial adapter).
- 6. Locate `primer.py` script in `sw/tools` folder.
+ 6. Locate `primer.py` script in the root folder.
  7. Make sure these files are located in the same folder as `primer.py` script: `requirements.txt`, `sc64-firmware-{version}.bin`.
- 8. Run `pip3 install -r requirements.txt` to install required python packages.
- 9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**). On Windows it's python instead of python3.
+ 8. Run `pip3 install -r requirements.txt` in the terminal to install required python packages.
+ 9. Run `python3 primer.py COMx sc64-firmware-{version}.bin` (replace `COMx` with port located in step **4**). On Windows it's `python` instead of `python3`.
  10. Follow the instructions on the screen.
  11. Wait until programming process has finished (**DO NOT STOP PROGRAMMING PROCESS OR DISCONNECT SC64 BOARD FROM PC**, doing so might irrecoverably break programming through UART header and you would need to program FPGA and/or microcontroller with separate dedicated programming interfaces through *Tag-Connect* connector on the PCB).
 
