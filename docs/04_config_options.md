@@ -148,7 +148,7 @@ type: *word* | default: `0xFFFF`
 
 Use this setting to force specific CIC seed.
 By setting value `0xFFFF` bootloader will try to guess needed values from loaded ROM IPL3.
-This setting is not used when **BOOT_MODE** is set to `3` or `4` (direct boot).
+This setting is not used when **BOOT_MODE** is set to `0` (menu), `3` or `4` (direct boot).
 
 ---
 

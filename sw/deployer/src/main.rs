@@ -5,7 +5,7 @@ mod sc64;
 
 use chrono::Local;
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use clap_num::maybe_hex_range;
+use clap_num::{maybe_hex, maybe_hex_range};
 use colored::Colorize;
 use panic_message::panic_message;
 use std::{
@@ -100,6 +100,10 @@ struct UploadArgs {
     /// Force TV type
     #[arg(long, conflicts_with = "direct")]
     tv: Option<TvType>,
+
+    /// Force CIC seed
+    #[arg(long, value_parser = |s: &str| maybe_hex::<u8>(s))]
+    cic_seed: Option<u8>,
 }
 
 #[derive(Subcommand)]
@@ -141,6 +145,10 @@ struct _64DDArgs {
     /// Force TV type
     #[arg(long, conflicts_with = "direct")]
     tv: Option<TvType>,
+
+    /// Force CIC seed
+    #[arg(long, value_parser = |s: &str| maybe_hex::<u8>(s))]
+    cic_seed: Option<u8>,
 }
 
 #[derive(Args)]
@@ -376,7 +384,7 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
         sc64.set_tv_type(tv_type)?;
     }
 
-    sc64.calculate_cic_parameters()?;
+    sc64.calculate_cic_parameters(args.cic_seed)?;
 
     Ok(())
 }
@@ -477,7 +485,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         sc64.set_tv_type(tv_type)?;
     }
 
-    sc64.calculate_cic_parameters()?;
+    sc64.calculate_cic_parameters(args.cic_seed)?;
 
     if args.disk.len() == 0 {
         let dd_mode = sc64::DdMode::DdIpl;

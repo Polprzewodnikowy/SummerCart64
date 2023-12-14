@@ -1,4 +1,5 @@
 #include "boot.h"
+#include "cic.h"
 #include "error.h"
 #include "init.h"
 #include "io.h"
@@ -26,7 +27,7 @@ void main (void) {
             menu_load();
             boot_params.device_type = BOOT_DEVICE_TYPE_ROM;
             boot_params.reset_type = BOOT_RESET_TYPE_NMI;
-            boot_params.cic_seed = 0x3F;
+            boot_params.cic_seed = cic_get_seed(CIC_6102_7101);
             boot_params.detect_cic_seed = false;
             break;
 
