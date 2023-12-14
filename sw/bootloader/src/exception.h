@@ -7,7 +7,6 @@
 #define EXCEPTION_TRIGGER(code)     { asm volatile ("syscall %[c]\n" :: [c] "i" (code)); }
 
 
-void exception_install (void);
 void exception_enable_interrupts (void);
 void exception_disable_interrupts (void);
 void exception_enable_watchdog (void);

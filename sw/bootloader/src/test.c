@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "display.h"
 #include "error.h"
+#include "init.h"
 #include "io.h"
 #include "sc64.h"
 #include "test.h"
@@ -224,7 +225,7 @@ bool test_check (void) {
     sc64_error_t error;
     uint32_t button_state;
 
-    if (OS_INFO->reset_type != OS_INFO_RESET_TYPE_COLD) {
+    if (__reset_type == INIT_RESET_TYPE_WARM) {
         return false;
     }
 

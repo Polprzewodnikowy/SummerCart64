@@ -13,6 +13,7 @@
  - 64DD add-on emulation
  - IS-Viewer 64 debug interface
  - N64 bootloader with support for IPL3 registers spoofing and loading menu from SD card
+ - Dedicated open source menu written specifically for this flashcart - [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu)
  - Enhanced [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
  - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug terminal)
  - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
@@ -47,8 +48,15 @@ I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korg
 
 One option is to ask in `#summer-cart-64` channel on [N64brew](https://discord.gg/WqFgNWf) Discord server if someone is making a group order.
 
-If you want to order it yourself then I've prepared all necessary manufacturing files on [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
-Full disclosure: for every order made through this link I will receive 10% of PCB manufacturing and PCB assembly service cost. This is a great way of supporting further project development.
+If you want to order it yourself then I've prepared all necessary manufacturing files on the [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
+
+**Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
+
+**Be careful**: this is an advanced project and it is assumed that you have enough knowledge about electronics.
+Selecting wrong options or giving PCB manufacturer wrong information might result in an undesired time and/or money loss.
+Boards also come unprogrammed from the manufacturer - you need to do **initial programming step** yourself after receiving the board.
+To avoid problems _**please**_ read **both** [build guide](./docs/06_build_guide.md) and description on the shared project page **in full**.
+If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the Discord server mentioned above if that's the case.
 
 If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
 
@@ -63,7 +71,9 @@ If you don't need a physical product but still want to support me then check my 
 ## Finished example
 
 [<img src="assets/sc64_finished_example.jpg" alt="SC64 finished example" width="800" />](assets/sc64_finished_example.jpg)
+
 [<img src="assets/sc64_pcb_front.jpg" alt="SC64 PCB front" width="800" />](assets/sc64_pcb_front.jpg)
+
 [<img src="assets/sc64_pcb_back.jpg" alt="SC64 PCB back" width="800" />](assets/sc64_pcb_back.jpg)
 
 ---
@@ -81,3 +91,4 @@ This project wouldn't be possible without these contributions:
 - [FatFs](http://elm-chan.org/fsw/ff/00index_e.html) FAT32/exFAT library being easiest to integrate in embedded environment.
 - [Yakumono's (@LuigiBlood)](https://twitter.com/LuigiBlood) extensive [64DD documentation](https://github.com/LuigiBlood/64dd/wiki) and its implementation in various emulators.
 - [Libdragon](https://github.com/DragonMinded/libdragon) open source N64 SDK project and its developers.
+- [SERV](https://github.com/olofk/serv) bit-serial 32-bit RISC-V CPU soft core.

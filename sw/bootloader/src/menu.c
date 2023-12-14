@@ -6,7 +6,6 @@
 
 
 #define ROM_ADDRESS     (0x10000000)
-#define FILL_SIZE       (0x101000)
 
 
 static const char *fatfs_error_codes[] = {
@@ -45,43 +44,6 @@ static void fix_menu_file_size (FIL *fil) {
     fil->obj.objsize = ALIGN(f_size(fil), FF_MAX_SS);
 }
 
-static void fill_remaining_menu_space (size_t menu_file_size) {
-    if (menu_file_size >= FILL_SIZE) {
-        return;
-    }
-
-    sc64_error_t error;
-    uint32_t rom_write_enable_restore;
-
-    if ((error = sc64_get_config(CFG_ID_ROM_WRITE_ENABLE, &rom_write_enable_restore)) != SC64_OK) {
-        error_display("Command CONFIG_GET [CFG_ID_ROM_WRITE_ENABLE] failed: %d", error);
-    }
-
-    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true)) != SC64_OK) {
-        error_display("Command CONFIG_SET [CFG_ID_ROM_WRITE_ENABLE] failed: %d", error);
-    }
-
-    uint8_t fill_buffer[4096] __attribute__((aligned(8)));
-
-    for (int i = 0; i < sizeof(fill_buffer); i++) {
-        fill_buffer[i] = 0;
-    }
-
-    uint32_t address = (ROM_ADDRESS + menu_file_size);
-    uint32_t left = (FILL_SIZE - menu_file_size);
-
-    while (left > 0) {
-        size_t block = (left > sizeof(fill_buffer)) ? sizeof(fill_buffer) : left;
-        pi_dma_write((io32_t *) (address), fill_buffer, block);
-        address += block;
-        left -= block;
-    }
-
-    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, rom_write_enable_restore)) != SC64_OK) {
-        error_display("Command CONFIG_SET [CFG_ID_ROM_WRITE_ENABLE] failed: %d", error);
-    }
-}
-
 
 void menu_load (void) {
     sc64_error_t error;
@@ -106,7 +68,6 @@ void menu_load (void) {
     fix_menu_file_size(&fil);
     FF_CHECK(f_read(&fil, (void *) (ROM_ADDRESS), f_size(&fil), &bytes_read), "Could not read menu file");
     FF_CHECK((bytes_read != f_size(&fil)) ? FR_INT_ERR : FR_OK, "Read size is different than expected");
-    fill_remaining_menu_space(f_size(&fil));
     FF_CHECK(f_close(&fil), "Could not close menu file");
     FF_CHECK(f_unmount(""), "Could not unmount drive");
 }

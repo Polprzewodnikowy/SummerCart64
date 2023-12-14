@@ -1,9 +1,14 @@
-TOOLCHAIN = mips64-elf-
+N64_BINDIR = $(N64_INST)/bin
+
+TOOLCHAIN = $(N64_BINDIR)/mips64-elf-
 CC = $(TOOLCHAIN)gcc
 CXX = $(TOOLCHAIN)g++
 OBJCOPY = $(TOOLCHAIN)objcopy
 OBJDUMP = $(TOOLCHAIN)objdump
+STRIP = $(TOOLCHAIN)strip
 SIZE = $(TOOLCHAIN)size
+N64_ELFCOMPRESS = $(N64_BINDIR)/n64elfcompress
+N64_TOOL = $(N64_BINDIR)/n64tool
 PYTHON = python3
 
 FLAGS = -march=vr4300 -mtune=vr4300 $(USER_FLAGS)
@@ -19,7 +24,7 @@ BUILD_DIR = build
 SRC_FILES = \
 	startup.S \
 	boot.c \
-	crc32.c \
+	cic.c \
 	display.c \
 	error.c \
 	exception.c \
@@ -69,19 +74,20 @@ $(BUILD_DIR)/%.asset.o: $(BUILD_DIR)/%.asset $(ASSET_DIR)/assets.S
 
 $(BUILD_DIR)/bootloader.elf: $(OBJS) N64.ld
 	$(CXX) $(FLAGS) $(LDFLAGS) -TN64.ld $(OBJS) -o $@
-	@$(OBJDUMP) -S $@ > $(BUILD_DIR)/bootloader.lst
-
-$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf tools/finalize.py
-	@$(OBJCOPY) -O binary $< $@
-	@$(PYTHON) tools/finalize.py $@ > /dev/null
-
-print_size: $(BUILD_DIR)/bootloader.elf
 	@echo 'Size of modules:'
 	@$(SIZE) -B -d -t --common $(OBJS)
 	@echo 'Size of bootloader:'
-	@$(SIZE) -B -d $<
+	@$(SIZE) -B -d $@
+	@$(OBJDUMP) -S $@ > $(BUILD_DIR)/bootloader.lst
 
-all: $(BUILD_DIR)/bootloader.bin print_size
+$(BUILD_DIR)/bootloader.bin: $(BUILD_DIR)/bootloader.elf
+	@cp $< $<.stripped
+	@$(STRIP) -s $<.stripped
+	@cp $<.stripped $<.compressed
+	@$(N64_ELFCOMPRESS) -c 2 -o $(dir $<) $<.compressed
+	@$(N64_TOOL) --title "SC64 bootloader" --output $@ --align 256 $<.compressed
+
+all: $(BUILD_DIR)/bootloader.bin
 
 clean:
 	@rm -rf ./$(BUILD_DIR)/*

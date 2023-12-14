@@ -18,7 +18,10 @@ module n64_top (
     inout [15:0] n64_pi_ad,
 
     input n64_si_clk,
-    inout n64_si_dq
+    inout n64_si_dq,
+
+    input n64_cic_clk,
+    inout n64_cic_dq
 );
 
     logic n64_dd_irq;
@@ -99,6 +102,17 @@ module n64_top (
         .reset(reset),
 
         .n64_scb(n64_scb)
+    );
+
+    n64_cic n64_cic_inst (
+        .clk(clk),
+        .reset(reset),
+
+        .n64_scb(n64_scb),
+
+        .n64_reset(n64_reset),
+        .n64_cic_clk(n64_cic_clk),
+        .n64_cic_dq(n64_cic_dq)
     );
 
 endmodule

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "display.h"
 #include "font.h"
+#include "init.h"
 #include "io.h"
 
 
@@ -67,24 +68,22 @@ static const vi_regs_t vi_config[] = {{
 
 
 static void display_decompress_background (uint32_t *background) {
-    uint32_t pixel_count = ((*background++) / sizeof(uint32_t));
-    uint32_t pixels_painted = 0;
-    uint8_t *background_data = (uint8_t *) (background);
     uint32_t *framebuffer = (uint32_t *) (display_framebuffer);
 
+    int pixel_count = (int) ((*background++) / 3);
+    int pixels_painted = 0;
+
     while (pixels_painted < pixel_count) {
-        int pixel_repeat = ((background_data[0]) + 1);
-        uint32_t pixel_value = (
-            ((background_data[1]) << 24) |
-            ((background_data[2]) << 16) |
-            ((background_data[3]) << 8) |
-            (background_data[4])
-        );
+        uint32_t pixel = *background++;
+
+        int pixel_repeat = (((pixel >> 24) & 0xFF) + 1);
+        uint32_t pixel_value = (((pixel << 8) & 0xFFFFFF00) | 0xFF);
+
         for (int i = 0; i < pixel_repeat; i++) {
             cpu_io_write(framebuffer++, pixel_value);
         }
+
         pixels_painted += pixel_repeat;
-        background_data += 5;
     }
 }
 
@@ -163,7 +162,7 @@ void display_init (uint32_t *background) {
     if (!vi_configured) {
         vi_configured = true;
 
-        const vi_regs_t *cfg = &vi_config[OS_INFO->tv_type];
+        const vi_regs_t *cfg = &vi_config[__tv_type];
 
         cpu_io_write(&VI->MADDR, (uint32_t) (display_framebuffer));
         cpu_io_write(&VI->H_WIDTH, cfg->H_WIDTH);

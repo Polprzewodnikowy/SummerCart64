@@ -95,16 +95,3 @@ void pi_dma_write (io32_t *address, void *buffer, size_t length) {
     cpu_io_write(&PI->RDMA, length - 1);
     while (pi_busy());
 }
-
-uint32_t si_busy (void) {
-    return (cpu_io_read(&SI->SR) & (SI_SR_IO_BUSY | SI_SR_DMA_BUSY));
-}
-
-uint32_t si_io_read (io32_t *address) {
-    return cpu_io_read(address);
-}
-
-void si_io_write (io32_t *address, uint32_t value) {
-    cpu_io_write(address, value);
-    while (si_busy());
-}

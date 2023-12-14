@@ -20,16 +20,16 @@ module n64_pi (
 
     logic [1:0] n64_reset_ff;
     logic [1:0] n64_nmi_ff;
-    logic [3:0] n64_pi_alel_ff;
-    logic [3:0] n64_pi_aleh_ff;
+    logic [2:0] n64_pi_alel_ff;
+    logic [2:0] n64_pi_aleh_ff;
     logic [1:0] n64_pi_read_ff;
     logic [2:0] n64_pi_write_ff;
 
     always_ff @(posedge clk) begin
         n64_reset_ff <= {n64_reset_ff[0], n64_reset};
         n64_nmi_ff <= {n64_nmi_ff[0], n64_nmi};
-        n64_pi_aleh_ff <= {n64_pi_aleh_ff[2:0], n64_pi_aleh};
-        n64_pi_alel_ff <= {n64_pi_alel_ff[2:0], n64_pi_alel};
+        n64_pi_aleh_ff <= {n64_pi_aleh_ff[1:0], n64_pi_aleh};
+        n64_pi_alel_ff <= {n64_pi_alel_ff[1:0], n64_pi_alel};
         n64_pi_read_ff <= {n64_pi_read_ff[0], n64_pi_read};
         n64_pi_write_ff <= {n64_pi_write_ff[1:0], n64_pi_write};
     end
@@ -44,8 +44,8 @@ module n64_pi (
     always_comb begin
         pi_reset = n64_reset_ff[1];
         pi_nmi = n64_nmi_ff[1];
-        pi_aleh = n64_pi_aleh_ff[3];
-        pi_alel = n64_pi_alel_ff[3];
+        pi_aleh = n64_pi_aleh_ff[2];
+        pi_alel = n64_pi_alel_ff[2];
         pi_read = n64_pi_read_ff[1];
         pi_write = n64_pi_write_ff[2];
     end
@@ -98,11 +98,14 @@ module n64_pi (
     always_comb begin
         n64_scb.n64_reset = !last_reset && pi_reset;
         n64_scb.n64_nmi = !last_nmi && pi_nmi;
-        aleh_op = pi_reset && (last_pi_mode != PI_MODE_HIGH) && (pi_mode == PI_MODE_HIGH);
-        alel_op = pi_reset && (last_pi_mode == PI_MODE_HIGH) && (pi_mode == PI_MODE_LOW);
-        read_op = pi_reset && (pi_mode == PI_MODE_VALID) && (read_port != PORT_NONE) && (last_read && !pi_read);
-        write_op = pi_reset && (pi_mode == PI_MODE_VALID) && (write_port != PORT_NONE) && (last_write && !pi_write);
-        end_op = pi_reset && (last_pi_mode == PI_MODE_VALID) && (pi_mode != PI_MODE_VALID);
+    end
+
+    always_ff @(posedge clk) begin
+        aleh_op <= pi_reset && (last_pi_mode != PI_MODE_HIGH) && (pi_mode == PI_MODE_HIGH);
+        alel_op <= pi_reset && (last_pi_mode == PI_MODE_HIGH) && (pi_mode == PI_MODE_LOW);
+        read_op <= pi_reset && (pi_mode == PI_MODE_VALID) && (read_port != PORT_NONE) && (last_read && !pi_read);
+        write_op <= pi_reset && (pi_mode == PI_MODE_VALID) && (write_port != PORT_NONE) && (last_write && !pi_write);
+        end_op <= pi_reset && (last_pi_mode == PI_MODE_VALID) && (pi_mode != PI_MODE_VALID);
     end
 
 

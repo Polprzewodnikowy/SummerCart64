@@ -1,33 +1,12 @@
 #include "boot.h"
-#include "crc32.h"
+#include "cic.h"
+#include "init.h"
 #include "io.h"
 #include "vr4300.h"
 
 
 extern uint32_t reboot_start __attribute__((section(".text")));
 extern size_t reboot_size __attribute__((section(".text")));
-
-
-typedef struct {
-    const uint32_t crc32;
-    const uint8_t seed;
-} ipl3_crc32_t;
-
-static const ipl3_crc32_t ipl3_crc32[] = {
-    { .crc32 = 0x587BD543, .seed = 0xAC },  // 5101
-    { .crc32 = 0x6170A4A1, .seed = 0x3F },  // 6101
-    { .crc32 = 0x009E9EA3, .seed = 0x3F },  // 7102
-    { .crc32 = 0x90BB6CB5, .seed = 0x3F },  // 6102/7101
-    { .crc32 = 0x0B050EE0, .seed = 0x78 },  // x103
-    { .crc32 = 0x98BC2C86, .seed = 0x91 },  // x105
-    { .crc32 = 0xACC8580A, .seed = 0x85 },  // x106
-    { .crc32 = 0x0E018159, .seed = 0xDD },  // 5167
-    { .crc32 = 0x10C68B18, .seed = 0xDD },  // NDXJ0
-    { .crc32 = 0xBC605D0A, .seed = 0xDD },  // NDDJ0
-    { .crc32 = 0x502C4466, .seed = 0xDD },  // NDDJ1
-    { .crc32 = 0x0C965795, .seed = 0xDD },  // NDDJ2
-    { .crc32 = 0x8FEBA21E, .seed = 0xDE },  // NDDE0
-};
 
 
 static io32_t *boot_get_device_base (boot_params_t *params) {
@@ -38,37 +17,38 @@ static io32_t *boot_get_device_base (boot_params_t *params) {
     return device_base_address;
 }
 
-static bool boot_detect_cic_seed (boot_params_t *params) {
+static void boot_detect_cic_seed (boot_params_t *params) {
     io32_t *base = boot_get_device_base(params);
 
-    uint32_t ipl3[1008] __attribute__((aligned(8)));
+    uint8_t ipl3[IPL3_LENGTH] __attribute__((aligned(8)));
 
     pi_dma_read(&base[16], ipl3, sizeof(ipl3));
 
-    uint32_t crc32 = crc32_calculate(ipl3, sizeof(ipl3));
-
-    for (int i = 0; i < sizeof(ipl3_crc32) / sizeof(ipl3_crc32_t); i++) {
-        if (ipl3_crc32[i].crc32 == crc32) {
-            params->cic_seed = ipl3_crc32[i].seed;
-            return true;
-        }
-    }
-
-    return false;
+    params->cic_seed = cic_get_seed(cic_detect(ipl3));
 }
+
 
 void boot (boot_params_t *params) {
     if (params->tv_type == BOOT_TV_TYPE_PASSTHROUGH) {
-        params->tv_type = OS_INFO->tv_type;
-    }
-
-    if (params->detect_cic_seed) {
-        if (!boot_detect_cic_seed(params)) {
-            params->cic_seed = 0x3F;
+        switch (__tv_type) {
+            case INIT_TV_TYPE_PAL:
+                params->tv_type = BOOT_TV_TYPE_PAL;
+                break;
+            case INIT_TV_TYPE_NTSC:
+                params->tv_type = BOOT_TV_TYPE_NTSC;
+                break;
+            case INIT_TV_TYPE_MPAL:
+                params->tv_type = BOOT_TV_TYPE_MPAL;
+                break;
+            default:
+                params->tv_type = BOOT_TV_TYPE_NTSC;
+                break;
         }
     }
 
-    OS_INFO->mem_size_6105 = OS_INFO->mem_size;
+    if (params->detect_cic_seed) {
+        boot_detect_cic_seed(params);
+    }
 
     asm volatile (
         "li $t1, %[status] \n"

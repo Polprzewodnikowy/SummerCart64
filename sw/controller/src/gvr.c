@@ -1,5 +1,6 @@
 #include "button.h"
 #include "cfg.h"
+#include "cic.h"
 #include "dd.h"
 #include "flashram.h"
 #include "fpga.h"
@@ -15,6 +16,7 @@ void gvr_task (void) {
 
     button_init();
     cfg_init();
+    cic_init();
     dd_init();
     flashram_init();
     isv_init();
@@ -25,6 +27,7 @@ void gvr_task (void) {
     while (1) {
         button_process();
         cfg_process();
+        cic_process();
         dd_process();
         flashram_process();
         isv_process();

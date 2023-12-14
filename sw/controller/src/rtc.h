@@ -21,6 +21,7 @@ typedef struct {
 } rtc_settings_t;
 
 
+bool rtc_is_initialized (void);
 bool rtc_get_time (rtc_time_t *time);
 void rtc_set_time (rtc_time_t *time);
 uint8_t rtc_get_region (void);

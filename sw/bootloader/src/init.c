@@ -1,17 +1,20 @@
 #include "error.h"
 #include "exception.h"
+#include "init.h"
 #include "io.h"
 #include "sc64.h"
 #include "test.h"
 
 
-void init (void) {
+init_tv_type_t __tv_type;
+init_reset_type_t __reset_type;
+
+
+void init (init_tv_type_t tv_type, init_reset_type_t reset_type) {
     sc64_error_t error;
 
-    uint32_t pifram = si_io_read((io32_t *) (PIFRAM_STATUS));
-    si_io_write((io32_t *) (PIFRAM_STATUS), pifram | PIFRAM_TERMINATE_BOOT);
-
-    exception_install();
+    __tv_type = tv_type;
+    __reset_type = reset_type;
 
     sc64_unlock();
 
@@ -23,7 +26,7 @@ void init (void) {
     exception_enable_interrupts();
 
     if ((error = sc64_set_config(CFG_ID_BOOTLOADER_SWITCH, false)) != SC64_OK) {
-        error_display("Command SET_CONFIG [BOOTLOADER_SWITCH] failed: %d", error);
+        error_display("Command CONFIG_SET [BOOTLOADER_SWITCH] failed: %d", error);
     }
 
     if (test_check()) {
@@ -33,7 +36,8 @@ void init (void) {
 }
 
 void deinit (void) {
-    sc64_lock();
     exception_disable_interrupts();
     exception_disable_watchdog();
+
+    sc64_lock();
 }

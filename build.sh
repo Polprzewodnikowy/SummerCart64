@@ -29,6 +29,7 @@ FILES=(
 
 BUILT_BOOTLOADER=false
 BUILT_CONTROLLER=false
+BUILT_CIC=false
 BUILT_FPGA=false
 BUILT_UPDATE=false
 BUILT_RELEASE=false
@@ -66,6 +67,19 @@ build_controller () {
     BUILT_CONTROLLER=true
 }
 
+build_cic () {
+    if [ "$BUILT_CIC" = true ]; then return; fi
+
+    pushd sw/cic > /dev/null
+    if [ "$FORCE_CLEAN" = true ]; then
+        ./build.sh clean
+    fi
+    ./build.sh all
+    popd > /dev/null
+
+    BUILT_CIC=true
+}
+
 build_fpga () {
     if [ "$BUILT_FPGA" = true ]; then return; fi
 
@@ -84,6 +98,7 @@ build_update () {
 
     build_bootloader
     build_controller
+    build_cic
     build_fpga
 
     pushd sw/tools > /dev/null
@@ -126,10 +141,11 @@ build_release () {
 
 print_usage () {
     echo "builder script for SC64"
-    echo "usage: ./build.sh [bootloader] [controller] [fpga] [update] [release] [-c] [--help]"
+    echo "usage: ./build.sh [bootloader] [controller] [cic] [fpga] [update] [release] [-c] [--help]"
     echo "parameters:"
     echo "  bootloader  - compile N64 bootloader software"
     echo "  controller  - compile MCU controller software"
+    echo "  cic         - compile CIC emulation software"
     echo "  fpga        - compile FPGA design"
     echo "  update      - compile all software and designs"
     echo "  release     - collect and zip files for release (triggers 'update' build)"
@@ -147,6 +163,7 @@ fi
 
 TRIGGER_BOOTLOADER=false
 TRIGGER_CONTROLLER=false
+TRIGGER_CIC=false
 TRIGGER_FPGA=false
 TRIGGER_UPDATE=false
 TRIGGER_RELEASE=false
@@ -158,6 +175,9 @@ while test $# -gt 0; do
             ;;
         controller)
             TRIGGER_CONTROLLER=true
+            ;;
+        cic)
+            TRIGGER_CIC=true
             ;;
         fpga)
             TRIGGER_FPGA=true
@@ -187,6 +207,7 @@ done
 
 if [ "$TRIGGER_BOOTLOADER" = true ]; then build_bootloader; fi
 if [ "$TRIGGER_CONTROLLER" = true ]; then build_controller; fi
+if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi

@@ -18,7 +18,7 @@ pub use self::{
 };
 
 use self::{
-    cic::{calculate_ipl3_checksum, guess_ipl3_seed, IPL3_LENGTH, IPL3_OFFSET},
+    cic::{sign_ipl3, IPL3_LENGTH, IPL3_OFFSET},
     link::{Command, Link},
     time::{convert_from_datetime, convert_to_datetime},
     types::{
@@ -143,11 +143,13 @@ impl SC64 {
         &mut self,
         disable: bool,
         seed: u8,
-        checksum: &[u8; 6],
+        checksum: u64,
     ) -> Result<(), Error> {
+        let checksum_high = ((checksum >> 32) & 0xFFFF) as u32;
+        let checksum_low = (checksum & 0xFFFFFFFF) as u32;
         let args = [
-            u32::from_be_bytes([(disable as u8) << 0, seed, checksum[0], checksum[1]]),
-            u32::from_be_bytes([checksum[2], checksum[3], checksum[4], checksum[5]]),
+            ((if disable { 1 } else { 0 }) << 24) | ((seed as u32) << 16) | checksum_high,
+            checksum_low,
         ];
         self.link.execute_command(&Command {
             id: b'B',
@@ -503,8 +505,7 @@ impl SC64 {
             _ => BOOTLOADER_ADDRESS,
         };
         let ipl3 = self.command_memory_read(address + IPL3_OFFSET, IPL3_LENGTH)?;
-        let seed = guess_ipl3_seed(&ipl3)?;
-        let checksum = &calculate_ipl3_checksum(&ipl3, seed)?;
+        let (seed, checksum) = sign_ipl3(&ipl3)?;
         self.command_cic_params_set(false, seed, checksum)
     }
 

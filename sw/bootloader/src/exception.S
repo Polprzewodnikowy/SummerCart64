@@ -3,10 +3,6 @@
 
 #define WATCHDOG_TIMEOUT            (5 * (93750000UL / 2))
 
-#define VECTOR_LOCATION             (0xA0000000UL)
-#define VECTOR_SIZE                 (0x80)
-#define VECTOR_NUM                  (4)
-
 #define ZR_OFFSET                   (0)
 #define AT_OFFSET                   (8)
 #define V0_OFFSET                   (16)
@@ -46,8 +42,23 @@
 #define SAVE_REGISTERS_SIZE         (280)
 
 
+.section .text.exception_vector
+exception_tlb_miss:
+    .org 0x0000
+    j exception_handler
+
+exception_xtlb_miss:
+    .org 0x0080
+    j exception_handler
+
+exception_other:
+    .org 0x0180
+    j exception_handler
+
+
 .section .text.exception_handler
 exception_handler:
+    .type exception_handler, %function
     .set noat
     la $k0, (_esp - SAVE_REGISTERS_SIZE)
     sd $zero, ZR_OFFSET($k0)
@@ -153,48 +164,9 @@ exception_restore:
     eret
 
 
-.section .text.exception_vector
-exception_vector:
-    .set noreorder
-    la $k0, exception_handler
-    jalr $k1, $k0
-    nop
-    .equ exception_vector_size, (. - exception_vector)
-    .set reorder
-
-
-.section .text.exception_install
-exception_install:
-    .global exception_install
-    la $t0, exception_vector
-    li $t1, VECTOR_LOCATION
-    li $t2, (VECTOR_SIZE * VECTOR_NUM)
-    add $t2, $t2, $t1
-1:
-    move $t3, $t0
-    move $t4, $t1
-    li $t5, exception_vector_size
-    add $t5, $t5, $t4
-2:
-    lw $t6, 0($t3)
-    addiu $t3, 4
-    sw $t6, 0($t4)
-    addiu $t4, 4
-    bne $t4, $t5, 2b
-    addiu $t1, VECTOR_SIZE
-    bne $t1, $t2, 1b
-    li $t0, VECTOR_LOCATION
-    li $t1, (VECTOR_SIZE * VECTOR_NUM)
-    add $t1, $t0, $t1
-3:
-    cache HIT_INVALIDATE_I, 0($t0)
-    addiu $t0, CACHE_LINE_SIZE_I
-    bne $t0, $t1, 3b
-    jr $ra
-
-
 .section .text.exception_enable_interrupts
 exception_enable_interrupts:
+    .type exception_enable_interrupts, %function
     .global exception_enable_interrupts
     mfc0 $t0, C0_STATUS
     li $t1, C0_SR_IE
@@ -205,6 +177,7 @@ exception_enable_interrupts:
 
 .section .text.exception_disable_interrupts
 exception_disable_interrupts:
+    .type exception_disable_interrupts, %function
     .global exception_disable_interrupts
     mfc0 $t0, C0_STATUS
     li $t1, ~(C0_SR_IE)
@@ -215,6 +188,7 @@ exception_disable_interrupts:
 
 .section .text.exception_enable_watchdog
 exception_enable_watchdog:
+    .type exception_enable_watchdog, %function
     .global exception_enable_watchdog
     mtc0 $zero, C0_COUNT
     li $t1, WATCHDOG_TIMEOUT
@@ -228,6 +202,7 @@ exception_enable_watchdog:
 
 .section .text.exception_disable_watchdog
 exception_disable_watchdog:
+    .type exception_disable_watchdog, %function
     .global exception_disable_watchdog
     mfc0 $t0, C0_STATUS
     li $t1, ~(C0_SR_IM7)

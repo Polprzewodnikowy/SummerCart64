@@ -7,7 +7,7 @@
 .section .loader, "a", %progbits
 .type loader, %object
 loader:
-    .incbin "../build/loader/loader.bin"
+    .incbin "build/loader/loader.bin"
 
 
 .section .text.Reset_Handler

@@ -83,6 +83,7 @@ static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_osp
 void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void)) {
     uint8_t port = ((id >> 4) & 0x07);
     uint8_t pin = (id & 0x0F);
+    __disable_irq();
     if (irq == GPIO_IRQ_FALLING) {
         EXTI->FTSR1 |= (EXTI_FTSR1_FT0 << pin);
         gpio_irq_callbacks[pin].falling = callback;
@@ -92,6 +93,7 @@ void hw_gpio_irq_setup (gpio_id_t id, gpio_irq_t irq, void (*callback)(void)) {
     }
     EXTI->EXTICR[pin / 4] |= (port << (8 * (pin % 4)));
     EXTI->IMR1 |= (EXTI_IMR1_IM0 << pin);
+    __enable_irq();
 }
 
 uint32_t hw_gpio_get (gpio_id_t id) {
@@ -509,7 +511,7 @@ static void hw_init_crc (void) {
 static void hw_init_misc (void) {
     hw_gpio_init(GPIO_ID_N64_RESET, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_DOWN, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_N64_CIC_CLK, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
-    hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_OUTPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);
+    hw_gpio_init(GPIO_ID_N64_CIC_DQ, GPIO_INPUT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 1);
     hw_gpio_init(GPIO_ID_FPGA_INT, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
     hw_gpio_init(GPIO_ID_RTC_MFP, GPIO_INPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_UP, GPIO_AF_0, 0);
 }
@@ -528,14 +530,14 @@ void hw_init (void) {
     hw_init_misc();
 
     NVIC_SetPriority(EXTI0_1_IRQn, 0);
-    NVIC_SetPriority(EXTI2_3_IRQn, 1);
-    NVIC_SetPriority(EXTI4_15_IRQn, 2);
-    NVIC_SetPriority(I2C1_IRQn, 1);
+    NVIC_SetPriority(EXTI2_3_IRQn, 0);
+    NVIC_SetPriority(EXTI4_15_IRQn, 0);
+    NVIC_SetPriority(I2C1_IRQn, 0);
     NVIC_SetPriority(TIM14_IRQn, 0);
-    NVIC_SetPriority(TIM16_IRQn, 1);
-    NVIC_SetPriority(TIM17_IRQn, 2);
-    NVIC_SetPriority(TIM3_IRQn, 2);
-    NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 1);
+    NVIC_SetPriority(TIM16_IRQn, 0);
+    NVIC_SetPriority(TIM17_IRQn, 0);
+    NVIC_SetPriority(TIM3_IRQn, 0);
+    NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 0);
 
     NVIC_EnableIRQ(EXTI0_1_IRQn);
     NVIC_EnableIRQ(EXTI2_3_IRQn);
