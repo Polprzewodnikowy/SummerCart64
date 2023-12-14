@@ -96,7 +96,7 @@ First, program the ***FT232H EEPROM***:
 
 Your SC64 should be ready for next programming step.
 
-Second, program FPGA, microcontroller and bootloader:
+Second, program ***FPGA, microcontroller and bootloader***:
  1. Disconnect SC64 board from power (unplug USB-C cable).
  2. Connect serial UART/TTL adapter to `TX/RX/GND` pads marked on the PCB. Cross connection `TX -> RX`, `RX -> TX`!
  3. Connect serial adapter to the PC.
