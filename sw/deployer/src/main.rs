@@ -60,6 +60,9 @@ enum Commands {
     /// Print information about connected SC64 device
     Info,
 
+    /// Reset SC64 state (same as after power-up)
+    Reset,
+
     /// Update persistent settings on SC64 device
     Set {
         #[command(subcommand)]
@@ -317,6 +320,7 @@ fn handle_command(command: &Commands, port: Option<String>, remote: Option<Strin
         Commands::Debug(args) => handle_debug_command(connection, args),
         Commands::Dump(args) => handle_dump_command(connection, args),
         Commands::Info => handle_info_command(connection),
+        Commands::Reset => handle_reset_command(connection),
         Commands::Set { command } => handle_set_command(connection, command),
         Commands::Firmware { command } => handle_firmware_command(connection, command),
         Commands::Server(args) => handle_server_command(connection, args),
@@ -735,6 +739,16 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" FPGA debug data:     {}", state.fpga_debug_data);
     println!(" MCU stack usage:     {}", state.mcu_stack_usage);
+
+    Ok(())
+}
+
+fn handle_reset_command(connection: Connection) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
+
+    sc64.reset_state()?;
+
+    println!("SC64 state has been reset");
 
     Ok(())
 }
