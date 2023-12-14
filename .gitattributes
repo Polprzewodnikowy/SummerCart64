@@ -1,5 +1,5 @@
 fw/project/lcmxo2/*.sty linguist-generated
-fw/rtl/serv/* -linguist-vendored
+fw/rtl/serv/* linguist-vendored
 fw/rtl/vendor/** -linguist-vendored
 fw/rtl/vendor/lcmxo2/generated/* linguist-generated
 hw/pcb/*.html linguist-generated
