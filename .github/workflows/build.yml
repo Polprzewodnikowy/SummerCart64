@@ -52,26 +52,37 @@ jobs:
   build-deployer:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        version: [windows, windows-32bit, linux, macos]
         include:
-          - os: windows-latest
-            executable: sc64deployer.exe
-            name: sc64-deployer-windows
-            options: -c -a -f
-            extension: zip
+          - version: windows
+            os: windows-latest
+            executable: target/release/sc64deployer.exe
+            package-name: sc64-deployer-windows
+            package-params: -c -a -f
+            package-extension: zip
 
-          - os: ubuntu-latest
+          - version: windows-32bit
+            os: windows-latest
+            build-params: --target=i686-pc-windows-msvc
+            executable: target/i686-pc-windows-msvc/release/sc64deployer.exe
+            package-name: sc64-deployer-windows-32bit
+            package-params: -c -a -f
+            package-extension: zip
+
+          - version: linux
+            os: ubuntu-latest
             linux-packages: libudev-dev
-            executable: sc64deployer
-            name: sc64-deployer-linux
-            options: -czf
-            extension: tar.gz
+            executable: target/release/sc64deployer
+            package-name: sc64-deployer-linux
+            package-params: -czf
+            package-extension: tar.gz
 
-          - os: macos-latest
-            executable: sc64deployer
-            name: sc64-deployer-macos
-            options: -czf
-            extension: tgz
+          - version: macos
+            os: macos-latest
+            executable: target/release/sc64deployer
+            package-name: sc64-deployer-macos
+            package-params: -czf
+            package-extension: tgz
 
     runs-on: ${{ matrix.os }}
 
@@ -94,25 +105,26 @@ jobs:
           sudo apt-get -y install ${{ matrix.linux-packages }}
 
       - name: Build deployer
-        run: cargo b -r
+        run: cargo b -r ${{ matrix.build-params }}
         working-directory: sw/deployer
 
       - name: Package executable
         run: |
-          mkdir package
-          cd target/release
-          tar ${{ matrix.options }} ../../package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+          mkdir -p ./package
+          cp ${{ matrix.executable }} ./package/
+          cd ./package
+          tar ${{ matrix.package-params }} ./${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}.${{ matrix.package-extension }} *
         working-directory: sw/deployer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.name }}-${{ steps.version.outputs.replaced }}
-          path: sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
+          name: ${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}
+          path: sw/deployer/package/${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}.${{ matrix.package-extension }}
 
       - name: Upload release assets
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: softprops/action-gh-release@v0.1.15
         with:
           files: |
-            sw/deployer/package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }}
+            sw/deployer/package/${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}.${{ matrix.package-extension }}
