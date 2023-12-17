@@ -56,6 +56,7 @@ jobs:
         include:
           - version: windows
             os: windows-latest
+            release-dir: target/release
             executable: sc64deployer.exe
             name: sc64-deployer-windows
             options: -c -a -f
@@ -63,15 +64,17 @@ jobs:
 
           - version: windows-32bit
             os: windows-latest
-            executable: i686-pc-windows-msvc/sc64deployer.exe
-            name: sc64-deployer-windows-32bit
             build-params: --target=i686-pc-windows-msvc
+            release-dir: target/i686-pc-windows-msvc/release
+            executable: sc64deployer.exe
+            name: sc64-deployer-windows-32bit
             options: -c -a -f
             extension: zip
 
           - version: linux
             os: ubuntu-latest
             linux-packages: libudev-dev
+            release-dir: target/release
             executable: sc64deployer
             name: sc64-deployer-linux
             options: -czf
@@ -79,6 +82,7 @@ jobs:
 
           - version: macos
             os: macos-latest
+            release-dir: target/release
             executable: sc64deployer
             name: sc64-deployer-macos
             options: -czf
@@ -111,7 +115,7 @@ jobs:
       - name: Package executable
         run: |
           mkdir package
-          cd target/release
+          cd ${{ matrix.release-dir }}
           tar ${{ matrix.options }} ../../package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
         working-directory: sw/deployer
 
