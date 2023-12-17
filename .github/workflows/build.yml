@@ -114,9 +114,10 @@ jobs:
 
       - name: Package executable
         run: |
-          mkdir package
+          PACKAGE_DIR=$(pwd)/package
+          mkdir -p $PACKAGE_DIR
           cd ${{ matrix.release-dir }}
-          tar ${{ matrix.options }} ../../package/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+          tar ${{ matrix.options }} $PACKAGE_DIR/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
         working-directory: sw/deployer
 
       - name: Upload artifact
