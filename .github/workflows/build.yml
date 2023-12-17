@@ -118,6 +118,7 @@ jobs:
           mkdir -p $PACKAGE_DIR
           cd ${{ matrix.release-dir }}
           tar ${{ matrix.options }} $PACKAGE_DIR/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+        shell: bash
         working-directory: sw/deployer
 
       - name: Upload artifact
