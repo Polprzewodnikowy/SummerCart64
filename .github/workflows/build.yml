@@ -59,7 +59,7 @@ jobs:
             release-dir: target/release
             executable: sc64deployer.exe
             name: sc64-deployer-windows
-            package: tar.exe -c -a -f
+            package: zip
             extension: zip
 
           - version: windows-32bit
@@ -68,7 +68,7 @@ jobs:
             release-dir: target/i686-pc-windows-msvc/release
             executable: sc64deployer.exe
             name: sc64-deployer-windows-32bit
-            package: tar.exe -c -a -f
+            package: zip
             extension: zip
 
           - version: linux
