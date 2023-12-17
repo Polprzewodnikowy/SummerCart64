@@ -60,6 +60,13 @@ jobs:
             options: -c -a -f
             extension: zip
 
+          - os: windows-latest
+            executable: sc64deployer.exe
+            name: sc64-deployer-windows-32bit
+            parameters: --target=i686-pc-windows-msvc
+            options: -c -a -f
+            extension: zip
+
           - os: ubuntu-latest
             linux-packages: libudev-dev
             executable: sc64deployer
@@ -94,7 +101,7 @@ jobs:
           sudo apt-get -y install ${{ matrix.linux-packages }}
 
       - name: Build deployer
-        run: cargo b -r
+        run: cargo b -r ${{ matrix.parameters }}
         working-directory: sw/deployer
 
       - name: Package executable
