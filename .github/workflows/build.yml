@@ -52,29 +52,33 @@ jobs:
   build-deployer:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        version: [windows, windows-32bit, linux, macos]
         include:
-          - os: windows-latest
+          - version: windows
+            os: windows-latest
             executable: sc64deployer.exe
             name: sc64-deployer-windows
             options: -c -a -f
             extension: zip
 
-          - os: windows-latest
+          - version: windows-32bit
+            os: windows-latest
             executable: sc64deployer.exe
             name: sc64-deployer-windows-32bit
             parameters: --target=i686-pc-windows-msvc
             options: -c -a -f
             extension: zip
 
-          - os: ubuntu-latest
+          - version: linux
+            os: ubuntu-latest
             linux-packages: libudev-dev
             executable: sc64deployer
             name: sc64-deployer-linux
             options: -czf
             extension: tar.gz
 
-          - os: macos-latest
+          - version: macos
+            os: macos-latest
             executable: sc64deployer
             name: sc64-deployer-macos
             options: -czf
