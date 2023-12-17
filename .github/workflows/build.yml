@@ -13,41 +13,41 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-firmware:
-    runs-on: ubuntu-latest
+  # build-firmware:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Download SummerCart64 repository
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Download SummerCart64 repository
+  #       uses: actions/checkout@v3
 
-      - name: Set package version
-        uses: frabert/replace-string-action@v2
-        id: version
-        with:
-          pattern: '\/'
-          string: '${{ github.ref_name }}'
-          replace-with: '-'
+  #     - name: Set package version
+  #       uses: frabert/replace-string-action@v2
+  #       id: version
+  #       with:
+  #         pattern: '\/'
+  #         string: '${{ github.ref_name }}'
+  #         replace-with: '-'
 
-      - name: Build firmware
-        run: ./docker_build.sh release --force-clean
-        env:
-          SC64_VERSION: ${{ steps.version.outputs.replaced }}
+  #     - name: Build firmware
+  #       run: ./docker_build.sh release --force-clean
+  #       env:
+  #         SC64_VERSION: ${{ steps.version.outputs.replaced }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: sc64-pkg-${{ steps.version.outputs.replaced }}
-          path: |
-            sc64-extra-${{ steps.version.outputs.replaced }}.zip
-            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: sc64-pkg-${{ steps.version.outputs.replaced }}
+  #         path: |
+  #           sc64-extra-${{ steps.version.outputs.replaced }}.zip
+  #           sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
-      - name: Upload release assets
-        if: github.event_name == 'release' && github.event.action == 'created'
-        uses: softprops/action-gh-release@v0.1.15
-        with:
-          files: |
-            sc64-extra-${{ steps.version.outputs.replaced }}.zip
-            sc64-firmware-${{ steps.version.outputs.replaced }}.bin
+  #     - name: Upload release assets
+  #       if: github.event_name == 'release' && github.event.action == 'created'
+  #       uses: softprops/action-gh-release@v0.1.15
+  #       with:
+  #         files: |
+  #           sc64-extra-${{ steps.version.outputs.replaced }}.zip
+  #           sc64-firmware-${{ steps.version.outputs.replaced }}.bin
 
   build-deployer:
     strategy:
@@ -59,7 +59,7 @@ jobs:
             release-dir: target/release
             executable: sc64deployer.exe
             name: sc64-deployer-windows
-            options: -c -a -f
+            package: tar.exe -c -a -f
             extension: zip
 
           - version: windows-32bit
@@ -68,7 +68,7 @@ jobs:
             release-dir: target/i686-pc-windows-msvc/release
             executable: sc64deployer.exe
             name: sc64-deployer-windows-32bit
-            options: -c -a -f
+            package: tar.exe -c -a -f
             extension: zip
 
           - version: linux
@@ -77,7 +77,7 @@ jobs:
             release-dir: target/release
             executable: sc64deployer
             name: sc64-deployer-linux
-            options: -czf
+            package: tar -czf
             extension: tar.gz
 
           - version: macos
@@ -85,7 +85,7 @@ jobs:
             release-dir: target/release
             executable: sc64deployer
             name: sc64-deployer-macos
-            options: -czf
+            package: tar -czf
             extension: tgz
 
     runs-on: ${{ matrix.os }}
@@ -117,7 +117,7 @@ jobs:
           PACKAGE_DIR=$(pwd)/package
           mkdir -p $PACKAGE_DIR
           cd ${{ matrix.release-dir }}
-          tar ${{ matrix.options }} $PACKAGE_DIR/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
+          ${{ matrix.package }} $PACKAGE_DIR/${{ matrix.name }}-${{ steps.version.outputs.replaced }}.${{ matrix.extension }} ${{ matrix.executable }}
         shell: bash
         working-directory: sw/deployer
 
