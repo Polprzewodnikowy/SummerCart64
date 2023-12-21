@@ -49,7 +49,7 @@ Please download latest release before proceeding with the instructions.
 
   1. Locate `.stl` files inside `hw/shell` folder
   2. Use these files in the slicer and 3D printer of your choice or order ready made prints from 3D printing company
-  3. Find matching screws, go to discussions tab for community recommendations
+  3. For screws, M2x10 works great for the top two holes while M2x8 fits well in the bottom two
 
 ---
 
