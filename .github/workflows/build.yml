@@ -131,8 +131,12 @@ jobs:
 
   publish-website:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/main'
