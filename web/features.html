@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SummerCart64 - Features</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./script.js"></script>
+</head>
+
+<body>
+    <div class="menu-container">
+        <div class="menu-bar">
+            <div class="menu-buttons">
+                <img src="sc64.svg">
+                <a onclick="showMenu(event)">
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                </a>
+            </div>
+            <menu class="mobile-hidden">
+                <li><a href="/">Home</a></li>
+                <li class="active"><a href="/features.html">Features</a></li>
+                <li><a href="https://menu.summercart64.dev">Menu</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64/releases/latest">Downloads</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64">GitHub</a></li>
+            </menu>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <main>
+            <h1>SummerCart64 features</h1>
+            <section>
+                <article>
+                    <h3>Enough space for your ROMs</h3>
+                    <p>Flashcart embeds 64&nbsp;MiB of fast SDRAM memory, with additional 14&nbsp;MiB available from the
+                        flash memory, totaling up to 78&nbsp;MiB - more than biggest known retail ROMs.</p>
+                </article>
+
+                <article>
+                    <h3>Blazing fast I/O</h3>
+                    <p>Both microSD card slot and USB port operate at peak speed of ~23.8&nbsp;MiB/s. Even largest
+                        retail ROMs (64&nbsp;MiB) can be loaded in just couple of seconds.</p>
+                </article>
+
+                <article>
+                    <h3>Never lose your progress</h3>
+                    <p>Every known save type found in the retail games is supported. Saves are automatically flushed to
+                        the microSD card (or via USB with PC app attached) during gameplay - no reset button press is
+                        necessary!</p>
+                </article>
+
+                <article>
+                    <h3>Complete 64DD emulation built-in</h3>
+                    <p>Forget about 64DD ROM conversions - SummerCart64 can play disk dumps directly!</p>
+                </article>
+
+                <article>
+                    <h3>Every region is welcome</h3>
+                    <p>SummerCart64 supports every N64 console regardless of its region. NTSC/PAL switching is done
+                        automatically and last detected region is stored inside NVRAM.</p>
+                </article>
+
+                <article>
+                    <h3>Run games with ease</h3>
+                    <p>Browse, run and manage your game library right on the N64 console with the <a
+                            href="https://menu.summercart64.dev">N64FlashcartMenu</a> - a dedicated menu software for
+                        the SummerCart64.</p>
+                </article>
+
+                <article>
+                    <h3>Dedicated terminal PC app</h3>
+                    <p>Powerful, and yet simple, <a
+                            href="https://github.com/Polprzewodnikowy/SummerCart64/releases/latest"><code>sc64deployer</code></a>
+                        app greatly enhances developer user experience.</p>
+                </article>
+
+                <article>
+                    <h3>Outstanding developer features</h3>
+                    <p>SummerCart64 was born as a device for homebrew development first. As a consequence it
+                        incorporates many features to ease development of your own games:</p>
+                    <ul>
+                        <li>Dedicated PC app for loading ROMs and console access.</li>
+                        <li>Simple, command based, communication protocol - both on the USB and N64 side.</li>
+                        <li>microSD card interface with simple, block based, protocol.</li>
+                        <li>Fast USB interface with well documented protocol.</li>
+                        <li>8&nbsp;kiB buffer for general use with microSD card or USB interface.</li>
+                        <li>Native support for microSD card and USB interface in the <a
+                                href="https://libdragon.dev/">libdragon</a>.</li>
+                        <li><a href="https://github.com/buu342/N64-UNFLoader">UNFLoader</a> support - both in the PC app
+                            and USB library.</li>
+                        <li><a href="https://github.com/devwizard64/libcart">libcart</a> support.</li>
+                        <li>IS-Viewer 64 debug interface support in the hardware.</li>
+                    </ul>
+                </article>
+
+                <article>
+                    <h3>With freedom in mind</h3>
+                    <p>SummerCart64 project is completely open source - you can modify and build upon it freely as long
+                        as GNU GPLv3 license terms are satisfied.</p>
+                </article>
+            </section>
+
+            <div class="separator"></div>
+
+            <h1>Hardware specification</h1>
+            <section>
+                <h4>Input / Output</h4>
+                <ul>
+                    <li>N64 cartridge edge connector</li>
+                    <li>microSD card slot (~23.8&nbsp;MiB/s peak, cards up to 2&nbsp;TB are supported)</li>
+                    <li>USB Type-C receptacle (~23.8&nbsp;MiB/s peak)</li>
+                    <li>Programmable push button on the back</li>
+                    <li>Status LED</li>
+                </ul>
+
+                <h4>Memory</h4>
+                <ul>
+                    <li>64&nbsp;MiB SDRAM</li>
+                    <li>16&nbsp;MiB QSPI Flash (last 2&nbsp;MiB is reserved for internal use)</li>
+                    <li>8&nbsp;kiB buffer in the FPGA</li>
+                    <li>64&nbsp;byte battery-backed NVRAM in the RTC</li>
+                </ul>
+
+                <h4>CIC emulation</h4>
+                <ul>
+                    <li>Based on the <a href="https://github.com/jago85/UltraCIC_C">UltraCIC_C</a> with enhancements
+                    </li>
+                    <li>Automatic region switch</li>
+                    <li>Fully programmable seed/checksum values</li>
+                    <li>Supports booting directly from the 64DD IPL</li>
+                </ul>
+
+                <h4>Save support</h4>
+                <ul>
+                    <li>EEPROM 4&nbsp;kbit</li>
+                    <li>EEPROM 16&nbsp;kbit</li>
+                    <li>SRAM 256&nbsp;kbit</li>
+                    <li>SRAM 3x256&nbsp;kbit</li>
+                    <li>FlashRAM 1&nbsp;Mbit</li>
+                    <li>SRAM 1&nbsp;Mbit</li>
+                    <li>Automatic writeback after ~1 second to the microSD card or USB interface</li>
+                </ul>
+
+                <h4>Add-on hardware emulation</h4>
+                <ul>
+                    <li>64DD (N64 Disk Drive) - disk access to/from microSD card or USB interface</li>
+                    <li>IS-Viewer 64 (movable base address, fixed 64&nbsp;kiB buffer size, debug <code>printf</code>
+                        only)</li>
+                </ul>
+
+                <h4>Other</h4>
+                <ul>
+                    <li>Real time clock</li>
+                    <li>CR2032 RTC backup battery</li>
+                    <li>N64 bootloader capable of loading menu binary from the microSD card and displaying error
+                        messages</li>
+                    <li>Firmware updatable via USB interface</li>
+                    <li>Seamless power switching between USB and N64</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <span>© 2020 - 2024 <a href="https://mateuszfaderewski.pl">Mateusz Faderewski</a></span>
+    </footer>
+</body>
+
+</html>
