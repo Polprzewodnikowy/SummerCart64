@@ -208,7 +208,20 @@ main section>img.sc64-logo {
     padding-left: 0;
 }
 
-main section>div.sponsor-buttons {
+div.pcb-images {
+    display: flex;
+    flex-wrap: wrap;
+    margin: var(--main-paragraph-margin) 0;
+}
+
+div.pcb-images img {
+    flex-grow: 1;
+    flex-basis: 0;
+    width: 100%;
+    min-width: calc(var(--content-max-width) / 3.2);
+}
+
+div.sponsor-buttons {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
