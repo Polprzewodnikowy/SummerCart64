@@ -460,7 +460,7 @@ static void hw_init_spi (void) {
 static void hw_init_i2c (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
 
-    I2C1->TIMINGR = 0x00C12166UL;
+    I2C1->TIMINGR = 0x80821B20UL;
     I2C1->CR1 |= (I2C_CR1_TCIE | I2C_CR1_STOPIE | I2C_CR1_RXIE | I2C_CR1_TXIE | I2C_CR1_PE);
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
