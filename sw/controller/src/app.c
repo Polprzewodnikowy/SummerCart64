@@ -17,9 +17,10 @@ void app (void) {
     hw_app_init();
 
     timer_init();
-    rtc_init();
 
     while (fpga_id_get() != FPGA_ID);
+
+    rtc_init();
 
     button_init();
     cfg_init();

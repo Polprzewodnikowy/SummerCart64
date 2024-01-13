@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stm32g0xx.h>
 #include "hw.h"
@@ -262,11 +263,18 @@ static void hw_i2c_init (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
 
     I2C1->CR1 &= ~(I2C_CR1_PE);
-    I2C1->TIMINGR = 0x10901032UL;
-    I2C1->CR1 |= I2C_CR1_PE;
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
     hw_gpio_init(GPIO_ID_I2C_SDA, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
+
+    while (true) {
+        if (hw_gpio_get(GPIO_ID_I2C_SCL) && hw_gpio_get(GPIO_ID_I2C_SDA)) {
+            break;
+        }
+    }
+
+    I2C1->TIMINGR = 0x10901032UL;
+    I2C1->CR1 |= I2C_CR1_PE;
 }
 
 i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length) {
