@@ -7,8 +7,8 @@ uint8_t fpga_id_get (void) {
     uint8_t id;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&id, 1, SPI_RX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_rx(&id, 1);
     hw_spi_stop();
 
     return id;
@@ -19,9 +19,9 @@ uint32_t fpga_reg_get (fpga_reg_t reg) {
     uint32_t value;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&reg, 1, SPI_TX);
-    hw_spi_trx((uint8_t *) (&value), 4, SPI_RX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_tx(&reg, 1);
+    hw_spi_rx((uint8_t *) (&value), 4);
     hw_spi_stop();
 
     return value;
@@ -31,9 +31,9 @@ void fpga_reg_set (fpga_reg_t reg, uint32_t value) {
     fpga_cmd_t cmd = CMD_REG_WRITE;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&reg, 1, SPI_TX);
-    hw_spi_trx((uint8_t *) (&value), 4, SPI_TX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_tx(&reg, 1);
+    hw_spi_tx((uint8_t *) (&value), 4);
     hw_spi_stop();
 }
 
@@ -50,9 +50,9 @@ void fpga_mem_read (uint32_t address, size_t length, uint8_t *buffer) {
     while (fpga_reg_get(REG_MEM_SCR) & MEM_SCR_BUSY);
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&buffer_address, 1, SPI_TX);
-    hw_spi_trx(buffer, length, SPI_RX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_tx(&buffer_address, 1);
+    hw_spi_rx(buffer, length);
     hw_spi_stop();
 }
 
@@ -65,9 +65,9 @@ void fpga_mem_write (uint32_t address, size_t length, uint8_t *buffer) {
     }
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&buffer_address, 1, SPI_TX);
-    hw_spi_trx(buffer, length, SPI_TX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_tx(&buffer_address, 1);
+    hw_spi_tx(buffer, length);
     hw_spi_stop();
 
     fpga_reg_set(REG_MEM_ADDRESS, address);
@@ -95,8 +95,8 @@ uint8_t fpga_usb_status_get (void) {
     uint8_t status;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&status, 1, SPI_RX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_rx(&status, 1);
     hw_spi_stop();
 
     return status;
@@ -107,8 +107,8 @@ uint8_t fpga_usb_pop (void) {
     uint8_t data;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&data, 1, SPI_RX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_rx(&data, 1);
     hw_spi_stop();
 
     return data;
@@ -118,7 +118,7 @@ void fpga_usb_push (uint8_t data) {
     fpga_cmd_t cmd = CMD_USB_WRITE;
 
     hw_spi_start();
-    hw_spi_trx((uint8_t *) (&cmd), 1, SPI_TX);
-    hw_spi_trx(&data, 1, SPI_TX);
+    hw_spi_tx((uint8_t *) (&cmd), 1);
+    hw_spi_tx(&data, 1);
     hw_spi_stop();
 }

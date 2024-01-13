@@ -3,6 +3,7 @@
 
 
 void flashram_init (void);
+
 void flashram_process (void);
 
 

@@ -69,7 +69,10 @@ static void primer_send_response (uint8_t cmd, uint8_t *buffer, uint8_t tx_lengt
 
 void primer (void) {
     hw_primer_init();
+
     vendor_initial_configuration(primer_get_command, primer_send_response);
-    hw_uart_wait_busy();
+
+    hw_uart_write_wait_busy();
+
     hw_reset(NULL);
 }

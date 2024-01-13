@@ -40,10 +40,11 @@ void flashram_init (void) {
     }
 }
 
+
 void flashram_process (void) {
     uint32_t scr = fpga_reg_get(REG_FLASHRAM_SCR);
     enum operation op = flashram_operation_type(scr);
-    uint8_t read_buffer[FLASHRAM_PAGE_SIZE];
+    uint8_t page_buffer[FLASHRAM_PAGE_SIZE];
     uint8_t write_buffer[FLASHRAM_PAGE_SIZE];
     uint32_t address = FLASHRAM_ADDRESS;
     uint32_t erase_size = (op == OP_ERASE_SECTOR) ? FLASHRAM_SECTOR_SIZE : FLASHRAM_SIZE;
@@ -63,10 +64,10 @@ void flashram_process (void) {
             break;
 
         case OP_WRITE_PAGE:
-            fpga_mem_read(FLASHRAM_BUFFER_ADDRESS, FLASHRAM_PAGE_SIZE, read_buffer);
+            fpga_mem_read(FLASHRAM_BUFFER_ADDRESS, FLASHRAM_PAGE_SIZE, page_buffer);
             fpga_mem_read(address, FLASHRAM_PAGE_SIZE, write_buffer);
             for (int i = 0; i < FLASHRAM_PAGE_SIZE; i++) {
-                write_buffer[i] &= read_buffer[i];
+                write_buffer[i] &= page_buffer[i];
             }
             fpga_mem_write(address, FLASHRAM_PAGE_SIZE, write_buffer);
             fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);

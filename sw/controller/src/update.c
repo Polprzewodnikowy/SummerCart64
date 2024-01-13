@@ -312,7 +312,7 @@ void update_perform (void) {
         fpga_mem_read(parameters.mcu_address - 4, sizeof(length), (uint8_t *) (&length));
         if (mcu_update(parameters.mcu_address, length)) {
             update_status_notify(UPDATE_STATUS_ERROR);
-            while (1);
+            while (true);
         }
     }
 
@@ -321,7 +321,7 @@ void update_perform (void) {
         fpga_mem_read(parameters.fpga_address - 4, sizeof(length), (uint8_t *) (&length));
         if (vendor_update(parameters.fpga_address, length) != VENDOR_OK) {
             update_status_notify(UPDATE_STATUS_ERROR);
-            while (1);
+            while (true);
         }
     }
 
@@ -330,7 +330,7 @@ void update_perform (void) {
         fpga_mem_read(parameters.bootloader_address - 4, sizeof(length), (uint8_t *) (&length));
         if (bootloader_update(parameters.bootloader_address, length)) {
             update_status_notify(UPDATE_STATUS_ERROR);
-            while (1);
+            while (true);
         }
     }
 

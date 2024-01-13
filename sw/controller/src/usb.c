@@ -1,4 +1,3 @@
-#include "app.h"
 #include "cfg.h"
 #include "cic.h"
 #include "dd.h"
@@ -12,15 +11,15 @@
 #include "writeback.h"
 
 
-#define BOOTLOADER_ADDRESS          (0x04E00000UL)
-#define BOOTLOADER_LENGTH           (1920 * 1024)
+#define BOOTLOADER_ADDRESS      (0x04E00000UL)
+#define BOOTLOADER_LENGTH       (1920 * 1024)
 
-#define MEMORY_LENGTH               (0x05002980UL)
+#define MEMORY_LENGTH           (0x05002980UL)
 
-#define RX_FLUSH_ADDRESS            (0x07F00000UL)
-#define RX_FLUSH_LENGTH             (1 * 1024 * 1024)
+#define RX_FLUSH_ADDRESS        (0x07F00000UL)
+#define RX_FLUSH_LENGTH         (1 * 1024 * 1024)
 
-#define DEBUG_WRITE_TIMEOUT_TICKS   (100)
+#define DEBUG_WRITE_TIMEOUT_MS  (1000)
 
 
 enum rx_state {
@@ -175,7 +174,7 @@ static void usb_rx_process (void) {
             p.response_info.dma_length = 0;
             p.response_info.done_callback = NULL;
             if (p.rx_cmd == 'U') {
-                timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
+                timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
             }
         }
     }
@@ -311,9 +310,9 @@ static void usb_rx_process (void) {
                             p.read_length -= length;
                             p.read_address += length;
                             p.read_ready = true;
-                            timer_set(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_TICKS);
+                            timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
                         }
-                    } else if (timer_get(TIMER_ID_USB) == 0) {
+                    } else if (timer_countdown_elapsed(TIMER_ID_USB)) {
                         p.rx_state = RX_STATE_FLUSH;
                         p.flush_packet = true;
                     }
@@ -386,7 +385,10 @@ static void usb_rx_process (void) {
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 16;
-                app_get_stack_usage(p.response_info.data);
+                p.response_info.data[0] = 0;
+                p.response_info.data[1] = 0;
+                p.response_info.data[2] = 0;
+                p.response_info.data[3] = 0;
                 break;
 
             default:
@@ -521,6 +523,7 @@ bool usb_enqueue_packet (usb_tx_info_t *info) {
     return true;
 }
 
+
 bool usb_prepare_read (uint32_t *args) {
     if (!p.read_ready) {
         return false;
@@ -543,6 +546,7 @@ void usb_get_read_info (uint32_t *args) {
     args[0] |= (scr & USB_SCR_PWRSAV) ? (1 << 29) : 0;
 }
 
+
 void usb_init (void) {
     fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
     fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
@@ -562,6 +566,7 @@ void usb_init (void) {
     usb_tx_word_counter = 0;
     usb_rx_cmd_counter = 0;
 }
+
 
 void usb_process (void) {
     uint32_t scr = fpga_reg_get(REG_USB_SCR);

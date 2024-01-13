@@ -373,11 +373,11 @@ bool cfg_update (uint32_t *args) {
 }
 
 bool cfg_query_setting (uint32_t *args) {
-    rtc_settings_t settings = (*rtc_get_settings());
+    rtc_settings_t *settings = rtc_get_settings();
 
     switch (args[0]) {
         case SETTING_ID_LED_ENABLE:
-            args[1] = settings.led_enabled;
+            args[1] = settings->led_enabled;
             break;
         default:
             return true;
@@ -387,17 +387,17 @@ bool cfg_query_setting (uint32_t *args) {
 }
 
 bool cfg_update_setting (uint32_t *args) {
-    rtc_settings_t settings = (*rtc_get_settings());
+    rtc_settings_t *settings = rtc_get_settings();
 
     switch (args[0]) {
         case SETTING_ID_LED_ENABLE:
-            settings.led_enabled = args[1];
+            settings->led_enabled = args[1];
             break;
         default:
             return true;
     }
 
-    rtc_set_settings(&settings);
+    rtc_save_settings();
 
     return false;
 }
@@ -450,11 +450,13 @@ void cfg_reset_state (void) {
     p.boot_mode = BOOT_MODE_MENU;
 }
 
+
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
     cfg_reset_state();
     p.usb_output_ready = true;
 }
+
 
 void cfg_process (void) {
     uint32_t reg;

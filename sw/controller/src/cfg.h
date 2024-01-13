@@ -27,7 +27,9 @@ save_type_t cfg_get_save_type (void);
 void cfg_get_time (uint32_t *args);
 void cfg_set_time (uint32_t *args);
 void cfg_reset_state (void);
+
 void cfg_init (void);
+
 void cfg_process (void);
 
 

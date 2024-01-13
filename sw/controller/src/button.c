@@ -39,6 +39,7 @@ button_mode_t button_get_mode (void) {
     return p.mode;
 }
 
+
 void button_init (void) {
     p.counter = 0;
     p.state = false;
@@ -46,9 +47,12 @@ void button_init (void) {
     p.trigger = false;
 }
 
+
 void button_process (void) {
     usb_tx_info_t packet_info;
+
     uint32_t status = fpga_reg_get(REG_CFG_SCR);
+
     if (status & CFG_SCR_BUTTON_STATE) {
         if (p.counter < BUTTON_COUNTER_TRIGGER_ON) {
             p.counter += 1;
@@ -58,13 +62,16 @@ void button_process (void) {
             p.counter -= 1;
         }
     }
+
     if (!p.state && p.counter == BUTTON_COUNTER_TRIGGER_ON) {
         p.state = true;
         p.trigger = true;
     }
+
     if (p.state && p.counter == BUTTON_COUNTER_TRIGGER_OFF) {
         p.state = false;
     }
+
     if (p.trigger) {
         switch (p.mode) {
             case BUTTON_MODE_N64_IRQ:

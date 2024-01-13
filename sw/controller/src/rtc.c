@@ -1,8 +1,9 @@
+#include <string.h>
 #include "fpga.h"
 #include "hw.h"
 #include "led.h"
 #include "rtc.h"
-#include "task.h"
+#include "timer.h"
 
 
 #define RTC_I2C_ADDRESS             (0xDE)
@@ -28,6 +29,8 @@
 
 #define RTC_SETTINGS_VERSION        (1)
 
+#define RTC_TIME_REFRESH_PERIOD_MS  (500)
+
 
 static rtc_time_t rtc_time = {
     .second     = 0x00,
@@ -38,17 +41,15 @@ static rtc_time_t rtc_time = {
     .month      = 0x03,
     .year       = 0x22
 };
-static bool rtc_time_valid = false;
-static volatile bool rtc_time_pending = false;
+static bool rtc_time_pending = false;
 
 static uint8_t rtc_region = 0xFF;
-static volatile bool rtc_region_pending = false;
+static bool rtc_region_pending = false;
 
 static rtc_settings_t rtc_settings = {
     .led_enabled    = true,
 };
-static volatile bool rtc_settings_pending = false;
-static volatile bool rtc_initialized = false;
+static bool rtc_settings_pending = false;
 
 static const uint8_t rtc_regs_bit_mask[7] = {
     0b01111111,
@@ -61,29 +62,21 @@ static const uint8_t rtc_regs_bit_mask[7] = {
 };
 
 
-static void rtc_task_resume (void) {
-    task_set_ready(TASK_ID_RTC);
-}
-
-static void rtc_on_error (void) {
-    rtc_time_valid = false;
-    led_blink_error(LED_ERROR_RTC);
-    task_yield();
-}
-
 static void rtc_read (uint8_t address, uint8_t *data, uint8_t length) {
-    hw_i2c_read(RTC_I2C_ADDRESS, address, data, length, rtc_task_resume);
-    task_yield();
-    if (hw_i2c_get_error()) {
-        rtc_on_error();
+    uint8_t tmp = address;
+    if (hw_i2c_trx(RTC_I2C_ADDRESS, &tmp, 1, data, length) != I2C_OK) {
+        led_blink_error(LED_ERROR_RTC);
     }
 }
 
 static void rtc_write (uint8_t address, uint8_t *data, uint8_t length) {
-    hw_i2c_write(RTC_I2C_ADDRESS, address, data, length, rtc_task_resume);
-    task_yield();
-    if (hw_i2c_get_error()) {
-        rtc_on_error();
+    uint8_t tmp[16];
+    tmp[0] = address;
+    for (int i = 0; i < length; i++) {
+        tmp[i + 1] = data[i];
+    }
+    if (hw_i2c_trx(RTC_I2C_ADDRESS, tmp, length + 1, NULL, 0) != I2C_OK) {
+        led_blink_error(LED_ERROR_RTC);
     }
 }
 
@@ -110,17 +103,13 @@ static void rtc_read_time (void) {
 
     rtc_sanitize_time(regs);
 
-    if (!rtc_time_pending) {
-        rtc_time.second = regs[0];
-        rtc_time.minute = regs[1];
-        rtc_time.hour = regs[2];
-        rtc_time.weekday = regs[3];
-        rtc_time.day = regs[4];
-        rtc_time.month = regs[5];
-        rtc_time.year = regs[6];
-
-        rtc_time_valid = true;
-    }
+    rtc_time.second = regs[0];
+    rtc_time.minute = regs[1];
+    rtc_time.hour = regs[2];
+    rtc_time.weekday = regs[3];
+    rtc_time.day = regs[4];
+    rtc_time.month = regs[5];
+    rtc_time.year = regs[6];
 }
 
 static void rtc_write_time (void) {
@@ -161,12 +150,55 @@ static void rtc_write_settings (void) {
     rtc_write(RTC_ADDRESS_SRAM_SETTINGS, (uint8_t *) (&rtc_settings), sizeof(rtc_settings));
 }
 
-static void rtc_init (void) {
+
+void rtc_get_time (rtc_time_t *time) {
+    time->second = rtc_time.second;
+    time->minute = rtc_time.minute;
+    time->hour = rtc_time.hour;
+    time->weekday = rtc_time.weekday;
+    time->day = rtc_time.day;
+    time->month = rtc_time.month;
+    time->year = rtc_time.year;
+}
+
+void rtc_set_time (rtc_time_t *time) {
+    rtc_time.second = time->second;
+    rtc_time.minute = time->minute;
+    rtc_time.hour = time->hour;
+    rtc_time.weekday = time->weekday;
+    rtc_time.day = time->day;
+    rtc_time.month = time->month;
+    rtc_time.year = time->year;
+    rtc_time_pending = true;
+}
+
+
+uint8_t rtc_get_region (void) {
+    return rtc_region;
+}
+
+void rtc_set_region (uint8_t region) {
+    rtc_region = region;
+    rtc_region_pending = true;
+}
+
+
+rtc_settings_t *rtc_get_settings (void) {
+    return (&rtc_settings);
+}
+
+void rtc_save_settings (void) {
+    rtc_settings_pending = true;
+}
+
+
+void rtc_init (void) {
     bool uninitialized = false;
     const char *magic = "SC64";
     uint8_t buffer[4];
     uint32_t settings_version;
 
+    memset(buffer, 0, 4);
     rtc_read(RTC_ADDRESS_SRAM_MAGIC, buffer, 4);
 
     for (int i = 0; i < 4; i++) {
@@ -192,143 +224,73 @@ static void rtc_init (void) {
         rtc_write(RTC_ADDRESS_SRAM_VERSION, (uint8_t *) (&settings_version), 4);
         rtc_write_settings();
     }
-}
 
-
-bool rtc_is_initialized (void) {
-    return rtc_initialized;
-}
-
-bool rtc_get_time (rtc_time_t *time) {
-    bool vaild;
-
-    hw_i2c_disable_irq();
-    hw_tim_disable_irq(TIM_ID_RTC);
-
-    time->second = rtc_time.second;
-    time->minute = rtc_time.minute;
-    time->hour = rtc_time.hour;
-    time->weekday = rtc_time.weekday;
-    time->day = rtc_time.day;
-    time->month = rtc_time.month;
-    time->year = rtc_time.year;
-    vaild = rtc_time_valid;
-
-    hw_tim_enable_irq(TIM_ID_RTC);
-    hw_i2c_enable_irq();
-
-    return vaild;
-}
-
-void rtc_set_time (rtc_time_t *time) {
-    hw_i2c_disable_irq();
-    hw_tim_disable_irq(TIM_ID_RTC);
-
-    rtc_time.second = time->second;
-    rtc_time.minute = time->minute;
-    rtc_time.hour = time->hour;
-    rtc_time.weekday = time->weekday;
-    rtc_time.day = time->day;
-    rtc_time.month = time->month;
-    rtc_time.year = time->year;
-    rtc_time_pending = true;
-
-    hw_tim_enable_irq(TIM_ID_RTC);
-    hw_i2c_enable_irq();
-}
-
-uint8_t rtc_get_region (void) {
-    return rtc_region;
-}
-
-void rtc_set_region (uint8_t region) {
-    rtc_region = region;
-    rtc_region_pending = true;
-}
-
-rtc_settings_t *rtc_get_settings (void) {
-    return (&rtc_settings);
-}
-
-void rtc_set_settings (rtc_settings_t *settings) {
-    hw_tim_disable_irq(TIM_ID_LED);
-
-    rtc_settings = *settings;
-    rtc_settings_pending = true;
-
-    hw_tim_enable_irq(TIM_ID_LED);
-}
-
-void rtc_task (void) {
-    rtc_init();
-
+    rtc_read_time();
     rtc_read_region();
     rtc_read_settings();
 
-    rtc_initialized = true;
-
-    while (1) {
-        if (rtc_time_pending) {
-            rtc_time_pending = false;
-            rtc_write_time();
-        }
-
-        if (rtc_region_pending) {
-            rtc_region_pending = false;
-            rtc_write_region();
-        }
-
-        if (rtc_settings_pending) {
-            rtc_settings_pending = false;
-            rtc_write_settings();
-        }
-
-        rtc_read_time();
-
-        hw_tim_setup(TIM_ID_RTC, 50, rtc_task_resume);
-
-        task_yield();
-    }
+    timer_countdown_start(TIMER_ID_RTC, RTC_TIME_REFRESH_PERIOD_MS);
 }
 
+
 void rtc_process (void) {
-    rtc_time_t time;
-    uint32_t data[2];
     uint32_t scr = fpga_reg_get(REG_RTC_SCR);
 
     if ((scr & RTC_SCR_PENDING) && ((scr & RTC_SCR_MAGIC_MASK) == RTC_SCR_MAGIC)) {
+        uint32_t data[2];
+
         data[0] = fpga_reg_get(REG_RTC_TIME_0);
         data[1] = fpga_reg_get(REG_RTC_TIME_1);
 
-        time.weekday = ((data[0] >> 24) & 0xFF) + 1;
-        time.hour = ((data[0] >> 16) & 0xFF);
-        time.minute = ((data[0] >> 8) & 0xFF);
-        time.second = ((data[0] >> 0) & 0xFF);
-        time.year = ((data[1] >> 16) & 0xFF);
-        time.month = ((data[1] >> 8) & 0xFF);
-        time.day = ((data[1] >> 0) & 0xFF);
-
-        rtc_set_time(&time);
+        rtc_time.weekday = ((data[0] >> 24) & 0xFF) + 1;
+        rtc_time.hour = ((data[0] >> 16) & 0xFF);
+        rtc_time.minute = ((data[0] >> 8) & 0xFF);
+        rtc_time.second = ((data[0] >> 0) & 0xFF);
+        rtc_time.year = ((data[1] >> 16) & 0xFF);
+        rtc_time.month = ((data[1] >> 8) & 0xFF);
+        rtc_time.day = ((data[1] >> 0) & 0xFF);
+        rtc_time_pending = true;
 
         fpga_reg_set(REG_RTC_TIME_0, data[0]);
         fpga_reg_set(REG_RTC_TIME_1, data[1]);
         fpga_reg_set(REG_RTC_SCR, RTC_SCR_DONE);
     }
 
-    rtc_get_time(&time);
+    if (rtc_time_pending) {
+        rtc_time_pending = false;
+        rtc_write_time();
+    }
 
-    data[0] = (
-        ((time.weekday - 1) << 24) |
-        (time.hour << 16) |
-        (time.minute << 8) |
-        (time.second << 0)
-    );
-    data[1] = (
-        (time.year << 16) |
-        (time.month << 8) |
-        (time.day << 0)
-    );
+    if (rtc_region_pending) {
+        rtc_region_pending = false;
+        rtc_write_region();
+    }
 
-    fpga_reg_set(REG_RTC_TIME_0, data[0]);
-    fpga_reg_set(REG_RTC_TIME_1, data[1]);
+    if (rtc_settings_pending) {
+        rtc_settings_pending = false;
+        rtc_write_settings();
+    }
+
+    if (timer_countdown_elapsed(TIMER_ID_RTC)) {
+        timer_countdown_start(TIMER_ID_RTC, RTC_TIME_REFRESH_PERIOD_MS);
+
+        rtc_read_time();
+
+        uint32_t data[2];
+
+        data[0] = (
+            ((rtc_time.weekday - 1) << 24) |
+            (rtc_time.hour << 16) |
+            (rtc_time.minute << 8) |
+            (rtc_time.second << 0)
+        );
+        data[1] = (
+            (rtc_time.year << 16) |
+            (rtc_time.month << 8) |
+            (rtc_time.day << 0)
+        );
+
+        fpga_reg_set(REG_RTC_TIME_0, data[0]);
+        fpga_reg_set(REG_RTC_TIME_1, data[1]);
+    }
 }

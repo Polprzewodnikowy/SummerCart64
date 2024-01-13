@@ -382,7 +382,7 @@ module n64_si (
                     4'd1: {rtc_time_wp, rtc_backup_wp} <= rx_byte_data[1:0];
                     4'd2: begin
                         rtc_stopped <= rx_byte_data[2:1];
-                        if (rx_byte_data[2:1] == 2'b00) begin
+                        if ((|rtc_stopped) && (rx_byte_data[2:1] == 2'b00)) begin
                             n64_scb.rtc_pending <= 1'b1;
                         end
                     end

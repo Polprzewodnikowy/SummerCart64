@@ -114,7 +114,7 @@ static void lcmxo2_write_data (uint8_t *buffer, uint32_t length) {
 static void lcmxo2_reset_bus (void) {
 #ifdef LCMXO2_I2C
     uint8_t reset_data = 0;
-    hw_i2c_raw(LCMXO2_I2C_ADDR_RESET, &reset_data, sizeof(reset_data), NULL, 0);
+    hw_i2c_trx(LCMXO2_I2C_ADDR_RESET, &reset_data, sizeof(reset_data), NULL, 0);
 #else
     lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_RSTE);
     lcmxo2_reg_set(LCMXO2_CFGCR, 0);
@@ -131,7 +131,7 @@ static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint
         }
         packet_length += length;
     }
-    hw_i2c_raw(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+    hw_i2c_trx(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
 #else
     uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
     lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);

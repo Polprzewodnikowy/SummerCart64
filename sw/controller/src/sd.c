@@ -1,9 +1,8 @@
-#include <stdbool.h>
-#include <stdint.h>
 #include "fpga.h"
 #include "hw.h"
 #include "led.h"
 #include "sd.h"
+#include "timer.h"
 
 
 #define SD_INIT_BUFFER_ADDRESS          (0x05002800UL)
@@ -33,6 +32,8 @@
 #define SWITCH_FUNCTION_GROUP_1         (SD_INIT_BUFFER_ADDRESS + 12)
 #define SWITCH_FUNCTION_GROUP_1_HS      (1 << 1)
 
+#define TIMEOUT_INIT_MS                 (1000)
+
 #define DAT_BLOCK_MAX_COUNT             (256)
 #define DAT_TIMEOUT_INIT_MS             (2000)
 #define DAT_TIMEOUT_DATA_MS             (5000)
@@ -60,6 +61,12 @@ typedef enum {
     DAT_WRITE,
 } dat_mode_t;
 
+typedef enum {
+    DAT_OK,
+    DAT_ERR_IO,
+    DAT_ERR_TIMEOUT,
+} dat_err_t;
+
 
 struct process {
     bool card_initialized;
@@ -67,31 +74,12 @@ struct process {
     uint32_t rca;
     uint8_t csd[16];
     uint8_t cid[16];
-    volatile bool timeout;
     bool byte_swap;
 };
 
 
 static struct process p;
 
-
-static void sd_trigger_timeout (void) {
-    p.timeout = true;
-}
-
-static void sd_prepare_timeout (uint16_t value) {
-    p.timeout = false;
-    hw_tim_setup(TIM_ID_SD, value, sd_trigger_timeout);
-}
-
-static bool sd_did_timeout (void) {
-    return p.timeout;
-}
-
-static void sd_clear_timeout (void) {
-    hw_tim_stop(TIM_ID_SD);
-    p.timeout = false;
-}
 
 static void sd_set_clock (sd_clock_t mode) {
     fpga_reg_set(REG_SD_SCR, SD_SCR_CLOCK_MODE_OFF);
@@ -198,22 +186,25 @@ static void sd_dat_abort (void) {
     fpga_reg_set(REG_SD_DAT, SD_DAT_STOP | SD_DAT_FIFO_FLUSH);
 }
 
-static bool sd_dat_wait (uint16_t timeout) {
-    sd_prepare_timeout(timeout);
+static dat_err_t sd_dat_wait (uint16_t timeout_ms) {
+    timer_countdown_start(TIMER_ID_SD, timeout_ms);
 
     do {
         uint32_t sd_dat = fpga_reg_get(REG_SD_DAT);
         uint32_t sd_dma_scr = fpga_reg_get(REG_SD_DMA_SCR);
         led_blink_act();
         if ((!(sd_dat & SD_DAT_BUSY)) && (!(sd_dma_scr & DMA_SCR_BUSY))) {
-            sd_clear_timeout();
-            return (sd_dat & SD_DAT_ERROR);
+            if (sd_dat & SD_DAT_ERROR) {
+                sd_dat_abort();
+                return DAT_ERR_IO;
+            }
+            return DAT_OK;
         }
-    } while (!sd_did_timeout());
+    } while (!timer_countdown_elapsed(TIMER_ID_SD));
 
     sd_dat_abort();
 
-    return true;
+    return DAT_ERR_TIMEOUT;
 }
 
 
@@ -248,11 +239,11 @@ bool sd_card_init (void) {
         arg = (ACMD41_ARG_HCS | ACMD41_ARG_OCR);
     }
 
-    sd_prepare_timeout(1000);
+    timer_countdown_start(TIMER_ID_SD, TIMEOUT_INIT_MS);
     do {
-        if (sd_did_timeout()) {
+        if (timer_countdown_elapsed(TIMER_ID_SD)) {
             sd_card_deinit();
-            return true;            
+            return true;
         }
         if (sd_acmd(41, arg, RSP_R3, &rsp)) {
             sd_card_deinit();
@@ -266,8 +257,7 @@ bool sd_card_init (void) {
             p.card_type_block = (rsp & R3_CCS);
             break;
         }
-    } while (1);
-    sd_clear_timeout();
+    } while (true);
 
     if (sd_cmd(2, 0, RSP_R2, NULL)) {
         sd_card_deinit();
@@ -308,8 +298,7 @@ bool sd_card_init (void) {
         sd_card_deinit();
         return true;
     }
-    sd_dat_wait(DAT_TIMEOUT_INIT_MS);
-    if (sd_did_timeout()) {
+    if (sd_dat_wait(DAT_TIMEOUT_INIT_MS) == DAT_ERR_TIMEOUT) {
         sd_card_deinit();
         return true;
     }
@@ -326,8 +315,7 @@ bool sd_card_init (void) {
             sd_card_deinit();
             return true;
         }
-        sd_dat_wait(DAT_TIMEOUT_INIT_MS);
-        if (sd_did_timeout()) {
+        if (sd_dat_wait(DAT_TIMEOUT_INIT_MS) == DAT_ERR_TIMEOUT) {
             sd_card_deinit();
             return true;
         }
@@ -389,6 +377,7 @@ bool sd_set_byte_swap (bool enabled) {
     return false;
 }
 
+
 bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
     if (!p.card_initialized || (count == 0)) {
         return true;
@@ -405,8 +394,7 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             return true;
         }
         sd_dat_prepare(address, blocks, DAT_WRITE);
-        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS)) {
-            sd_dat_abort();
+        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS) != DAT_OK) {
             sd_cmd(12, 0, RSP_R1b, NULL);
             return true;
         }
@@ -440,10 +428,8 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
             sd_dat_abort();
             return true;
         }
-        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS)) {
-            if (sd_did_timeout()) {
-                sd_cmd(12, 0, RSP_R1b, NULL);
-            }
+        if (sd_dat_wait(DAT_TIMEOUT_DATA_MS) != DAT_OK) {
+            sd_cmd(12, 0, RSP_R1b, NULL);
             return true;
         }
         sd_cmd(12, 0, RSP_R1b, NULL);
@@ -454,6 +440,7 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
     return false;
 }
+
 
 bool sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32_t count, sd_process_sectors_t sd_process_sectors) {
     uint32_t starting_sector = 0;
@@ -483,11 +470,13 @@ bool sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32_t cou
     return false;
 }
 
+
 void sd_init (void) {
     p.card_initialized = false;
     p.byte_swap = false;
     sd_set_clock(CLOCK_STOP);
 }
+
 
 void sd_process (void) {
     if (p.card_initialized && !sd_card_is_inserted()) {

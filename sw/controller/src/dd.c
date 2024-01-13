@@ -1,10 +1,9 @@
-#include <stdint.h>
 #include "dd.h"
 #include "fpga.h"
-#include "hw.h"
 #include "led.h"
 #include "rtc.h"
 #include "sd.h"
+#include "timer.h"
 #include "usb.h"
 
 
@@ -20,7 +19,7 @@
 #define DD_DRIVE_ID_DEVELOPMENT     (0x0004)
 #define DD_VERSION_RETAIL           (0x0114)
 
-#define DD_SPIN_UP_TIME             (2000)
+#define DD_SPIN_UP_TIME_MS          (2000)
 
 #define DD_THB_UNMAPPED             (0xFFFFFFFF)
 #define DD_THB_WRITABLE_FLAG        (1 << 31)
@@ -75,7 +74,6 @@ struct process {
     rtc_time_t time;
     bool disk_spinning;
     bool cmd_response_delayed;
-    bool cmd_response_ready;
     bool bm_running;
     bool transfer_mode;
     bool full_track_transfer;
@@ -176,10 +174,6 @@ static bool dd_block_write_request (void) {
         return usb_enqueue_packet(&packet_info);
     }
     return true;
-}
-
-static void dd_set_cmd_response_ready (void) {
-    p.cmd_response_ready = true;
 }
 
 
@@ -284,13 +278,13 @@ void dd_handle_button (void) {
     }
 }
 
+
 void dd_init (void) {
     fpga_reg_set(REG_DD_SCR, 0);
     fpga_reg_set(REG_DD_HEAD_TRACK, 0);
     fpga_reg_set(REG_DD_DRIVE_ID, DD_DRIVE_ID_RETAIL);
     p.state = STATE_IDLE;
     p.cmd_response_delayed = false;
-    p.cmd_response_ready = false;
     p.disk_spinning = false;
     p.bm_running = false;
     p.drive_type = DD_DRIVE_TYPE_RETAIL;
@@ -299,6 +293,7 @@ void dd_init (void) {
     dd_set_disk_mapping(0, 0);
 }
 
+
 void dd_process (void) {
     uint32_t starting_scr = fpga_reg_get(REG_DD_SCR);
     uint32_t scr = starting_scr;
@@ -306,7 +301,6 @@ void dd_process (void) {
     if (scr & DD_SCR_HARD_RESET) {
         p.state = STATE_IDLE;
         p.cmd_response_delayed = false;
-        p.cmd_response_ready = false;
         p.disk_spinning = false;
         p.bm_running = false;
         p.head_track = 0;
@@ -319,19 +313,16 @@ void dd_process (void) {
         uint16_t data = cmd_data & 0xFFFF;
 
         if (p.cmd_response_delayed) {
-            if (p.cmd_response_ready) {
+            if (timer_countdown_elapsed(TIMER_ID_DD)) {
                 p.cmd_response_delayed = false;
                 fpga_reg_set(REG_DD_HEAD_TRACK, DD_HEAD_TRACK_INDEX_LOCK | data);
                 scr |= DD_SCR_CMD_READY;
             }
         } else if ((cmd == DD_CMD_SEEK_READ) || (cmd == DD_CMD_SEEK_WRITE)) {
             p.cmd_response_delayed = true;
-            p.cmd_response_ready = false;
             if (!p.disk_spinning) {
                 p.disk_spinning = true;
-                hw_tim_setup(TIM_ID_DD, DD_SPIN_UP_TIME, dd_set_cmd_response_ready);
-            } else {
-                p.cmd_response_ready = true;
+                timer_countdown_start(TIMER_ID_DD, DD_SPIN_UP_TIME_MS);
             }
             fpga_reg_set(REG_DD_HEAD_TRACK, p.head_track & ~(DD_HEAD_TRACK_INDEX_LOCK));
             p.head_track = data & DD_HEAD_TRACK_MASK;
@@ -397,7 +388,7 @@ void dd_process (void) {
             fpga_reg_set(REG_DD_CMD_DATA, data);
             scr |= DD_SCR_CMD_READY;
         }
-    } 
+    }
 
     if (scr & DD_SCR_BM_STOP) {
         scr |= DD_SCR_BM_STOP_CLEAR;

@@ -6,16 +6,19 @@
 #include "writeback.h"
 
 
-#define SAVE_MAX_SECTOR_COUNT       (256)
-#define EEPROM_ADDRESS              (0x05002000)
-#define SRAM_FLASHRAM_ADDRESS       (0x03FE0000)
-#define EEPROM_4K_LENGTH            (512)
-#define EEPROM_16K_LENGTH           (2048)
-#define SRAM_LENGTH                 (32 * 1024)
-#define FLASHRAM_LENGTH             (128 * 1024)
-#define SRAM_BANKED_LENGTH          (3 * 32 * 1024)
-#define SRAM_1M_LENGTH              (128 * 1024)
-#define WRITEBACK_DELAY_TICKS       (100)
+#define SAVE_MAX_SECTOR_COUNT   (256)
+
+#define EEPROM_ADDRESS          (0x05002000)
+#define SRAM_FLASHRAM_ADDRESS   (0x03FE0000)
+
+#define EEPROM_4K_LENGTH        (512)
+#define EEPROM_16K_LENGTH       (2048)
+#define SRAM_LENGTH             (32 * 1024)
+#define FLASHRAM_LENGTH         (128 * 1024)
+#define SRAM_BANKED_LENGTH      (3 * 32 * 1024)
+#define SRAM_1M_LENGTH          (128 * 1024)
+
+#define WRITEBACK_DELAY_MS      (1000)
 
 
 struct process {
@@ -111,6 +114,7 @@ void writeback_load_sector_table (uint32_t address) {
     }
 }
 
+
 void writeback_enable (writeback_mode_t mode) {
     p.enabled = true;
     p.pending = false;
@@ -121,12 +125,13 @@ void writeback_enable (writeback_mode_t mode) {
 void writeback_disable (void) {
     p.enabled = false;
     p.pending = false;
-    timer_set(TIMER_ID_WRITEBACK, 0);
+    timer_countdown_abort(TIMER_ID_WRITEBACK);
 }
 
 bool writeback_pending (void) {
     return p.enabled && p.pending;
 }
+
 
 void writeback_init (void) {
     p.enabled = false;
@@ -137,6 +142,7 @@ void writeback_init (void) {
     }
 }
 
+
 void writeback_process (void) {
     if (p.enabled && (p.mode == WRITEBACK_SD) && !sd_card_is_inserted()) {
         writeback_disable();
@@ -144,24 +150,27 @@ void writeback_process (void) {
 
     if (p.enabled) {
         uint16_t save_count = fpga_reg_get(REG_SAVE_COUNT);
+
         if (save_count != p.last_save_count) {
             p.pending = true;
             p.last_save_count = save_count;
-            timer_set(TIMER_ID_WRITEBACK, WRITEBACK_DELAY_TICKS);
+            timer_countdown_start(TIMER_ID_WRITEBACK, WRITEBACK_DELAY_MS);
         }
     }
 
-    if (p.pending && (timer_get(TIMER_ID_WRITEBACK) == 0)) {
+    if (p.pending && timer_countdown_elapsed(TIMER_ID_WRITEBACK)) {
         switch (p.mode) {
             case WRITEBACK_SD:
                 writeback_save_to_sd();
                 p.pending = false;
                 break;
+
             case WRITEBACK_USB:
                 if (writeback_save_to_usb()) {
                     p.pending = false;
                 }
                 break;
+
             default:
                 writeback_disable();
                 break;
