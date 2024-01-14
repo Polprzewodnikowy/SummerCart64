@@ -4,8 +4,7 @@
 #include "hw.h"
 
 
-#define CPU_FREQ        (64000000UL)
-#define UART_BAUD       (115200UL)
+#define CPU_FREQ    (64000000UL)
 
 
 void hw_set_vector_table (uint32_t offset) {
@@ -42,17 +41,62 @@ static void hw_clock_init (void) {
 }
 
 
-static void hw_delay_init (void) {
-    SysTick->LOAD = (((CPU_FREQ / 1000)) - 1);
-    SysTick->VAL = 0;
-    SysTick->CTRL = (SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk);
+#define TIMEOUT_US_PER_TICK (10)
+
+static void hw_timeout_init (void) {
+    RCC->APBENR1 |= RCC_APBENR1_DBGEN;
+    DBG->APBFZ2 |= DBG_APB_FZ2_DBG_TIM17_STOP;
+
+    RCC->APBENR2 |= RCC_APBENR2_TIM17EN;
+
+    TIM17->CR1 = TIM_CR1_OPM;
+    TIM17->PSC = (((CPU_FREQ / 1000 / 1000) * TIMEOUT_US_PER_TICK) - 1);
+    TIM17->EGR = TIM_EGR_UG;
 }
 
-void hw_delay_ms (uint32_t ms) {
-    SysTick->VAL = 0;
-    for (uint32_t i = 0; i < ms; i++) {
-        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+static void hw_timeout_start (void) {
+    TIM17->CR1 &= ~(TIM_CR1_CEN);
+    TIM17->CNT = 0;
+    TIM17->CR1 |= TIM_CR1_CEN;
+}
+
+static bool hw_timeout_occured (uint32_t timeout_us) {
+    uint16_t count = TIM17->CNT;
+
+    uint32_t adjusted_timeout = ((timeout_us + (TIMEOUT_US_PER_TICK - 1)) / TIMEOUT_US_PER_TICK);
+
+    if ((count >= adjusted_timeout) || (count == 0xFFFF)) {
+        return true;
     }
+
+    return false;
+}
+
+
+#define DELAY_MS_PER_TICK   (1)
+
+static void hw_delay_init (void) {
+    RCC->APBENR1 |= RCC_APBENR1_DBGEN;
+    DBG->APBFZ2 |= DBG_APB_FZ2_DBG_TIM16_STOP;
+
+    RCC->APBENR2 |= RCC_APBENR2_TIM16EN;
+
+    TIM16->CR1 = TIM_CR1_OPM;
+    TIM16->PSC = (((CPU_FREQ / 1000) * DELAY_MS_PER_TICK) - 1);
+    TIM16->EGR = TIM_EGR_UG;
+}
+
+void hw_delay_ms (uint32_t delay_ms) {
+    TIM16->CR1 &= ~(TIM_CR1_CEN);
+    TIM16->CNT = 0;
+    TIM16->CR1 |= TIM_CR1_CEN;
+
+    uint32_t adjusted_delay = ((delay_ms + (DELAY_MS_PER_TICK - 1)) / DELAY_MS_PER_TICK);
+
+    uint16_t count;
+    do {
+        count = TIM16->CNT;
+    } while ((count < adjusted_delay) && (count != 0xFFFF));
 }
 
 
@@ -114,7 +158,7 @@ static void hw_gpio_init (gpio_id_t id, gpio_mode_t mode, gpio_ot_t ot, gpio_osp
     uint8_t pin = (id & 0x0F);
     uint8_t afr = ((pin < 8) ? 0 : 1);
 
-    RCC->IOPENR |= RCC_IOPENR_GPIOAEN | RCC_IOPENR_GPIOBEN;
+    RCC->IOPENR |= (RCC_IOPENR_GPIOAEN | RCC_IOPENR_GPIOBEN);
 
     tmp.MODER = (gpio->MODER & ~(GPIO_MODER_MODE0_Msk << (pin * 2)));
     tmp.OTYPER = (gpio->OTYPER & ~(GPIO_OTYPER_OT0_Msk << pin));
@@ -150,6 +194,8 @@ void hw_gpio_reset (gpio_id_t id) {
 }
 
 
+#define UART_BAUD   (115200UL)
+
 static void hw_uart_init (void) {
     RCC->APBENR2 |= (RCC_APBENR2_USART1EN | RCC_APBENR2_SYSCFGEN);
 
@@ -158,9 +204,9 @@ static void hw_uart_init (void) {
     hw_gpio_init(GPIO_ID_UART_TX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
     hw_gpio_init(GPIO_ID_UART_RX, GPIO_ALT, GPIO_PP, GPIO_SPEED_LOW, GPIO_PULL_UP, GPIO_AF_1, 0);
 
-    USART1->BRR = CPU_FREQ / UART_BAUD;
-    USART1->RQR = USART_RQR_TXFRQ | USART_RQR_RXFRQ;
-    USART1->CR1 = USART_CR1_FIFOEN | USART_CR1_M0 | USART_CR1_PCE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
+    USART1->BRR = (CPU_FREQ / UART_BAUD);
+    USART1->RQR = (USART_RQR_TXFRQ | USART_RQR_RXFRQ);
+    USART1->CR1 = (USART_CR1_FIFOEN | USART_CR1_M0 | USART_CR1_PCE | USART_CR1_TE | USART_CR1_RE | USART_CR1_UE);
 }
 
 void hw_uart_read (uint8_t *data, int length) {
@@ -259,26 +305,35 @@ void hw_spi_tx (uint8_t *data, int length) {
 }
 
 
+#define I2C_TIMEOUT_US_BUSY     (1000)
+#define I2C_TIMEOUT_US_PER_BYTE (100)
+
 static void hw_i2c_init (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
 
-    I2C1->CR1 &= ~(I2C_CR1_PE);
+    I2C1->CR1 = 0;
 
     hw_gpio_init(GPIO_ID_I2C_SCL, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
     hw_gpio_init(GPIO_ID_I2C_SDA, GPIO_ALT, GPIO_OD, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_6, 0);
 
-    while (true) {
-        if (hw_gpio_get(GPIO_ID_I2C_SCL) && hw_gpio_get(GPIO_ID_I2C_SDA)) {
-            break;
-        }
-    }
+    while (!(hw_gpio_get(GPIO_ID_I2C_SCL) && hw_gpio_get(GPIO_ID_I2C_SDA)));
 
     I2C1->TIMINGR = 0x10901032UL;
     I2C1->CR1 |= I2C_CR1_PE;
 }
 
 i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length) {
-    while (I2C1->ISR & I2C_ISR_BUSY);
+    hw_timeout_start();
+
+    while (I2C1->ISR & I2C_ISR_BUSY) {
+        if (hw_timeout_occured(I2C_TIMEOUT_US_BUSY)) {
+            return I2C_ERR_BUSY;
+        }
+    }
+
+    uint32_t timeout = ((tx_length + rx_length) * I2C_TIMEOUT_US_PER_BYTE);
+
+    hw_timeout_start();
 
     if (tx_length > 0) {
         I2C1->ICR = I2C_ICR_NACKCF;
@@ -302,14 +357,20 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
             if (isr & I2C_ISR_NACKF) {
                 return I2C_ERR_NACK;
             }
+
+            if (hw_timeout_occured(timeout)) {
+                return I2C_ERR_TIMEOUT;
+            }
         }
 
         if (rx_length == 0) {
             return I2C_OK;
         }
 
-        if (left == 0) {
-            while (!(I2C1->ISR & I2C_ISR_TC));
+        while (!(I2C1->ISR & I2C_ISR_TC)) {
+            if (hw_timeout_occured(timeout)) {
+                return I2C_ERR_TIMEOUT;
+            }
         }
     }
 
@@ -330,6 +391,10 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
             if (isr & I2C_ISR_RXNE) {
                 *rx_data++ = I2C1->RXDR;
                 left -= 1;
+            }
+
+            if (hw_timeout_occured(timeout)) {
+                return I2C_ERR_TIMEOUT;
             }
         }
     }
@@ -392,7 +457,7 @@ void hw_flash_program (uint32_t offset, hw_flash_t value) {
 
 void hw_reset (loader_parameters_t *parameters) {
     if (parameters != NULL) {
-        RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+        RCC->APBENR1 |= (RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
         PWR->CR1 |= PWR_CR1_DBP;
         TAMP->BKP0R = parameters->magic;
         TAMP->BKP1R = parameters->flags;
@@ -407,7 +472,7 @@ void hw_reset (loader_parameters_t *parameters) {
 
 
 void hw_loader_get_parameters (loader_parameters_t *parameters) {
-    RCC->APBENR1 |= RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN;
+    RCC->APBENR1 |= (RCC_APBENR1_PWREN | RCC_APBENR1_RTCAPBEN);
     parameters->magic = TAMP->BKP0R;
     parameters->flags = TAMP->BKP1R;
     parameters->mcu_address = TAMP->BKP2R;
@@ -440,6 +505,7 @@ static void hw_misc_init (void) {
 
 void hw_primer_init (void) {
     hw_clock_init();
+    hw_timeout_init();
     hw_delay_init();
     hw_led_init();
     hw_uart_init();
@@ -450,6 +516,7 @@ void hw_primer_init (void) {
 
 void hw_loader_init (void) {
     hw_clock_init();
+    hw_timeout_init();
     hw_delay_init();
     hw_led_init();
     hw_spi_init();
@@ -457,10 +524,12 @@ void hw_loader_init (void) {
 
 void hw_app_init (void) {
     hw_clock_init();
+    hw_timeout_init();
+    hw_delay_init();
     hw_led_init();
+    hw_misc_init();
     hw_uart_init();
     hw_spi_init();
     hw_i2c_init();
     hw_crc32_init();
-    hw_misc_init();
 }

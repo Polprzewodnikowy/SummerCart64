@@ -1,4 +1,3 @@
-#include <string.h>
 #include "fpga.h"
 #include "hw.h"
 #include "led.h"
@@ -36,10 +35,10 @@ static rtc_time_t rtc_time = {
     .second     = 0x00,
     .minute     = 0x00,
     .hour       = 0x12,
-    .weekday    = 0x02,
+    .weekday    = 0x01,
     .day        = 0x01,
-    .month      = 0x03,
-    .year       = 0x22
+    .month      = 0x01,
+    .year       = 0x24
 };
 static bool rtc_time_pending = false;
 
@@ -62,22 +61,29 @@ static const uint8_t rtc_regs_bit_mask[7] = {
 };
 
 
-static void rtc_read (uint8_t address, uint8_t *data, uint8_t length) {
-    uint8_t tmp = address;
-    if (hw_i2c_trx(RTC_I2C_ADDRESS, &tmp, 1, data, length) != I2C_OK) {
+static bool rtc_read (uint8_t address, uint8_t *data, uint8_t length) {
+    if (hw_i2c_trx(RTC_I2C_ADDRESS, &address, 1, data, length) != I2C_OK) {
         led_blink_error(LED_ERROR_RTC);
+        return true;
     }
+
+    return false;
 }
 
-static void rtc_write (uint8_t address, uint8_t *data, uint8_t length) {
-    uint8_t tmp[16];
-    tmp[0] = address;
+static bool rtc_write (uint8_t address, uint8_t *data, uint8_t length) {
+    uint8_t buffer[16];
+    buffer[0] = address;
+
     for (int i = 0; i < length; i++) {
-        tmp[i + 1] = data[i];
+        buffer[i + 1] = data[i];
     }
-    if (hw_i2c_trx(RTC_I2C_ADDRESS, tmp, length + 1, NULL, 0) != I2C_OK) {
+
+    if (hw_i2c_trx(RTC_I2C_ADDRESS, buffer, length + 1, NULL, 0) != I2C_OK) {
         led_blink_error(LED_ERROR_RTC);
+        return true;
     }
+
+    return false;
 }
 
 static void rtc_sanitize_time (uint8_t *regs) {
@@ -91,15 +97,15 @@ static void rtc_osc_stop (void) {
 
     rtc_write(RTC_ADDRESS_RTCSEC, &tmp, 1);
 
-    do {
-        rtc_read(RTC_ADDRESS_RTCWKDAY, &tmp, 1);
-    } while (tmp & RTC_RTCWKDAY_OSCRUN);
+    while ((!rtc_read(RTC_ADDRESS_RTCWKDAY, &tmp, 1)) && (tmp & RTC_RTCWKDAY_OSCRUN));
 }
 
 static void rtc_read_time (void) {
     uint8_t regs[7];
 
-    rtc_read(RTC_ADDRESS_RTCSEC, regs, 7);
+    if (rtc_read(RTC_ADDRESS_RTCSEC, regs, 7)) {
+        return;
+    }
 
     rtc_sanitize_time(regs);
 
@@ -198,7 +204,10 @@ void rtc_init (void) {
     uint8_t buffer[4];
     uint32_t settings_version;
 
-    memset(buffer, 0, 4);
+    for (int i = 0; i < 4; i++) {
+        buffer[i] = 0;
+    }
+
     rtc_read(RTC_ADDRESS_SRAM_MAGIC, buffer, 4);
 
     for (int i = 0; i < 4; i++) {
@@ -211,7 +220,6 @@ void rtc_init (void) {
     if (uninitialized) {
         buffer[0] = 0;
         rtc_write(RTC_ADDRESS_SRAM_MAGIC, (uint8_t *) (magic), 4);
-        rtc_write(RTC_ADDRESS_CONTROL, buffer, 1);
         rtc_write(RTC_ADDRESS_OSCTRIM, buffer, 1);
         rtc_write_time();
         rtc_write_region();

@@ -27,6 +27,8 @@ typedef enum {
 
 typedef enum {
     I2C_OK,
+    I2C_ERR_BUSY,
+    I2C_ERR_TIMEOUT,
     I2C_ERR_NACK,
 } i2c_err_t;
 
