@@ -2,7 +2,7 @@
 #include "timer.h"
 
 
-#define TIMER_PERIOD_MS     (50)
+#define TIMER_PERIOD_MS     (25)
 
 
 typedef struct {

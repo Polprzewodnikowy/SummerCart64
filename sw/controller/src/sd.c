@@ -1,6 +1,5 @@
 #include "fpga.h"
 #include "hw.h"
-#include "led.h"
 #include "sd.h"
 #include "timer.h"
 
@@ -192,7 +191,6 @@ static dat_err_t sd_dat_wait (uint16_t timeout_ms) {
     do {
         uint32_t sd_dat = fpga_reg_get(REG_SD_DAT);
         uint32_t sd_dma_scr = fpga_reg_get(REG_SD_DMA_SCR);
-        led_blink_act();
         if ((!(sd_dat & SD_DAT_BUSY)) && (!(sd_dma_scr & DMA_SCR_BUSY))) {
             if (sd_dat & SD_DAT_ERROR) {
                 sd_dat_abort();
@@ -221,8 +219,6 @@ bool sd_card_init (void) {
 
     p.card_initialized = true;
     p.rca = 0;
-
-    led_blink_act();
 
     sd_set_clock(CLOCK_400KHZ);
 
@@ -389,7 +385,6 @@ bool sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
     while (count > 0) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
-        led_blink_act();
         if (sd_cmd(25, sector, RSP_R1, NULL)) {
             return true;
         }
@@ -422,7 +417,6 @@ bool sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
     while (count > 0) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
-        led_blink_act();
         sd_dat_prepare(address, blocks, DAT_READ);
         if (sd_cmd(18, sector, RSP_R1, NULL)) {
             sd_dat_abort();

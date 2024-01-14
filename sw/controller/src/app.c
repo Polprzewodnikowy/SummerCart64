@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "button.h"
 #include "cfg.h"
 #include "cic.h"
@@ -6,6 +7,7 @@
 #include "fpga.h"
 #include "hw.h"
 #include "isv.h"
+#include "led.h"
 #include "rtc.h"
 #include "sd.h"
 #include "timer.h"
@@ -28,17 +30,19 @@ void app (void) {
     dd_init();
     flashram_init();
     isv_init();
+    led_init();
     sd_init();
     usb_init();
     writeback_init();
 
-    while (1) {
+    while (true) {
         button_process();
         cfg_process();
         cic_process();
         dd_process();
         flashram_process();
         isv_process();
+        led_process();
         rtc_process();
         sd_process();
         usb_process();

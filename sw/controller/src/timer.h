@@ -8,6 +8,7 @@
 
 typedef enum {
     TIMER_ID_DD,
+    TIMER_ID_LED,
     TIMER_ID_RTC,
     TIMER_ID_SD,
     TIMER_ID_USB,

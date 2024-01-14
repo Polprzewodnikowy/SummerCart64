@@ -5,6 +5,7 @@
 #include "flash.h"
 #include "fpga.h"
 #include "isv.h"
+#include "led.h"
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
@@ -560,12 +561,16 @@ void cfg_process (void) {
                     case SD_CARD_OP_DEINIT:
                         sd_card_deinit();
                         break;
-                    case SD_CARD_OP_INIT:
-                        if (sd_card_init()) {
+                    case SD_CARD_OP_INIT: {
+                        led_activity_on();
+                        bool error = sd_card_init();
+                        led_activity_off();
+                        if (error) {
                             cfg_set_error(CFG_ERROR_SD_CARD);
                             return;
                         }
                         break;
+                    }
                     case SD_CARD_OP_GET_STATUS:
                         args[1] = sd_card_get_status();
                         break;
@@ -601,7 +606,7 @@ void cfg_process (void) {
                 p.sd_card_sector = args[0];
                 break;
 
-            case 's':
+            case 's': {
                 if (args[1] >= 0x800000) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
@@ -610,14 +615,18 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                if (sd_read_sectors(args[0], p.sd_card_sector, args[1])) {
+                led_activity_on();
+                bool error = sd_read_sectors(args[0], p.sd_card_sector, args[1]);
+                led_activity_off();
+                if (error) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
                 p.sd_card_sector += args[1];
                 break;
+            }
 
-            case 'S':
+            case 'S': {
                 if (args[1] >= 0x800000) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
@@ -626,12 +635,16 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                if (sd_write_sectors(args[0], p.sd_card_sector, args[1])) {
+                led_activity_on();
+                bool error = sd_write_sectors(args[0], p.sd_card_sector, args[1]);
+                led_activity_off();
+                if (error) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
                 p.sd_card_sector += args[1];
                 break;
+            }
 
             case 'D':
                 if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {

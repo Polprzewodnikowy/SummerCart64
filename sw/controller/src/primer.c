@@ -19,7 +19,7 @@ static uint8_t primer_get_command (uint8_t *buffer, uint8_t *rx_length) {
     uint32_t received_crc32;
     uint8_t token[4];
 
-    while (1) {
+    while (true) {
         hw_crc32_reset();
 
         primer_get_and_calculate_crc32(token, 4, &calculated_crc32);

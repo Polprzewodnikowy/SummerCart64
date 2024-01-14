@@ -263,7 +263,7 @@ void dd_set_disk_mapping (uint32_t address, uint32_t length) {
 }
 
 void dd_handle_button (void) {
-    led_blink_act();
+    led_activity_pulse();
     if (dd_get_disk_state() == DD_DISK_STATE_EJECTED) {
         dd_set_disk_state(DD_DISK_STATE_INSERTED);
     } else {
