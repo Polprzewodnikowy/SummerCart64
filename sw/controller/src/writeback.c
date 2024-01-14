@@ -1,5 +1,6 @@
 #include "cfg.h"
 #include "fpga.h"
+#include "led.h"
 #include "sd.h"
 #include "timer.h"
 #include "usb.h"
@@ -81,9 +82,14 @@ static void writeback_save_to_sd (void) {
         return;
     }
 
-    if(sd_optimize_sectors(address, p.sectors, length / SD_SECTOR_SIZE, sd_write_sectors)) {
+    bool error = sd_optimize_sectors(address, p.sectors, length / SD_SECTOR_SIZE, sd_write_sectors);
+
+    if (error) {
         writeback_disable();
+        return;
     }
+
+    led_activity_pulse();
 }
 
 static bool writeback_save_to_usb (void) {
@@ -103,7 +109,13 @@ static bool writeback_save_to_usb (void) {
     packet_info.data[0] = save;
     packet_info.dma_length = length;
     packet_info.dma_address = address;
-    return usb_enqueue_packet(&packet_info);
+    bool enqueued = usb_enqueue_packet(&packet_info);
+
+    if (enqueued) {
+        led_activity_pulse();
+    }
+
+    return enqueued;
 }
 
 

@@ -7,7 +7,7 @@
 
 #define LED_REFRESH_PERIOD_MS   (50)
 
-#define LED_PULSE_LENGTH_MS     (500)
+#define LED_PULSE_LENGTH_MS     (200)
 
 #define ERROR_BLINK_PERIOD_MS   (100)
 #define ERROR_TOTAL_PERIOD_MS   (1000)
