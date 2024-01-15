@@ -169,7 +169,7 @@ static bool lcmxo2_wait_busy (void) {
     uint32_t status;
     do {
         status = lcmxo2_read_status();
-    } while(status & LSC_STATUS_BUSY);
+    } while (status & LSC_STATUS_BUSY);
     return (status & LSC_STATUS_FAIL);
 }
 

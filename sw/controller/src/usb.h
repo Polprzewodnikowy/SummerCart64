@@ -7,13 +7,13 @@
 
 
 typedef enum packet_cmd {
-    PACKET_CMD_BUTTON_TRIGGER   = 'B',
-    PACKET_CMD_DATA_FLUSHED     = 'G',
-    PACKET_CMD_DEBUG_OUTPUT     = 'U',
-    PACKET_CMD_DD_REQUEST       = 'D',
-    PACKET_CMD_ISV_OUTPUT       = 'I',
-    PACKET_CMD_SAVE_WRITEBACK   = 'S',
-    PACKET_CMD_UPDATE_STATUS    = 'F',
+    PACKET_CMD_BUTTON_TRIGGER = 'B',
+    PACKET_CMD_DATA_FLUSHED = 'G',
+    PACKET_CMD_DEBUG_OUTPUT = 'U',
+    PACKET_CMD_DD_REQUEST = 'D',
+    PACKET_CMD_ISV_OUTPUT = 'I',
+    PACKET_CMD_SAVE_WRITEBACK = 'S',
+    PACKET_CMD_UPDATE_STATUS = 'F',
 } usb_packet_cmd_e;
 
 

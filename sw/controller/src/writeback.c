@@ -82,7 +82,7 @@ static void writeback_save_to_sd (void) {
         return;
     }
 
-    bool error = sd_optimize_sectors(address, p.sectors, length / SD_SECTOR_SIZE, sd_write_sectors);
+    bool error = sd_optimize_sectors(address, p.sectors, (length / SD_SECTOR_SIZE), sd_write_sectors);
 
     if (error) {
         writeback_disable();

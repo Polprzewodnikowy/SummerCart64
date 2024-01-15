@@ -21,7 +21,7 @@ static void timer_update (void) {
         }
         if (timer[id].pending) {
             timer[id].pending = false;
-        } else if(timer[id].value == 0) {
+        } else if (timer[id].value == 0) {
             timer[id].running = false;
         }
     }

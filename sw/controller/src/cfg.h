@@ -14,6 +14,7 @@ typedef enum {
     SAVE_TYPE_FLASHRAM = 4,
     SAVE_TYPE_SRAM_BANKED = 5,
     SAVE_TYPE_SRAM_1M = 6,
+    __SAVE_TYPE_COUNT
 } save_type_t;
 
 

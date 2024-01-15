@@ -136,7 +136,9 @@ static bool dd_block_read_request (void) {
     if (p.sd_mode) {
         uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
         uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, false);
+        led_activity_on();
         bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_read_sectors);
+        led_activity_off();
         dd_set_block_ready(!error);
     } else {
         usb_tx_info_t packet_info;
@@ -158,7 +160,9 @@ static bool dd_block_write_request (void) {
     if (p.sd_mode) {
         uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
         uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, true);
+        led_activity_on();
         bool error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_write_sectors);
+        led_activity_off();
         dd_set_block_ready(!error);
     } else {
         usb_tx_info_t packet_info;

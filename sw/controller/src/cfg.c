@@ -18,25 +18,25 @@
 
 
 typedef enum {
-    CFG_ID_BOOTLOADER_SWITCH,
-    CFG_ID_ROM_WRITE_ENABLE,
-    CFG_ID_ROM_SHADOW_ENABLE,
-    CFG_ID_DD_MODE,
-    CFG_ID_ISV_ADDRESS,
-    CFG_ID_BOOT_MODE,
-    CFG_ID_SAVE_TYPE,
-    CFG_ID_CIC_SEED,
-    CFG_ID_TV_TYPE,
-    CFG_ID_DD_SD_ENABLE,
-    CFG_ID_DD_DRIVE_TYPE,
-    CFG_ID_DD_DISK_STATE,
-    CFG_ID_BUTTON_STATE,
-    CFG_ID_BUTTON_MODE,
-    CFG_ID_ROM_EXTENDED_ENABLE,
+    CFG_ID_BOOTLOADER_SWITCH = 0,
+    CFG_ID_ROM_WRITE_ENABLE = 1,
+    CFG_ID_ROM_SHADOW_ENABLE = 2,
+    CFG_ID_DD_MODE = 3,
+    CFG_ID_ISV_ADDRESS = 4,
+    CFG_ID_BOOT_MODE = 5,
+    CFG_ID_SAVE_TYPE = 6,
+    CFG_ID_CIC_SEED = 7,
+    CFG_ID_TV_TYPE = 8,
+    CFG_ID_DD_SD_ENABLE = 9,
+    CFG_ID_DD_DRIVE_TYPE = 10,
+    CFG_ID_DD_DISK_STATE = 11,
+    CFG_ID_BUTTON_STATE = 12,
+    CFG_ID_BUTTON_MODE = 13,
+    CFG_ID_ROM_EXTENDED_ENABLE = 14,
 } cfg_id_t;
 
 typedef enum {
-    SETTING_ID_LED_ENABLE,
+    SETTING_ID_LED_ENABLE = 0,
 } setting_id_t;
 
 typedef enum {
@@ -179,7 +179,7 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
-    if (save_type > SAVE_TYPE_SRAM_1M) {
+    if (save_type >= __SAVE_TYPE_COUNT) {
         return true;
     }
 

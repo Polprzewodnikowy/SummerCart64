@@ -25,7 +25,7 @@ bool button_get_state (void) {
 }
 
 bool button_set_mode (button_mode_t mode) {
-    if (mode > BUTTON_MODE_DD_DISK_SWAP) {
+    if (mode >= __BUTTON_MODE_COUNT) {
         return true;
     }
     p.mode = mode;
