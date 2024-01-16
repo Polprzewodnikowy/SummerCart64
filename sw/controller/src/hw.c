@@ -305,8 +305,8 @@ void hw_spi_tx (uint8_t *data, int length) {
 }
 
 
-#define I2C_TIMEOUT_US_BUSY     (1000)
-#define I2C_TIMEOUT_US_PER_BYTE (100)
+#define I2C_TIMEOUT_US_BUSY     (10000)
+#define I2C_TIMEOUT_US_PER_BYTE (1000)
 
 static void hw_i2c_init (void) {
     RCC->APBENR1 |= RCC_APBENR1_I2C1EN;
@@ -331,18 +331,18 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
         }
     }
 
-    uint32_t timeout = ((tx_length + rx_length) * I2C_TIMEOUT_US_PER_BYTE);
-
-    hw_timeout_start();
-
     if (tx_length > 0) {
+        uint32_t tx_timeout = ((tx_length + 1) * I2C_TIMEOUT_US_PER_BYTE);
+
+        hw_timeout_start();
+
         I2C1->ICR = I2C_ICR_NACKCF;
         I2C1->CR2 = (
             ((rx_length > 0) ? 0 : I2C_CR2_AUTOEND) |
             (tx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
             (address << I2C_CR2_SADD_Pos)
         );
-        I2C1->CR2 |= I2C_CR2_START;
 
         uint8_t left = tx_length;
 
@@ -358,7 +358,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
                 return I2C_ERR_NACK;
             }
 
-            if (hw_timeout_occured(timeout)) {
+            if (hw_timeout_occured(tx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }
@@ -368,20 +368,24 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
         }
 
         while (!(I2C1->ISR & I2C_ISR_TC)) {
-            if (hw_timeout_occured(timeout)) {
+            if (hw_timeout_occured(tx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }
     }
 
     if (rx_length > 0) {
+        uint32_t rx_timeout = ((rx_length + 1) * I2C_TIMEOUT_US_PER_BYTE);
+
+        hw_timeout_start();
+
         I2C1->CR2 = (
             I2C_CR2_AUTOEND |
             (rx_length << I2C_CR2_NBYTES_Pos) |
+            I2C_CR2_START |
             I2C_CR2_RD_WRN |
             (address << I2C_CR2_SADD_Pos)
         );
-        I2C1->CR2 |= I2C_CR2_START;
 
         uint8_t left = rx_length;
 
@@ -393,7 +397,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
                 left -= 1;
             }
 
-            if (hw_timeout_occured(timeout)) {
+            if (hw_timeout_occured(rx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }

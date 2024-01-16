@@ -121,20 +121,26 @@ static void lcmxo2_reset_bus (void) {
 #endif
 }
 
-static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint8_t *buffer, uint8_t length, bool write) {
+static bool lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint8_t *buffer, uint8_t length, bool write) {
 #ifdef LCMXO2_I2C
     uint8_t packet[20] = { cmd, ((arg >> 16) & 0xFF), ((arg >> 8) & 0xFF), (arg & 0xFF) };
     int packet_length = ((type == CMD_TWO_OP) ? 3 : 4);
+
     if (write) {
         for (int i = 0; i < length; i++) {
             packet[packet_length + i] = buffer[i];
         }
         packet_length += length;
     }
-    hw_i2c_trx(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+
+    i2c_err_t err = hw_i2c_trx(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+
+    return (err != I2C_OK);
 #else
-    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
     lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
+
+    uint32_t data = (cmd << 24) | (arg & 0x00FFFFFF);
+
     fpga_reg_set(REG_VENDOR_DATA, data);
     fpga_reg_set(REG_VENDOR_SCR,
         (LCMXO2_CFGTXDR << VENDOR_SCR_ADDRESS_BIT) |
@@ -143,7 +149,9 @@ static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint
         VENDOR_SCR_WRITE |
         VENDOR_SCR_START
     );
+
     while (fpga_reg_get(REG_VENDOR_SCR) & VENDOR_SCR_BUSY);
+
     if (length > 0) {
         if (write) {
             lcmxo2_write_data(buffer, length);
@@ -151,82 +159,105 @@ static void lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint
             lcmxo2_read_data(buffer, length);
         }
     }
+
     lcmxo2_reg_set(LCMXO2_CFGCR, 0);
+
+    return false;
 #endif
 }
 
-static void lcmxo2_read_device_id (uint8_t *id) {
-    lcmxo2_execute_cmd(IDCODE_PUB, 0, CMD_NORMAL, id, DEVICE_ID_SIZE, false);
+static bool lcmxo2_read_device_id (uint8_t *id) {
+    return lcmxo2_execute_cmd(IDCODE_PUB, 0, CMD_NORMAL, id, DEVICE_ID_SIZE, false);
 }
 
-static uint32_t lcmxo2_read_status (void) {
-    uint32_t status = 0;
-    lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL, (uint8_t *) (&status), 4, false);
-    return SWAP32(status);
+static uint32_t lcmxo2_read_status (uint32_t *status) {
+    uint32_t tmp = 0;
+    bool error = lcmxo2_execute_cmd(LSC_READ_STATUS, 0, CMD_NORMAL, (uint8_t *) (&tmp), 4, false);
+    *status = SWAP32(tmp);
+    return error;
 }
 
 static bool lcmxo2_wait_busy (void) {
+    bool error;
     uint32_t status;
     do {
-        status = lcmxo2_read_status();
-    } while (status & LSC_STATUS_BUSY);
-    return (status & LSC_STATUS_FAIL);
+        error = lcmxo2_read_status(&status);
+    } while ((!error) && (status & LSC_STATUS_BUSY));
+    return (error) || (status & LSC_STATUS_FAIL);
 }
 
 static bool lcmxo2_enable_flash (void) {
 #ifdef LCMXO2_I2C
-    lcmxo2_execute_cmd(ISC_ENABLE, 0x080000, CMD_TWO_OP, NULL, 0, false);
+    if (lcmxo2_execute_cmd(ISC_ENABLE, 0x080000, CMD_TWO_OP, NULL, 0, false)) {
+        return true;
+    }
 #else
-    lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL, NULL, 0, false);
+    if (lcmxo2_execute_cmd(ISC_ENABLE_X, 0x080000, CMD_NORMAL, NULL, 0, false)) {
+        return true;
+    }
 #endif
     return lcmxo2_wait_busy();
 }
 
-static void lcmxo2_disable_flash (void) {
-    lcmxo2_wait_busy();
-    lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP, NULL, 0, false);
-    lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL, NULL, 0, false);
+static bool lcmxo2_disable_flash (void) {
+    if (lcmxo2_wait_busy()) {
+        return true;
+    }
+    if (lcmxo2_execute_cmd(ISC_DISABLE, 0, CMD_TWO_OP, NULL, 0, false)) {
+        return true;
+    }
+    return lcmxo2_execute_cmd(ISC_NOOP, 0xFFFFFF, CMD_NORMAL, NULL, 0, false);
 }
 
 static bool lcmxo2_erase_featbits (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_FEATURE, CMD_NORMAL, NULL, 0, false);
+    if (lcmxo2_execute_cmd(ISC_ERASE, ISC_ERASE_FEATURE, CMD_NORMAL, NULL, 0, false)) {
+        return true;
+    }
     return lcmxo2_wait_busy();
 }
 
 static bool lcmxo2_erase_flash (void) {
-    lcmxo2_execute_cmd(ISC_ERASE, (ISC_ERASE_UFM | ISC_ERASE_CFG), CMD_NORMAL, NULL, 0, false);
+    if (lcmxo2_execute_cmd(ISC_ERASE, (ISC_ERASE_UFM | ISC_ERASE_CFG), CMD_NORMAL, NULL, 0, false)) {
+        return true;
+    }
     return lcmxo2_wait_busy();
 }
 
-static void lcmxo2_reset_flash_address (void) {
-    lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL, NULL, 0, false);
+static bool lcmxo2_reset_flash_address (void) {
+    return lcmxo2_execute_cmd(LSC_INIT_ADDRESS, 0, CMD_NORMAL, NULL, 0, false);
 }
 
 static bool lcmxo2_write_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL, buffer, FLASH_PAGE_SIZE, true);
+    if (lcmxo2_execute_cmd(LSC_PROG_INCR_NV, 1, CMD_NORMAL, buffer, FLASH_PAGE_SIZE, true)) {
+        return true;
+    }
     return lcmxo2_wait_busy();
 }
 
-static void lcmxo2_read_flash_page (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED, buffer, FLASH_PAGE_SIZE, false);
+static bool lcmxo2_read_flash_page (uint8_t *buffer) {
+    return lcmxo2_execute_cmd(LSC_READ_INCR_NV, 1, CMD_DELAYED, buffer, FLASH_PAGE_SIZE, false);
 }
 
 static bool lcmxo2_program_done (void) {
-    lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL, NULL, 0, false);
+    if (lcmxo2_execute_cmd(ISC_PROGRAM_DONE, 0, CMD_NORMAL, NULL, 0, false)) {
+        return true;
+    }
     return lcmxo2_wait_busy();
 }
 
 static bool lcmxo2_write_featbits (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, true);
+    if (lcmxo2_execute_cmd(LSC_PROG_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, true)) {
+        return true;
+    }
     return lcmxo2_wait_busy();
 }
 
-static void lcmxo2_read_featbits (uint8_t *buffer) {
-    lcmxo2_execute_cmd(LSC_READ_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, false);
+static bool lcmxo2_read_featbits (uint8_t *buffer) {
+    return lcmxo2_execute_cmd(LSC_READ_FEABITS, 0, CMD_NORMAL, buffer, FEATBITS_SIZE, false);
 }
 
-static void lcmxo2_refresh (void) {
-    lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP, NULL, 0, false);
+static bool lcmxo2_refresh (void) {
+    return lcmxo2_execute_cmd(LSC_REFRESH, 0, CMD_TWO_OP, NULL, 0, false);
 }
 
 static vendor_error_t lcmxo2_fail (vendor_error_t error) {
@@ -346,20 +377,29 @@ static bool primer_check_rx_length (primer_cmd_e cmd, size_t rx_length) {
 static bool lcmxo2_init_featbits (void) {
     uint8_t programmed[2] = { 0x00, 0x00 };
     uint8_t target[2] = { FEATBITS_0_SPI_OFF, FEATBITS_1_PROGRAMN_OFF };
-    lcmxo2_read_featbits(programmed);
+
+    if (lcmxo2_read_featbits(programmed)) {
+        return true;
+    }
+
     if ((programmed[0] == target[0]) && (programmed[1] == target[1])) {
         return false;
     }
+
     if (lcmxo2_erase_featbits()) {
         return true;
     }
     if (lcmxo2_write_featbits(target)) {
         return true;
     }
-    lcmxo2_read_featbits(programmed);
+    if (lcmxo2_read_featbits(programmed)) {
+        return true;
+    }
+
     if ((programmed[0] != target[0]) || (programmed[1] != target[1])) {
         return true;
     }
+
     return false;
 }
 
@@ -403,7 +443,7 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_GET_DEVICE_ID:
-                lcmxo2_read_device_id(buffer);
+                error = lcmxo2_read_device_id(buffer);
                 tx_length = 4;
                 break;
 
@@ -416,7 +456,7 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_RESET_ADDRESS:
-                lcmxo2_reset_flash_address();
+                error = lcmxo2_reset_flash_address();
                 break;
 
             case CMD_WRITE_PAGE:
@@ -424,7 +464,7 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_READ_PAGE:
-                lcmxo2_read_flash_page(buffer);
+                error = lcmxo2_read_flash_page(buffer);
                 tx_length = FLASH_PAGE_SIZE;
                 break;
 
@@ -437,7 +477,7 @@ void vendor_initial_configuration (vendor_get_cmd_t get_cmd, vendor_send_respons
                 break;
 
             case CMD_REFRESH:
-                lcmxo2_refresh();
+                error = lcmxo2_refresh();
                 hw_delay_ms(200);
                 break;
 

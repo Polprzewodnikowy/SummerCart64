@@ -204,9 +204,16 @@ class STM32Bootloader:
 
     __connected = False
 
-    def __init__(self, write: Callable[[bytes], None], read: Callable[[int], bytes], progress: Callable[[int, int, str], None]):
+    def __init__(
+            self,
+            write: Callable[[bytes], None],
+            read: Callable[[int], bytes],
+            flush: Callable[[None], None],
+            progress: Callable[[int, int, str], None]
+        ):
         self.__write = write
         self.__read = read
+        self.__flush = flush
         self.__progress = progress
 
     def __append_xor(self, data: bytes) -> bytes:
@@ -217,7 +224,7 @@ class STM32Bootloader:
 
     def __check_ack(self) -> None:
         response = self.__read(1)
-        if (response == None):
+        if (len(response) != 1):
             raise STM32BootloaderException('No ACK/NACK byte received')
         if (response == self.__NACK):
             raise STM32BootloaderException('NACK byte received')
@@ -228,18 +235,22 @@ class STM32Bootloader:
         if (len(cmd) != 1):
             raise ValueError('Command must contain only one byte')
         self.__write(self.__append_xor(cmd))
+        self.__flush()
         self.__check_ack()
 
     def __data_write(self, data: bytes) -> None:
         self.__write(self.__append_xor(data))
+        self.__flush()
         self.__check_ack()
 
     def __data_read(self) -> bytes:
         length = self.__read(1)
         if (len(length) != 1):
             raise STM32BootloaderException('Did not receive length byte')
-        length = length[0]
-        data = self.__read(length + 1)
+        length = (length[0] + 1)
+        data = self.__read(length)
+        if (len(data) != length):
+            raise STM32BootloaderException('Did not receive requested data bytes')
         self.__check_ack()
         return data
 
@@ -253,7 +264,10 @@ class STM32Bootloader:
         self.__cmd_send(b'\x11')
         self.__data_write(address.to_bytes(4, byteorder='big'))
         self.__data_write(bytes([length - 1]))
-        return self.__read(length)
+        data = self.__read(length)
+        if (len(data) != length):
+            raise STM32BootloaderException(f'Did not receive requested memory bytes')
+        return data
 
     def __go(self, address: int) -> None:
         self.__cmd_send(b'\x21')
@@ -288,8 +302,12 @@ class STM32Bootloader:
 
     def connect(self, id: int) -> None:
         if (not self.__connected):
-            self.__write(self.__INIT)
-            self.__check_ack()
+            try:
+                self.__write(self.__INIT)
+                self.__flush()
+                self.__check_ack()
+            except STM32BootloaderException as e:
+                raise STM32BootloaderException(f'Could not connect to the STM32 ({e})')
             self.__connected = True
         dev_id = self.__get_id()
         if (dev_id != id):
@@ -339,9 +357,16 @@ class LCMXO2Primer:
 
     DEV_ID_LCMXO2_7000HC = b'\x01\x2B\xD0\x43'
 
-    def __init__(self, write: Callable[[bytes], None], read: Callable[[int], bytes], progress: Callable[[int, int, str], None]):
+    def __init__(
+            self,
+            write: Callable[[bytes], None],
+            read: Callable[[int], bytes],
+            flush: Callable[[None], None],
+            progress: Callable[[int, int, str], None]
+        ):
         self.__write = write
         self.__read = read
+        self.__flush = flush
         self.__progress = progress
 
     def __cmd_execute(self, cmd: bytes, data: bytes=b'') -> bytes:
@@ -355,14 +380,20 @@ class LCMXO2Primer:
         packet += data
         packet += crc32(packet).to_bytes(4, byteorder='little')
         self.__write(packet)
+        self.__flush()
 
         response = self.__read(5)
         if (len(response) != 5):
             raise LCMXO2PrimerException(f'No response received [{cmd}]')
         length = int.from_bytes(response[4:5], byteorder='little')
-        response += self.__read(length)
-        calculated_checksum = crc32(response)
-        received_checksum = int.from_bytes(self.__read(4), byteorder='little')
+        response_data = self.__read(length)
+        if (len(response_data) != length):
+            raise LCMXO2PrimerException(f'No response data received [{cmd}]')
+        checksum = self.__read(4)
+        if (len(checksum) != 4):
+            raise LCMXO2PrimerException(f'No response data checksum received [{cmd}]')
+        calculated_checksum = crc32(response + response_data)
+        received_checksum = int.from_bytes(checksum, byteorder='little')
 
         if (response[0:3] != b'RSP'):
             raise LCMXO2PrimerException(f'Invalid response token [{response[0:3]} / {cmd}]')
@@ -371,16 +402,19 @@ class LCMXO2Primer:
         if (calculated_checksum != received_checksum):
             raise LCMXO2PrimerException(f'Invalid response checksum [{cmd}]')
 
-        return response[5:]
+        return response_data
 
     def connect(self, id: bytes) -> None:
-        primer_id = self.__cmd_execute(self.__CMD_GET_PRIMER_ID)
-        if (primer_id != self.__PRIMER_ID_LCMXO2):
-            raise LCMXO2PrimerException('Invalid primer ID received')
+        try:
+            primer_id = self.__cmd_execute(self.__CMD_GET_PRIMER_ID)
+            if (primer_id != self.__PRIMER_ID_LCMXO2):
+                raise LCMXO2PrimerException('Invalid primer ID received')
 
-        dev_id = self.__cmd_execute(self.__CMD_GET_DEVICE_ID)
-        if (dev_id != id):
-            raise LCMXO2PrimerException('Invalid FPGA device id received')
+            dev_id = self.__cmd_execute(self.__CMD_GET_DEVICE_ID)
+            if (dev_id != id):
+                raise LCMXO2PrimerException('Invalid FPGA device id received')
+        except LCMXO2PrimerException as e:
+            raise LCMXO2PrimerException(f'Could not connect to the LCMXO2 primer ({e})')
 
     def load_flash_and_run(self, data: bytes, description: str) -> None:
         erase_description = f'{description} / Erase'
@@ -599,8 +633,8 @@ class SC64BringUp:
                     write_timeout=self.__SERIAL_TIMEOUT
                 )
 
-                stm32_bootloader = STM32Bootloader(link.write, link.read, self.__progress)
-                lcmxo2_primer = LCMXO2Primer(link.write, link.read, self.__progress)
+                stm32_bootloader = STM32Bootloader(link.write, link.read, link.flush, self.__progress)
+                lcmxo2_primer = LCMXO2Primer(link.write, link.read, link.flush, self.__progress)
 
                 stm32_bootloader.connect(stm32_bootloader.DEV_ID_STM32G030XX)
                 stm32_bootloader.load_ram_and_run(self.__sc64_update_data.get_primer_data(), 'FPGA primer -> STM32 RAM')
@@ -645,7 +679,7 @@ if __name__ == '__main__':
     sc64_bring_up = SC64BringUp(progress=utils.progress)
 
     Utils.log()
-    Utils.info('[ Welcome to SC64 flashcart board bring-up! ]')
+    Utils.info('[ Welcome to SummerCart64 flashcart board bring-up! ]')
     Utils.log()
 
     Utils.log(f'Serial port: {port}')
@@ -683,6 +717,7 @@ if __name__ == '__main__':
     original_sigint_handler = signal.getsignal(signal.SIGINT)
     try:
         signal.signal(signal.SIGINT, lambda *kwargs: utils.exit_warning())
+        Utils.log('Starting SC64 flashcart board bring-up...')
         sc64_bring_up.start_bring_up(port, bootloader_only)
     except (serial.SerialException, STM32BootloaderException, LCMXO2PrimerException, SC64Exception) as e:
         if (utils.get_progress_active):
