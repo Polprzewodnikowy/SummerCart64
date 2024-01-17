@@ -679,7 +679,7 @@ if __name__ == '__main__':
     sc64_bring_up = SC64BringUp(progress=utils.progress)
 
     Utils.log()
-    Utils.info('[ Welcome to SummerCart64 flashcart board bring-up! ]')
+    Utils.info('[ Welcome to the SummerCart64 flashcart board bring-up! ]')
     Utils.log()
 
     Utils.log(f'Serial port: {port}')

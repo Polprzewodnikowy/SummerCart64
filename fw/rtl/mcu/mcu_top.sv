@@ -474,7 +474,7 @@ module mcu_top (
                         18'd0,
                         n64_scb.flashram_write_or_erase,
                         n64_scb.flashram_sector_or_all,
-                        n64_scb.flashram_sector,
+                        n64_scb.flashram_page,
                         n64_scb.flashram_pending,
                         1'b0
                     };
