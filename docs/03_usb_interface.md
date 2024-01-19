@@ -170,7 +170,7 @@ Available packet IDs are listed in the [asynchronous packets](#asynchronous-pack
 | `f` | **FIRMWARE_BACKUP**                             | address      | ---           | ---  | status/length    | Backup firmware to specified memory address                   |
 | `F` | **FIRMWARE_UPDATE**                             | address      | length        | ---  | status           | Update firmware from specified memory address                 |
 | `?` | **DEBUG_GET**                                   | ---          | ---           | ---  | debug_data       | Get internal FPGA debug info                                  |
-| `%` | **STACK_USAGE_GET**                             | ---          | ---           | ---  | stack_usage      | Get per task stack usage                                      |
+| `%` | **DIAGNOSTIC_GET**                              | ---          | ---           | ---  | diagnostic_data  | Get diagnostic data                                           |
 
 ---
 

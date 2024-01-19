@@ -738,7 +738,7 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" LED blink:           {}", state.led_enable);
     println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!(" FPGA debug data:     {}", state.fpga_debug_data);
-    println!(" MCU stack usage:     {}", state.mcu_stack_usage);
+    println!(" Diagnostic data:     {}", state.diagnostic_data);
 
     Ok(())
 }

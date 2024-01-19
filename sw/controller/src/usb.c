@@ -3,6 +3,7 @@
 #include "dd.h"
 #include "flash.h"
 #include "fpga.h"
+#include "hw.h"
 #include "rtc.h"
 #include "timer.h"
 #include "update.h"
@@ -20,6 +21,9 @@
 #define RX_FLUSH_LENGTH         (1 * 1024 * 1024)
 
 #define DEBUG_WRITE_TIMEOUT_MS  (1000)
+
+#define DIAGNOSTIC_DATA_MARKER  (1 << 31)
+#define DIAGNOSTIC_DATA_VERSION (1)
 
 
 enum rx_state {
@@ -381,15 +385,19 @@ static void usb_rx_process (void) {
                 p.response_info.data[1] = fpga_reg_get(REG_DEBUG_1);
                 break;
 
-            case '%':
+            case '%': {
+                uint16_t voltage;
+                int16_t temperature;
+                hw_adc_read_voltage_temperature(&voltage, &temperature);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 p.response_info.data_length = 16;
-                p.response_info.data[0] = 0;
-                p.response_info.data[1] = 0;
-                p.response_info.data[2] = 0;
+                p.response_info.data[0] = (DIAGNOSTIC_DATA_MARKER | DIAGNOSTIC_DATA_VERSION);
+                p.response_info.data[1] = (uint32_t) (voltage);
+                p.response_info.data[2] = (uint32_t) (temperature);
                 p.response_info.data[3] = 0;
                 break;
+            }
 
             default:
                 p.rx_state = RX_STATE_IDLE;

@@ -85,6 +85,8 @@ void hw_reset (loader_parameters_t *parameters);
 
 void hw_loader_get_parameters (loader_parameters_t *parameters);
 
+void hw_adc_read_voltage_temperature (uint16_t *voltage, int16_t *temperature);
+
 void hw_primer_init (void);
 void hw_loader_init (void);
 void hw_app_init (void);

@@ -45,23 +45,23 @@ static void hw_clock_init (void) {
 
 static void hw_timeout_init (void) {
     RCC->APBENR1 |= RCC_APBENR1_DBGEN;
-    DBG->APBFZ2 |= DBG_APB_FZ2_DBG_TIM17_STOP;
+    DBG->APBFZ2 |= DBG_APB_FZ2_DBG_TIM1_STOP;
 
-    RCC->APBENR2 |= RCC_APBENR2_TIM17EN;
+    RCC->APBENR2 |= RCC_APBENR2_TIM1EN;
 
-    TIM17->CR1 = TIM_CR1_OPM;
-    TIM17->PSC = (((CPU_FREQ / 1000 / 1000) * TIMEOUT_US_PER_TICK) - 1);
-    TIM17->EGR = TIM_EGR_UG;
+    TIM1->CR1 = TIM_CR1_OPM;
+    TIM1->PSC = (((CPU_FREQ / 1000 / 1000) * TIMEOUT_US_PER_TICK) - 1);
+    TIM1->EGR = TIM_EGR_UG;
 }
 
 static void hw_timeout_start (void) {
-    TIM17->CR1 &= ~(TIM_CR1_CEN);
-    TIM17->CNT = 0;
-    TIM17->CR1 |= TIM_CR1_CEN;
+    TIM1->CR1 &= ~(TIM_CR1_CEN);
+    TIM1->CNT = 0;
+    TIM1->CR1 |= TIM_CR1_CEN;
 }
 
 static bool hw_timeout_occured (uint32_t timeout_us) {
-    uint16_t count = TIM17->CNT;
+    uint16_t count = TIM1->CNT;
 
     uint32_t adjusted_timeout = ((timeout_us + (TIMEOUT_US_PER_TICK - 1)) / TIMEOUT_US_PER_TICK);
 
@@ -73,29 +73,46 @@ static bool hw_timeout_occured (uint32_t timeout_us) {
 }
 
 
+#define DELAY_US_PER_TICK   (1)
 #define DELAY_MS_PER_TICK   (1)
 
 static void hw_delay_init (void) {
     RCC->APBENR1 |= RCC_APBENR1_DBGEN;
-    DBG->APBFZ2 |= DBG_APB_FZ2_DBG_TIM16_STOP;
+    DBG->APBFZ1 |= DBG_APB_FZ1_DBG_TIM3_STOP;
 
-    RCC->APBENR2 |= RCC_APBENR2_TIM16EN;
+    RCC->APBENR1 |= RCC_APBENR1_TIM3EN;
 
-    TIM16->CR1 = TIM_CR1_OPM;
-    TIM16->PSC = (((CPU_FREQ / 1000) * DELAY_MS_PER_TICK) - 1);
-    TIM16->EGR = TIM_EGR_UG;
+    TIM3->CR1 = TIM_CR1_OPM;
+    TIM3->EGR = TIM_EGR_UG;
+}
+
+void hw_delay_us (uint32_t delay_us) {
+    TIM3->CR1 &= ~(TIM_CR1_CEN);
+    TIM3->PSC = (((CPU_FREQ / 1000 / 1000) * DELAY_US_PER_TICK) - 1);
+    TIM3->CNT = 0;
+    TIM3->EGR = TIM_EGR_UG;
+    TIM3->CR1 |= TIM_CR1_CEN;
+
+    uint32_t adjusted_delay = ((delay_us + (DELAY_US_PER_TICK - 1)) / DELAY_US_PER_TICK);
+
+    uint16_t count;
+    do {
+        count = TIM3->CNT;
+    } while ((count < adjusted_delay) && (count != 0xFFFF));
 }
 
 void hw_delay_ms (uint32_t delay_ms) {
-    TIM16->CR1 &= ~(TIM_CR1_CEN);
-    TIM16->CNT = 0;
-    TIM16->CR1 |= TIM_CR1_CEN;
+    TIM3->CR1 &= ~(TIM_CR1_CEN);
+    TIM3->PSC = (((CPU_FREQ / 1000) * DELAY_MS_PER_TICK) - 1);
+    TIM3->CNT = 0;
+    TIM3->EGR = TIM_EGR_UG;
+    TIM3->CR1 |= TIM_CR1_CEN;
 
     uint32_t adjusted_delay = ((delay_ms + (DELAY_MS_PER_TICK - 1)) / DELAY_MS_PER_TICK);
 
     uint16_t count;
     do {
-        count = TIM16->CNT;
+        count = TIM3->CNT;
     } while ((count < adjusted_delay) && (count != 0xFFFF));
 }
 
@@ -493,6 +510,61 @@ void hw_loader_get_parameters (loader_parameters_t *parameters) {
 }
 
 
+#define ADC_VREF_CAL_POINT  (3000)
+#define ADC_VREF_CAL_VALUE  (*(uint16_t *) (0x1FFF75AAUL))
+
+#define TEMP_CAL_POINT_1    (30)
+#define TEMP_CAL_VALUE_1    (*(uint16_t *) (0x1FFF75A8UL))
+
+#define TEMP_CAL_POINT_2    (130)
+#define TEMP_CAL_VALUE_2    (*(uint16_t *) (0x1FFF75CAUL))
+
+#define TEMP_CAL_VREF       (3000)
+
+#define TEMP_SCALE          (10)
+
+static void hw_adc_init (void) {
+    RCC->APBENR2 |= RCC_APBENR2_ADCEN;
+
+    ADC1->CFGR2 = ADC_CFGR2_CKMODE_1;
+
+    ADC->CCR = (ADC_CCR_TSEN | ADC_CCR_VREFEN);
+    ADC1->CR = ADC_CR_ADVREGEN;
+
+    hw_delay_us(120);
+
+    ADC1->ISR = ADC_ISR_EOCAL;
+    ADC1->CR |= ADC_CR_ADCAL;
+    while (!(ADC1->ISR & ADC_ISR_EOCAL));
+
+    ADC1->CFGR1 = (ADC_CFGR1_AUTOFF | ADC_CFGR1_WAIT | ADC_CFGR1_SCANDIR);
+    ADC1->CFGR2 |= (ADC_CFGR2_OVSS_2 | ADC_CFGR2_OVSR_1 | ADC_CFGR2_OVSR_0 | ADC_CFGR2_OVSE);
+    ADC1->SMPR = (ADC_SMPR_SMP1_2 | ADC_SMPR_SMP1_1 | ADC_SMPR_SMP1_0);
+
+    ADC1->ISR = ADC_ISR_CCRDY;
+    ADC1->CHSELR = (ADC_CHSELR_CHSEL13 | ADC_CHSELR_CHSEL12);
+    while (!(ADC1->ISR & ADC_ISR_CCRDY));
+
+    ADC1->CR |= ADC_CR_ADEN;
+}
+
+void hw_adc_read_voltage_temperature (uint16_t *voltage, int16_t *temperature) {
+    ADC1->CR |= ADC_CR_ADSTART;
+
+    while (!(ADC1->ISR & ADC_ISR_EOC));
+    uint16_t adc_vref = ((ADC_VREF_CAL_POINT * ADC_VREF_CAL_VALUE) / ADC1->DR);
+
+    while (!(ADC1->ISR & ADC_ISR_EOC));
+    int16_t adc_temp = ((ADC1->DR * adc_vref) / TEMP_CAL_VREF);
+
+    *voltage = adc_vref;
+    *temperature = (
+        ((adc_temp - TEMP_CAL_VALUE_1) * (TEMP_CAL_POINT_2 - TEMP_CAL_POINT_1) * TEMP_SCALE) /
+        (TEMP_CAL_VALUE_2 - TEMP_CAL_VALUE_1)
+    ) + (TEMP_CAL_POINT_1 * TEMP_SCALE);
+}
+
+
 static void hw_led_init (void) {
     hw_gpio_init(GPIO_ID_LED, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_0, 0);
 }
@@ -530,6 +602,7 @@ void hw_app_init (void) {
     hw_clock_init();
     hw_timeout_init();
     hw_delay_init();
+    hw_adc_init();
     hw_led_init();
     hw_misc_init();
     hw_uart_init();

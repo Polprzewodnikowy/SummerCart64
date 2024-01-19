@@ -93,6 +93,10 @@ typedef enum {
     BUTTON_MODE_DD_DISK_SWAP,
 } sc64_button_mode_t;
 
+typedef enum {
+    DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE,
+} sc64_diagnostic_id_t;
+
 typedef struct {
     sc64_boot_mode_t boot_mode;
     sc64_cic_seed_t cic_seed;
@@ -173,6 +177,8 @@ sc64_error_t sc64_flash_program (void *address, uint32_t length);
 sc64_error_t sc64_flash_wait_busy (void);
 sc64_error_t sc64_flash_get_erase_block_size (size_t *erase_block_size);
 sc64_error_t sc64_flash_erase_block (void *address);
+
+sc64_error_t sc64_get_diagnostic (sc64_diagnostic_id_t id, uint32_t *value);
 
 
 #endif

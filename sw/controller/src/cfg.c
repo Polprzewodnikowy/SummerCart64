@@ -4,6 +4,7 @@
 #include "dd.h"
 #include "flash.h"
 #include "fpga.h"
+#include "hw.h"
 #include "isv.h"
 #include "led.h"
 #include "rtc.h"
@@ -83,6 +84,10 @@ typedef enum {
     SD_CARD_OP_BYTE_SWAP_ON = 4,
     SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
+
+typedef enum {
+    DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE = 0,
+} diagnostic_id_t;
 
 typedef enum {
     SDRAM = (1 << 0),
@@ -222,6 +227,22 @@ static bool cfg_set_save_type (save_type_t save_type) {
     }
 
     p.save_type = save_type;
+
+    return false;
+}
+
+static bool cfg_read_diagnostic_data (uint32_t *args) {
+    switch (args[0]) {
+        case DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE: {
+            uint16_t voltage;
+            int16_t temperature;
+            hw_adc_read_voltage_temperature(&voltage, &temperature);
+            args[1] = ((uint32_t) (voltage) << 16) | ((uint32_t) (temperature));
+            break;
+        }
+        default:
+            return true;
+    }
 
     return false;
 }
@@ -696,6 +717,13 @@ void cfg_process (void) {
                 }
                 if (flash_erase_block(args[0])) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
+                break;
+
+            case '%':
+                if (cfg_read_diagnostic_data(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
                     return;
                 }
                 break;
