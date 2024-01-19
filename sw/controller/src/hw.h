@@ -54,7 +54,8 @@ void hw_set_vector_table (uint32_t offset);
 void hw_enter_critical (void);
 void hw_exit_critical (void);
 
-void hw_delay_ms (uint32_t ms);
+void hw_delay_us (uint32_t delay_us);
+void hw_delay_ms (uint32_t delay_ms);
 
 void hw_systick_config (uint32_t period_ms, void (*callback) (void));
 
