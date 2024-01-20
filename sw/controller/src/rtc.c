@@ -93,18 +93,14 @@ static void rtc_sanitize_time (uint8_t *regs) {
     }
 }
 
-static void rtc_wait_osc (bool running) {
-    uint8_t rtcwkday;
+static void rtc_osc_stop (void) {
+    uint8_t tmp = 0x00;
 
-    while (1) {
-        rtc_read(RTC_ADDRESS_RTCWKDAY, &rtcwkday, 1);
+    rtc_write(RTC_ADDRESS_RTCSEC, &tmp, 1);
 
-        if (running && (rtcwkday & RTC_RTCWKDAY_OSCRUN)) {
-            return;
-        } else if (!running && (!(rtcwkday & RTC_RTCWKDAY_OSCRUN))) {
-            return;
-        }
-    }
+    do {
+        rtc_read(RTC_ADDRESS_RTCWKDAY, &tmp, 1);
+    } while (tmp & RTC_RTCWKDAY_OSCRUN);
 }
 
 static void rtc_read_time (void) {
@@ -130,11 +126,7 @@ static void rtc_read_time (void) {
 static void rtc_write_time (void) {
     uint8_t regs[7];
 
-    regs[0] = 0x00;
-
-    rtc_write(RTC_ADDRESS_RTCSEC, regs, 1);
-
-    rtc_wait_osc(false);
+    rtc_osc_stop();
 
     regs[0] = rtc_time.second;
     regs[1] = rtc_time.minute;
@@ -147,11 +139,10 @@ static void rtc_write_time (void) {
     rtc_sanitize_time(regs);
 
     regs[0] |= RTC_RTCSEC_ST;
-    regs[3] |= (RTC_RTCWKDAY_OSCRUN | RTC_RTCWKDAY_VBATEN);
+    regs[3] |= RTC_RTCWKDAY_VBATEN;
 
-    rtc_write(RTC_ADDRESS_RTCSEC, regs, 7);
-
-    rtc_wait_osc(true);
+    rtc_write(RTC_ADDRESS_RTCMIN, &regs[1], 6);
+    rtc_write(RTC_ADDRESS_RTCSEC, &regs[0], 1);
 }
 
 static void rtc_read_region (void) {
@@ -188,6 +179,7 @@ static void rtc_init (void) {
     if (uninitialized) {
         buffer[0] = 0;
         rtc_write(RTC_ADDRESS_SRAM_MAGIC, (uint8_t *) (magic), 4);
+        rtc_write(RTC_ADDRESS_CONTROL, buffer, 1);
         rtc_write(RTC_ADDRESS_OSCTRIM, buffer, 1);
         rtc_write_time();
         rtc_write_region();
