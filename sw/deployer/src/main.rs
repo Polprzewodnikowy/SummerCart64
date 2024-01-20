@@ -417,7 +417,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 
     let mut sc64 = init_sc64(connection, true)?;
 
-    let mut debug_handler = debug::new();
+    let mut debug_handler = debug::Handler::new();
 
     println!(
         "{}\n{}\n{}\n{}",
@@ -627,7 +627,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 fn handle_debug_command(connection: Connection, args: &DebugArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    let mut debug_handler = debug::new();
+    let mut debug_handler = debug::Handler::new();
 
     if args.euc_jp {
         debug_handler.set_text_encoding(debug::Encoding::EUCJP);
@@ -859,7 +859,7 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
         None
     };
 
-    sc64::run_server(port, args.address.clone(), |event| match event {
+    sc64::server::run(port, args.address.clone(), |event| match event {
         sc64::ServerEvent::Listening(address) => {
             println!(
                 "{}: Listening on address [{}]",
@@ -895,8 +895,8 @@ fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<()
 
 fn init_sc64(connection: Connection, check_firmware: bool) -> Result<sc64::SC64, sc64::Error> {
     let mut sc64 = match connection {
-        Connection::Local(port) => sc64::new_local(port),
-        Connection::Remote(remote) => sc64::new_remote(remote),
+        Connection::Local(port) => sc64::SC64::open_local(port),
+        Connection::Remote(remote) => sc64::SC64::open_remote(remote),
     }?;
 
     if check_firmware {

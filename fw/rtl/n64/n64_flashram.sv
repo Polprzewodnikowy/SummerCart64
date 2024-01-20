@@ -134,8 +134,9 @@ module n64_flashram (
                         endcase
                     end
                 end else begin
-                    if (reg_bus.address[1] && state != STATE_BUFFER) begin
-                        status <= reg_bus.wdata[3:0];
+                    if (reg_bus.address[1] && state == STATE_STATUS) begin
+                        status[ERASE_DONE] <= 1'b0;
+                        status[WRITE_DONE] <= 1'b0;
                     end
                 end
             end

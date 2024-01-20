@@ -2,7 +2,7 @@ mod cic;
 mod error;
 pub mod firmware;
 mod link;
-mod server;
+pub mod server;
 mod time;
 mod types;
 
@@ -787,36 +787,25 @@ impl SC64 {
     }
 }
 
-pub fn new_local(port: Option<String>) -> Result<SC64, Error> {
-    let port = if let Some(port) = port {
-        port
-    } else {
-        list_local_devices()?[0].port.clone()
-    };
-    let mut sc64 = SC64 {
-        link: link::new_local(&port)?,
-    };
-    sc64.check_device()?;
-    Ok(sc64)
-}
+impl SC64 {
+    pub fn open_local(port: Option<String>) -> Result<Self, Error> {
+        let port = if let Some(port) = port {
+            port
+        } else {
+            list_local_devices()?[0].port.clone()
+        };
+        let mut sc64 = SC64 {
+            link: link::new_local(&port)?,
+        };
+        sc64.check_device()?;
+        Ok(sc64)
+    }
 
-pub fn new_remote(address: String) -> Result<SC64, Error> {
-    let mut sc64 = SC64 {
-        link: link::new_remote(&address)?,
-    };
-    sc64.check_device()?;
-    Ok(sc64)
-}
-
-pub fn run_server(
-    port: Option<String>,
-    address: String,
-    event_callback: fn(ServerEvent),
-) -> Result<(), Error> {
-    let port = if let Some(port) = port {
-        port
-    } else {
-        list_local_devices()?[0].port.clone()
-    };
-    server::run_server(&port, address, event_callback)
+    pub fn open_remote(address: String) -> Result<Self, Error> {
+        let mut sc64 = SC64 {
+            link: link::new_remote(&address)?,
+        };
+        sc64.check_device()?;
+        Ok(sc64)
+    }
 }
