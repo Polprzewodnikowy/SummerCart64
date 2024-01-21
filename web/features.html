@@ -18,12 +18,12 @@
     <div class="menu-container">
         <div class="menu-bar">
             <div class="menu-buttons">
-                <img src="sc64.svg">
-                <a onclick="showMenu(event)">
+                <a href="/"><img src="sc64.svg"></a>
+                <div class="menu-button" onclick="showMenu(event)">
                     <div class="menu-button-line"></div>
                     <div class="menu-button-line"></div>
                     <div class="menu-button-line"></div>
-                </a>
+                </div>
             </div>
             <menu class="mobile-hidden">
                 <li><a href="/">Home</a></li>
@@ -77,6 +77,13 @@
                 </article>
 
                 <article>
+                    <h3>Full control of boot process</h3>
+                    <p>Direct mode makes testing possible without any interference from the bootloader embedded into
+                        SummerCart64, perfect for trying out custom IPL3 replacements giving you control right after
+                        N64 boots up.</p>
+                </article>
+
+                <article>
                     <h3>Dedicated terminal PC app</h3>
                     <p>Powerful, and yet simple, <a
                             href="https://github.com/Polprzewodnikowy/SummerCart64/releases/latest"><code>sc64deployer</code></a>
@@ -88,7 +95,7 @@
                     <p>SummerCart64 was born as a device for homebrew development first. As a consequence it
                         incorporates many features to ease development of your own games:</p>
                     <ul>
-                        <li>Dedicated PC app for loading ROMs and console access.</li>
+                        <li>Dedicated PC app for loading ROMs and debug terminal access.</li>
                         <li>Simple, command based, communication protocol - both on the USB and N64 side.</li>
                         <li>microSD card interface with simple, block based, protocol.</li>
                         <li>Fast USB interface with well documented protocol.</li>
@@ -161,8 +168,9 @@
                 <ul>
                     <li>Real time clock</li>
                     <li>CR2032 RTC backup battery</li>
-                    <li>N64 bootloader capable of loading menu binary from the microSD card and displaying error
-                        messages</li>
+                    <li>Embedded N64 bootloader capable of loading menu binary from the microSD card and displaying
+                        error messages</li>
+                    <li>Option to disable embedded N64 bootloader (direct mode)</li>
                     <li>Firmware updatable via USB interface</li>
                     <li>Seamless power switching between USB and N64</li>
                 </ul>

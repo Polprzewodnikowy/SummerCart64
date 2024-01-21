@@ -18,12 +18,12 @@
     <div class="menu-container">
         <div class="menu-bar">
             <div class="menu-buttons">
-                <img src="sc64.svg">
-                <a onclick="showMenu(event)">
+                <a href="/"><img src="sc64.svg"></a>
+                <div class="menu-button" onclick="showMenu(event)">
                     <div class="menu-button-line"></div>
                     <div class="menu-button-line"></div>
                     <div class="menu-button-line"></div>
-                </a>
+                </div>
             </div>
             <menu class="mobile-hidden">
                 <li class="active"><a href="/">Home</a></li>
@@ -48,9 +48,10 @@
                         href="https://github.com/buu342/N64-UNFLoader">UNFLoader</a>, and well documented API, testing
                     your homebrew on real hardware was never this easy before!</p>
                 <p>SummerCart64 employs features not available in other N64 flashcarts, like <strong>64DD</strong>
-                    hardware emulation, automatic save backup <strong>during gameplay</strong>, making it the best
-                    choice for both players and game developers. Please check <a href="/features.html">full feature
-                        list</a> for more details!</p>
+                    hardware emulation, automatic save backup <strong>during gameplay</strong>, or ability to behave
+                    like a stock game pak with <strong>direct mode</strong>, making it the best choice for both players
+                    and game developers. Please check <a href="/features.html">full feature list</a> for more details!
+                </p>
                 <div class="pcb-images">
                     <img src="sc64-render-front.png">
                     <img src="sc64-render-back.png">
