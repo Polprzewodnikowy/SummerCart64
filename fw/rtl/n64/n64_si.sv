@@ -77,7 +77,7 @@ module n64_si (
 
     // RX bit generator
 
-    logic [3:0] rx_sub_bit_counter;
+    logic [4:0] rx_sub_bit_counter;
     logic rx_timeout;
     logic rx_bit_valid;
     logic rx_bit_data;
@@ -94,7 +94,7 @@ module n64_si (
     always_comb begin
         rx_timeout = si_clk_rising_edge && si_dq_in && (&rx_sub_bit_counter);
         rx_bit_valid = si_dq_rising_edge;
-        rx_bit_data = (rx_sub_bit_counter >= 4'd3) ? 1'b0 : 1'b1;
+        rx_bit_data = (rx_sub_bit_counter > 5'd4) ? 1'b0 : 1'b1;
     end
 
 
@@ -124,7 +124,7 @@ module n64_si (
     logic rx_stop;
 
     always_comb begin
-        rx_stop = si_clk_rising_edge && si_dq_in && (rx_sub_bit_counter == 4'd7) && (rx_bit_counter == 3'd1);
+        rx_stop = si_clk_rising_edge && si_dq_in && (rx_sub_bit_counter == 5'd16) && (rx_bit_counter == 3'd1);
     end
 
 
