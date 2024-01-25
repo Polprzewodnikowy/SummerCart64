@@ -225,6 +225,7 @@ main section>img.sc64-logo {
 div.pcb-images {
     display: flex;
     flex-wrap: wrap;
+    gap: var(--main-paragraph-margin);
     margin: var(--main-paragraph-margin) 0;
 }
 
