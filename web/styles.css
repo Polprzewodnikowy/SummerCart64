@@ -6,8 +6,8 @@
     --menu-item-height: 48px;
     --menu-item-spacing: 20px;
     --menu-bg-color: rgb(28, 28, 28);
+    --menu-active-color: rgb(40, 40, 40);
     --menu-mobile-bg-color: rgb(20, 20, 20);
-    --menu-mobile-active-color: rgb(40, 40, 40);
     --menu-shadow: 0px 0px 12px rgb(0, 0, 0);
     --menu-font-size: 16px;
 
@@ -72,7 +72,6 @@ a:hover {
 .menu-bar {
     display: flex;
     flex-flow: row;
-    align-items: center;
     margin: 0 var(--content-margin) 0 var(--content-margin);
     width: 100%;
     max-width: var(--content-max-width);
@@ -85,8 +84,11 @@ a:hover {
     height: var(--menu-height);
 }
 
-.menu-bar>.menu-buttons>img {
-    margin-right: var(--content-margin);
+.menu-bar>.menu-buttons a {
+    height: var(--menu-item-height);
+}
+
+.menu-bar>.menu-buttons img {
     height: var(--menu-item-height);
 }
 
@@ -94,15 +96,26 @@ a:hover {
     display: none;
 }
 
-.menu-bar menu {
+.menu-bar>menu {
     display: flex;
     margin: 0;
+    margin-left: var(--content-margin);
     padding: 0;
 }
 
-.menu-bar menu>li {
+.menu-bar>menu>li {
     list-style: none;
-    padding: 0 var(--menu-item-spacing) 0 var(--menu-item-spacing);
+}
+
+.menu-bar>menu>li:hover {
+    background-color: var(--menu-active-color);
+}
+
+.menu-bar>menu>li a {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 var(--menu-item-spacing);
 }
 
 .menu-bar menu>li.active a {
@@ -121,7 +134,7 @@ a:hover {
         margin: 0 var(--content-margin) 0 var(--content-margin);
     }
 
-    .menu-bar>.menu-buttons>a {
+    .menu-bar>.menu-buttons>.menu-button {
         display: flex;
         flex-flow: column;
         justify-content: center;
@@ -132,7 +145,7 @@ a:hover {
         cursor: pointer;
     }
 
-    .menu-bar>.menu-buttons>a>.menu-button-line {
+    .menu-bar>.menu-buttons>.menu-button>.menu-button-line {
         width: 28px;
         height: 3px;
         background-color: var(--link-text-color);
@@ -140,12 +153,13 @@ a:hover {
         border-radius: 2px;
     }
 
-    .menu-bar>.menu-buttons>a.active>.menu-button-line {
+    .menu-bar>.menu-buttons>.menu-button.active>.menu-button-line {
         background-color: var(--text-color);
     }
 
     .menu-bar>menu {
         flex-flow: column;
+        margin: 0;
         width: 100%;
         background-color: var(--menu-mobile-bg-color);
     }
@@ -153,7 +167,7 @@ a:hover {
     .menu-bar>menu>li {
         height: var(--menu-item-height);
         padding: 0;
-        border-bottom: 1px solid var(--menu-mobile-active-color);
+        border-bottom: 1px solid var(--menu-active-color);
     }
 
     .menu-bar>menu>li:last-child {
@@ -161,7 +175,7 @@ a:hover {
     }
 
     .menu-bar>menu>li.active {
-        background-color: var(--menu-mobile-active-color);
+        background-color: var(--menu-active-color);
     }
 
     .menu-bar>menu>li>a {
@@ -211,6 +225,7 @@ main section>img.sc64-logo {
 div.pcb-images {
     display: flex;
     flex-wrap: wrap;
+    gap: var(--main-paragraph-margin);
     margin: var(--main-paragraph-margin) 0;
 }
 
