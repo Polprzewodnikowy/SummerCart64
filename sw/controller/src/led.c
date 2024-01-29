@@ -2,102 +2,46 @@
 #include "hw.h"
 #include "led.h"
 #include "rtc.h"
-#include "task.h"
 #include "timer.h"
 
 
-#define LED_MS_PER_TICK         (10)
-#define LED_ERROR_TICKS_PERIOD  (50)
-#define LED_ERROR_TICKS_ON      (25)
-#define LED_ACT_TICKS_PERIOD    (15)
-#define LED_ACT_TICKS_ON        (6)
+#define LED_REFRESH_PERIOD_MS   (50)
+
+#define LED_PULSE_LENGTH_MS     (200)
+
+#define ERROR_BLINK_PERIOD_MS   (100)
+#define ERROR_TOTAL_PERIOD_MS   (1000)
+
+#define CIC_ERROR_BLINKS        (1)
+#define RTC_ERROR_BLINKS        (2)
 
 
-static bool error_mode = false;
-static uint32_t error_timer = 0;
-static volatile bool cic_error = false;
-static volatile bool rtc_error = false;
+static bool activity_pulse = false;
+static int activity_pulse_timer = 0;
 
-static uint32_t act_timer = 0;
-static uint32_t current_act_counter = 0;
-static volatile uint32_t next_act_counter = 0;
+static bool cic_error = false;
+static bool rtc_error = false;
+static bool error_active = false;
+static int error_timer = 0;
 
 
-static void led_task_resume (void) {
-    task_set_ready(TASK_ID_LED);
+void led_activity_on (void) {
+    rtc_settings_t *settings = rtc_get_settings();
+    if (!activity_pulse && !error_active && settings->led_enabled) {
+        hw_gpio_set(GPIO_ID_LED);
+    }
 }
 
-static void led_set_state (bool state, bool force) {
+void led_activity_off (void) {
     rtc_settings_t *settings = rtc_get_settings();
-    if (settings->led_enabled || force) {
-        if (state) {
-            hw_gpio_set(GPIO_ID_LED);
-        } else {
-            hw_gpio_reset(GPIO_ID_LED);
-        }
-    } else {
+    if (!activity_pulse && !error_active && settings->led_enabled) {
         hw_gpio_reset(GPIO_ID_LED);
     }
 }
 
-static void led_update_error_mode (void) {
-    if (error_mode) {
-        if (!(cic_error || rtc_error)) {
-            led_set_state(false, true);
-            error_mode = false;
-            act_timer = 0;
-        }
-    } else {
-        if (cic_error || rtc_error) {
-            led_set_state(false, true);
-            error_mode = true;
-            error_timer = 0;
-        }
-    }
-}
-
-static void led_process_errors (void) {
-    if (error_timer == 0) {
-        error_timer = LED_ERROR_TICKS_PERIOD;
-        if (cic_error) {
-            error_timer *= 1;
-        } else if (rtc_error) {
-            error_timer *= 2;
-        }
-        error_timer += LED_ERROR_TICKS_PERIOD;
-    }
-
-    if (error_timer > 0) {
-        error_timer -= 1;
-        if (error_timer >= LED_ERROR_TICKS_PERIOD) {
-            uint32_t error_cycle = (error_timer % LED_ERROR_TICKS_PERIOD);
-            if (error_cycle == LED_ERROR_TICKS_ON) {
-                led_set_state(true, true);
-            }
-            if (error_cycle == 0) {
-                led_set_state(false, true);
-            }
-        }
-    }
-}
-
-static void led_process_act (void) {
-    if (act_timer == 0) {
-        if (current_act_counter != next_act_counter) {
-            current_act_counter = next_act_counter;
-            act_timer = LED_ACT_TICKS_PERIOD;
-        }
-    }
-
-    if (act_timer > 0) {
-        act_timer -= 1;
-        if (act_timer == LED_ACT_TICKS_ON) {
-            led_set_state(true, false);
-        }
-        if (act_timer == 0) {
-            led_set_state(false, false);
-        }
-    }
+void led_activity_pulse (void) {
+    activity_pulse = true;
+    activity_pulse_timer = LED_PULSE_LENGTH_MS;
 }
 
 
@@ -106,10 +50,16 @@ void led_blink_error (led_error_t error) {
         case LED_ERROR_CIC:
             cic_error = true;
             break;
+
         case LED_ERROR_RTC:
             rtc_error = true;
             break;
     }
+
+    error_active = (
+        cic_error |
+        rtc_error
+    );
 }
 
 void led_clear_error (led_error_t error) {
@@ -117,32 +67,81 @@ void led_clear_error (led_error_t error) {
         case LED_ERROR_CIC:
             cic_error = false;
             break;
+
         case LED_ERROR_RTC:
             rtc_error = false;
             break;
     }
+
+    error_active = (
+        cic_error |
+        rtc_error
+    );
+
+    if (!error_active) {
+        activity_pulse = false;
+        activity_pulse_timer = 0;
+        error_timer = 0;
+    }
 }
 
-void led_blink_act (void) {
-    next_act_counter += 1;
+
+void led_init (void) {
+    timer_countdown_start(TIMER_ID_LED, LED_REFRESH_PERIOD_MS);
 }
 
-void led_task (void) {
-    timer_init();
 
-    while (1) {
-        hw_tim_setup(TIM_ID_LED, LED_MS_PER_TICK, led_task_resume);
+void led_process (void) {
+    if (!timer_countdown_elapsed(TIMER_ID_LED)) {
+        return;
+    }
 
-        led_update_error_mode();
+    timer_countdown_start(TIMER_ID_LED, LED_REFRESH_PERIOD_MS);
 
-        if (error_mode) {
-            led_process_errors();
-        } else {
-            led_process_act();
+    if (error_active) {
+        int blinks = 0;
+
+        if (cic_error) {
+            blinks = CIC_ERROR_BLINKS;
+        } else if (rtc_error) {
+            blinks = RTC_ERROR_BLINKS;
         }
 
-        timer_update();
+        bool led_on = false;
 
-        task_yield();
+        for (int i = 0; i < blinks; i++) {
+            bool lower_bound = (error_timer >= (ERROR_BLINK_PERIOD_MS * (i * 2)));
+            bool upper_bound = (error_timer < (ERROR_BLINK_PERIOD_MS * ((i * 2) + 1)));
+            if (lower_bound && upper_bound) {
+                led_on = true;
+                break;
+            }
+        }
+
+        if (led_on) {
+            hw_gpio_set(GPIO_ID_LED);
+        } else {
+            hw_gpio_reset(GPIO_ID_LED);
+        }
+
+        error_timer += LED_REFRESH_PERIOD_MS;
+
+        if (error_timer >= ERROR_TOTAL_PERIOD_MS) {
+            error_timer = 0;
+        }
+
+        return;
+    }
+
+    if (activity_pulse) {
+        if (activity_pulse_timer > 0) {
+            hw_gpio_set(GPIO_ID_LED);
+        } else {
+            activity_pulse = false;
+            hw_gpio_reset(GPIO_ID_LED);
+            return;
+        }
+
+        activity_pulse_timer -= LED_REFRESH_PERIOD_MS;
     }
 }

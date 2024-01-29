@@ -83,6 +83,8 @@ build_cic () {
 build_fpga () {
     if [ "$BUILT_FPGA" = true ]; then return; fi
 
+    build_cic
+
     pushd fw/project/lcmxo2 > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
         rm -rf ./impl1/

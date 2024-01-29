@@ -29,9 +29,12 @@ typedef struct usb_tx_info {
 
 void usb_create_packet (usb_tx_info_t *info, usb_packet_cmd_e cmd);
 bool usb_enqueue_packet (usb_tx_info_t *info);
+
 bool usb_prepare_read (uint32_t *args);
 void usb_get_read_info (uint32_t *args);
+
 void usb_init (void);
+
 void usb_process (void);
 
 

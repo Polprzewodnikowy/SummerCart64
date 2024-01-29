@@ -2,7 +2,7 @@ mod cic;
 mod error;
 pub mod firmware;
 mod link;
-mod server;
+pub mod server;
 mod time;
 mod types;
 
@@ -12,7 +12,7 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiskPacket, DiskPacketKind, FpgaDebugData, McuStackUsage, SaveType,
+        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, SaveType,
         SaveWriteback, Switch, TvType,
     },
 };
@@ -55,7 +55,7 @@ pub struct DeviceState {
     pub led_enable: Switch,
     pub datetime: DateTime<Local>,
     pub fpga_debug_data: FpgaDebugData,
-    pub mcu_stack_usage: McuStackUsage,
+    pub diagnostic_data: DiagnosticData,
 }
 
 const SC64_V2_IDENTIFIER: &[u8; 4] = b"SCv2";
@@ -350,7 +350,7 @@ impl SC64 {
         Ok(u32::from_be_bytes(data[0..4].try_into().unwrap()).try_into()?)
     }
 
-    fn command_debug_get(&mut self) -> Result<FpgaDebugData, Error> {
+    fn command_fpga_debug_data_get(&mut self) -> Result<FpgaDebugData, Error> {
         let data = self.link.execute_command(&Command {
             id: b'?',
             args: [0, 0],
@@ -359,7 +359,7 @@ impl SC64 {
         Ok(data.try_into()?)
     }
 
-    fn command_stack_usage_get(&mut self) -> Result<McuStackUsage, Error> {
+    fn command_diagnostic_data_get(&mut self) -> Result<DiagnosticData, Error> {
         let data = self.link.execute_command(&Command {
             id: b'%',
             args: [0, 0],
@@ -557,8 +557,8 @@ impl SC64 {
             rom_extended_enable: get_config!(self, RomExtendedEnable)?,
             led_enable: get_setting!(self, LedEnable)?,
             datetime: self.get_datetime()?,
-            fpga_debug_data: self.command_debug_get()?,
-            mcu_stack_usage: self.command_stack_usage_get()?,
+            fpga_debug_data: self.command_fpga_debug_data_get()?,
+            diagnostic_data: self.command_diagnostic_data_get()?,
         })
     }
 
@@ -787,36 +787,25 @@ impl SC64 {
     }
 }
 
-pub fn new_local(port: Option<String>) -> Result<SC64, Error> {
-    let port = if let Some(port) = port {
-        port
-    } else {
-        list_local_devices()?[0].port.clone()
-    };
-    let mut sc64 = SC64 {
-        link: link::new_local(&port)?,
-    };
-    sc64.check_device()?;
-    Ok(sc64)
-}
+impl SC64 {
+    pub fn open_local(port: Option<String>) -> Result<Self, Error> {
+        let port = if let Some(port) = port {
+            port
+        } else {
+            list_local_devices()?[0].port.clone()
+        };
+        let mut sc64 = SC64 {
+            link: link::new_local(&port)?,
+        };
+        sc64.check_device()?;
+        Ok(sc64)
+    }
 
-pub fn new_remote(address: String) -> Result<SC64, Error> {
-    let mut sc64 = SC64 {
-        link: link::new_remote(&address)?,
-    };
-    sc64.check_device()?;
-    Ok(sc64)
-}
-
-pub fn run_server(
-    port: Option<String>,
-    address: String,
-    event_callback: fn(ServerEvent),
-) -> Result<(), Error> {
-    let port = if let Some(port) = port {
-        port
-    } else {
-        list_local_devices()?[0].port.clone()
-    };
-    server::run_server(&port, address, event_callback)
+    pub fn open_remote(address: String) -> Result<Self, Error> {
+        let mut sc64 = SC64 {
+            link: link::new_remote(&address)?,
+        };
+        sc64.check_device()?;
+        Ok(sc64)
+    }
 }

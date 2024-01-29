@@ -14,14 +14,12 @@ SRC_FILES = \
 	flash.c \
 	flashram.c \
 	fpga.c \
-	gvr.c \
 	hw.c \
 	isv.c \
 	lcmxo2.c \
 	led.c \
 	rtc.c \
 	sd.c \
-	task.c \
 	timer.c \
 	update.c \
 	usb.c \

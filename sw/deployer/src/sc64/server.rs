@@ -1,6 +1,6 @@
 use super::{
     error::Error,
-    link::{new_serial, Command, DataType, Packet, Response, Serial},
+    link::{list_local_devices, new_serial, Command, DataType, Packet, Response, Serial},
 };
 use std::{
     collections::VecDeque,
@@ -22,11 +22,16 @@ pub enum ServerEvent {
     Err(String),
 }
 
-pub fn run_server(
-    port: &str,
+pub fn run(
+    port: Option<String>,
     address: String,
     event_callback: fn(ServerEvent),
 ) -> Result<(), Error> {
+    let port = if let Some(port) = port {
+        port
+    } else {
+        list_local_devices()?[0].port.clone()
+    };
     let listener = TcpListener::bind(address)?;
     let listening_address = listener.local_addr()?;
     event_callback(ServerEvent::Listening(listening_address.to_string()));
@@ -36,7 +41,7 @@ pub fn run_server(
             Ok(mut stream) => {
                 let peer = stream.peer_addr()?.to_string();
                 event_callback(ServerEvent::Connected(peer.clone()));
-                match server_accept_connection(port, &mut stream) {
+                match server_accept_connection(port.clone(), &mut stream) {
                     Ok(()) => event_callback(ServerEvent::Disconnected(peer.clone())),
                     Err(error) => event_callback(ServerEvent::Err(error.to_string())),
                 }
@@ -58,14 +63,14 @@ enum Event {
     Closed(Option<Error>),
 }
 
-fn server_accept_connection(port: &str, stream: &mut TcpStream) -> Result<(), Error> {
+fn server_accept_connection(port: String, stream: &mut TcpStream) -> Result<(), Error> {
     let (event_sender, event_receiver) = channel::<Event>();
     let exit_flag = Arc::new(AtomicBool::new(false));
 
     let mut stream_writer = BufWriter::new(stream.try_clone()?);
     let mut stream_reader = stream.try_clone()?;
 
-    let serial = Arc::new(new_serial(port)?);
+    let serial = Arc::new(new_serial(&port)?);
     let serial_writer = serial.clone();
     let serial_reader = serial.clone();
 

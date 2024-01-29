@@ -8,10 +8,16 @@ typedef enum {
 } led_error_t;
 
 
+void led_activity_on (void);
+void led_activity_off (void);
+void led_activity_pulse (void);
+
 void led_blink_error (led_error_t error);
 void led_clear_error (led_error_t error);
-void led_blink_act (void);
-void led_task (void);
+
+void led_init (void);
+
+void led_process (void);
 
 
 #endif

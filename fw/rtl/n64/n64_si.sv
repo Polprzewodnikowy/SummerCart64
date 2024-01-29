@@ -59,6 +59,7 @@ module n64_si (
     // Data falling/rising event generator
 
     logic last_si_dq_in;
+    logic si_dq_in_inhibit;
 
     always_ff @(posedge clk) begin
         if (si_clk_rising_edge) begin
@@ -70,14 +71,14 @@ module n64_si (
     logic si_dq_rising_edge;
 
     always_comb begin
-        si_dq_falling_edge = si_clk_rising_edge && last_si_dq_in && !si_dq_in;
-        si_dq_rising_edge = si_clk_rising_edge && !last_si_dq_in && si_dq_in;
+        si_dq_falling_edge = si_clk_rising_edge && last_si_dq_in && !si_dq_in && !si_dq_in_inhibit;
+        si_dq_rising_edge = si_clk_rising_edge && !last_si_dq_in && si_dq_in && !si_dq_in_inhibit;
     end
 
 
     // RX bit generator
 
-    logic [3:0] rx_sub_bit_counter;
+    logic [4:0] rx_sub_bit_counter;
     logic rx_timeout;
     logic rx_bit_valid;
     logic rx_bit_data;
@@ -94,7 +95,7 @@ module n64_si (
     always_comb begin
         rx_timeout = si_clk_rising_edge && si_dq_in && (&rx_sub_bit_counter);
         rx_bit_valid = si_dq_rising_edge;
-        rx_bit_data = (rx_sub_bit_counter >= 4'd3) ? 1'b0 : 1'b1;
+        rx_bit_data = (rx_sub_bit_counter >= 5'd4) ? 1'b0 : 1'b1;
     end
 
 
@@ -124,7 +125,7 @@ module n64_si (
     logic rx_stop;
 
     always_comb begin
-        rx_stop = si_clk_rising_edge && si_dq_in && (rx_sub_bit_counter == 4'd7) && (rx_bit_counter == 3'd1);
+        rx_stop = si_clk_rising_edge && si_dq_in && (rx_sub_bit_counter == 5'd15) && (rx_bit_counter == 3'd1);
     end
 
 
@@ -260,7 +261,8 @@ module n64_si (
     typedef enum bit [1:0] {
         TX_STATE_IDLE,
         TX_STATE_DATA,
-        TX_STATE_STOP
+        TX_STATE_STOP,
+        TX_STATE_STOP_WAIT
     } e_tx_state;
 
     e_tx_state tx_state;
@@ -278,12 +280,14 @@ module n64_si (
 
         if (reset) begin
             tx_state <= TX_STATE_IDLE;
+            si_dq_in_inhibit <= 1'b0;
         end else begin
             case (tx_state)
                 TX_STATE_IDLE: begin
                     if (tx_start) begin
                         tx_byte_counter <= 4'd0;
                         tx_state <= TX_STATE_DATA;
+                        si_dq_in_inhibit <= 1'b1;
                     end
                 end
 
@@ -299,7 +303,14 @@ module n64_si (
                 TX_STATE_STOP: begin
                     tx_stop <= 1'b1;
                     if (!tx_busy && tx_stop) begin
+                        tx_state <= TX_STATE_STOP_WAIT;
+                    end
+                end
+
+                TX_STATE_STOP_WAIT: begin
+                    if (!tx_busy) begin
                         tx_state <= TX_STATE_IDLE;
+                        si_dq_in_inhibit <= 1'b0;
                     end
                 end
             endcase
@@ -382,7 +393,7 @@ module n64_si (
                     4'd1: {rtc_time_wp, rtc_backup_wp} <= rx_byte_data[1:0];
                     4'd2: begin
                         rtc_stopped <= rx_byte_data[2:1];
-                        if (rx_byte_data[2:1] == 2'b00) begin
+                        if ((|rtc_stopped) && (rx_byte_data[2:1] == 2'b00)) begin
                             n64_scb.rtc_pending <= 1'b1;
                         end
                     end

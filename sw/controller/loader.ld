@@ -23,7 +23,7 @@ SECTIONS {
         . = ALIGN(4);
         _stext = .;
         *(.text)
-        *(.text*) 
+        *(.text*)
         *(.glue_7)
         *(.glue_7t)
         . = ALIGN(4);

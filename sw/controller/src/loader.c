@@ -9,6 +9,7 @@ void no_valid_image (void) {
     hw_gpio_set(GPIO_ID_LED);
 }
 
+
 void loader (void) {
     if (update_check()) {
         hw_loader_init();

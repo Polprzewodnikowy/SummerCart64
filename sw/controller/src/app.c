@@ -1,34 +1,51 @@
-#include "app.h"
-#include "gvr.h"
+#include <stdbool.h>
+#include "button.h"
+#include "cfg.h"
+#include "cic.h"
+#include "dd.h"
+#include "flashram.h"
+#include "fpga.h"
 #include "hw.h"
+#include "isv.h"
 #include "led.h"
 #include "rtc.h"
-#include "task.h"
+#include "sd.h"
+#include "timer.h"
+#include "usb.h"
+#include "writeback.h"
 
-
-#define RTC_STACK_SIZE  (256)
-#define LED_STACK_SIZE  (256)
-#define GVR_STACK_SIZE  (2048)
-
-
-uint8_t rtc_stack[RTC_STACK_SIZE] __attribute__((aligned(8)));
-uint8_t led_stack[LED_STACK_SIZE] __attribute__((aligned(8)));
-uint8_t gvr_stack[GVR_STACK_SIZE] __attribute__((aligned(8)));
-
-
-void app_get_stack_usage (uint32_t *usage) {
-    *usage++ = 0;
-    *usage++ = task_get_stack_usage(rtc_stack, RTC_STACK_SIZE);
-    *usage++ = task_get_stack_usage(led_stack, LED_STACK_SIZE);
-    *usage++ = task_get_stack_usage(gvr_stack, GVR_STACK_SIZE);
-}
 
 void app (void) {
-    hw_init();
+    hw_app_init();
 
-    task_create(TASK_ID_RTC, rtc_task, rtc_stack, RTC_STACK_SIZE);
-    task_create(TASK_ID_LED, led_task, led_stack, LED_STACK_SIZE);
-    task_create(TASK_ID_GVR, gvr_task, gvr_stack, GVR_STACK_SIZE);
+    timer_init();
 
-    task_scheduler_start();
+    while (fpga_id_get() != FPGA_ID);
+
+    rtc_init();
+
+    button_init();
+    cfg_init();
+    cic_init();
+    dd_init();
+    flashram_init();
+    isv_init();
+    led_init();
+    sd_init();
+    usb_init();
+    writeback_init();
+
+    while (true) {
+        button_process();
+        cfg_process();
+        cic_process();
+        dd_process();
+        flashram_process();
+        isv_process();
+        led_process();
+        rtc_process();
+        sd_process();
+        usb_process();
+        writeback_process();
+    }
 }
