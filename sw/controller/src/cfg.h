@@ -14,6 +14,7 @@ typedef enum {
     SAVE_TYPE_FLASHRAM = 4,
     SAVE_TYPE_SRAM_BANKED = 5,
     SAVE_TYPE_SRAM_1M = 6,
+    __SAVE_TYPE_COUNT
 } save_type_t;
 
 
@@ -27,7 +28,9 @@ save_type_t cfg_get_save_type (void);
 void cfg_get_time (uint32_t *args);
 void cfg_set_time (uint32_t *args);
 void cfg_reset_state (void);
+
 void cfg_init (void);
+
 void cfg_process (void);
 
 

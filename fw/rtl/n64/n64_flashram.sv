@@ -8,7 +8,7 @@ module n64_flashram (
 );
 
     localparam [31:0] FLASH_TYPE_ID     = 32'h1111_8001;
-    localparam [31:0] FLASH_MODEL_ID    = 32'h00C2_001D;
+    localparam [31:0] FLASH_MODEL_ID    = 32'h0032_00F1;
 
     typedef enum bit [7:0] {
         CMD_STATUS_MODE     = 8'hD2,
@@ -97,14 +97,14 @@ module n64_flashram (
                             CMD_ERASE_SECTOR: begin
                                 state <= STATE_STATUS;
                                 erase_enabled <= 1'b1;
-                                n64_scb.flashram_sector <= reg_bus.wdata[9:0];
+                                n64_scb.flashram_page <= reg_bus.wdata[9:0];
                                 n64_scb.flashram_sector_or_all <= 1'b0;
                             end
 
                             CMD_ERASE_CHIP: begin
                                 state <= STATE_STATUS;
                                 erase_enabled <= 1'b1;
-                                n64_scb.flashram_sector <= 10'd0;
+                                n64_scb.flashram_page <= 10'd0;
                                 n64_scb.flashram_sector_or_all <= 1'b1;
                             end
 
@@ -126,7 +126,7 @@ module n64_flashram (
                                 state <= STATE_STATUS;
                                 status[WRITE_BUSY] <= 1'b1;
                                 status[WRITE_DONE] <= 1'b0;
-                                n64_scb.flashram_sector <= reg_bus.wdata[9:0];
+                                n64_scb.flashram_page <= reg_bus.wdata[9:0];
                                 n64_scb.flashram_pending <= 1'b1;
                                 n64_scb.flashram_write_or_erase <= 1'b0;
                                 n64_scb.flashram_sector_or_all <= 1'b0;
@@ -134,9 +134,9 @@ module n64_flashram (
                         endcase
                     end
                 end else begin
-                    if (reg_bus.address[1] && state != STATE_BUFFER) begin
-                        status[ERASE_BUSY] <= reg_bus.wdata[ERASE_BUSY];
-                        status[WRITE_BUSY] <= reg_bus.wdata[WRITE_BUSY];
+                    if (reg_bus.address[1] && state == STATE_STATUS) begin
+                        status[ERASE_DONE] <= 1'b0;
+                        status[WRITE_DONE] <= 1'b0;
                     end
                 end
             end

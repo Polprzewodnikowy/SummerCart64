@@ -10,24 +10,46 @@
 
 static void test_sc64_cfg (void) {
     sc64_error_t error;
+    uint32_t button_state;
     uint32_t identifier;
     uint16_t major;
     uint16_t minor;
     uint32_t revision;
+    uint32_t tmp;
+
+    display_printf("Waiting for the button to be released... ");
+
+    do {
+        if ((error = sc64_get_config(CFG_ID_BUTTON_STATE, &button_state)) != SC64_OK) {
+            error_display("Command CONFIG_GET [BUTTON_STATE] failed: %d", error);
+        }
+    } while (button_state != 0);
+
+    display_printf("done\n\n");
 
     if ((error = sc64_get_identifier(&identifier)) != SC64_OK) {
         error_display("Command IDENTIFIER_GET failed: %d", error);
         return;
     }
-    
+
     if ((error = sc64_get_version(&major, &minor, &revision)) != SC64_OK) {
         error_display("Command VERSION_GET failed: %d", error);
         return;
     }
 
-    display_printf("Identifier: 0x%08X\n\n", identifier);
+    if ((error = sc64_get_diagnostic(DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE, &tmp)) != SC64_OK) {
+        error_display("Command DIAGNOSTIC_GET failed: %d", error);
+        return;
+    }
 
-    display_printf("SC64 firmware version: %d.%d.%d\n", major, minor, revision);
+    uint16_t voltage = (uint16_t) (tmp >> 16);
+    int16_t temperature = (int16_t) (tmp & 0xFFFF);
+
+    display_printf("Identifier: 0x%08X\n", identifier);
+    display_printf("SC64 firmware version: %d.%d.%d\n\n", major, minor, revision);
+
+    display_printf("Voltage: %d.%03d V\n", (voltage / 1000), (voltage % 1000));
+    display_printf("Temperature: %d.%01d `C\n", (temperature / 10), (temperature % 10));
 }
 
 static void test_rtc (void) {
@@ -233,7 +255,7 @@ bool test_check (void) {
         error_display("Command CONFIG_GET [BUTTON_STATE] failed: %d", error);
     }
 
-    return button_state != 0;
+    return (button_state != 0);
 }
 
 static struct {

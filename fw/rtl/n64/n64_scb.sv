@@ -22,7 +22,7 @@ interface n64_scb ();
 
     logic flashram_pending;
     logic flashram_done;
-    logic [9:0] flashram_sector;
+    logic [9:0] flashram_page;
     logic flashram_sector_or_all;
     logic flashram_write_or_erase;
     logic flashram_read_mode;
@@ -84,7 +84,7 @@ interface n64_scb ();
 
         input flashram_pending,
         output flashram_done,
-        input flashram_sector,
+        input flashram_page,
         input flashram_sector_or_all,
         input flashram_write_or_erase,
 
@@ -143,7 +143,7 @@ interface n64_scb ();
     modport flashram (
         output flashram_pending,
         input flashram_done,
-        output flashram_sector,
+        output flashram_page,
         output flashram_sector_or_all,
         output flashram_write_or_erase,
 

@@ -19,7 +19,7 @@ static uint8_t primer_get_command (uint8_t *buffer, uint8_t *rx_length) {
     uint32_t received_crc32;
     uint8_t token[4];
 
-    while (1) {
+    while (true) {
         hw_crc32_reset();
 
         primer_get_and_calculate_crc32(token, 4, &calculated_crc32);
@@ -69,7 +69,10 @@ static void primer_send_response (uint8_t cmd, uint8_t *buffer, uint8_t tx_lengt
 
 void primer (void) {
     hw_primer_init();
+
     vendor_initial_configuration(primer_get_command, primer_send_response);
-    hw_uart_wait_busy();
+
+    hw_uart_write_wait_busy();
+
     hw_reset(NULL);
 }

@@ -8,7 +8,7 @@
 .type loader, %object
 loader:
     .incbin "build/loader/loader.bin"
-
+    .org 0x1000, 0xFF
 
 .section .text.Reset_Handler
 .type Reset_Handler, %function

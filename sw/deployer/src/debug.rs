@@ -166,6 +166,20 @@ const MAX_PACKET_LENGTH: usize = 8 * 1024 * 1024;
 const SUPPORTED_USB_PROTOCOL_VERSION: u16 = 2;
 
 impl Handler {
+    pub fn new() -> Self {
+        let (line_tx, line_rx) = channel::<String>();
+        let external_line_tx = line_tx.clone();
+
+        spawn(move || stdin_thread(line_tx));
+
+        Handler {
+            header: None,
+            line_rx,
+            external_line_tx,
+            encoding: Encoding::UTF8,
+        }
+    }
+
     pub fn set_text_encoding(&mut self, encoding: Encoding) {
         self.encoding = encoding;
     }
@@ -388,20 +402,6 @@ impl Handler {
             Encoding::UTF8 => print!("{}", String::from_utf8_lossy(&data)),
             Encoding::EUCJP => print!("{}", EUC_JP.decode(&data).0),
         }
-    }
-}
-
-pub fn new() -> Handler {
-    let (line_tx, line_rx) = channel::<String>();
-    let external_line_tx = line_tx.clone();
-
-    spawn(move || stdin_thread(line_tx));
-
-    Handler {
-        header: None,
-        line_rx,
-        external_line_tx,
-        encoding: Encoding::UTF8,
     }
 }
 

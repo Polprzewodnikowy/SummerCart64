@@ -1,6 +1,6 @@
 [package]
 name = "sc64deployer"
-version = "2.18.0"
+version = "2.18.1"
 edition = "2021"
 authors = ["Polprzewodnikowy"]
 description = "SummerCart64 loader and control software"
@@ -20,8 +20,8 @@ include-flate = { version = "0.2.0", features = ["stable"] }
 md5 = "0.7.0"
 panic-message = "0.3.0"
 rust-ini = "0.18.0"
-serial2 = "0.1.7"
-serialport = "4.2.0"
+serial2 = "0.2.17"
+serialport = "4.3.0"
 
 [profile.release]
 lto = true

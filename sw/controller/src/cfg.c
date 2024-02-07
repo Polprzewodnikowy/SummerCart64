@@ -4,7 +4,9 @@
 #include "dd.h"
 #include "flash.h"
 #include "fpga.h"
+#include "hw.h"
 #include "isv.h"
+#include "led.h"
 #include "rtc.h"
 #include "sd.h"
 #include "usb.h"
@@ -17,25 +19,25 @@
 
 
 typedef enum {
-    CFG_ID_BOOTLOADER_SWITCH,
-    CFG_ID_ROM_WRITE_ENABLE,
-    CFG_ID_ROM_SHADOW_ENABLE,
-    CFG_ID_DD_MODE,
-    CFG_ID_ISV_ADDRESS,
-    CFG_ID_BOOT_MODE,
-    CFG_ID_SAVE_TYPE,
-    CFG_ID_CIC_SEED,
-    CFG_ID_TV_TYPE,
-    CFG_ID_DD_SD_ENABLE,
-    CFG_ID_DD_DRIVE_TYPE,
-    CFG_ID_DD_DISK_STATE,
-    CFG_ID_BUTTON_STATE,
-    CFG_ID_BUTTON_MODE,
-    CFG_ID_ROM_EXTENDED_ENABLE,
+    CFG_ID_BOOTLOADER_SWITCH = 0,
+    CFG_ID_ROM_WRITE_ENABLE = 1,
+    CFG_ID_ROM_SHADOW_ENABLE = 2,
+    CFG_ID_DD_MODE = 3,
+    CFG_ID_ISV_ADDRESS = 4,
+    CFG_ID_BOOT_MODE = 5,
+    CFG_ID_SAVE_TYPE = 6,
+    CFG_ID_CIC_SEED = 7,
+    CFG_ID_TV_TYPE = 8,
+    CFG_ID_DD_SD_ENABLE = 9,
+    CFG_ID_DD_DRIVE_TYPE = 10,
+    CFG_ID_DD_DISK_STATE = 11,
+    CFG_ID_BUTTON_STATE = 12,
+    CFG_ID_BUTTON_MODE = 13,
+    CFG_ID_ROM_EXTENDED_ENABLE = 14,
 } cfg_id_t;
 
 typedef enum {
-    SETTING_ID_LED_ENABLE,
+    SETTING_ID_LED_ENABLE = 0,
 } setting_id_t;
 
 typedef enum {
@@ -82,6 +84,10 @@ typedef enum {
     SD_CARD_OP_BYTE_SWAP_ON = 4,
     SD_CARD_OP_BYTE_SWAP_OFF = 5,
 } sd_card_op_t;
+
+typedef enum {
+    DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE = 0,
+} diagnostic_id_t;
 
 typedef enum {
     SDRAM = (1 << 0),
@@ -178,7 +184,7 @@ static void cfg_change_scr_bits (uint32_t mask, bool value) {
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
-    if (save_type > SAVE_TYPE_SRAM_1M) {
+    if (save_type >= __SAVE_TYPE_COUNT) {
         return true;
     }
 
@@ -221,6 +227,22 @@ static bool cfg_set_save_type (save_type_t save_type) {
     }
 
     p.save_type = save_type;
+
+    return false;
+}
+
+static bool cfg_read_diagnostic_data (uint32_t *args) {
+    switch (args[0]) {
+        case DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE: {
+            uint16_t voltage;
+            int16_t temperature;
+            hw_adc_read_voltage_temperature(&voltage, &temperature);
+            args[1] = ((uint32_t) (voltage) << 16) | ((uint32_t) (temperature));
+            break;
+        }
+        default:
+            return true;
+    }
 
     return false;
 }
@@ -373,11 +395,11 @@ bool cfg_update (uint32_t *args) {
 }
 
 bool cfg_query_setting (uint32_t *args) {
-    rtc_settings_t settings = (*rtc_get_settings());
+    rtc_settings_t *settings = rtc_get_settings();
 
     switch (args[0]) {
         case SETTING_ID_LED_ENABLE:
-            args[1] = settings.led_enabled;
+            args[1] = settings->led_enabled;
             break;
         default:
             return true;
@@ -387,17 +409,17 @@ bool cfg_query_setting (uint32_t *args) {
 }
 
 bool cfg_update_setting (uint32_t *args) {
-    rtc_settings_t settings = (*rtc_get_settings());
+    rtc_settings_t *settings = rtc_get_settings();
 
     switch (args[0]) {
         case SETTING_ID_LED_ENABLE:
-            settings.led_enabled = args[1];
+            settings->led_enabled = args[1];
             break;
         default:
             return true;
     }
 
-    rtc_set_settings(&settings);
+    rtc_save_settings();
 
     return false;
 }
@@ -450,11 +472,13 @@ void cfg_reset_state (void) {
     p.boot_mode = BOOT_MODE_MENU;
 }
 
+
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
     cfg_reset_state();
     p.usb_output_ready = true;
 }
+
 
 void cfg_process (void) {
     uint32_t reg;
@@ -558,12 +582,16 @@ void cfg_process (void) {
                     case SD_CARD_OP_DEINIT:
                         sd_card_deinit();
                         break;
-                    case SD_CARD_OP_INIT:
-                        if (sd_card_init()) {
+                    case SD_CARD_OP_INIT: {
+                        led_activity_on();
+                        bool error = sd_card_init();
+                        led_activity_off();
+                        if (error) {
                             cfg_set_error(CFG_ERROR_SD_CARD);
                             return;
                         }
                         break;
+                    }
                     case SD_CARD_OP_GET_STATUS:
                         args[1] = sd_card_get_status();
                         break;
@@ -599,7 +627,7 @@ void cfg_process (void) {
                 p.sd_card_sector = args[0];
                 break;
 
-            case 's':
+            case 's': {
                 if (args[1] >= 0x800000) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
@@ -608,14 +636,18 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                if (sd_read_sectors(args[0], p.sd_card_sector, args[1])) {
+                led_activity_on();
+                bool error = sd_read_sectors(args[0], p.sd_card_sector, args[1]);
+                led_activity_off();
+                if (error) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
                 p.sd_card_sector += args[1];
                 break;
+            }
 
-            case 'S':
+            case 'S': {
                 if (args[1] >= 0x800000) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
                     return;
@@ -624,12 +656,16 @@ void cfg_process (void) {
                     cfg_set_error(CFG_ERROR_BAD_ADDRESS);
                     return;
                 }
-                if (sd_write_sectors(args[0], p.sd_card_sector, args[1])) {
+                led_activity_on();
+                bool error = sd_write_sectors(args[0], p.sd_card_sector, args[1]);
+                led_activity_off();
+                if (error) {
                     cfg_set_error(CFG_ERROR_SD_CARD);
                     return;
                 }
                 p.sd_card_sector += args[1];
                 break;
+            }
 
             case 'D':
                 if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {
@@ -681,6 +717,13 @@ void cfg_process (void) {
                 }
                 if (flash_erase_block(args[0])) {
                     cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
+                    return;
+                }
+                break;
+
+            case '%':
+                if (cfg_read_diagnostic_data(args)) {
+                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
                     return;
                 }
                 break;

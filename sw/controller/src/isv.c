@@ -57,10 +57,12 @@ uint32_t isv_get_address (void) {
     return p.address;
 }
 
+
 void isv_init (void) {
     p.address = 0;
     p.ready = true;
 }
+
 
 void isv_process (void) {
     if ((p.address != 0) && p.ready) {

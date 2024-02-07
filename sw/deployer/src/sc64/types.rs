@@ -828,37 +828,81 @@ impl Display for FpgaDebugData {
     }
 }
 
-pub struct McuStackUsage {
+pub struct DiagnosticDataV0 {
     pub cic: u32,
     pub rtc: u32,
     pub led: u32,
     pub gvr: u32,
 }
 
-impl TryFrom<Vec<u8>> for McuStackUsage {
+pub struct DiagnosticDataV1 {
+    pub voltage: f32,
+    pub temperature: f32,
+}
+
+pub enum DiagnosticData {
+    V0(DiagnosticDataV0),
+    V1(DiagnosticDataV1),
+    Unknown,
+}
+
+impl TryFrom<Vec<u8>> for DiagnosticData {
     type Error = Error;
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() != 16 {
-            return Err(Error::new("Invalid data length for MCU stack usage"));
+        if value.len() < 4 {
+            return Err(Error::new("Invalid data length for diagnostic data"));
         }
-        Ok(McuStackUsage {
-            cic: u32::from_be_bytes(value[0..4].try_into().unwrap()),
-            rtc: u32::from_be_bytes(value[4..8].try_into().unwrap()),
-            led: u32::from_be_bytes(value[8..12].try_into().unwrap()),
-            gvr: u32::from_be_bytes(value[12..16].try_into().unwrap()),
-        })
+        let raw_version = u32::from_be_bytes(value[0..4].try_into().unwrap());
+        let unversioned = raw_version & (1 << 31) == 0;
+        let version = raw_version & !(1 << 31);
+
+        if unversioned {
+            if value.len() != 16 {
+                return Err(Error::new("Invalid data length for V0 diagnostic data"));
+            }
+            return Ok(DiagnosticData::V0(DiagnosticDataV0 {
+                cic: u32::from_be_bytes(value[0..4].try_into().unwrap()),
+                rtc: u32::from_be_bytes(value[4..8].try_into().unwrap()),
+                led: u32::from_be_bytes(value[8..12].try_into().unwrap()),
+                gvr: u32::from_be_bytes(value[12..16].try_into().unwrap()),
+            }));
+        }
+
+        match version {
+            1 => {
+                if value.len() != 16 {
+                    return Err(Error::new("Invalid data length for V1 diagnostic data"));
+                }
+                let raw_voltage = u32::from_be_bytes(value[4..8].try_into().unwrap()) as f32;
+                let raw_temperature = u32::from_be_bytes(value[8..12].try_into().unwrap()) as f32;
+                Ok(DiagnosticData::V1(DiagnosticDataV1 {
+                    voltage: raw_voltage / 1000.0,
+                    temperature: raw_temperature / 10.0,
+                }))
+            }
+            _ => Ok(DiagnosticData::Unknown),
+        }
     }
 }
 
-impl Display for McuStackUsage {
+impl Display for DiagnosticData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.cic > 0 {
-            f.write_fmt(format_args!("CIC: {}, ", self.cic))?;
+        match self {
+            DiagnosticData::V0(d) => {
+                if d.cic > 0 {
+                    f.write_fmt(format_args!("CIC: {}, ", d.cic))?;
+                }
+                f.write_fmt(format_args!(
+                    "RTC: {}, LED: {}, GVR: {}",
+                    d.rtc, d.led, d.gvr
+                ))
+            }
+            DiagnosticData::V1(d) => f.write_fmt(format_args!(
+                "{:.03} V / {:.01} °C",
+                d.voltage, d.temperature
+            )),
+            DiagnosticData::Unknown => f.write_str("Unknown"),
         }
-        f.write_fmt(format_args!(
-            "RTC: {}, LED: {}, GVR: {}",
-            self.rtc, self.led, self.gvr
-        ))
     }
 }
 
@@ -874,7 +918,7 @@ macro_rules! get_config {
 
 macro_rules! get_setting {
     ($sc64:ident, $setting:ident) => {{
-        // Note: remove 'allow(irrefutable_let_patterns)' below when more settings are added
+        // NOTE: remove 'allow(irrefutable_let_patterns)' below when more settings are added
         #[allow(irrefutable_let_patterns)]
         if let Setting::$setting(value) = $sc64.command_setting_get(SettingId::$setting)? {
             Ok(value)
