@@ -172,7 +172,7 @@ fn server_stream_thread(
             if exit_flag.load(Ordering::Relaxed) {
                 return Ok(());
             }
-            match stream.read(&mut header[header_position..header_length]) {
+            match stream_reader.read(&mut header[header_position..header_length]) {
                 Ok(0) => return Ok(()),
                 Ok(bytes) => header_position += bytes,
                 Err(error) => match error.kind() {
