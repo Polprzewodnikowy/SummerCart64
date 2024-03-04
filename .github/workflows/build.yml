@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: 
+    branches:
       - main
   pull_request:
     branches:
@@ -130,17 +130,31 @@ jobs:
             sw/deployer/package/${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}.${{ matrix.package-extension }}
 
   publish-website:
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Download SummerCart64 repository
+        uses: actions/checkout@v4
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.ref == 'refs/heads/main'
+      - name: Setup GitHub pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./web
-          cname: summercart64.dev
+          path: ./web
+
+      - name: Publish website from uploaded artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
