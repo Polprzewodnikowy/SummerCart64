@@ -62,28 +62,51 @@ pub struct Serial {
 
 impl Serial {
     fn reset(&self) -> Result<(), Error> {
-        const WAIT_DURATION: Duration = Duration::from_millis(10);
-        const RETRY_COUNT: i32 = 100;
+        const RESET_WAIT_DURATION: Duration = Duration::from_millis(10);
+        const RESET_RETRY_COUNT: i32 = 100;
+        const FLUSH_TIMEOUT: Duration = Duration::from_secs(1);
 
         self.serial.set_dtr(true)?;
-        for n in 0..=RETRY_COUNT {
+        for n in 0..=RESET_RETRY_COUNT {
             self.serial.discard_buffers()?;
-            thread::sleep(WAIT_DURATION);
+            thread::sleep(RESET_WAIT_DURATION);
             if self.serial.read_dsr()? {
                 break;
             }
-            if n == RETRY_COUNT {
+            if n == RESET_RETRY_COUNT {
                 return Err(Error::new("Couldn't reset SC64 device (on)"));
             }
         }
 
+        let flush_timeout = Instant::now();
+
+        loop {
+            match self.serial.read(&mut vec![0; 1]) {
+                Ok(length) => match length {
+                    0 => break,
+                    _ => {}
+                },
+                Err(error) => match error.kind() {
+                    ErrorKind::TimedOut => break,
+                    _ => {
+                        return Err(Error::new(
+                            format!("Couldn't flush SC64 serial buffer: {error}").as_str(),
+                        ))
+                    }
+                },
+            }
+            if flush_timeout.elapsed() >= FLUSH_TIMEOUT {
+                return Err(Error::new("SC64 serial buffer flush took too long"));
+            }
+        }
+
         self.serial.set_dtr(false)?;
-        for n in 0..=RETRY_COUNT {
-            thread::sleep(WAIT_DURATION);
+        for n in 0..=RESET_RETRY_COUNT {
+            thread::sleep(RESET_WAIT_DURATION);
             if !self.serial.read_dsr()? {
                 break;
             }
-            if n == RETRY_COUNT {
+            if n == RESET_RETRY_COUNT {
                 return Err(Error::new("Couldn't reset SC64 device (off)"));
             }
         }
