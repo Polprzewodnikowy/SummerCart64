@@ -6,7 +6,9 @@
   - [**Putting it together**](#putting-it-together)
   - [**Initial programming**](#initial-programming)
   - [**Troubleshooting**](#troubleshooting)
-    - [*`primer.py` threw error on `Bootloader -> SC64 FLASH` step*](#primerpy-threw-error-on-bootloader---sc64-flash-step)
+    - [*`primer.py` threw `No SC64 USB device found` error*](#primerpy-threw-no-sc64-usb-device-found-error)
+    - [*`primer.py` threw `SDRAM test error...` message*](#primerpy-threw-sdram-test-error-message)
+    - [*`primer.py` threw other error message*](#primerpy-threw-other-error-message)
 
 ---
 
@@ -115,9 +117,23 @@ Congratulations! Your SC64 flashcart should be ready for use!
 
 ### **Troubleshooting**
 
-#### *`primer.py` threw error on `Bootloader -> SC64 FLASH` step*
+#### *`primer.py` threw `No SC64 USB device found` error*
 
 This issue can be attributed to incorrectly programmed FT232H EEPROM in the first programming step.
 Check again in `FT_PROG` application if device was configured properly.
+Make sure default FTDI drivers are installed for the SC64 in the device manager (only on Windows OS).
+Make sure you have correct access to `/dev/ttyUSBx` device and `ftdi_sio` and `usbserial` modules are loaded (only on Linux OS).
+
+#### *`primer.py` threw `SDRAM test error...` message*
+
+This issue shows up when there's a problem with the connection to the SDRAM chip or the chip itself is malfunctioning.
+Check for any solder bridges and unconnected pins on U8/U9 chips.
 Once FPGA and microcontroller has been programmed successfully `primer.py` script needs to be run in special mode.
-Please use command `python3 primer.py COMx sc64-firmware-{version}.bin --bootloader-only` to try programming bootloader again.
+Please use command `python3 primer.py COMx sc64-firmware-{version}.bin --bootloader-only` to test SDRAM again and continue bootloader programming process.
+
+#### *`primer.py` threw other error message*
+Due to multiple possible causes of the problem it's best to start visually inspecting SC64's board for any defects, like bad solder work or chips soldered backwards.
+If visual inspection didn't yield any obvious culprits then next step would be to check if everything is connected correctly.
+Check if TX/RX signals aren't swapped and if SC64 is getting power from the USB cable. Best place to check supply voltage are the exposed test pads on the left of U8 chip.
+If everything at this point was checked and looked fine, then feel free to open new thread in the [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab.
+Make sure to describe your problem extensively, attach SC64 board photos **from the both sides**, and paste all logs/screenshots from the `primer.py` output.

@@ -5,10 +5,11 @@ import os
 import queue
 import serial
 import signal
+import struct
 import sys
 import time
 from binascii import crc32
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from serial.tools import list_ports
 from sys import exit
 from typing import Callable, Optional
@@ -78,7 +79,7 @@ class SC64UpdateData:
 
     def __int_to_bytes(self, value: int) -> bytes:
         return value.to_bytes(4, byteorder='little')
-    
+
     def __align(self, value: int) -> int:
         if (value % 16 != 0):
             value += (16 - (value % 16))
@@ -166,7 +167,7 @@ class SC64UpdateData:
 
     def get_primer_data(self) -> Optional[bytes]:
         return self.__primer_data
-    
+
     def create_bootloader_only_firmware(self):
         if (self.__bootloader_data == None):
             raise SC64UpdateDataException('No bootloader data available for firmware creation')
@@ -478,6 +479,8 @@ class SC64:
     __serial: Optional[serial.Serial] = None
     __packets = queue.Queue()
 
+    SDRAM_SIZE = 64 * 1024 * 1024
+
     class __UpdateStatus(IntEnum):
         MCU = 1
         FPGA = 2
@@ -485,7 +488,8 @@ class SC64:
         DONE = 0x80
         ERROR = 0xFF
 
-    def __init__(self) -> None:
+    def __init__(self, progress: Callable[[int, int, str], None]) -> None:
+        self.__progress = progress
         SC64_VID = 0x0403
         SC64_PID = 0x6014
         SC64_SID = "SC64"
@@ -575,14 +579,36 @@ class SC64:
             return packet
         return None
 
-    def update_firmware(self, data: bytes) -> None:
+    def __cmd_state_reset(self) -> None:
+        self.__execute_command(b'R')
+
+    def __cmd_memory_read(self, address: int, length: int) -> bytes:
+        return self.__execute_command(b'm', [address, length])
+
+    def __cmd_memory_write(self, address: int, data: bytes) -> None:
+        self.__execute_command(b'M', [address, len(data)], data)
+
+    def __cmd_firmware_update(self, address: int, length: int) -> None:
+        self.__execute_command(b'F', [address, length])
+
+    def update_firmware(self, data: bytes, description: str) -> None:
         FIRMWARE_ADDRESS = 0x00100000
         FIRMWARE_UPDATE_TIMEOUT = 90.0
+        STEPS = 6
+
+        self.__progress(STEPS, 0, description)
 
         self.__reset()
-        self.__execute_command(b'R')
-        self.__execute_command(b'M', [FIRMWARE_ADDRESS, len(data)], data)
-        self.__execute_command(b'F', [FIRMWARE_ADDRESS, len(data)])
+        self.__progress(STEPS, 1, description)
+
+        self.__cmd_state_reset()
+        self.__progress(STEPS, 2, description)
+
+        self.__cmd_memory_write(FIRMWARE_ADDRESS, data)
+        self.__progress(STEPS, 3, description)
+
+        self.__cmd_firmware_update(FIRMWARE_ADDRESS, len(data))
+        self.__progress(STEPS, 4, description)
 
         timeout = time.time() + FIRMWARE_UPDATE_TIMEOUT
         while True:
@@ -596,11 +622,62 @@ class SC64:
             if (id != b'F'):
                 raise SC64Exception('Unexpected packet id received')
             status = self.__UpdateStatus(int.from_bytes(packet_data[0:4], byteorder='big'))
-            if (status == self.__UpdateStatus.ERROR):
-                raise SC64Exception('Firmware update error')
-            if (status == self.__UpdateStatus.DONE):
+            if (status == self.__UpdateStatus.BOOTLOADER):
+                self.__progress(STEPS, 5, description)
+            elif (status == self.__UpdateStatus.DONE):
+                self.__progress(STEPS, 6, description)
                 time.sleep(2)
                 break
+            elif (status == self.__UpdateStatus.ERROR):
+                raise SC64Exception('Firmware update error')
+
+    class __RamTestPattern(StrEnum):
+        OWN_ADDRESS = 'own address'
+        ALL_ZEROS = 'all zeros'
+        ALL_ONES = 'all ones'
+        RANDOM_DATA = 'random data'
+
+    def __create_ram_test_pattern(self, pattern: __RamTestPattern) -> bytes:
+        if (pattern == self.__RamTestPattern.OWN_ADDRESS):
+            addresses = list(range(0, self.SDRAM_SIZE, 4))
+            data = struct.pack(f'>{len(addresses)}I', *addresses)
+        elif (pattern == self.__RamTestPattern.ALL_ZEROS):
+            data = b'\x00' * self.SDRAM_SIZE
+        elif (pattern == self.__RamTestPattern.ALL_ONES):
+            data = b'\xFF' * self.SDRAM_SIZE
+        elif (pattern == self.__RamTestPattern.RANDOM_DATA):
+            data = os.urandom(self.SDRAM_SIZE)
+        return bytes(data)
+
+    def sdram_test(self, description: str) -> None:
+        CHUNK_LENGTH = 1 * 1024 * 1024
+
+        self.__reset()
+
+        self.__cmd_state_reset()
+
+        for pattern in self.__RamTestPattern:
+            write_description = f'{description} / Write {pattern.value}'
+            check_description = f'{description} / Check {pattern.value}'
+
+            test_data = self.__create_ram_test_pattern(pattern)
+
+            self.__progress(self.SDRAM_SIZE, 0, write_description)
+            for offset in range(0, self.SDRAM_SIZE, CHUNK_LENGTH):
+                self.__cmd_memory_write(offset, test_data[offset:offset+CHUNK_LENGTH])
+                self.__progress(self.SDRAM_SIZE, offset + CHUNK_LENGTH, write_description)
+
+            self.__progress(self.SDRAM_SIZE, 0, check_description)
+            for offset in range(0, self.SDRAM_SIZE, CHUNK_LENGTH):
+                check_data = self.__cmd_memory_read(offset, CHUNK_LENGTH)
+                if (check_data != test_data[offset:offset+CHUNK_LENGTH]):
+                    for chunk_offset in range(0, CHUNK_LENGTH, 4):
+                        test_address = offset + chunk_offset
+                        expected_value = int.from_bytes(test_data[test_address:test_address+4], byteorder='big')
+                        read_value = int.from_bytes(check_data[chunk_offset:chunk_offset+4], byteorder='big')
+                        if (read_value != expected_value or test_address == 0x00100000):
+                            raise SC64Exception(f'SDRAM test error at 0x{test_address:08X}: read 0x{read_value:08X} != expected 0x{expected_value:08X}')
+                self.__progress(self.SDRAM_SIZE, offset + CHUNK_LENGTH, check_description)
 
 
 class SC64BringUp:
@@ -621,7 +698,7 @@ class SC64BringUp:
 
     def start_bring_up(self, port: str, bootloader_only: bool=False) -> None:
         link = None
-        sc64 = SC64()
+        sc64 = SC64(self.__progress)
 
         try:
             if (not bootloader_only):
@@ -651,11 +728,8 @@ class SC64BringUp:
                 time.sleep(self.__INTERVAL_TIME)
                 link.read_all()
 
-            bootloader_description = 'Bootloader -> SC64 FLASH (no progress reporting)'
-            bootloader_length = len(self.__bootloader_only_firmware)
-            self.__progress(bootloader_length, 0, bootloader_description)
-            sc64.update_firmware(self.__bootloader_only_firmware)
-            self.__progress(bootloader_length, bootloader_length, bootloader_description)
+            sc64.sdram_test('SC64 SDRAM test')
+            sc64.update_firmware(self.__bootloader_only_firmware, 'Bootloader -> SC64 FLASH')
         finally:
             if (link and link.is_open):
                 link.close()
