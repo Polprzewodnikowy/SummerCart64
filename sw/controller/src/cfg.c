@@ -19,6 +19,32 @@
 
 
 typedef enum {
+    CMD_ID_IDENTIFIER_GET = 'v',
+    CMD_ID_VERSION_GET = 'V',
+    CMD_ID_CONFIG_GET = 'c',
+    CMD_ID_CONFIG_SET = 'C',
+    CMD_ID_SETTING_GET = 'a',
+    CMD_ID_SETTING_SET = 'A',
+    CMD_ID_TIME_GET = 't',
+    CMD_ID_TIME_SET = 'T',
+    CMD_ID_USB_READ = 'm',
+    CMD_ID_USB_WRITE = 'M',
+    CMD_ID_USB_READ_STATUS = 'u',
+    CMD_ID_USB_WRITE_STATUS = 'U',
+    CMD_ID_SD_CARD_OP = 'i',
+    CMD_ID_SD_SECTOR_SET = 'I',
+    CMD_ID_SD_READ = 's',
+    CMD_ID_SD_WRITE = 'S',
+    CMD_ID_DISK_MAPPING_SET = 'D',
+    CMD_ID_WRITEBACK_PENDING = 'w',
+    CMD_ID_WRITEBACK_SD_INFO = 'W',
+    CMD_ID_FLASH_PROGRAM = 'K',
+    CMD_ID_FLASH_WAIT_BUSY = 'p',
+    CMD_ID_FLASH_ERASE_BLOCK = 'P',
+    CMD_ID_DIAGNOSTIC_GET = '%',
+} cmd_id_t;
+
+typedef enum {
     CFG_ID_BOOTLOADER_SWITCH = 0,
     CFG_ID_ROM_WRITE_ENABLE = 1,
     CFG_ID_ROM_SHADOW_ENABLE = 2,
@@ -97,6 +123,9 @@ typedef enum {
 
 
 struct process {
+    bool cmd_queued;
+    cmd_id_t cmd;
+    uint32_t data[2];
     boot_mode_t boot_mode;
     save_type_t save_type;
     cic_seed_t cic_seed;
@@ -109,8 +138,43 @@ struct process {
 static struct process p;
 
 
-static void cfg_set_usb_output_ready (void) {
-    p.usb_output_ready = true;
+static bool cfg_cmd_check (void) {
+    if (!p.cmd_queued) {
+        uint32_t reg = fpga_reg_get(REG_CFG_CMD);
+
+        if (!(reg & CFG_CMD_PENDING)) {
+            return true;
+        }
+
+        p.cmd_queued = true;
+        p.cmd = (cmd_id_t) ((reg & CFG_CMD_MASK) >> CFG_CMD_BIT);
+        p.data[0] = fpga_reg_get(REG_CFG_DATA_0);
+        p.data[1] = fpga_reg_get(REG_CFG_DATA_1);
+    }
+
+    return false;
+}
+
+static void cfg_cmd_reply_success (void) {
+    p.cmd_queued = false;
+    fpga_reg_set(REG_CFG_DATA_0, p.data[0]);
+    fpga_reg_set(REG_CFG_DATA_1, p.data[1]);
+    fpga_reg_set(REG_CFG_CMD, CFG_CMD_DONE);
+}
+
+static void cfg_cmd_reply_error (cfg_error_t error) {
+    p.cmd_queued = false;
+    fpga_reg_set(REG_CFG_DATA_0, error);
+    fpga_reg_set(REG_CFG_DATA_1, 0);
+    fpga_reg_set(REG_CFG_CMD, CFG_CMD_ERROR | CFG_CMD_DONE);
+}
+
+static void cfg_change_scr_bits (uint32_t mask, bool value) {
+    if (value) {
+        fpga_reg_set(REG_CFG_SCR, fpga_reg_get(REG_CFG_SCR) | mask);
+    } else {
+        fpga_reg_set(REG_CFG_SCR, fpga_reg_get(REG_CFG_SCR) & (~mask));
+    }
 }
 
 static bool cfg_translate_address (uint32_t *address, uint32_t length, translate_type_t type) {
@@ -167,20 +231,6 @@ static bool cfg_translate_address (uint32_t *address, uint32_t length, translate
         }
     }
     return true;
-}
-
-static void cfg_set_error (cfg_error_t error) {
-    fpga_reg_set(REG_CFG_DATA_0, error);
-    fpga_reg_set(REG_CFG_DATA_1, 0);
-    fpga_reg_set(REG_CFG_CMD, CFG_CMD_ERROR | CFG_CMD_DONE);
-}
-
-static void cfg_change_scr_bits (uint32_t mask, bool value) {
-    if (value) {
-        fpga_reg_set(REG_CFG_SCR, fpga_reg_get(REG_CFG_SCR) | mask);
-    } else {
-        fpga_reg_set(REG_CFG_SCR, fpga_reg_get(REG_CFG_SCR) & (~mask));
-    }
 }
 
 static bool cfg_set_save_type (save_type_t save_type) {
@@ -245,6 +295,10 @@ static bool cfg_read_diagnostic_data (uint32_t *args) {
     }
 
     return false;
+}
+
+static void cfg_set_usb_output_ready (void) {
+    p.usb_output_ready = true;
 }
 
 
@@ -476,265 +530,237 @@ void cfg_reset_state (void) {
 void cfg_init (void) {
     fpga_reg_set(REG_CFG_SCR, CFG_SCR_BOOTLOADER_ENABLED);
     cfg_reset_state();
+    p.cmd_queued = false;
     p.usb_output_ready = true;
 }
 
 
 void cfg_process (void) {
-    uint32_t reg;
-    uint32_t args[2];
-    uint32_t prev_cfg[2];
-    usb_tx_info_t packet_info;
+    if (cfg_cmd_check()) {
+        return;
+    }
 
-    reg = fpga_reg_get(REG_CFG_CMD);
+    switch (p.cmd) {
+        case CMD_ID_IDENTIFIER_GET:
+            p.data[0] = cfg_get_identifier();
+            break;
 
-    if (reg & CFG_CMD_PENDING) {
-        args[0] = fpga_reg_get(REG_CFG_DATA_0);
-        args[1] = fpga_reg_get(REG_CFG_DATA_1);
-        char cmd = (char) ((reg & CFG_CMD_MASK) >> CFG_CMD_BIT);
+        case CMD_ID_VERSION_GET:
+            version_firmware(&p.data[0], &p.data[1]);
+            break;
 
-        switch (cmd) {
-            case 'v':
-                args[0] = cfg_get_identifier();
-                break;
-
-            case 'V':
-                version_firmware(&args[0], &args[1]);
-                break;
-
-            case 'c':
-                if (cfg_query(args)) {
-                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
-                    return;
-                }
-                break;
-
-            case 'C':
-                prev_cfg[0] = args[0];
-                cfg_query(prev_cfg);
-                if (cfg_update(args)) {
-                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
-                    return;
-                }
-                args[1] = prev_cfg[1];
-                break;
-
-            case 'a':
-                if (cfg_query_setting(args)) {
-                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
-                    return;
-                }
-                break;
-
-            case 'A':
-                if (cfg_update_setting(args)) {
-                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
-                    return;
-                }
-                break;
-
-            case 't':
-                cfg_get_time(args);
-                break;
-
-            case 'T':
-                cfg_set_time(args);
-                break;
-
-            case 'm':
-                if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                if (!usb_prepare_read(args)) {
-                    return;
-                }
-                break;
-
-            case 'M':
-                if (cfg_translate_address(&args[0], args[1] & 0xFFFFFF, (SDRAM | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                usb_create_packet(&packet_info, PACKET_CMD_DEBUG_OUTPUT);
-                packet_info.data_length = 4;
-                packet_info.data[0] = args[1];
-                packet_info.dma_length = (args[1] & 0xFFFFFF);
-                packet_info.dma_address = args[0];
-                packet_info.done_callback = cfg_set_usb_output_ready;
-                if (usb_enqueue_packet(&packet_info)) {
-                    p.usb_output_ready = false;
-                } else {
-                    return;
-                }
-                break;
-
-            case 'u':
-                usb_get_read_info(args);
-                break;
-
-            case 'U':
-                args[0] = p.usb_output_ready ? 0 : (1 << 31);
-                break;
-
-            case 'i':
-                switch (args[1]) {
-                    case SD_CARD_OP_DEINIT:
-                        sd_card_deinit();
-                        break;
-                    case SD_CARD_OP_INIT: {
-                        led_activity_on();
-                        bool error = sd_card_init();
-                        led_activity_off();
-                        if (error) {
-                            cfg_set_error(CFG_ERROR_SD_CARD);
-                            return;
-                        }
-                        break;
-                    }
-                    case SD_CARD_OP_GET_STATUS:
-                        args[1] = sd_card_get_status();
-                        break;
-                    case SD_CARD_OP_GET_INFO:
-                        if (cfg_translate_address(&args[0], SD_CARD_INFO_SIZE, (SDRAM | BRAM))) {
-                            cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                            return;
-                        }
-                        if (sd_card_get_info(args[0])) {
-                            cfg_set_error(CFG_ERROR_SD_CARD);
-                            return;
-                        }
-                        break;
-                    case SD_CARD_OP_BYTE_SWAP_ON:
-                        if (sd_set_byte_swap(true)) {
-                            cfg_set_error(CFG_ERROR_SD_CARD);
-                            return;
-                        }
-                        break;
-                    case SD_CARD_OP_BYTE_SWAP_OFF:
-                        if (sd_set_byte_swap(false)) {
-                            cfg_set_error(CFG_ERROR_SD_CARD);
-                            return;
-                        }
-                        break;
-                    default:
-                        cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                        return;
-                }
-                break;
-
-            case 'I':
-                p.sd_card_sector = args[0];
-                break;
-
-            case 's': {
-                if (args[1] >= 0x800000) {
-                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                    return;
-                }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                led_activity_on();
-                bool error = sd_read_sectors(args[0], p.sd_card_sector, args[1]);
-                led_activity_off();
-                if (error) {
-                    cfg_set_error(CFG_ERROR_SD_CARD);
-                    return;
-                }
-                p.sd_card_sector += args[1];
-                break;
+        case CMD_ID_CONFIG_GET:
+            if (cfg_query(p.data)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_CONFIG_ID);
             }
+            break;
 
-            case 'S': {
-                if (args[1] >= 0x800000) {
-                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                    return;
-                }
-                if (cfg_translate_address(&args[0], args[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                led_activity_on();
-                bool error = sd_write_sectors(args[0], p.sd_card_sector, args[1]);
-                led_activity_off();
-                if (error) {
-                    cfg_set_error(CFG_ERROR_SD_CARD);
-                    return;
-                }
-                p.sd_card_sector += args[1];
-                break;
+        case CMD_ID_CONFIG_SET: {
+            uint32_t prev[2] = { p.data[0], 0 };
+            cfg_query(prev);
+            if (cfg_update(p.data)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_CONFIG_ID);
             }
-
-            case 'D':
-                if (cfg_translate_address(&args[0], args[1], (SDRAM | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                dd_set_disk_mapping(args[0], args[1]);
-                break;
-
-            case 'w':
-                args[0] = writeback_pending();
-                break;
-
-            case 'W':
-                if (cfg_translate_address(&args[0], WRITEBACK_SECTOR_TABLE_SIZE, (SDRAM | BRAM))) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                writeback_load_sector_table(args[0]);
-                writeback_enable(WRITEBACK_SD);
-                break;
-
-            case 'K':
-                if (args[1] >= DATA_BUFFER_SIZE) {
-                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                    return;
-                }
-                if (cfg_translate_address(&args[0], args[1], FLASH)) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                if (flash_program(DATA_BUFFER_ADDRESS, args[0], args[1])) {
-                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                    return;
-                }
-                break;
-
-            case 'p':
-                if (args[0]) {
-                    flash_wait_busy();
-                }
-                args[0] = FLASH_ERASE_BLOCK_SIZE;
-                break;
-
-            case 'P':
-                if (cfg_translate_address(&args[0], FLASH_ERASE_BLOCK_SIZE, FLASH)) {
-                    cfg_set_error(CFG_ERROR_BAD_ADDRESS);
-                    return;
-                }
-                if (flash_erase_block(args[0])) {
-                    cfg_set_error(CFG_ERROR_BAD_ARGUMENT);
-                    return;
-                }
-                break;
-
-            case '%':
-                if (cfg_read_diagnostic_data(args)) {
-                    cfg_set_error(CFG_ERROR_BAD_CONFIG_ID);
-                    return;
-                }
-                break;
-
-            default:
-                cfg_set_error(CFG_ERROR_UNKNOWN_CMD);
-                return;
+            p.data[1] = prev[1];
+            break;
         }
 
-        fpga_reg_set(REG_CFG_DATA_0, args[0]);
-        fpga_reg_set(REG_CFG_DATA_1, args[1]);
-        fpga_reg_set(REG_CFG_CMD, CFG_CMD_DONE);
+        case CMD_ID_SETTING_GET:
+            if (cfg_query_setting(p.data)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_CONFIG_ID);
+            }
+            break;
+
+        case CMD_ID_SETTING_SET:
+            if (cfg_update_setting(p.data)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_CONFIG_ID);
+            }
+            break;
+
+        case CMD_ID_TIME_GET:
+            cfg_get_time(p.data);
+            break;
+
+        case CMD_ID_TIME_SET:
+            cfg_set_time(p.data);
+            break;
+
+        case CMD_ID_USB_READ:
+            if (cfg_translate_address(&p.data[0], p.data[1], (SDRAM | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            if (!usb_prepare_read(p.data)) {
+                return;
+            }
+            break;
+
+        case CMD_ID_USB_WRITE: {
+            if (cfg_translate_address(&p.data[0], p.data[1] & 0xFFFFFF, (SDRAM | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            usb_tx_info_t packet_info;
+            usb_create_packet(&packet_info, PACKET_CMD_DEBUG_OUTPUT);
+            packet_info.data_length = 4;
+            packet_info.data[0] = p.data[1];
+            packet_info.dma_length = (p.data[1] & 0xFFFFFF);
+            packet_info.dma_address = p.data[0];
+            packet_info.done_callback = cfg_set_usb_output_ready;
+            if (usb_enqueue_packet(&packet_info)) {
+                p.usb_output_ready = false;
+            } else {
+                return;
+            }
+            break;
+        }
+
+        case CMD_ID_USB_READ_STATUS:
+            usb_get_read_info(p.data);
+            break;
+
+        case CMD_ID_USB_WRITE_STATUS:
+            p.data[0] = p.usb_output_ready ? 0 : (1 << 31);
+            break;
+
+        case CMD_ID_SD_CARD_OP:
+            switch (p.data[1]) {
+                case SD_CARD_OP_DEINIT:
+                    sd_card_deinit();
+                    break;
+
+                case SD_CARD_OP_INIT: {
+                    led_activity_on();
+                    bool error = sd_card_init();
+                    led_activity_off();
+                    if (error) {
+                        return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+                    }
+                    break;
+                }
+
+                case SD_CARD_OP_GET_STATUS:
+                    p.data[1] = sd_card_get_status();
+                    break;
+
+                case SD_CARD_OP_GET_INFO:
+                    if (cfg_translate_address(&p.data[0], SD_CARD_INFO_SIZE, (SDRAM | BRAM))) {
+                        return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+                    }
+                    if (sd_card_get_info(p.data[0])) {
+                        return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+                    }
+                    break;
+
+                case SD_CARD_OP_BYTE_SWAP_ON:
+                    if (sd_set_byte_swap(true)) {
+                        return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+                    }
+                    break;
+
+                case SD_CARD_OP_BYTE_SWAP_OFF:
+                    if (sd_set_byte_swap(false)) {
+                        return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+                    }
+                    break;
+
+                default:
+                    return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            break;
+
+        case CMD_ID_SD_SECTOR_SET:
+            p.sd_card_sector = p.data[0];
+            break;
+
+        case CMD_ID_SD_READ: {
+            if (p.data[1] >= 0x800000) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            if (cfg_translate_address(&p.data[0], p.data[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            led_activity_on();
+            bool error = sd_read_sectors(p.data[0], p.sd_card_sector, p.data[1]);
+            led_activity_off();
+            if (error) {
+                return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+            }
+            p.sd_card_sector += p.data[1];
+            break;
+        }
+
+        case CMD_ID_SD_WRITE: {
+            if (p.data[1] >= 0x800000) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            if (cfg_translate_address(&p.data[0], p.data[1] * SD_SECTOR_SIZE, (SDRAM | FLASH | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            led_activity_on();
+            bool error = sd_write_sectors(p.data[0], p.sd_card_sector, p.data[1]);
+            led_activity_off();
+            if (error) {
+                return cfg_cmd_reply_error(CFG_ERROR_SD_CARD);
+            }
+            p.sd_card_sector += p.data[1];
+            break;
+        }
+
+        case CMD_ID_DISK_MAPPING_SET:
+            if (cfg_translate_address(&p.data[0], p.data[1], (SDRAM | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            dd_set_disk_mapping(p.data[0], p.data[1]);
+            break;
+
+        case CMD_ID_WRITEBACK_PENDING:
+            p.data[0] = writeback_pending();
+            break;
+
+        case CMD_ID_WRITEBACK_SD_INFO:
+            if (cfg_translate_address(&p.data[0], WRITEBACK_SECTOR_TABLE_SIZE, (SDRAM | BRAM))) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            writeback_load_sector_table(p.data[0]);
+            writeback_enable(WRITEBACK_SD);
+            break;
+
+        case CMD_ID_FLASH_PROGRAM:
+            if (p.data[1] >= DATA_BUFFER_SIZE) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            if (cfg_translate_address(&p.data[0], p.data[1], FLASH)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            if (flash_program(DATA_BUFFER_ADDRESS, p.data[0], p.data[1])) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            break;
+
+        case CMD_ID_FLASH_WAIT_BUSY:
+            if (p.data[0]) {
+                flash_wait_busy();
+            }
+            p.data[0] = FLASH_ERASE_BLOCK_SIZE;
+            break;
+
+        case CMD_ID_FLASH_ERASE_BLOCK:
+            if (cfg_translate_address(&p.data[0], FLASH_ERASE_BLOCK_SIZE, FLASH)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ADDRESS);
+            }
+            if (flash_erase_block(p.data[0])) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_ARGUMENT);
+            }
+            break;
+
+        case CMD_ID_DIAGNOSTIC_GET:
+            if (cfg_read_diagnostic_data(p.data)) {
+                return cfg_cmd_reply_error(CFG_ERROR_BAD_CONFIG_ID);
+            }
+            break;
+
+        default:
+            return cfg_cmd_reply_error(CFG_ERROR_UNKNOWN_CMD);
     }
+
+    cfg_cmd_reply_success();
 }

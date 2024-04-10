@@ -7,7 +7,10 @@
     - [`0x1FFF_0004`: **DATA0** and `0x1FFF_0008`: **DATA1**](#0x1fff_0004-data0-and-0x1fff_0008-data1)
     - [`0x1FFF_000C`: **IDENTIFIER**](#0x1fff_000c-identifier)
     - [`0x1FFF_0010`: **KEY**](#0x1fff_0010-key)
+    - [`0x1FFF_0014`: **IRQ**](#0x1fff_0014-irq)
 - [Command execution flow](#command-execution-flow)
+  - [Without interrupt](#without-interrupt)
+  - [With interrupt](#with-interrupt)
 
 ---
 
@@ -51,7 +54,7 @@ This mapping is used when accessing flashcart from N64 side.
 | EEPROM              | `0x1FFE_2000` | 2 kiB     | RW     | `0x0500_2000` | Block RAM             | mem bus     | SC64 register access is enabled   |
 | 64DD buffer [8]     | `0x1FFE_2800` | 256 bytes | RW     | `0x0500_2800` | Block RAM             | mem bus     | SC64 register access is enabled   |
 | FlashRAM buffer [8] | `0x1FFE_2900` | 128 bytes | R      | `0x0500_2900` | Block RAM             | mem bus     | SC64 register access is enabled   |
-| SC64 registers      | `0x1FFF_0000` | 20 bytes  | RW     | N/A           | Flashcart Interface   | reg bus     | SC64 register access is enabled   |
+| SC64 registers      | `0x1FFF_0000` | 24 bytes  | RW     | N/A           | Flashcart Interface   | reg bus     | SC64 register access is enabled   |
 
  - Note [1]: 64DD IPL share SDRAM memory space with ROM (last 4 MiB minus 128 kiB for saves). Write access is always disabled for this section.
  - Note [2]: SRAM and FlashRAM save types share SDRAM memory space with ROM (last 128 kiB).
@@ -88,25 +91,28 @@ SC64 contains small register region used for communication between N64 and contr
 Protocol is command based with support for up to 256 diferrent commands and two 32-bit argument/result values per operation.
 Support for interrupts is provided but currently no command relies on it, 64DD IRQ is handled separately.
 
-| name               | address       | size    | access | usage                              |
-| ------------------ | ------------- | ------- | ------ | ---------------------------------- |
-| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execution and status       |
-| **DATA0**          | `0x1FFF_0004` | 4 bytes | RW     | Command argument/result 0          |
-| **DATA1**          | `0x1FFF_0008` | 4 bytes | RW     | Command argument/result 1          |
-| **IDENTIFIER**     | `0x1FFF_000C` | 4 bytes | RW     | Flashcart identifier and IRQ clear |
-| **KEY**            | `0x1FFF_0010` | 4 bytes | W      | SC64 register access lock/unlock   |
+| name               | address       | size    | access | usage                            |
+| ------------------ | ------------- | ------- | ------ | -------------------------------- |
+| **STATUS/COMMAND** | `0x1FFF_0000` | 4 bytes | RW     | Command execution and status     |
+| **DATA0**          | `0x1FFF_0004` | 4 bytes | RW     | Command argument/result 0        |
+| **DATA1**          | `0x1FFF_0008` | 4 bytes | RW     | Command argument/result 1        |
+| **IDENTIFIER**     | `0x1FFF_000C` | 4 bytes | RW     | Flashcart identifier             |
+| **KEY**            | `0x1FFF_0010` | 4 bytes | W      | SC64 register access lock/unlock |
+| **IRQ**            | `0x1FFF_0014` | 4 bytes | W      | Pending IRQ clear                |
 
 ---
 
 #### `0x1FFF_0000`: **STATUS/COMMAND** 
 
-| name          | bits   | access | meaning                                               |
-| ------------- | ------ | ------ | ----------------------------------------------------- |
-| `CMD_BUSY`    | [31]   | R      | `1` if dispatched command is pending/executing        |
-| `CMD_ERROR`   | [30]   | R      | `1` if last executed command returned with error code |
-| `IRQ_PENDING` | [29]   | R      | `1` if flashcart has raised an interrupt              |
-| N/A           | [28:8] | N/A    | Unused, write `0` for future compatibility            |
-| `CMD_ID`      | [7:0]  | RW     | Command ID to be executed                             |
+| name              | bits   | access | meaning                                                     |
+| ----------------- | ------ | ------ | ----------------------------------------------------------- |
+| `CMD_BUSY`        | [31]   | R      | `1` if dispatched command is pending/executing              |
+| `CMD_ERROR`       | [30]   | R      | `1` if last executed command returned with error code       |
+| `MCU_IRQ_PENDING` | [29]   | R      | `1` if flashcart has raised a MCU interrupt                 |
+| `CMD_IRQ_PENDING` | [28]   | R      | `1` if flashcart has raised a command finish interrupt      |
+| N/A               | [27:9] | N/A    | Unused, write `0` for future compatibility                  |
+| `CMD_IRQ_REQUEST` | [8]    | RW     | Raise cart interrupt signal when command finishes execution |
+| `CMD_ID`          | [7:0]  | RW     | Command ID to be executed                                   |
 
 Note: Write to this register raises `CMD_BUSY` bit and clears `CMD_ERROR` bit. Flashcart then will start executing provided command.
 
@@ -124,11 +130,10 @@ Note: Result is valid only when command has executed and `CMD_BUSY` bit is reset
 
 #### `0x1FFF_000C`: **IDENTIFIER**
 
-| name         | bits   | access | meaning                                           |
-| ------------ | ------ | ------ | ------------------------------------------------- |
-| `IDENTIFIER` | [31:0] | RW     | Flashcart identifier (ASCII `SCv2`) and IRQ clear |
+| name         | bits   | access | meaning                             |
+| ------------ | ------ | ------ | ----------------------------------- |
+| `IDENTIFIER` | [31:0] | R      | Flashcart identifier (ASCII `SCv2`) |
 
-Note: Writing any value to this register will clear pending flashcart interrupt.
 
 ---
 
@@ -147,12 +152,36 @@ Value `0xFFFFFFFF` will lock all SC64 registers if flashcart is in unlock state.
 
 ---
 
+#### `0x1FFF_0014`: **IRQ**
+
+| name        | bits   | access | meaning                                       |
+| ----------- | ------ | ------ | --------------------------------------------- |
+| `MCU_CLEAR` | [31]   | W      | Write `1` to clear a MCU interrupt            |
+| `CMD_CLEAR` | [30]   | W      | Write `1` to clear a command finish interrupt |
+| N/A         | [29:0] | N/A    | Unused, write `0` for future compatibility    |
+
+---
+
 ## Command execution flow
+
+### Without interrupt
 
 1. Check if command is already executing by reading `CMD_BUSY` bit in **STATUS/COMMAND** register (optional).
 2. Write command argument values to **DATA0** and **DATA1** registers, can be skipped if command doesn't require it.
 3. Write command ID to **STATUS/COMMAND** register.
 4. Wait for `CMD_BUSY` bit in **STATUS/COMMAND** register to go low.
 5. Check if `CMD_ERROR` bit in **STATUS/COMMAND** is set:
+   - If error is set then read **DATA0** register containing error code.
+   - If error is not set then read **DATA0** and **DATA1** registers containing command result values, can be skipped if command doesn't return any values.
+
+### With interrupt
+
+1. Check if command is already executing by reading `CMD_BUSY` bit in **STATUS/COMMAND** register (optional).
+2. Write command argument values to **DATA0** and **DATA1** registers, can be skipped if command doesn't require it.
+3. Write command ID to **STATUS/COMMAND** register and set `CMD_IRQ_REQUEST` bit high.
+4. Wait for cart interrupt.
+5. Check (in cart interrupt handler) if `CMD_IRQ_PENDING` bit in **STATUS/COMMAND** register is set high.
+6. Clear interrupt by setting `CMD_CLEAR` bit high in the **IRQ** register.
+7. Check if `CMD_ERROR` bit in **STATUS/COMMAND** is set:
    - If error is set then read **DATA0** register containing error code.
    - If error is not set then read **DATA0** and **DATA1** registers containing command result values, can be skipped if command doesn't return any values.
