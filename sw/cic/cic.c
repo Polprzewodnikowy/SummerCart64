@@ -36,33 +36,32 @@ typedef struct {
 
 #define EXT ((ext_regs_t *) (0xC0000000UL))
 
-#define CIC_DQ                      (1 << 0)
-#define CIC_CLK                     (1 << 1)
-#define CIC_RESET                   (1 << 2)
-#define CIC_INVALID_REGION          (1 << 3)
-#define CIC_TIMER_RESET             (1 << 4)
-#define CIC_TIMER_BIT               (16)
-#define CIC_TIMER_MASK              (0xFFF)
+#define CIC_DQ                      (1 << 0) // IO
+#define CIC_CLK                     (1 << 1) // I
+#define CIC_RESET                   (1 << 2) // I
+#define CIC_TIMER_ELAPSED           (1 << 3) // I
+#define CIC_TIMER_START             (1 << 4) // O
+#define CIC_TIMER_CLEAR             (1 << 5) // O
+#define CIC_INVALID_REGION          (1 << 6) // O
 
+#define CIC_INIT()                  { EXT->IO = (CIC_TIMER_CLEAR | CIC_DQ); }
 #define CIC_IS_RUNNING()            (EXT->IO & CIC_RESET)
-#define CIC_CLK_WAIT_LOW()          { while ((EXT->IO & (CIC_RESET | CIC_CLK)) == (CIC_RESET | CIC_CLK)); }
-#define CIC_CLK_WAIT_HIGH()         { while ((EXT->IO & (CIC_RESET | CIC_CLK)) == CIC_RESET); }
+#define CIC_CLK_WAIT_LOW()          { while ((EXT->IO & (CIC_TIMER_ELAPSED | CIC_RESET | CIC_CLK)) == (CIC_RESET | CIC_CLK)); }
+#define CIC_CLK_WAIT_HIGH()         { while ((EXT->IO & (CIC_TIMER_ELAPSED | CIC_RESET | CIC_CLK)) == CIC_RESET); }
+#define CIC_CLK_IS_LOW()            ((EXT->IO & (CIC_RESET | CIC_CLK)) == CIC_RESET)
 #define CIC_DQ_GET()                (EXT->IO & CIC_DQ)
 #define CIC_DQ_SET(v)               { EXT->IO = ((v) ? CIC_DQ : 0); }
-#define CIC_CLK_GET()               (EXT->IO & (CIC_RESET | CIC_CLK))
 #define CIC_NOTIFY_INVALID_REGION() { EXT->IO = (CIC_INVALID_REGION | CIC_DQ); }
-#define CIC_TIMEOUT_START()         { EXT->IO = (CIC_TIMER_RESET | CIC_DQ); }
-#define CIC_TIMEOUT_GET()           ((EXT->IO >> CIC_TIMER_BIT) & CIC_TIMER_MASK)
+#define CIC_TIMEOUT_START()         { EXT->IO = (CIC_TIMER_START | CIC_DQ); }
+#define CIC_TIMEOUT_STOP()          { EXT->IO = (CIC_TIMER_CLEAR | CIC_DQ); }
+#define CIC_TIMEOUT_ELAPSED()       (EXT->IO & CIC_TIMER_ELAPSED)
+#define CIC_SET_STEP(v)             { EXT->DEBUG = (v); }
 
-#define CIC_TIMER_MS_TO_TICKS(ms)   ((((62500000 / 32) / 256) * (ms)) / 1000)
-
-#define CIC_TIMEOUT_INVALID_REGION  CIC_TIMER_MS_TO_TICKS(100)
-#define CIC_TIMEOUT_SOFT_RESET      CIC_TIMER_MS_TO_TICKS(500)
 
 typedef enum {
     CIC_STEP_UNAVAILABLE = 0,
     CIC_STEP_POWER_OFF = 1,
-    CIC_STEP_INIT = 2,
+    CIC_STEP_CONFIG_LOAD = 2,
     CIC_STEP_ID = 3,
     CIC_STEP_SEED = 4,
     CIC_STEP_CHECKSUM = 5,
@@ -77,7 +76,6 @@ typedef enum {
     CIC_STEP_DIE_COMMAND = 14,
 } cic_step_t;
 
-
 typedef struct {
     bool cic_disabled;
     bool cic_64dd_mode;
@@ -87,8 +85,6 @@ typedef struct {
 } cic_config_t;
 
 static cic_config_t config;
-
-static uint16_t timeout;
 
 static uint8_t cic_ram[32];
 static uint8_t cic_x105_ram[30];
@@ -100,30 +96,16 @@ static const uint8_t cic_ram_init[2][16] = {{
 }};
 
 
-static void cic_set_step (cic_step_t step) {
-    EXT->DEBUG = step;
-}
-
-static void cic_timeout_start (uint16_t timeout_ticks) {
-    CIC_TIMEOUT_START();
-    timeout = timeout_ticks;
-}
-
-static bool cic_timeout_elapsed (void) {
-    return (CIC_TIMEOUT_GET() >= timeout);
-}
-
-static void cic_die (cic_step_t reason) {
-    cic_set_step(reason);
+static void cic_die (void) {
     while (CIC_IS_RUNNING());
 }
 
 static void cic_wait_power_on (void) {
-    CIC_DQ_SET(1);
+    CIC_INIT();
     while (!CIC_IS_RUNNING());
 }
 
-static void cic_init (void) {
+static void cic_load_config (void) {
     uint32_t cic_config[2];
 
     cic_config[0] = EXT->CIC_CONFIG[0];
@@ -141,7 +123,8 @@ static void cic_init (void) {
     config.cic_checksum[5] = (cic_config[1] & 0xFF);
 
     if (config.cic_disabled) {
-        cic_die(CIC_STEP_DIE_DISABLED);
+        CIC_SET_STEP(CIC_STEP_DIE_DISABLED);
+        cic_die();
     }
 }
 
@@ -192,9 +175,10 @@ static void cic_encode_round (uint8_t index) {
 static void cic_write_id (void) {
     if (config.cic_64dd_mode) {
         CIC_CLK_WAIT_LOW();
-        while (CIC_CLK_GET() == CIC_RESET) {
+        while (CIC_CLK_IS_LOW()) {
             if (!CIC_DQ_GET()) {
-                cic_die(CIC_STEP_DIE_64DD);
+                CIC_SET_STEP(CIC_STEP_DIE_64DD);
+                cic_die();
             }
         }
     } else {
@@ -215,16 +199,17 @@ static void cic_write_seed (void) {
     cic_encode_round(0x0A);
     cic_encode_round(0x0A);
 
-    cic_timeout_start(CIC_TIMEOUT_INVALID_REGION);
-
-    while (CIC_CLK_GET() == (CIC_RESET | CIC_CLK)) {
-        if (cic_timeout_elapsed()) {
-            CIC_NOTIFY_INVALID_REGION();
-            cic_die(CIC_STEP_DIE_INVALID_REGION);
-        }
-    }
+    CIC_TIMEOUT_START();
 
     cic_write_ram_nibbles(0x0A);
+
+    if (CIC_TIMEOUT_ELAPSED()) {
+        CIC_NOTIFY_INVALID_REGION();
+        CIC_SET_STEP(CIC_STEP_DIE_INVALID_REGION);
+        cic_die();
+    }
+
+    CIC_TIMEOUT_STOP();
 }
 
 static void cic_write_checksum (void) {
@@ -232,14 +217,15 @@ static void cic_write_checksum (void) {
         cic_ram[i] = 0x00;
     }
     for (int i = 0; i < 6; i++) {
-        cic_ram[(i * 2) + 4] = ((config.cic_checksum[i] >> 4) & 0x0F);
-        cic_ram[(i * 2) + 5] = (config.cic_checksum[i] & 0x0F);
+        uint8_t value = config.cic_checksum[i];
+        cic_ram[(i * 2) + 4] = ((value >> 4) & 0x0F);
+        cic_ram[(i * 2) + 5] = (value & 0x0F);
     }
     cic_encode_round(0x00);
     cic_encode_round(0x00);
     cic_encode_round(0x00);
     cic_encode_round(0x00);
-    cic_write(0);
+    cic_read();
     cic_write_ram_nibbles(0x00);
 }
 
@@ -374,49 +360,53 @@ static void cic_x105_mode (void) {
 
 static void cic_soft_reset (void) {
     CIC_CLK_WAIT_LOW();
-    cic_timeout_start(CIC_TIMEOUT_SOFT_RESET);
-    while ((!cic_timeout_elapsed()) && CIC_IS_RUNNING());
+
+    CIC_TIMEOUT_START();
+    while ((!CIC_TIMEOUT_ELAPSED()) && CIC_IS_RUNNING());
+    CIC_TIMEOUT_STOP();
+
     cic_write(0);
 }
 
 
 __attribute__((naked)) void cic_main (void) {
     while (true) {
-        cic_set_step(CIC_STEP_POWER_OFF);
+        CIC_SET_STEP(CIC_STEP_POWER_OFF);
         cic_wait_power_on();
 
-        cic_set_step(CIC_STEP_INIT);
-        cic_init();
+        CIC_SET_STEP(CIC_STEP_CONFIG_LOAD);
+        cic_load_config();
 
-        cic_set_step(CIC_STEP_ID);
+        CIC_SET_STEP(CIC_STEP_ID);
         cic_write_id();
 
-        cic_set_step(CIC_STEP_SEED);
+        CIC_SET_STEP(CIC_STEP_SEED);
         cic_write_seed();
 
-        cic_set_step(CIC_STEP_CHECKSUM);
+        CIC_SET_STEP(CIC_STEP_CHECKSUM);
         cic_write_checksum();
 
-        cic_set_step(CIC_STEP_INIT_RAM);
+        CIC_SET_STEP(CIC_STEP_INIT_RAM);
         cic_init_ram();
 
         while (CIC_IS_RUNNING()) {
-            cic_set_step(CIC_STEP_COMMAND);
+            CIC_SET_STEP(CIC_STEP_COMMAND);
             uint8_t cmd = 0;
             cmd |= (cic_read() << 1);
             cmd |= cic_read();
 
             if (cmd == 0) {
-                cic_set_step(CIC_STEP_COMPARE);
+                CIC_SET_STEP(CIC_STEP_COMPARE);
                 cic_compare_mode();
             } else if (cmd == 2) {
-                cic_set_step(CIC_STEP_X105);
+                CIC_SET_STEP(CIC_STEP_X105);
                 cic_x105_mode();
             } else if (cmd == 3) {
-                cic_set_step(CIC_STEP_RESET_BUTTON);
+                CIC_SET_STEP(CIC_STEP_RESET_BUTTON);
                 cic_soft_reset();
             } else {
-                cic_die(CIC_STEP_DIE_COMMAND);
+                CIC_SET_STEP(CIC_STEP_DIE_COMMAND);
+                cic_die();
             }
         }
     }
