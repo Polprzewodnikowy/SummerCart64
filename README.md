@@ -1,7 +1,7 @@
 # SummerCart64 - a fully open source Nintendo 64 flashcart
 [<img src="assets/sc64_logo.svg" />](assets/sc64_logo.svg)
 
-### **For non-technical description of the SummerCart64, please head to the https://summercart64.dev website!**
+**For non-technical description of the SummerCart64, please head to the https://summercart64.dev website!**
 
 ## Features
  - 64 MiB SDRAM memory for game and save data
