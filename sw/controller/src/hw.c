@@ -60,7 +60,7 @@ static void hw_timeout_start (void) {
     TIM1->CR1 |= TIM_CR1_CEN;
 }
 
-static bool hw_timeout_occured (uint32_t timeout_us) {
+static bool hw_timeout_elapsed (uint32_t timeout_us) {
     uint16_t count = TIM1->CNT;
 
     uint32_t adjusted_timeout = ((timeout_us + (TIMEOUT_US_PER_TICK - 1)) / TIMEOUT_US_PER_TICK);
@@ -343,7 +343,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
     hw_timeout_start();
 
     while (I2C1->ISR & I2C_ISR_BUSY) {
-        if (hw_timeout_occured(I2C_TIMEOUT_US_BUSY)) {
+        if (hw_timeout_elapsed(I2C_TIMEOUT_US_BUSY)) {
             return I2C_ERR_BUSY;
         }
     }
@@ -375,7 +375,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
                 return I2C_ERR_NACK;
             }
 
-            if (hw_timeout_occured(tx_timeout)) {
+            if (hw_timeout_elapsed(tx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }
@@ -385,7 +385,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
         }
 
         while (!(I2C1->ISR & I2C_ISR_TC)) {
-            if (hw_timeout_occured(tx_timeout)) {
+            if (hw_timeout_elapsed(tx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }
@@ -414,7 +414,7 @@ i2c_err_t hw_i2c_trx (uint8_t address, uint8_t *tx_data, uint8_t tx_length, uint
                 left -= 1;
             }
 
-            if (hw_timeout_occured(rx_timeout)) {
+            if (hw_timeout_elapsed(rx_timeout)) {
                 return I2C_ERR_TIMEOUT;
             }
         }

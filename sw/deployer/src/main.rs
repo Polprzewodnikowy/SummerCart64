@@ -716,9 +716,9 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
 
     let (major, minor, revision) = sc64.check_firmware_version()?;
     let state = sc64.get_device_state()?;
-    let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S %Z");
+    let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S");
 
-    println!("{}", "SC64 information and current state:".bold());
+    println!("{}", "SummerCart64 state information:".bold());
     println!(" Firmware version:    v{}.{}.{}", major, minor, revision);
     println!(" RTC datetime:        {}", datetime);
     println!(" Boot mode:           {}", state.boot_mode);
@@ -737,7 +737,10 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" Button state:        {}", state.button_state);
     println!(" LED blink:           {}", state.led_enable);
     println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
-    println!(" FPGA debug data:     {}", state.fpga_debug_data);
+    println!("{}", "SummerCart64 diagnostic information:".bold());
+    println!(" Last PI address:     0x{:08X}", state.fpga_debug_data.last_pi_address);
+    println!(" PI FIFO flags:       {}", state.fpga_debug_data.pi_fifo_flags);
+    println!(" Current CIC step:    {}", state.fpga_debug_data.cic_step);
     println!(" Diagnostic data:     {}", state.diagnostic_data);
 
     Ok(())

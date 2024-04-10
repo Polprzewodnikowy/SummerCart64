@@ -60,7 +60,7 @@ typedef struct {
 #define CIC_TIMEOUT_SOFT_RESET      CIC_TIMER_MS_TO_TICKS(500)
 
 typedef enum {
-    CIC_STEP_UNINITIALIZED = 0,
+    CIC_STEP_UNAVAILABLE = 0,
     CIC_STEP_POWER_OFF = 1,
     CIC_STEP_INIT = 2,
     CIC_STEP_ID = 3,
@@ -94,11 +94,9 @@ static uint8_t cic_ram[32];
 static uint8_t cic_x105_ram[30];
 
 static const uint8_t cic_ram_init[2][16] = {{
-    0xE0, 0x9A, 0x18, 0x5A, 0x13, 0xE1, 0x0D, 0xEC,
-    0x0B, 0x14, 0xF8, 0xB5, 0x7C, 0xD6, 0x1E, 0x98
+    0xE0, 0x9A, 0x18, 0x5A, 0x13, 0xE1, 0x0D, 0xEC, 0x0B, 0x14, 0xF8, 0xB5, 0x7C, 0xD6, 0x1E, 0x98
 }, {
-    0xE0, 0x4F, 0x51, 0x21, 0x71, 0x98, 0x57, 0x5A,
-    0x0B, 0x12, 0x3F, 0x82, 0x71, 0x98, 0x11, 0x5C
+    0xE0, 0x4F, 0x51, 0x21, 0x71, 0x98, 0x57, 0x5A, 0x0B, 0x12, 0x3F, 0x82, 0x71, 0x98, 0x11, 0x5C
 }};
 
 
@@ -246,10 +244,10 @@ static void cic_write_checksum (void) {
 }
 
 static void cic_init_ram (void) {
-    for (int i = 0; i < 32; i += 2) {
-        uint8_t value = cic_ram_init[config.cic_region ? 1 : 0][i / 2];
-        cic_ram[i] = ((value >> 4) & 0x0F);
-        cic_ram[i + 1] = (value & 0x0F);
+    for (int i = 0; i < 16; i++) {
+        uint8_t value = cic_ram_init[config.cic_region ? 1 : 0][i];
+        cic_ram[(i * 2)] = ((value >> 4) & 0x0F);
+        cic_ram[(i * 2) + 1] = (value & 0x0F);
     }
     cic_ram[0x01] = cic_read_nibble();
     cic_ram[0x11] = cic_read_nibble();
