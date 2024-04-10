@@ -649,7 +649,8 @@ module mcu_top (
 
                 REG_DEBUG_1: begin
                     reg_rdata <= {
-                        28'd0,
+                        24'd0,
+                        n64_scb.cic_debug,
                         n64_scb.pi_debug[35:32]
                     };
                 end

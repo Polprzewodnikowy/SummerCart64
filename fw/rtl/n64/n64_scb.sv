@@ -61,6 +61,7 @@ interface n64_scb ();
     logic cic_region;
     logic [7:0] cic_seed;
     logic [47:0] cic_checksum;
+    logic [3:0] cic_debug;
 
     logic pi_sdram_active;
     logic pi_flash_active;
@@ -111,6 +112,7 @@ interface n64_scb ();
         output cic_region,
         output cic_seed,
         output cic_checksum,
+        input cic_debug,
 
         input pi_debug
     );
@@ -225,7 +227,8 @@ interface n64_scb ();
         input cic_64dd_mode,
         input cic_region,
         input cic_seed,
-        input cic_checksum
+        input cic_checksum,
+        output cic_debug
     );
 
     modport arbiter (

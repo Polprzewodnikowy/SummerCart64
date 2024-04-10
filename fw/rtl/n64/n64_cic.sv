@@ -6,7 +6,8 @@ module n64_cic (
 
     input n64_reset,
     input n64_cic_clk,
-    inout n64_cic_dq
+    inout n64_cic_dq,
+    input n64_si_clk
 );
 
     // Input/output synchronization
@@ -14,26 +15,62 @@ module n64_cic (
     logic [1:0] n64_reset_ff;
     logic [1:0] n64_cic_clk_ff;
     logic [1:0] n64_cic_dq_ff;
+    logic [1:0] n64_si_clk_ff;
 
     always_ff @(posedge clk) begin
         n64_reset_ff <= {n64_reset_ff[0], n64_reset};
         n64_cic_clk_ff <= {n64_cic_clk_ff[0], n64_cic_clk};
         n64_cic_dq_ff <= {n64_cic_dq_ff[0], n64_cic_dq};
+        n64_si_clk_ff <= {n64_si_clk_ff[0], n64_si_clk};
     end
 
     logic cic_reset;
     logic cic_clk;
     logic cic_dq;
+    logic si_clk;
 
     always_comb begin
         cic_reset = n64_reset_ff[1];
         cic_clk = n64_cic_clk_ff[1];
         cic_dq = n64_cic_dq_ff[1];
+        si_clk = n64_si_clk_ff[1];
     end
 
     logic cic_dq_out;
 
     assign n64_cic_dq = cic_dq_out ? 1'bZ : 1'b0;
+
+
+    // Timer (divider and counter)
+
+    logic last_si_clk;
+
+    always_ff @(posedge clk) begin
+        last_si_clk <= si_clk;
+    end
+
+    logic si_clk_rising_edge;
+
+    always_comb begin
+        si_clk_rising_edge = cic_reset && !last_si_clk && si_clk;
+    end
+
+    logic [7:0] timer_divider;
+    logic [11:0] timer_counter;
+    logic timer_reset;
+
+    always_ff @(posedge clk) begin
+        if (si_clk_rising_edge) begin
+            timer_divider <= timer_divider + 1'd1;
+            if (&timer_divider) begin
+                timer_counter <= timer_counter + 1'd1;
+            end
+        end
+        if (timer_reset) begin
+            timer_divider <= 8'd0;
+            timer_counter <= 12'd0;
+        end
+    end
 
 
     // SERV RISC-V CPU
@@ -110,6 +147,7 @@ module n64_cic (
     // Bus controller
 
     always_ff @(posedge clk) begin
+        timer_reset <= 1'b0;
         n64_scb.cic_invalid_region <= 1'b0;
 
         dbus_ack <= dbus_cycle && !dbus_ack;
@@ -126,12 +164,21 @@ module n64_cic (
                 2'b11: begin
                     case (dbus_addr[3:2])
                         2'b10: begin
+                            timer_reset <= dbus_wdata[4];
                             n64_scb.cic_invalid_region <= dbus_wdata[3];
                             cic_dq_out <= dbus_wdata[0];
+                        end
+
+                        2'b11: begin
+                            n64_scb.cic_debug <= dbus_wdata[3:0];
                         end
                     endcase
                 end
             endcase
+        end
+
+        if (reset) begin
+            n64_scb.cic_debug <= 3'd0;
         end
 
         if (reset || !cic_reset) begin
@@ -159,7 +206,16 @@ module n64_cic (
 
                     2'b01: dbus_rdata = n64_scb.cic_checksum[31:0];
 
-                    2'b10: dbus_rdata = {29'd0, cic_reset, cic_clk, cic_dq};
+                    2'b10: dbus_rdata = {
+                        4'd0,
+                        timer_counter,
+                        13'd0,
+                        cic_reset,
+                        cic_clk,
+                        cic_dq
+                    };
+
+                    2'b11: dbus_rdata = {28'd0, n64_scb.cic_debug};
                 endcase
             end
         endcase

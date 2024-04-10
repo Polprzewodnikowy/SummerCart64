@@ -3,7 +3,7 @@
 // MIT License
 
 // Copyright (c) 2019 Jan Goldacker
-// Copyright (c) 2022-2023 Mateusz Faderewski
+// Copyright (c) 2022-2024 Mateusz Faderewski
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,8 @@
 
 typedef struct {
     volatile uint32_t CIC_CONFIG[2];
-    volatile uint32_t GPIO;
+    volatile uint32_t IO;
+    volatile uint32_t DEBUG;
 } ext_regs_t;
 
 #define EXT ((ext_regs_t *) (0xC0000000UL))
@@ -39,14 +40,42 @@ typedef struct {
 #define CIC_CLK                     (1 << 1)
 #define CIC_RESET                   (1 << 2)
 #define CIC_INVALID_REGION          (1 << 3)
+#define CIC_TIMER_RESET             (1 << 4)
+#define CIC_TIMER_BIT               (16)
+#define CIC_TIMER_MASK              (0xFFF)
 
-#define CIC_IS_RUNNING()            (EXT->GPIO & CIC_RESET)
-#define CIC_CLK_WAIT_LOW()          { while ((EXT->GPIO & (CIC_RESET | CIC_CLK)) == (CIC_RESET | CIC_CLK)); }
-#define CIC_CLK_WAIT_HIGH()         { while ((EXT->GPIO & (CIC_RESET | CIC_CLK)) == CIC_RESET); }
-#define CIC_DQ_GET()                (EXT->GPIO & CIC_DQ)
-#define CIC_DQ_SET(v)               { EXT->GPIO = ((v) ? CIC_DQ : 0); }
-#define CIC_CLK_GET()               (EXT->GPIO & (CIC_RESET | CIC_CLK))
-#define CIC_NOTIFY_INVALID_REGION() { EXT->GPIO = (CIC_INVALID_REGION | CIC_DQ); }
+#define CIC_IS_RUNNING()            (EXT->IO & CIC_RESET)
+#define CIC_CLK_WAIT_LOW()          { while ((EXT->IO & (CIC_RESET | CIC_CLK)) == (CIC_RESET | CIC_CLK)); }
+#define CIC_CLK_WAIT_HIGH()         { while ((EXT->IO & (CIC_RESET | CIC_CLK)) == CIC_RESET); }
+#define CIC_DQ_GET()                (EXT->IO & CIC_DQ)
+#define CIC_DQ_SET(v)               { EXT->IO = ((v) ? CIC_DQ : 0); }
+#define CIC_CLK_GET()               (EXT->IO & (CIC_RESET | CIC_CLK))
+#define CIC_NOTIFY_INVALID_REGION() { EXT->IO = (CIC_INVALID_REGION | CIC_DQ); }
+#define CIC_TIMEOUT_START()         { EXT->IO = (CIC_TIMER_RESET | CIC_DQ); }
+#define CIC_TIMEOUT_GET()           ((EXT->IO >> CIC_TIMER_BIT) & CIC_TIMER_MASK)
+
+#define CIC_TIMER_MS_TO_TICKS(ms)   ((((62500000 / 32) / 256) * (ms)) / 1000)
+
+#define CIC_TIMEOUT_INVALID_REGION  CIC_TIMER_MS_TO_TICKS(100)
+#define CIC_TIMEOUT_SOFT_RESET      CIC_TIMER_MS_TO_TICKS(500)
+
+typedef enum {
+    CIC_STEP_UNINITIALIZED = 0,
+    CIC_STEP_POWER_OFF = 1,
+    CIC_STEP_INIT = 2,
+    CIC_STEP_ID = 3,
+    CIC_STEP_SEED = 4,
+    CIC_STEP_CHECKSUM = 5,
+    CIC_STEP_INIT_RAM = 6,
+    CIC_STEP_COMMAND = 7,
+    CIC_STEP_COMPARE = 8,
+    CIC_STEP_X105 = 9,
+    CIC_STEP_RESET_BUTTON = 10,
+    CIC_STEP_DIE_DISABLED = 11,
+    CIC_STEP_DIE_64DD = 12,
+    CIC_STEP_DIE_INVALID_REGION = 13,
+    CIC_STEP_DIE_COMMAND = 14,
+} cic_step_t;
 
 
 typedef struct {
@@ -59,27 +88,44 @@ typedef struct {
 
 static cic_config_t config;
 
+static uint16_t timeout;
+
 static uint8_t cic_ram[32];
 static uint8_t cic_x105_ram[30];
 
-static const uint8_t cic_ram_init[2][32] = {{
-    0xE, 0x0, 0x9, 0xA, 0x1, 0x8, 0x5, 0xA, 0x1, 0x3, 0xE, 0x1, 0x0, 0xD, 0xE, 0xC,
-    0x0, 0xB, 0x1, 0x4, 0xF, 0x8, 0xB, 0x5, 0x7, 0xC, 0xD, 0x6, 0x1, 0xE, 0x9, 0x8
+static const uint8_t cic_ram_init[2][16] = {{
+    0xE0, 0x9A, 0x18, 0x5A, 0x13, 0xE1, 0x0D, 0xEC,
+    0x0B, 0x14, 0xF8, 0xB5, 0x7C, 0xD6, 0x1E, 0x98
 }, {
-    0xE, 0x0, 0x4, 0xF, 0x5, 0x1, 0x2, 0x1, 0x7, 0x1, 0x9, 0x8, 0x5, 0x7, 0x5, 0xA,
-    0x0, 0xB, 0x1, 0x2, 0x3, 0xF, 0x8, 0x2, 0x7, 0x1, 0x9, 0x8, 0x1, 0x1, 0x5, 0xC
+    0xE0, 0x4F, 0x51, 0x21, 0x71, 0x98, 0x57, 0x5A,
+    0x0B, 0x12, 0x3F, 0x82, 0x71, 0x98, 0x11, 0x5C
 }};
 
 
-static void cic_die (void) {
+static void cic_set_step (cic_step_t step) {
+    EXT->DEBUG = step;
+}
+
+static void cic_timeout_start (uint16_t timeout_ticks) {
+    CIC_TIMEOUT_START();
+    timeout = timeout_ticks;
+}
+
+static bool cic_timeout_elapsed (void) {
+    return (CIC_TIMEOUT_GET() >= timeout);
+}
+
+static void cic_die (cic_step_t reason) {
+    cic_set_step(reason);
     while (CIC_IS_RUNNING());
 }
 
-static void cic_init (void) {
+static void cic_wait_power_on (void) {
     CIC_DQ_SET(1);
-
     while (!CIC_IS_RUNNING());
+}
 
+static void cic_init (void) {
     uint32_t cic_config[2];
 
     cic_config[0] = EXT->CIC_CONFIG[0];
@@ -97,7 +143,7 @@ static void cic_init (void) {
     config.cic_checksum[5] = (cic_config[1] & 0xFF);
 
     if (config.cic_disabled) {
-        cic_die();
+        cic_die(CIC_STEP_DIE_DISABLED);
     }
 }
 
@@ -150,7 +196,7 @@ static void cic_write_id (void) {
         CIC_CLK_WAIT_LOW();
         while (CIC_CLK_GET() == CIC_RESET) {
             if (!CIC_DQ_GET()) {
-                cic_die();
+                cic_die(CIC_STEP_DIE_64DD);
             }
         }
     } else {
@@ -171,13 +217,14 @@ static void cic_write_seed (void) {
     cic_encode_round(0x0A);
     cic_encode_round(0x0A);
 
-    uint32_t timeout = 10000;
-    do {
-        if (timeout == 0) {
+    cic_timeout_start(CIC_TIMEOUT_INVALID_REGION);
+
+    while (CIC_CLK_GET() == (CIC_RESET | CIC_CLK)) {
+        if (cic_timeout_elapsed()) {
             CIC_NOTIFY_INVALID_REGION();
-            cic_die();
+            cic_die(CIC_STEP_DIE_INVALID_REGION);
         }
-    } while (timeout-- && (CIC_CLK_GET() == (CIC_RESET | CIC_CLK)));
+    }
 
     cic_write_ram_nibbles(0x0A);
 }
@@ -199,8 +246,10 @@ static void cic_write_checksum (void) {
 }
 
 static void cic_init_ram (void) {
-    for (int i = 0; i < 32; i++) {
-        cic_ram[i] = cic_ram_init[config.cic_region ? 1 : 0][i];
+    for (int i = 0; i < 32; i += 2) {
+        uint8_t value = cic_ram_init[config.cic_region ? 1 : 0][i / 2];
+        cic_ram[i] = ((value >> 4) & 0x0F);
+        cic_ram[i + 1] = (value & 0x0F);
     }
     cic_ram[0x01] = cic_read_nibble();
     cic_ram[0x11] = cic_read_nibble();
@@ -326,35 +375,50 @@ static void cic_x105_mode (void) {
 }
 
 static void cic_soft_reset (void) {
-    volatile uint32_t timeout = 119050; // ~500 ms delay, measured on real hardware
     CIC_CLK_WAIT_LOW();
-    while ((timeout--) && CIC_IS_RUNNING());
+    cic_timeout_start(CIC_TIMEOUT_SOFT_RESET);
+    while ((!cic_timeout_elapsed()) && CIC_IS_RUNNING());
     cic_write(0);
 }
 
 
 __attribute__((naked)) void cic_main (void) {
     while (true) {
+        cic_set_step(CIC_STEP_POWER_OFF);
+        cic_wait_power_on();
+
+        cic_set_step(CIC_STEP_INIT);
         cic_init();
 
+        cic_set_step(CIC_STEP_ID);
         cic_write_id();
+
+        cic_set_step(CIC_STEP_SEED);
         cic_write_seed();
+
+        cic_set_step(CIC_STEP_CHECKSUM);
         cic_write_checksum();
+
+        cic_set_step(CIC_STEP_INIT_RAM);
         cic_init_ram();
 
         while (CIC_IS_RUNNING()) {
+            cic_set_step(CIC_STEP_COMMAND);
             uint8_t cmd = 0;
             cmd |= (cic_read() << 1);
             cmd |= cic_read();
 
             if (cmd == 0) {
+                cic_set_step(CIC_STEP_COMPARE);
                 cic_compare_mode();
             } else if (cmd == 2) {
+                cic_set_step(CIC_STEP_X105);
                 cic_x105_mode();
             } else if (cmd == 3) {
+                cic_set_step(CIC_STEP_RESET_BUTTON);
                 cic_soft_reset();
             } else {
-                cic_die();
+                cic_die(CIC_STEP_DIE_COMMAND);
             }
         }
     }

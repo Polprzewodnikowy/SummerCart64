@@ -782,12 +782,79 @@ impl TryFrom<u32> for UpdateStatus {
     }
 }
 
+pub enum CicStep {
+    Uninitialized,
+    PowerOff,
+    Init,
+    Id,
+    Seed,
+    Checksum,
+    InitRam,
+    Command,
+    Compare,
+    X105,
+    ResetButton,
+    DieDisabled,
+    Die64DD,
+    DieInvalidRegion,
+    DieCommand,
+    Unknown,
+}
+
+impl Display for CicStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Uninitialized => "Uninitialized",
+            Self::PowerOff => "Power off",
+            Self::Init => "Initialize",
+            Self::Id => "ID",
+            Self::Seed => "Seed",
+            Self::Checksum => "Checksum",
+            Self::InitRam => "RAM init",
+            Self::Command => "Command wait",
+            Self::Compare => "Compare algorithm",
+            Self::X105 => "X105 algorithm",
+            Self::ResetButton => "Reset button pressed",
+            Self::DieDisabled => "Die (disabled)",
+            Self::Die64DD => "Die (found another CIC in 64DD mode)",
+            Self::DieInvalidRegion => "Die (invalid region)",
+            Self::DieCommand => "Die (triggered by command)",
+            Self::Unknown => "Unknown",
+        })
+    }
+}
+
+impl TryFrom<u8> for CicStep {
+    type Error = Error;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Uninitialized,
+            1 => Self::PowerOff,
+            2 => Self::Init,
+            3 => Self::Id,
+            4 => Self::Seed,
+            5 => Self::Checksum,
+            6 => Self::InitRam,
+            7 => Self::Command,
+            8 => Self::Compare,
+            9 => Self::X105,
+            10 => Self::ResetButton,
+            11 => Self::DieDisabled,
+            12 => Self::Die64DD,
+            13 => Self::DieInvalidRegion,
+            14 => Self::DieCommand,
+            _ => Self::Unknown
+        })
+    }
+}
+
 pub struct FpgaDebugData {
     pub last_pi_address: u32,
     pub read_fifo_wait: bool,
     pub read_fifo_failure: bool,
     pub write_fifo_wait: bool,
     pub write_fifo_failure: bool,
+    pub cic_step: CicStep,
 }
 
 impl TryFrom<Vec<u8>> for FpgaDebugData {
@@ -802,6 +869,7 @@ impl TryFrom<Vec<u8>> for FpgaDebugData {
             read_fifo_failure: (value[7] & (1 << 1)) != 0,
             write_fifo_wait: (value[7] & (1 << 2)) != 0,
             write_fifo_failure: (value[7] & (1 << 3)) != 0,
+            cic_step: ((value[7] >> 4) & 0xF).try_into().unwrap(),
         })
     }
 }
@@ -824,6 +892,8 @@ impl Display for FpgaDebugData {
         if self.write_fifo_failure {
             f.write_str(" WF")?;
         }
+        f.write_str(" / ")?;
+        f.write_fmt(format_args!("CIC step: {}", self.cic_step))?;
         Ok(())
     }
 }

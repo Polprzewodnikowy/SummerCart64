@@ -112,7 +112,8 @@ module n64_top (
 
         .n64_reset(n64_reset),
         .n64_cic_clk(n64_cic_clk),
-        .n64_cic_dq(n64_cic_dq)
+        .n64_cic_dq(n64_cic_dq),
+        .n64_si_clk(n64_si_clk)
     );
 
 endmodule
