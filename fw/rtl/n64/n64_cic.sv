@@ -57,18 +57,34 @@ module n64_cic (
 
     logic [7:0] timer_divider;
     logic [11:0] timer_counter;
-    logic timer_reset;
+    logic timer_start;
+    logic timer_clear;
+    logic timer_elapsed;
+
+    const bit [11:0] TIMEOUT_500MS = 12'd3815; // (62_500_000 / 32 / 256 / 2) = ~500 ms
 
     always_ff @(posedge clk) begin
         if (si_clk_rising_edge) begin
             timer_divider <= timer_divider + 1'd1;
-            if (&timer_divider) begin
-                timer_counter <= timer_counter + 1'd1;
+        end
+
+        if (si_clk_rising_edge && (&timer_divider) && (timer_counter > 12'd0)) begin
+            timer_counter <= timer_counter - 1'd1;
+            if (timer_counter == 12'd1) begin
+                timer_elapsed <= 1'b1;
             end
         end
-        if (timer_reset) begin
+
+        if (timer_start) begin
+            timer_divider <= 8'd0;
+            timer_counter <= TIMEOUT_500MS;
+            timer_elapsed <= 1'b0;
+        end
+
+        if (timer_clear) begin
             timer_divider <= 8'd0;
             timer_counter <= 12'd0;
+            timer_elapsed <= 1'b0;
         end
     end
 
@@ -135,7 +151,6 @@ module n64_cic (
 
     always_ff @(posedge clk) begin
         ram_output <= ram[ram_addr];
-
         ibus_ack <= ibus_cycle && !ibus_ack;
     end
 
@@ -147,7 +162,8 @@ module n64_cic (
     // Bus controller
 
     always_ff @(posedge clk) begin
-        timer_reset <= 1'b0;
+        timer_start <= 1'b0;
+        timer_clear <= 1'b0;
         n64_scb.cic_invalid_region <= 1'b0;
 
         dbus_ack <= dbus_cycle && !dbus_ack;
@@ -164,8 +180,9 @@ module n64_cic (
                 2'b11: begin
                     case (dbus_addr[3:2])
                         2'b10: begin
-                            timer_reset <= dbus_wdata[4];
-                            n64_scb.cic_invalid_region <= dbus_wdata[3];
+                            n64_scb.cic_invalid_region <= dbus_wdata[6];
+                            timer_clear <= dbus_wdata[5];
+                            timer_start <= dbus_wdata[4];
                             cic_dq_out <= dbus_wdata[0];
                         end
 
@@ -207,9 +224,8 @@ module n64_cic (
                     2'b01: dbus_rdata = n64_scb.cic_checksum[31:0];
 
                     2'b10: dbus_rdata = {
-                        4'd0,
-                        timer_counter,
-                        13'd0,
+                        28'd0,
+                        timer_elapsed,
                         cic_reset,
                         cic_clk,
                         cic_dq

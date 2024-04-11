@@ -785,7 +785,7 @@ impl TryFrom<u32> for UpdateStatus {
 pub enum CicStep {
     Unavailable,
     PowerOff,
-    Init,
+    ConfigLoad,
     Id,
     Seed,
     Checksum,
@@ -806,7 +806,7 @@ impl Display for CicStep {
         f.write_str(match self {
             Self::Unavailable => "Unavailable",
             Self::PowerOff => "Power off",
-            Self::Init => "Initialize",
+            Self::ConfigLoad => "Load config",
             Self::Id => "ID",
             Self::Seed => "Seed",
             Self::Checksum => "Checksum",
@@ -830,7 +830,7 @@ impl TryFrom<u8> for CicStep {
         Ok(match value {
             0 => Self::Unavailable,
             1 => Self::PowerOff,
-            2 => Self::Init,
+            2 => Self::ConfigLoad,
             3 => Self::Id,
             4 => Self::Seed,
             5 => Self::Checksum,
