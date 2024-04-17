@@ -1979,7 +1979,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp 6ada18a1-cda2-4660-90f3-3f4f75f9908c))
     (fp_circle (center 0 0) (end 2.25 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp c591474d-238d-4c84-a612-ee496f305afe))
-    (pad "" np_thru_hole circle (at 0 0) (size 2 2) (drill 2) (layers "*.Cu" "*.Mask") (tstamp c7193e35-dceb-447c-ad59-0ec8e4b4e718))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.5 2.5) (drill 2.5) (layers "F&B.Cu" "*.Mask") (tstamp c7193e35-dceb-447c-ad59-0ec8e4b4e718))
   )
 
   (footprint "Resistor_SMD:R_0603_1608Metric" (layer "F.Cu")
@@ -3678,7 +3678,7 @@
       (stroke (width 0.15) (type solid)) (fill none) (layer "Cmts.User") (tstamp 9eecae69-62ca-4572-aee0-fa0e5463ad89))
     (fp_circle (center 0 0) (end 2.25 0)
       (stroke (width 0.05) (type solid)) (fill none) (layer "F.CrtYd") (tstamp e6a2c566-ab8e-4468-9856-def92a6b2f2f))
-    (pad "" np_thru_hole circle (at 0 0) (size 2 2) (drill 2) (layers "*.Cu" "*.Mask") (tstamp df924fac-cbe5-4c6e-ad8b-c486578cd2ca))
+    (pad "" np_thru_hole circle (at 0 0) (size 2.5 2.5) (drill 2.5) (layers "F&B.Cu" "*.Mask") (tstamp df924fac-cbe5-4c6e-ad8b-c486578cd2ca))
   )
 
   (footprint "LED_SMD:LED_0603_1608Metric" (layer "B.Cu")
