@@ -9,9 +9,9 @@
 	(paper "A4")
 	(title_block
 		(title "SC64")
-		(date "2023-02-12")
-		(rev "2.0a")
-		(company "Polprzewodnikowy")
+		(date "2024-04-17")
+		(rev "2.0b")
+		(company "Mateusz Faderewski")
 	)
 	(layers
 		(0 "F.Cu" signal)
@@ -8222,7 +8222,7 @@
 		(descr "Resistor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC_7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf), generated with kicad-footprint-generator")
 		(tags "resistor")
 		(property "Reference" "R6"
-			(at -2.75 0 90)
+			(at 2.75 0 90)
 			(layer "F.SilkS")
 			(uuid "aeeea69e-6e13-441b-8bc4-c00b8dc62384")
 			(effects
@@ -26341,16 +26341,16 @@
 			)
 		)
 	)
-	(gr_text "https://github.com/Polprzewodnikowy/SummerCart64"
-		(at 101.25 123.5 0)
+	(gr_text "Licensed under GNU GPLv3\nDesigned by Mateusz Faderewski\nhttps://summercart64.dev"
+		(at 137 118 0)
 		(layer "F.SilkS")
 		(uuid "77e7f556-c63c-46bb-bff0-b858da0827cb")
 		(effects
 			(font
-				(size 0.7 0.7)
-				(thickness 0.1)
+				(size 0.95 0.95)
+				(thickness 0.15)
 			)
-			(justify left)
+			(justify top)
 		)
 	)
 	(gr_text "3V3"
