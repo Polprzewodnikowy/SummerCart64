@@ -1,4 +1,4 @@
-# SummerCart64 - a fully open source Nintendo 64 flashcart
+# SummerCart64 - a fully open source N64 flashcart
 [<img src="../assets/sc64_logo.svg" />](../assets/sc64_logo.svg)
 
 ## Documentation
