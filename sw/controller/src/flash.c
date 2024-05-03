@@ -8,10 +8,13 @@
 
 
 bool flash_program (uint32_t src, uint32_t dst, uint32_t length) {
-    if (((src + length) > FLASH_ADDRESS) && (src < (FLASH_ADDRESS + FLASH_SIZE))) {
+    if ((dst < FLASH_ADDRESS) || ((dst + length) > (FLASH_ADDRESS + FLASH_SIZE))) {
         return true;
     }
-    if ((dst < FLASH_ADDRESS) || ((dst + length) > (FLASH_ADDRESS + FLASH_SIZE))) {
+    if ((src <= dst) && ((src + length) > dst)) {
+        return true;
+    }
+    if ((dst <= src) && ((dst + length) > src)) {
         return true;
     }
     while (length > 0) {

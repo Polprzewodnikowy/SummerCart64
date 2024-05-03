@@ -212,13 +212,23 @@ enum FirmwareCommands {
     Backup(FirmwareArgs),
 
     /// Update SC64 firmware from provided file
-    Update(FirmwareArgs),
+    Update(FirmwareUpdateArgs),
 }
 
 #[derive(Args)]
 struct FirmwareArgs {
     /// Path to the firmware file
     firmware: PathBuf,
+}
+
+#[derive(Args)]
+struct FirmwareUpdateArgs {
+    /// Path to the firmware file
+    firmware: PathBuf,
+
+    /// Put firmware update in the Flash memory instead of SDRAM
+    #[arg(long)]
+    use_flash_memory: bool,
 }
 
 #[derive(Args)]
@@ -738,8 +748,14 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" LED blink:           {}", state.led_enable);
     println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!("{}", "SummerCart64 diagnostic information:".bold());
-    println!(" Last PI address:     0x{:08X}", state.fpga_debug_data.last_pi_address);
-    println!(" PI FIFO flags:       {}", state.fpga_debug_data.pi_fifo_flags);
+    println!(
+        " Last PI address:     0x{:08X}",
+        state.fpga_debug_data.last_pi_address
+    );
+    println!(
+        " PI FIFO flags:       {}",
+        state.fpga_debug_data.pi_fifo_flags
+    );
     println!(" Current CIC step:    {}", state.fpga_debug_data.cic_step);
     println!(" Diagnostic data:     {}", state.diagnostic_data);
 
@@ -835,6 +851,12 @@ fn handle_firmware_command(
             println!("{}", "Firmware metadata:".bold());
             println!("{}", format!("{}", metadata).bright_blue().to_string());
             println!("{}", "Firmware file verification was successful".green());
+            if args.use_flash_memory {
+                println!(
+                    "{}",
+                    "Warning: using Flash memory to perform firmware update".yellow()
+                );
+            }
             let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
             if answer.to_ascii_lowercase() != "y" {
                 println!("{}", "Firmware update process aborted".red());
@@ -847,7 +869,7 @@ fn handle_firmware_command(
 
             log_wait(
                 format!("Updating firmware, this might take a while [{update_name}]"),
-                || sc64.update_firmware(&firmware),
+                || sc64.update_firmware(&firmware, args.use_flash_memory),
             )?;
 
             Ok(())

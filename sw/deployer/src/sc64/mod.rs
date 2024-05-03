@@ -89,7 +89,8 @@ const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
-const FIRMWARE_ADDRESS: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
+const FIRMWARE_ADDRESS_SDRAM: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
+const FIRMWARE_ADDRESS_FLASH: u32 = 0x0410_0000; // Arbitrary offset in Flash memory
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
@@ -668,19 +669,43 @@ impl SC64 {
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
         self.command_state_reset()?;
-        let (status, length) = self.command_firmware_backup(FIRMWARE_ADDRESS)?;
+        let (status, length) = self.command_firmware_backup(FIRMWARE_ADDRESS_SDRAM)?;
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
                 format!("Firmware backup error: {}", status).as_str(),
             ));
         }
-        self.command_memory_read(FIRMWARE_ADDRESS, length as usize)
+        self.command_memory_read(FIRMWARE_ADDRESS_SDRAM, length as usize)
     }
 
-    pub fn update_firmware(&mut self, data: &[u8]) -> Result<(), Error> {
-        self.command_state_reset()?;
-        self.command_memory_write(FIRMWARE_ADDRESS, data)?;
-        let status = self.command_firmware_update(FIRMWARE_ADDRESS, data.len())?;
+    pub fn update_firmware(&mut self, data: &[u8], use_flash_memory: bool) -> Result<(), Error> {
+        const FLASH_UPDATE_SUPPORTED_MINOR_VERSION: u16 = 19;
+        let status = if use_flash_memory {
+            let unsupported_version_error = Error::new(format!(
+                "Your firmware doesn't support updating from Flash memory, minimum required version: {}.{}.x",
+                SUPPORTED_MAJOR_VERSION, FLASH_UPDATE_SUPPORTED_MINOR_VERSION
+            ).as_str());
+            self.command_version_get()
+                .and_then(|(major, minor, revision)| {
+                    if major != SUPPORTED_MAJOR_VERSION
+                        || minor < FLASH_UPDATE_SUPPORTED_MINOR_VERSION
+                    {
+                        return Err(unsupported_version_error.clone());
+                    } else {
+                        Ok((major, minor, revision))
+                    }
+                })
+                .map_err(|_| unsupported_version_error.clone())?;
+            self.command_state_reset()?;
+            self.flash_erase(FIRMWARE_ADDRESS_FLASH, data.len())?;
+            self.command_memory_write(FIRMWARE_ADDRESS_FLASH, data)?;
+            self.command_flash_wait_busy(true)?;
+            self.command_firmware_update(FIRMWARE_ADDRESS_FLASH, data.len())?
+        } else {
+            self.command_state_reset()?;
+            self.command_memory_write(FIRMWARE_ADDRESS_SDRAM, data)?;
+            self.command_firmware_update(FIRMWARE_ADDRESS_SDRAM, data.len())?
+        };
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
                 format!("Firmware update verify error: {}", status).as_str(),

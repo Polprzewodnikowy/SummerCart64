@@ -6,12 +6,14 @@
 #include "vendor.h"
 
 
-#define SDRAM_ADDRESS       (0x00000000UL)
-#define SDRAM_LENGTH        (64 * 1024 * 1024)
+#define SDRAM_ADDRESS           (0x00000000UL)
+#define SDRAM_LENGTH            (64 * 1024 * 1024)
+#define FLASH_USABLE_LENGTH     (14 * 1024 * 1024)
+#define UPDATE_ADDRESS_END      (SDRAM_ADDRESS + SDRAM_LENGTH + FLASH_USABLE_LENGTH)
 
-#define UPDATE_MAGIC_START  (0x54535055UL)
-#define BOOTLOADER_ADDRESS  (0x04E00000UL)
-#define BOOTLOADER_LENGTH   (0x001E0000UL)
+#define UPDATE_MAGIC_START      (0x54535055UL)
+#define BOOTLOADER_ADDRESS      (0x04E00000UL)
+#define BOOTLOADER_LENGTH       (0x001E0000UL)
 
 
 typedef enum {
@@ -234,10 +236,10 @@ update_error_t update_prepare (uint32_t address, uint32_t length) {
     uint32_t data_address;
     uint32_t data_length;
 
-    if ((address >= (SDRAM_ADDRESS + SDRAM_LENGTH)) || (length > SDRAM_LENGTH)) {
+    if ((address >= UPDATE_ADDRESS_END) || (length > (SDRAM_LENGTH + FLASH_USABLE_LENGTH))) {
         return UPDATE_ERROR_ADDRESS;
     }
-    if (end_address > (SDRAM_ADDRESS + SDRAM_LENGTH)) {
+    if (end_address > UPDATE_ADDRESS_END) {
         return UPDATE_ERROR_ADDRESS;
     }
 
