@@ -51,7 +51,10 @@ module top (
     output mcu_miso,
 
     // Unused I/O
-    output n64_video_sync
+
+    output n64_video_sync,
+
+    output [2:0] test_point
 );
 
     logic clk;
@@ -277,5 +280,7 @@ module top (
     // Unused I/O
 
     assign n64_video_sync = 1'bZ;
+
+    assign test_point = 3'b000;
 
 endmodule
