@@ -17,7 +17,7 @@ TOP_FILES=(
 FILES=(
     "./assets/*"
     "./docs/*"
-    "./hw/pcb/sc64_hw_v2.0a_bom.html"
+    "./hw/pcb/sc64v2_bom.html"
     "./hw/pcb/sc64v2.kicad_pcb"
     "./hw/pcb/sc64v2.kicad_pro"
     "./hw/pcb/sc64v2.kicad_sch"
