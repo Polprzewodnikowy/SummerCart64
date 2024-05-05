@@ -96,6 +96,9 @@ IOBUF PORT "sdram_dqm[0]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
 IOBUF PORT "sdram_dqm[1]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
 IOBUF PORT "sdram_ras" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
 IOBUF PORT "sdram_we" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
+IOBUF PORT "test_point[0]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
+IOBUF PORT "test_point[1]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
+IOBUF PORT "test_point[2]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
 IOBUF PORT "usb_clk" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
 IOBUF PORT "usb_cs" PULLMODE=UP IO_TYPE=LVCMOS33 ;
 IOBUF PORT "usb_miosi[0]" PULLMODE=NONE IO_TYPE=LVCMOS33 ;
@@ -216,3 +219,43 @@ BLOCK PATH TO PORT "mcu_int" ;
 BLOCK PATH TO PORT "n64_irq" ;
 BLOCK PATH FROM PORT "usb_pwrsav" ;
 BLOCK PATH FROM PORT "sd_det" ;
+DEFINE PORT GROUP "sdram_output" "sdram_cs" 
+"sdram_ras" 
+"sdram_cas" 
+"sdram_we" 
+"sdram_ba[1]" 
+"sdram_ba[0]" 
+"sdram_a[12]" 
+"sdram_a[11]" 
+"sdram_a[10]" 
+"sdram_a[9]" 
+"sdram_a[8]" 
+"sdram_a[7]" 
+"sdram_a[6]" 
+"sdram_a[5]" 
+"sdram_a[4]" 
+"sdram_a[3]" 
+"sdram_a[2]" 
+"sdram_a[1]" 
+"sdram_a[0]" 
+"sdram_dqm[1]" 
+"sdram_dqm[0]" ;
+DEFINE PORT GROUP "sdram_bidir" "sdram_dq[15]" 
+"sdram_dq[14]" 
+"sdram_dq[13]" 
+"sdram_dq[12]" 
+"sdram_dq[11]" 
+"sdram_dq[10]" 
+"sdram_dq[9]" 
+"sdram_dq[8]" 
+"sdram_dq[7]" 
+"sdram_dq[6]" 
+"sdram_dq[5]" 
+"sdram_dq[4]" 
+"sdram_dq[3]" 
+"sdram_dq[2]" 
+"sdram_dq[1]" 
+"sdram_dq[0]" ;
+INPUT_SETUP GROUP "sdram_bidir"INPUT_DELAY 5.400000 ns HOLD -2.500000 ns CLKNET "clk" CLK_OFFSET -0.250000 X ;
+CLOCK_TO_OUT GROUP "sdram_output" OUTPUT_DELAY 1.500000 ns MIN 0.800000 ns CLKNET "clk" CLKOUT PORT "sdram_clk" ;
+CLOCK_TO_OUT GROUP "sdram_bidir" OUTPUT_DELAY 1.500000 ns MIN 0.800000 ns CLKNET "clk" CLKOUT PORT "sdram_clk" ;

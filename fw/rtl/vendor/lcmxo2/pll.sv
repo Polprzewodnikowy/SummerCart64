@@ -17,8 +17,8 @@ module pll (
     );
 
     ODDRXE oddrxe_sdram_clk_inst (
-        .D0(1'b0),
-        .D1(1'b1),
+        .D0(1'b1),
+        .D1(1'b0),
         .SCLK(pll_sdram_clk),
         .RST(1'b0),
         .Q(buf_sdram_clk)
