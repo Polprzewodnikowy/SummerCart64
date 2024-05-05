@@ -123,7 +123,7 @@ a:hover {
     font-weight: 600;
 }
 
-@media only screen and (max-width: 768px) {
+@media only screen and (max-width: 800px) {
     .menu-bar {
         flex-flow: row wrap;
         margin: 0;
@@ -253,6 +253,13 @@ main .separator {
     height: var(--main-separator-height);
     background-color: var(--text-color);
     margin: var(--main-separator-margin) 0;
+}
+
+iframe.bom {
+    display: flex;
+    flex-grow: 1;
+    margin-top: var(--menu-height);
+    border: none;
 }
 
 footer {
