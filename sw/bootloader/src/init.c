@@ -8,13 +8,15 @@
 
 init_tv_type_t __tv_type;
 init_reset_type_t __reset_type;
+uint32_t __entropy;
 
 
-void init (init_tv_type_t tv_type, init_reset_type_t reset_type) {
+void init (init_tv_type_t tv_type, init_reset_type_t reset_type, uint32_t entropy) {
     sc64_error_t error;
 
     __tv_type = tv_type;
     __reset_type = reset_type;
+    __entropy = entropy;
 
     sc64_unlock();
 

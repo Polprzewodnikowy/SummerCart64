@@ -10,6 +10,7 @@ entry_handler:
     lui $t0, 0xA400
     lbu $a0, 9($t0)     # TV type
     lbu $a1, 10($t0)    # Reset type
+    lw $a2, 4($t0)      # Entropy
 
     la $t0, init
     jalr $t0

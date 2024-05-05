@@ -8,6 +8,44 @@
 #include "test.h"
 
 
+#define SDRAM_ADDRESS       (0x10000000)
+#define SDRAM_SIZE          (64 * 1024 * 1024)
+#define SDRAM_BUFFER_SIZE   (128 * 1024)
+
+
+typedef struct  {
+    char *name;
+    void (*fill) (uint32_t *buffer, int size, uint32_t offset, uint32_t pattern);
+    uint32_t pattern;
+    int fade;
+} sdram_test_t;
+
+
+static uint32_t random_seed = 0;
+
+static uint32_t w_buffer[SDRAM_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
+static uint32_t r_buffer[SDRAM_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
+
+
+static void fill_own_address (uint32_t *buffer, int size, uint32_t pattern, uint32_t offset) {
+    for (int i = 0; i < (size / sizeof(uint32_t)); i++) {
+        buffer[i] = offset + (i * sizeof(uint32_t));
+    }
+}
+
+static void fill_pattern (uint32_t *buffer, int size, uint32_t pattern, uint32_t offset) {
+    for (int i = 0; i < (size / sizeof(uint32_t)); i++) {
+        buffer[i] = pattern;
+    }
+}
+
+static void fill_random (uint32_t *buffer, int size, uint32_t pattern, uint32_t offset) {
+    for (int i = 0; i < (size / sizeof(uint32_t)); i++) {
+        buffer[i] = (rand() << 31) | rand();
+    }
+}
+
+
 static void test_sc64_cfg (void) {
     sc64_error_t error;
     uint32_t button_state;
@@ -50,6 +88,46 @@ static void test_sc64_cfg (void) {
 
     display_printf("Voltage: %d.%03d V\n", (voltage / 1000), (voltage % 1000));
     display_printf("Temperature: %d.%01d `C\n", (temperature / 10), (temperature % 10));
+}
+
+static void test_pi (void) {
+    int count = 16384;
+    int size = sizeof(SC64_BUFFERS->BUFFER);
+
+    srand(random_seed);
+
+    display_printf("Testing %d write/read cycles of %dkiB to the SC64 buffer\n\n", count, size / 1024);
+
+    for (int i = 0; i < count; i++) {
+        fill_random(w_buffer, size, 0, 0);
+
+        if ((i % (count / 256)) == 0) {
+            display_printf(".");
+        }
+
+        pi_dma_write((io32_t *) (SC64_BUFFERS->BUFFER), w_buffer, size);
+
+        pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), r_buffer, size);
+
+        for (int i = 0; i < size / sizeof(uint32_t); i++) {
+            if (w_buffer[i] != r_buffer[i]) {
+                display_printf(
+                    "\n"
+                    " > Mismatch error at address 0x%08lX\n"
+                    " > 0x%08lX (W) != 0x%08lX (R)",
+                    (uint32_t) (SC64_BUFFERS->BUFFER) + (i * sizeof(uint32_t)),
+                    w_buffer[i],
+                    r_buffer[i]
+                );
+
+                while (true);
+            }
+        }
+    }
+
+    random_seed += c0_count();
+
+    display_printf("\n");
 }
 
 static void test_rtc (void) {
@@ -157,88 +235,126 @@ static void test_sd_card (void) {
     display_printf(" Boot signature: 0x%02X%02X\n", sector[510], sector[511]);
 }
 
-#define SDRAM_ADDRESS   (0x10000000)
-#define SDRAM_SIZE      (64 * 1024 * 1024)
-#define BUFFER_SIZE     (128 * 1024)
-
-static uint32_t w_buffer[BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
-static uint32_t r_buffer[BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
-
 static void test_sdram (void) {
-    sc64_error_t error;
+    static int phase = 0;
 
-    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true))) {
-        error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed: %d", error);
-        return;
-    }
-
-    if ((error = sc64_set_config(CFG_ID_ROM_SHADOW_ENABLE, false))) {
-        error_display("Command CONFIG_SET [ROM_SHADOW_ENABLE] failed: %d", error);
-        return;
-    }
-
-    pi_io_config(0x0B, 0x05, 0x0C, 0x02);
-    display_printf("PI config - PGS: 0x0B, LAT: 0x05, PWD: 0x0C, RLS: 0x02\n");
-
-    const struct patterns_s {
-        bool constant;
-        uint32_t value;
-    } patterns[] = {
-        { .constant = true, .value = 0x00000000 },
-        { .constant = true, .value = 0xFFFFFFFF },
-        { .constant = true, .value = 0xFFFF0000 },
-        { .constant = true, .value = 0x0000FFFF },
-        { .constant = true, .value = 0xF0F0F0F0 },
-        { .constant = true, .value = 0x0F0F0F0F },
-        { .constant = true, .value = 0xAAAAAAAA },
-        { .constant = true, .value = 0x55555555 },
-        { .constant = true, .value = 0xA5A5A5A5 },
-        { .constant = true, .value = 0x5A5A5A5A },
-        { .constant = false },
-        { .constant = false },
+    sdram_test_t phase_0_tests[] = {
+        { .name = "Own address:", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0  },
+        { .name = "All ones:   ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0  },
+        { .name = "All zeros:  ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random 1:   ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random 2:   ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Fadeout (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 60 },
+        { .name = "Fadeout (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 60 },
+        { .name = NULL },
     };
 
-    srand(c0_count());
+    sdram_test_t phase_1_tests[] = {
+        { .name = "0x00010001: ", .fill = fill_pattern,     .pattern = 0x00010001, .fade = 0  },
+        { .name = "0x00020002: ", .fill = fill_pattern,     .pattern = 0x00020002, .fade = 0  },
+        { .name = "0x00040004: ", .fill = fill_pattern,     .pattern = 0x00040004, .fade = 0  },
+        { .name = "0x00080008: ", .fill = fill_pattern,     .pattern = 0x00080008, .fade = 0  },
+        { .name = "0x00100010: ", .fill = fill_pattern,     .pattern = 0x00100010, .fade = 0  },
+        { .name = "0x00200020: ", .fill = fill_pattern,     .pattern = 0x00200020, .fade = 0  },
+        { .name = "0x00400040: ", .fill = fill_pattern,     .pattern = 0x00400040, .fade = 0  },
+        { .name = "0x00800080: ", .fill = fill_pattern,     .pattern = 0x00800080, .fade = 0  },
+        { .name = NULL },
+    };
 
-    for (int pattern = 0; pattern < sizeof(patterns) / sizeof(patterns[0]); pattern++) {
-        if (patterns[pattern].constant) {
-            display_printf("Pattern: 0x%08X ", patterns[pattern].value);
-            for (int i = 0; i < BUFFER_SIZE / sizeof(uint32_t); i++) {
-                w_buffer[i] = patterns[pattern].value;
+    sdram_test_t phase_2_tests[] = {
+        { .name = "0x01000100: ", .fill = fill_pattern,     .pattern = 0x01000100, .fade = 0  },
+        { .name = "0x02000200: ", .fill = fill_pattern,     .pattern = 0x02000200, .fade = 0  },
+        { .name = "0x04000400: ", .fill = fill_pattern,     .pattern = 0x04000400, .fade = 0  },
+        { .name = "0x08000800: ", .fill = fill_pattern,     .pattern = 0x08000800, .fade = 0  },
+        { .name = "0x10001000: ", .fill = fill_pattern,     .pattern = 0x10001000, .fade = 0  },
+        { .name = "0x20002000: ", .fill = fill_pattern,     .pattern = 0x20002000, .fade = 0  },
+        { .name = "0x40004000: ", .fill = fill_pattern,     .pattern = 0x40004000, .fade = 0  },
+        { .name = "0x80008000: ", .fill = fill_pattern,     .pattern = 0x80008000, .fade = 0  },
+        { .name = NULL },
+    };
+
+    sdram_test_t phase_3_tests[] = {
+        { .name = "0x55555555: ", .fill = fill_pattern,     .pattern = 0x55555555, .fade = 0  },
+        { .name = "0xAAAAAAAA: ", .fill = fill_pattern,     .pattern = 0xAAAAAAAA, .fade = 0  },
+        { .name = "0x0F0F0F0F: ", .fill = fill_pattern,     .pattern = 0x0F0F0F0F, .fade = 0  },
+        { .name = "0xF0F0F0F0: ", .fill = fill_pattern,     .pattern = 0xF0F0F0F0, .fade = 0  },
+        { .name = "0x00FF00FF: ", .fill = fill_pattern,     .pattern = 0x00FF00FF, .fade = 0  },
+        { .name = "0xFF00FF00: ", .fill = fill_pattern,     .pattern = 0xFF00FF00, .fade = 0  },
+        { .name = "0x0000FFFF: ", .fill = fill_pattern,     .pattern = 0x0000FFFF, .fade = 0  },
+        { .name = "0xFFFF0000: ", .fill = fill_pattern,     .pattern = 0xFFFF0000, .fade = 0  },
+        { .name = NULL },
+    };
+
+    sdram_test_t *test = NULL;
+
+    switch (phase) {
+        case 0: test = phase_0_tests; break;
+        case 1: test = phase_1_tests; break;
+        case 2: test = phase_2_tests; break;
+        case 3: test = phase_3_tests; break;
+    }
+
+    phase += 1;
+    if (phase > 3) {
+        phase = 0;
+    }
+
+    while (test->name != NULL) {
+        display_printf("%s ", test->name);
+
+        srand(random_seed);
+
+        for (int offset = 0; offset < SDRAM_SIZE; offset += SDRAM_BUFFER_SIZE) {
+            if ((offset % (SDRAM_SIZE / 16)) == 0) {
+                display_printf("w");
             }
-        } else {
-            display_printf("Pattern: random     ");
+
+            test->fill(w_buffer, SDRAM_BUFFER_SIZE, test->pattern, offset);
+
+            pi_dma_write((io32_t *) (SDRAM_ADDRESS + offset), w_buffer, SDRAM_BUFFER_SIZE);
         }
 
-        for (int offset = 0; offset < SDRAM_SIZE; offset += BUFFER_SIZE) {
-            if (!patterns[pattern].constant) {
-                for (int i = 0; i < BUFFER_SIZE / sizeof(uint32_t); i++) {
-                    w_buffer[i] = (rand() << 31) | rand();
-                }
+        for (int fade = test->fade; fade > 0; fade--) {
+            display_printf(" %2ds", fade);
+            delay_ms(1000);
+            display_printf("\b\b\b\b");
+        }
+
+        srand(random_seed);
+
+        for (int offset = 0; offset < SDRAM_SIZE; offset += SDRAM_BUFFER_SIZE) {
+            if ((offset % (SDRAM_SIZE / 16)) == 0) {
+                display_printf("r");
             }
 
-            pi_dma_write((io32_t *) (SDRAM_ADDRESS + offset), w_buffer, BUFFER_SIZE);
+            test->fill(w_buffer, SDRAM_BUFFER_SIZE, test->pattern, offset);
 
-            pi_dma_read((io32_t *) (SDRAM_ADDRESS + offset), r_buffer, BUFFER_SIZE);
+            pi_dma_read((io32_t *) (SDRAM_ADDRESS + offset), r_buffer, SDRAM_BUFFER_SIZE);
 
-            for (int i = 0; i < BUFFER_SIZE / sizeof(uint32_t); i++) {
-                if (w_buffer[i] != r_buffer[i]) {
+            uint64_t *test_data = (uint64_t *) (w_buffer);
+            uint64_t *check_data = (uint64_t *) (r_buffer);
+
+            for (int i = 0; i < SDRAM_BUFFER_SIZE / sizeof(uint64_t); i++) {
+                if (test_data[i] != check_data[i]) {
                     display_printf(
-                        "\nMISMATCH: [0x%08X]: 0x%08X (R) != 0x%08X (W)\n",
-                        SDRAM_ADDRESS + offset,
-                        r_buffer[i],
-                        w_buffer[i]
+                        "\n"
+                        " > Mismatch error at address 0x%08lX\n"
+                        " > 0x%016llX (W) != 0x%016llX (R)",
+                        SDRAM_ADDRESS + offset + (i * sizeof(uint64_t)),
+                        test_data[i],
+                        check_data[i]
                     );
+
                     while (true);
                 }
             }
-
-            if ((offset % (SDRAM_SIZE / 32)) == 0) {
-                display_printf(".");
-            }
         }
 
+        random_seed += c0_count();
+
         display_printf(" OK\n");
+
+        test += 1;
     }
 }
 
@@ -263,12 +379,32 @@ static struct {
     void (*fn) (void);
 } tests[] = {
     { "SC64 CFG", test_sc64_cfg },
+    { "PI", test_pi },
     { "RTC", test_rtc },
     { "SD card", test_sd_card },
-    { "SDRAM", test_sdram },
+    { "SDRAM (1/4)", test_sdram },
+    { "SDRAM (2/4)", test_sdram },
+    { "SDRAM (3/4)", test_sdram },
+    { "SDRAM (4/4)", test_sdram },
 };
 
 void test_execute (void) {
+    sc64_error_t error;
+
+    pi_io_config(0x0B, 0x05, 0x0C, 0x02);
+
+    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true))) {
+        error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed: %d", error);
+        return;
+    }
+
+    if ((error = sc64_set_config(CFG_ID_ROM_SHADOW_ENABLE, false))) {
+        error_display("Command CONFIG_SET [ROM_SHADOW_ENABLE] failed: %d", error);
+        return;
+    }
+
+    random_seed = __entropy + c0_count();
+
     const int test_count = sizeof(tests) / sizeof(tests[0]);
     int current = 0;
 
@@ -285,10 +421,11 @@ void test_execute (void) {
             current = 0;
         }
 
-        display_printf("Next test [ %s ] starts in:  ", tests[current].title);
-        for (int delay = 5; delay > 0; delay--) {
-            display_printf("\b%d", delay);
+        display_printf("Next test [ %s ] starts in: ", tests[current].title);
+        for (int delay = 10; delay > 0; delay--) {
+            display_printf("%2ds", delay);
             delay_ms(1000);
+            display_printf("\b\b\b", delay);
         }
     }
 }
