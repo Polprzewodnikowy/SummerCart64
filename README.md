@@ -89,6 +89,8 @@ This project wouldn't be possible without these contributions:
 
 - [64drive](https://64drive.retroactive.be) ([archived](https://web.archive.org/web/20240406215731/https://64drive.retroactive.be/)) orders being on permanent hold long before creating this repository.
 - [EverDrive-64 X7](https://krikzz.com/our-products/cartridges/ed64x7.html) being disappointment for homebrew development (slow USB upload, unjustified price and overcomplicated SD card access).
+  - Context: Both aforementioned products were priced at $199 in 2020. 64drive features made it a vastly more useful tool for homebrew development.
+    Since then, 64drive had never been restocked and EverDrive-64 X7 price was lowered to $159 (as of May 2024).
 - [Jan Goldacker (@jago85)](https://github.com/jago85) and his projects:
   - [Brutzelkarte](https://github.com/jago85/Brutzelkarte_FPGA) providing solid base for starting this project and sparking hope for true open source N64 flashcarts.
   - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) reimplementation for easy integration in modern microcontrollers. Thanks also goes to everyone involved in N64 CIC reverse engineering.

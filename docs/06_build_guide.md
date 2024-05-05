@@ -42,7 +42,7 @@ Please download latest release before proceeding with the instructions.
 
 ### **Components**
 
-  1. Locate interactive BOM file inside `hw/pcb` folder
+  1. Locate interactive BOM file inside `hw/pcb` folder (alternatively, check out this [BOM discussion](https://github.com/Polprzewodnikowy/SummerCart64/discussions/27))
   2. Order all parts listed in the BOM file or use PCB assembly service together with your PCB order
 
 ---
