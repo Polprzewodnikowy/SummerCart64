@@ -87,7 +87,31 @@ static void test_sc64_cfg (void) {
     display_printf("SC64 firmware version: %d.%d.%d\n\n", major, minor, revision);
 
     display_printf("Voltage: %d.%03d V\n", (voltage / 1000), (voltage % 1000));
-    display_printf("Temperature: %d.%01d `C\n", (temperature / 10), (temperature % 10));
+    display_printf("Temperature: %d.%01d `C\n\n", (temperature / 10), (temperature % 10));
+    
+    const char *weekdays[8] = {
+        "Unknown day",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    };
+
+    sc64_rtc_time_t t;
+
+    if ((error = sc64_get_time(&t)) != SC64_OK) {
+        error_display("Command TIME_GET failed: %d", error);
+    }
+
+    display_printf("RTC current time:\n ");
+    display_printf("%04d-%02d-%02d", 2000 + FROM_BCD(t.year), FROM_BCD(t.month), FROM_BCD(t.day));
+    display_printf("T");
+    display_printf("%02d:%02d:%02d", FROM_BCD(t.hour), FROM_BCD(t.minute), FROM_BCD(t.second));
+    display_printf(" (%s)", weekdays[FROM_BCD(t.weekday)]);
+    display_printf("\n");
 }
 
 static void test_pi (void) {
@@ -127,33 +151,6 @@ static void test_pi (void) {
 
     random_seed += c0_count();
 
-    display_printf("\n");
-}
-
-static void test_rtc (void) {
-    sc64_error_t error;
-    sc64_rtc_time_t t;
-
-    const char *weekdays[8] = {
-        "",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-    };
-
-    if ((error = sc64_get_time(&t)) != SC64_OK) {
-        error_display("Command TIME_GET failed: %d", error);
-    }
-
-    display_printf("RTC current time:\n ");
-    display_printf("%04d-%02d-%02d", 2000 + FROM_BCD(t.year), FROM_BCD(t.month), FROM_BCD(t.day));
-    display_printf("T");
-    display_printf("%02d:%02d:%02d", FROM_BCD(t.hour), FROM_BCD(t.minute), FROM_BCD(t.second));
-    display_printf(" (%s)", weekdays[FROM_BCD(t.weekday)]);
     display_printf("\n");
 }
 
@@ -239,49 +236,68 @@ static void test_sdram (void) {
     static int phase = 0;
 
     sdram_test_t phase_0_tests[] = {
-        { .name = "Own address:", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0  },
-        { .name = "All ones:   ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0  },
-        { .name = "All zeros:  ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0  },
-        { .name = "Random 1:   ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
-        { .name = "Random 2:   ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
-        { .name = "Fadeout (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 60 },
-        { .name = "Fadeout (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 60 },
+        { .name = "Own address:  ", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0   },
+        { .name = "All zeros:    ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0   },
+        { .name = "All ones:     ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0   },
+        { .name = "Random (1/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
+        { .name = "Random (2/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
+        { .name = "Random (3/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
+        { .name = "Fadeout S (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 60  },
+        { .name = "Fadeout S (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 60  },
         { .name = NULL },
     };
 
     sdram_test_t phase_1_tests[] = {
-        { .name = "0x00010001: ", .fill = fill_pattern,     .pattern = 0x00010001, .fade = 0  },
-        { .name = "0x00020002: ", .fill = fill_pattern,     .pattern = 0x00020002, .fade = 0  },
-        { .name = "0x00040004: ", .fill = fill_pattern,     .pattern = 0x00040004, .fade = 0  },
-        { .name = "0x00080008: ", .fill = fill_pattern,     .pattern = 0x00080008, .fade = 0  },
-        { .name = "0x00100010: ", .fill = fill_pattern,     .pattern = 0x00100010, .fade = 0  },
-        { .name = "0x00200020: ", .fill = fill_pattern,     .pattern = 0x00200020, .fade = 0  },
-        { .name = "0x00400040: ", .fill = fill_pattern,     .pattern = 0x00400040, .fade = 0  },
-        { .name = "0x00800080: ", .fill = fill_pattern,     .pattern = 0x00800080, .fade = 0  },
+        { .name = "0x00010001:   ", .fill = fill_pattern,     .pattern = 0x00010001, .fade = 0   },
+        { .name = "0xFFFEFFFE:   ", .fill = fill_pattern,     .pattern = 0xFFFEFFFE, .fade = 0   },
+        { .name = "0x00020002:   ", .fill = fill_pattern,     .pattern = 0x00020002, .fade = 0   },
+        { .name = "0xFFFDFFFD:   ", .fill = fill_pattern,     .pattern = 0xFFFDFFFD, .fade = 0   },
+        { .name = "0x00040004:   ", .fill = fill_pattern,     .pattern = 0x00040004, .fade = 0   },
+        { .name = "0xFFFBFFFB:   ", .fill = fill_pattern,     .pattern = 0xFFFBFFFB, .fade = 0   },
+        { .name = "0x00080008:   ", .fill = fill_pattern,     .pattern = 0x00080008, .fade = 0   },
+        { .name = "0xFFF7FFF7:   ", .fill = fill_pattern,     .pattern = 0xFFF7FFF7, .fade = 0   },
         { .name = NULL },
     };
 
     sdram_test_t phase_2_tests[] = {
-        { .name = "0x01000100: ", .fill = fill_pattern,     .pattern = 0x01000100, .fade = 0  },
-        { .name = "0x02000200: ", .fill = fill_pattern,     .pattern = 0x02000200, .fade = 0  },
-        { .name = "0x04000400: ", .fill = fill_pattern,     .pattern = 0x04000400, .fade = 0  },
-        { .name = "0x08000800: ", .fill = fill_pattern,     .pattern = 0x08000800, .fade = 0  },
-        { .name = "0x10001000: ", .fill = fill_pattern,     .pattern = 0x10001000, .fade = 0  },
-        { .name = "0x20002000: ", .fill = fill_pattern,     .pattern = 0x20002000, .fade = 0  },
-        { .name = "0x40004000: ", .fill = fill_pattern,     .pattern = 0x40004000, .fade = 0  },
-        { .name = "0x80008000: ", .fill = fill_pattern,     .pattern = 0x80008000, .fade = 0  },
+        { .name = "0x00100010:   ", .fill = fill_pattern,     .pattern = 0x00100010, .fade = 0   },
+        { .name = "0xFFEFFFEF:   ", .fill = fill_pattern,     .pattern = 0xFFEFFFEF, .fade = 0   },
+        { .name = "0x00200020:   ", .fill = fill_pattern,     .pattern = 0x00200020, .fade = 0   },
+        { .name = "0xFFDFFFDF:   ", .fill = fill_pattern,     .pattern = 0xFFDFFFDF, .fade = 0   },
+        { .name = "0x00400040:   ", .fill = fill_pattern,     .pattern = 0x00400040, .fade = 0   },
+        { .name = "0xFFBFFFBF:   ", .fill = fill_pattern,     .pattern = 0xFFBFFFBF, .fade = 0   },
+        { .name = "0x00800080:   ", .fill = fill_pattern,     .pattern = 0x00800080, .fade = 0   },
+        { .name = "0xFF7FFF7F:   ", .fill = fill_pattern,     .pattern = 0xFF7FFF7F, .fade = 0   },
         { .name = NULL },
     };
 
     sdram_test_t phase_3_tests[] = {
-        { .name = "0x55555555: ", .fill = fill_pattern,     .pattern = 0x55555555, .fade = 0  },
-        { .name = "0xAAAAAAAA: ", .fill = fill_pattern,     .pattern = 0xAAAAAAAA, .fade = 0  },
-        { .name = "0x0F0F0F0F: ", .fill = fill_pattern,     .pattern = 0x0F0F0F0F, .fade = 0  },
-        { .name = "0xF0F0F0F0: ", .fill = fill_pattern,     .pattern = 0xF0F0F0F0, .fade = 0  },
-        { .name = "0x00FF00FF: ", .fill = fill_pattern,     .pattern = 0x00FF00FF, .fade = 0  },
-        { .name = "0xFF00FF00: ", .fill = fill_pattern,     .pattern = 0xFF00FF00, .fade = 0  },
-        { .name = "0x0000FFFF: ", .fill = fill_pattern,     .pattern = 0x0000FFFF, .fade = 0  },
-        { .name = "0xFFFF0000: ", .fill = fill_pattern,     .pattern = 0xFFFF0000, .fade = 0  },
+        { .name = "0x01000100:   ", .fill = fill_pattern,     .pattern = 0x01000100, .fade = 0   },
+        { .name = "0xFEFFFEFF:   ", .fill = fill_pattern,     .pattern = 0xFEFFFEFF, .fade = 0   },
+        { .name = "0x02000200:   ", .fill = fill_pattern,     .pattern = 0x02000200, .fade = 0   },
+        { .name = "0xFDFFFDFF:   ", .fill = fill_pattern,     .pattern = 0xFDFFFDFF, .fade = 0   },
+        { .name = "0x04000400:   ", .fill = fill_pattern,     .pattern = 0x04000400, .fade = 0   },
+        { .name = "0xFBFFFBFF:   ", .fill = fill_pattern,     .pattern = 0xFBFFFBFF, .fade = 0   },
+        { .name = "0x08000800:   ", .fill = fill_pattern,     .pattern = 0x08000800, .fade = 0   },
+        { .name = "0xF7FFF7FF:   ", .fill = fill_pattern,     .pattern = 0xF7FFF7FF, .fade = 0   },
+        { .name = NULL },
+    };
+
+    sdram_test_t phase_4_tests[] = {
+        { .name = "0x10001000:   ", .fill = fill_pattern,     .pattern = 0x10001000, .fade = 0   },
+        { .name = "0xEFFFEFFF:   ", .fill = fill_pattern,     .pattern = 0xEFFFEFFF, .fade = 0   },
+        { .name = "0x20002000:   ", .fill = fill_pattern,     .pattern = 0x20002000, .fade = 0   },
+        { .name = "0xDFFFDFFF:   ", .fill = fill_pattern,     .pattern = 0xDFFFDFFF, .fade = 0   },
+        { .name = "0x40004000:   ", .fill = fill_pattern,     .pattern = 0x40004000, .fade = 0   },
+        { .name = "0xBFFFBFFF:   ", .fill = fill_pattern,     .pattern = 0xBFFFBFFF, .fade = 0   },
+        { .name = "0x80008000:   ", .fill = fill_pattern,     .pattern = 0x80008000, .fade = 0   },
+        { .name = "0x7FFF7FFF:   ", .fill = fill_pattern,     .pattern = 0x7FFF7FFF, .fade = 0   },
+        { .name = NULL },
+    };
+
+    sdram_test_t phase_5_tests[] = {
+        { .name = "Fadeout L (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 300 },
+        { .name = "Fadeout L (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 300 },
         { .name = NULL },
     };
 
@@ -292,11 +308,8 @@ static void test_sdram (void) {
         case 1: test = phase_1_tests; break;
         case 2: test = phase_2_tests; break;
         case 3: test = phase_3_tests; break;
-    }
-
-    phase += 1;
-    if (phase > 3) {
-        phase = 0;
+        case 4: test = phase_4_tests; break;
+        case 5: test = phase_5_tests; break;
     }
 
     while (test->name != NULL) {
@@ -315,9 +328,9 @@ static void test_sdram (void) {
         }
 
         for (int fade = test->fade; fade > 0; fade--) {
-            display_printf(" %2ds", fade);
+            display_printf(" %3ds", fade);
             delay_ms(1000);
-            display_printf("\b\b\b\b");
+            display_printf("\b\b\b\b\b");
         }
 
         srand(random_seed);
@@ -356,6 +369,12 @@ static void test_sdram (void) {
 
         test += 1;
     }
+
+    phase += 1;
+
+    if (phase > 5) {
+        phase = 0;
+    }
 }
 
 
@@ -380,18 +399,19 @@ static struct {
 } tests[] = {
     { "SC64 CFG", test_sc64_cfg },
     { "PI", test_pi },
-    { "RTC", test_rtc },
     { "SD card", test_sd_card },
-    { "SDRAM (1/4)", test_sdram },
-    { "SDRAM (2/4)", test_sdram },
-    { "SDRAM (3/4)", test_sdram },
-    { "SDRAM (4/4)", test_sdram },
+    { "SDRAM (1/6)", test_sdram },
+    { "SDRAM (2/6)", test_sdram },
+    { "SDRAM (3/6)", test_sdram },
+    { "SDRAM (4/6)", test_sdram },
+    { "SDRAM (5/6)", test_sdram },
+    { "SDRAM (6/6)", test_sdram },
 };
 
 void test_execute (void) {
     sc64_error_t error;
 
-    pi_io_config(0x0B, 0x05, 0x0C, 0x02);
+    pi_io_config(0x0F, 0x05, 0x0C, 0x02);
 
     if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true))) {
         error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed: %d", error);
