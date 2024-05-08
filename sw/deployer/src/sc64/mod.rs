@@ -771,13 +771,16 @@ impl SC64 {
         };
 
         let raw_test_data: Vec<u8> = test_data.iter().flat_map(|v| v.to_be_bytes()).collect();
-        self.command_memory_write(SDRAM_ADDRESS, &raw_test_data)?;
+        let mut writer: &[u8] = &raw_test_data;
+        self.memory_write_chunked(&mut writer, SDRAM_ADDRESS, SDRAM_LENGTH, None)?;
 
         if let Some(fade) = fade {
             sleep(Duration::from_secs(fade));
         }
 
-        let raw_check_data = self.command_memory_read(SDRAM_ADDRESS, SDRAM_LENGTH)?;
+        let mut raw_check_data = vec![0u8; SDRAM_LENGTH];
+        let mut reader: &mut [u8] = &mut raw_check_data;
+        self.memory_read_chunked(&mut reader, SDRAM_ADDRESS, SDRAM_LENGTH)?;
         let check_data = raw_check_data
             .chunks(4)
             .map(|a| u32::from_be_bytes(a[0..4].try_into().unwrap()));
