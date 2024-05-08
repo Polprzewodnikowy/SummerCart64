@@ -12,8 +12,8 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, SaveType,
-        SaveWriteback, Switch, TvType,
+        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestResult,
+        MemoryTestType, SaveType, SaveWriteback, Switch, TvType,
     },
 };
 
@@ -26,10 +26,12 @@ use self::{
     },
 };
 use chrono::{DateTime, Local};
+use rand::Rng;
 use std::{
+    cmp::min,
     io::{Read, Seek, Write},
-    time::Instant,
-    {cmp::min, time::Duration},
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
 pub struct SC64 {
@@ -746,6 +748,58 @@ impl SC64 {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    pub fn test_sdram(
+        &mut self,
+        test_type: MemoryTestType,
+        fade: Option<u64>,
+    ) -> Result<MemoryTestResult, Error> {
+        let item_size = std::mem::size_of::<u32>();
+        let mut test_data = vec![0u32; SDRAM_LENGTH / item_size];
+
+        match test_type {
+            MemoryTestType::OwnAddress => {
+                for (index, item) in test_data.iter_mut().enumerate() {
+                    *item = (index * item_size) as u32;
+                }
+            }
+            MemoryTestType::AllZeros => test_data.fill(0x00000000u32),
+            MemoryTestType::AllOnes => test_data.fill(0xFFFFFFFFu32),
+            MemoryTestType::Pattern(pattern) => test_data.fill(pattern),
+            MemoryTestType::Random => rand::thread_rng().fill(&mut test_data[..]),
+        };
+
+        let raw_test_data: Vec<u8> = test_data.iter().flat_map(|v| v.to_be_bytes()).collect();
+        self.command_memory_write(SDRAM_ADDRESS, &raw_test_data)?;
+
+        if let Some(fade) = fade {
+            sleep(Duration::from_secs(fade));
+        }
+
+        let raw_check_data = self.command_memory_read(SDRAM_ADDRESS, SDRAM_LENGTH)?;
+        let check_data = raw_check_data
+            .chunks(4)
+            .map(|a| u32::from_be_bytes(a[0..4].try_into().unwrap()));
+
+        let all_errors: Vec<(usize, (u32, u32))> = test_data
+            .into_iter()
+            .zip(check_data)
+            .enumerate()
+            .filter(|(_, (a, b))| a != b)
+            .map(|(i, (a, b))| (i * item_size, (a, b)))
+            .collect();
+
+        let first_error = if all_errors.len() > 0 {
+            Some(all_errors.get(0).copied().unwrap())
+        } else {
+            None
+        };
+
+        return Ok(MemoryTestResult {
+            first_error,
+            all_errors,
+        });
     }
 
     fn memory_read_chunked(

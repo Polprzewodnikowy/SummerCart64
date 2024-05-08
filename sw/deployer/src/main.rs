@@ -75,6 +75,9 @@ enum Commands {
         command: FirmwareCommands,
     },
 
+    /// Test SC64 hardware
+    Test,
+
     /// Expose SC64 device over network
     Server(ServerArgs),
 }
@@ -333,6 +336,7 @@ fn handle_command(command: &Commands, port: Option<String>, remote: Option<Strin
         Commands::Reset => handle_reset_command(connection),
         Commands::Set { command } => handle_set_command(connection, command),
         Commands::Firmware { command } => handle_firmware_command(connection, command),
+        Commands::Test => handle_test_command(connection),
         Commands::Server(args) => handle_server_command(connection, args),
     };
     match result {
@@ -781,7 +785,7 @@ fn handle_set_command(connection: Connection, command: &SetCommands) -> Result<(
             sc64.set_datetime(datetime)?;
             println!(
                 "SC64 RTC datetime synchronized to: {}",
-                datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string().green()
+                datetime.format("%Y-%m-%d %H:%M:%S").to_string().green()
             );
         }
 
@@ -875,6 +879,96 @@ fn handle_firmware_command(
             Ok(())
         }
     }
+}
+
+fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, false)?;
+
+    println!("{}: SDRAM", "[SC64 Tests]".bold());
+
+    let sdram_tests = [
+        (sc64::MemoryTestType::OwnAddress, None),
+        (sc64::MemoryTestType::AllZeros, None),
+        (sc64::MemoryTestType::AllOnes, None),
+        (sc64::MemoryTestType::Random, None),
+        (sc64::MemoryTestType::Random, None),
+        (sc64::MemoryTestType::Random, None),
+        (sc64::MemoryTestType::AllZeros, Some(60)),
+        (sc64::MemoryTestType::AllOnes, Some(60)),
+        (sc64::MemoryTestType::Pattern(0x00010001), None),
+        (sc64::MemoryTestType::Pattern(0xFFFEFFFE), None),
+        (sc64::MemoryTestType::Pattern(0x00020002), None),
+        (sc64::MemoryTestType::Pattern(0xFFFDFFFD), None),
+        (sc64::MemoryTestType::Pattern(0x00040004), None),
+        (sc64::MemoryTestType::Pattern(0xFFFBFFFB), None),
+        (sc64::MemoryTestType::Pattern(0x00080008), None),
+        (sc64::MemoryTestType::Pattern(0xFFF7FFF7), None),
+        (sc64::MemoryTestType::Pattern(0x00100010), None),
+        (sc64::MemoryTestType::Pattern(0xFFEFFFEF), None),
+        (sc64::MemoryTestType::Pattern(0x00200020), None),
+        (sc64::MemoryTestType::Pattern(0xFFDFFFDF), None),
+        (sc64::MemoryTestType::Pattern(0x00400040), None),
+        (sc64::MemoryTestType::Pattern(0xFFBFFFBF), None),
+        (sc64::MemoryTestType::Pattern(0x00800080), None),
+        (sc64::MemoryTestType::Pattern(0xFF7FFF7F), None),
+        (sc64::MemoryTestType::Pattern(0x01000100), None),
+        (sc64::MemoryTestType::Pattern(0xFEFFFEFF), None),
+        (sc64::MemoryTestType::Pattern(0x02000200), None),
+        (sc64::MemoryTestType::Pattern(0xFDFFFDFF), None),
+        (sc64::MemoryTestType::Pattern(0x04000400), None),
+        (sc64::MemoryTestType::Pattern(0xFBFFFBFF), None),
+        (sc64::MemoryTestType::Pattern(0x08000800), None),
+        (sc64::MemoryTestType::Pattern(0xF7FFF7FF), None),
+        (sc64::MemoryTestType::Pattern(0x10001000), None),
+        (sc64::MemoryTestType::Pattern(0xEFFFEFFF), None),
+        (sc64::MemoryTestType::Pattern(0x20002000), None),
+        (sc64::MemoryTestType::Pattern(0xDFFFDFFF), None),
+        (sc64::MemoryTestType::Pattern(0x40004000), None),
+        (sc64::MemoryTestType::Pattern(0xBFFFBFFF), None),
+        (sc64::MemoryTestType::Pattern(0x80008000), None),
+        (sc64::MemoryTestType::Pattern(0x7FFF7FFF), None),
+        (sc64::MemoryTestType::AllZeros, Some(300)),
+        (sc64::MemoryTestType::AllOnes, Some(300)),
+    ];
+    let sdram_tests_count = sdram_tests.len();
+
+    let mut sdram_tests_failed = false;
+
+    for (i, (test_type, fade)) in sdram_tests.into_iter().enumerate() {
+        let fadeout_text = if let Some(fade) = fade {
+            format!(", fadeout {fade} seconds")
+        } else {
+            "".to_string()
+        };
+        print!(
+            " ({} / {sdram_tests_count}) Testing {test_type}{fadeout_text}... ",
+            i + 1
+        );
+        stdout().flush().unwrap();
+
+        let result = sc64.test_sdram(test_type, fade)?;
+
+        if let Some((address, (written, read))) = result.first_error {
+            sdram_tests_failed = true;
+            println!("{}", "error!".bright_red());
+            println!("  Found a mismatch at address 0x{address:08X}",);
+            println!("   0x{written:08X} (W) != 0x{read:08X} (R)");
+            println!("   Total errors found: {}", result.all_errors.len());
+        } else {
+            println!("{}", "ok".bright_green());
+        }
+    }
+
+    if sdram_tests_failed {
+        println!(
+            "{}",
+            "Some SDRAM tests failed, SDRAM chip might be defective".bright_red()
+        );
+    } else {
+        println!("{}", "All SDRAM tests passed without error".bright_green());
+    }
+
+    Ok(())
 }
 
 fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<(), sc64::Error> {
