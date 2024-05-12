@@ -15,7 +15,7 @@
 /  and optional writing functions as well. */
 
 
-#define FF_FS_MINIMIZE	2
+#define FF_FS_MINIMIZE	0
 /* This option defines minimization level to remove some basic API functions.
 /
 /   0: Basic functions are fully enabled.
@@ -47,7 +47,7 @@
 /  (0:Disable or 1:Enable) Also FF_FS_READONLY needs to be 0 to enable this option. */
 
 
-#define FF_USE_LABEL	0
+#define FF_USE_LABEL	1
 /* This option switches volume label functions, f_getlabel() and f_setlabel().
 /  (0:Disable or 1:Enable) */
 

@@ -12,8 +12,8 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestResult,
-        MemoryTestType, SaveType, SaveWriteback, Switch, TvType,
+        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestPattern,
+        MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
     },
 };
 
@@ -750,24 +750,24 @@ impl SC64 {
         }
     }
 
-    pub fn test_sdram(
+    pub fn test_sdram_pattern(
         &mut self,
-        test_type: MemoryTestType,
+        pattern: MemoryTestPattern,
         fade: Option<u64>,
-    ) -> Result<MemoryTestResult, Error> {
+    ) -> Result<MemoryTestPatternResult, Error> {
         let item_size = std::mem::size_of::<u32>();
         let mut test_data = vec![0u32; SDRAM_LENGTH / item_size];
 
-        match test_type {
-            MemoryTestType::OwnAddress => {
+        match pattern {
+            MemoryTestPattern::OwnAddress => {
                 for (index, item) in test_data.iter_mut().enumerate() {
                     *item = (index * item_size) as u32;
                 }
             }
-            MemoryTestType::AllZeros => test_data.fill(0x00000000u32),
-            MemoryTestType::AllOnes => test_data.fill(0xFFFFFFFFu32),
-            MemoryTestType::Pattern(pattern) => test_data.fill(pattern),
-            MemoryTestType::Random => rand::thread_rng().fill(&mut test_data[..]),
+            MemoryTestPattern::AllZeros => test_data.fill(0x00000000u32),
+            MemoryTestPattern::AllOnes => test_data.fill(0xFFFFFFFFu32),
+            MemoryTestPattern::Custom(pattern) => test_data.fill(pattern),
+            MemoryTestPattern::Random => rand::thread_rng().fill(&mut test_data[..]),
         };
 
         let raw_test_data: Vec<u8> = test_data.iter().flat_map(|v| v.to_be_bytes()).collect();
@@ -799,7 +799,7 @@ impl SC64 {
             None
         };
 
-        return Ok(MemoryTestResult {
+        return Ok(MemoryTestPatternResult {
             first_error,
             all_errors,
         });

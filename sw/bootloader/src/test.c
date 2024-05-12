@@ -2,15 +2,19 @@
 #include <stdlib.h>
 #include "display.h"
 #include "error.h"
+#include "fatfs/ff.h"
 #include "init.h"
 #include "io.h"
 #include "sc64.h"
 #include "test.h"
 
 
+#define TEST_BUFFER_SIZE    (128 * 1024)
+
+#define SD_TEST_FILE_SIZE   (16 * 1024 * 1024)
+
 #define SDRAM_ADDRESS       (0x10000000)
 #define SDRAM_SIZE          (64 * 1024 * 1024)
-#define SDRAM_BUFFER_SIZE   (128 * 1024)
 
 
 typedef struct  {
@@ -23,8 +27,8 @@ typedef struct  {
 
 static uint32_t random_seed = 0;
 
-static uint32_t w_buffer[SDRAM_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
-static uint32_t r_buffer[SDRAM_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
+static uint32_t w_buffer[TEST_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
+static uint32_t r_buffer[TEST_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((aligned(8)));
 
 
 static void fill_own_address (uint32_t *buffer, int size, uint32_t pattern, uint32_t offset) {
@@ -67,17 +71,14 @@ static void test_sc64_cfg (void) {
 
     if ((error = sc64_get_identifier(&identifier)) != SC64_OK) {
         error_display("Command IDENTIFIER_GET failed: %d", error);
-        return;
     }
 
     if ((error = sc64_get_version(&major, &minor, &revision)) != SC64_OK) {
         error_display("Command VERSION_GET failed: %d", error);
-        return;
     }
 
     if ((error = sc64_get_diagnostic(DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE, &tmp)) != SC64_OK) {
         error_display("Command DIAGNOSTIC_GET failed: %d", error);
-        return;
     }
 
     uint16_t voltage = (uint16_t) (tmp >> 16);
@@ -88,7 +89,7 @@ static void test_sc64_cfg (void) {
 
     display_printf("Voltage: %d.%03d V\n", (voltage / 1000), (voltage % 1000));
     display_printf("Temperature: %d.%01d `C\n\n", (temperature / 10), (temperature % 10));
-    
+
     const char *weekdays[8] = {
         "Unknown day",
         "Monday",
@@ -154,7 +155,7 @@ static void test_pi (void) {
     display_printf("\n");
 }
 
-static void test_sd_card (void) {
+static void test_sd_card_io (void) {
     sc64_error_t error;
     sc64_sd_card_status_t card_status;
     uint8_t card_info[32] __attribute__((aligned(8)));
@@ -170,9 +171,12 @@ static void test_sd_card (void) {
         display_printf("SD card is not inserted\n");
     }
 
+    if ((error = sc64_sd_card_deinit()) != SC64_OK) {
+        return display_printf("SD card deinit error: %d", error);
+    }
+
     if ((error = sc64_sd_card_init()) != SC64_OK) {
-        display_printf("SD card init error: %d\n", error);
-        return;
+        return display_printf("SD card init error: %d\n", error);
     }
 
     if ((error = sc64_sd_card_get_status(&card_status)) != SC64_OK) {
@@ -193,8 +197,7 @@ static void test_sd_card (void) {
     }
 
     if ((error = sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) != SC64_OK) {
-        display_printf("SD card get info error: %d\n", error);
-        return;
+        return display_printf("SD card get info error: %d\n", error);
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), card_info, sizeof(card_info));
@@ -214,8 +217,7 @@ static void test_sd_card (void) {
     display_printf("\n");
 
     if ((error = sc64_sd_read_sectors((void *) (SC64_BUFFERS->BUFFER), 0, 1)) != SC64_OK) {
-        display_printf("SD card read sector 0 error: %d\n", error);
-        return;
+        return display_printf("SD card read sector 0 error: %d\n", error);
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), sector, sizeof(sector));
@@ -232,72 +234,194 @@ static void test_sd_card (void) {
     display_printf(" Boot signature: 0x%02X%02X\n", sector[510], sector[511]);
 }
 
+static void test_sd_card_fatfs (void) {
+    sc64_error_t error;
+    FRESULT fresult;
+    FATFS fs;
+    TCHAR label[23];
+    DWORD vsn;
+    FIL fil;
+    UINT left;
+    UINT bytes;
+
+    if ((error = sc64_sd_card_deinit()) != SC64_OK) {
+        return display_printf("SD card deinit error: %d", error);
+    }
+
+    if ((fresult = f_mount(&fs, "", 1)) != FR_OK) {
+        return display_printf("f_mount error: %d\n", fresult);
+    }
+
+    if ((fresult = f_getlabel("", label, &vsn)) != FR_OK) {
+        return display_printf("f_getlabel error: %d\n", fresult);
+    }
+
+    display_printf("Volume [%s] / [%08lX]\n\n", label, vsn);
+
+    if ((fresult = f_open(&fil, "sc64test.bin", FA_CREATE_ALWAYS | FA_WRITE)) != FR_OK) {
+        return display_printf("f_open (write) error: %d\n", fresult);
+    }
+
+    srand(random_seed);
+
+    left = SD_TEST_FILE_SIZE;
+
+    while (left) {
+        if ((left % (SD_TEST_FILE_SIZE / 64)) == 0) {
+            display_printf("w");
+        }
+
+        UINT block_size = (left > TEST_BUFFER_SIZE) ? TEST_BUFFER_SIZE : left;
+
+        fill_random(w_buffer, block_size, 0, 0);
+
+        if ((fresult = f_write(&fil, w_buffer, block_size, &bytes)) != FR_OK) {
+            return display_printf("\nf_write error: %d\n", fresult);
+        }
+
+        if (bytes != block_size) {
+            return display_printf("\nf_write (%ld!=%ld) error: %d\n", bytes, block_size, fresult);
+        }
+
+        left -= block_size;
+    }
+
+    display_printf("\n");
+
+    if ((fresult = f_close(&fil)) != FR_OK) {
+        return display_printf("f_close (write) error: %d\n", fresult);
+    }
+
+    if ((fresult = f_open(&fil, "sc64test.bin", FA_OPEN_EXISTING | FA_READ)) != FR_OK) {
+        return display_printf("f_open (read) error: %d\n", fresult);
+    }
+
+    if (f_size(&fil) != SD_TEST_FILE_SIZE) {
+        return display_printf("f_size (%d!=%d) error\n", f_size(&fil), SD_TEST_FILE_SIZE);
+    }
+
+    srand(random_seed);
+
+    left = SD_TEST_FILE_SIZE;
+
+    while (left) {
+        if ((left % (SD_TEST_FILE_SIZE / 64)) == 0) {
+            display_printf("r");
+        }
+
+        UINT block_size = (left > TEST_BUFFER_SIZE) ? TEST_BUFFER_SIZE : left;
+
+        fill_random(w_buffer, block_size, 0, 0);
+
+        if ((fresult = f_read(&fil, r_buffer, block_size, &bytes)) != FR_OK) {
+            return display_printf("\nf_read error: %d\n", fresult);
+        }
+
+        if (bytes != block_size) {
+            return display_printf("\nf_read (%ld!=%ld) error: %d\n", bytes, block_size, fresult);
+        }
+
+        for (UINT i = 0; i < (block_size / sizeof(uint32_t)); i++) {
+            if (w_buffer[i] != r_buffer[i]) {
+                display_printf(
+                    "\n"
+                    " > Mismatch error at file offset 0x%08lX\n"
+                    " > 0x%08lX (W) != 0x%08lX (R)",
+                    f_tell(&fil) + (i * sizeof(uint32_t)),
+                    w_buffer[i],
+                    r_buffer[i]
+                );
+
+                while (true);
+            }
+        }
+
+        left -= block_size;
+    }
+
+    display_printf("\n");
+
+    if ((fresult = f_close(&fil)) != FR_OK) {
+        return display_printf("f_close (read) error: %d\n", fresult);
+    }
+
+    if ((fresult = f_unlink("sc64test.bin")) != FR_OK) {
+        return display_printf("f_unlink error: %d\n", fresult);
+    }
+
+    if ((fresult = f_unmount("")) != FR_OK) {
+        return display_printf("f_unmount error: %d\n", fresult);
+    }
+
+    random_seed += c0_count();
+}
+
 static void test_sdram (void) {
     static int phase = 0;
 
     sdram_test_t phase_0_tests[] = {
-        { .name = "Own address:  ", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0   },
-        { .name = "All zeros:    ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0   },
-        { .name = "All ones:     ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0   },
-        { .name = "Random (1/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
-        { .name = "Random (2/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
-        { .name = "Random (3/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0   },
-        { .name = "Fadeout S (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 60  },
-        { .name = "Fadeout S (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 60  },
+        { .name = "Own address:  ", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0  },
+        { .name = "All zeros:    ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0  },
+        { .name = "All ones:     ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0  },
+        { .name = "0xAAAA5555:   ", .fill = fill_pattern,     .pattern = 0xAAAA5555, .fade = 0  },
+        { .name = "0x5555AAAA:   ", .fill = fill_pattern,     .pattern = 0x5555AAAA, .fade = 0  },
+        { .name = "Random (1/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (2/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (3/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
         { .name = NULL },
     };
 
     sdram_test_t phase_1_tests[] = {
-        { .name = "0x00010001:   ", .fill = fill_pattern,     .pattern = 0x00010001, .fade = 0   },
-        { .name = "0xFFFEFFFE:   ", .fill = fill_pattern,     .pattern = 0xFFFEFFFE, .fade = 0   },
-        { .name = "0x00020002:   ", .fill = fill_pattern,     .pattern = 0x00020002, .fade = 0   },
-        { .name = "0xFFFDFFFD:   ", .fill = fill_pattern,     .pattern = 0xFFFDFFFD, .fade = 0   },
-        { .name = "0x00040004:   ", .fill = fill_pattern,     .pattern = 0x00040004, .fade = 0   },
-        { .name = "0xFFFBFFFB:   ", .fill = fill_pattern,     .pattern = 0xFFFBFFFB, .fade = 0   },
-        { .name = "0x00080008:   ", .fill = fill_pattern,     .pattern = 0x00080008, .fade = 0   },
-        { .name = "0xFFF7FFF7:   ", .fill = fill_pattern,     .pattern = 0xFFF7FFF7, .fade = 0   },
+        { .name = "0x00010001:   ", .fill = fill_pattern,     .pattern = 0x00010001, .fade = 0  },
+        { .name = "0xFFFEFFFE:   ", .fill = fill_pattern,     .pattern = 0xFFFEFFFE, .fade = 0  },
+        { .name = "0x00020002:   ", .fill = fill_pattern,     .pattern = 0x00020002, .fade = 0  },
+        { .name = "0xFFFDFFFD:   ", .fill = fill_pattern,     .pattern = 0xFFFDFFFD, .fade = 0  },
+        { .name = "0x00040004:   ", .fill = fill_pattern,     .pattern = 0x00040004, .fade = 0  },
+        { .name = "0xFFFBFFFB:   ", .fill = fill_pattern,     .pattern = 0xFFFBFFFB, .fade = 0  },
+        { .name = "0x00080008:   ", .fill = fill_pattern,     .pattern = 0x00080008, .fade = 0  },
+        { .name = "0xFFF7FFF7:   ", .fill = fill_pattern,     .pattern = 0xFFF7FFF7, .fade = 0  },
         { .name = NULL },
     };
 
     sdram_test_t phase_2_tests[] = {
-        { .name = "0x00100010:   ", .fill = fill_pattern,     .pattern = 0x00100010, .fade = 0   },
-        { .name = "0xFFEFFFEF:   ", .fill = fill_pattern,     .pattern = 0xFFEFFFEF, .fade = 0   },
-        { .name = "0x00200020:   ", .fill = fill_pattern,     .pattern = 0x00200020, .fade = 0   },
-        { .name = "0xFFDFFFDF:   ", .fill = fill_pattern,     .pattern = 0xFFDFFFDF, .fade = 0   },
-        { .name = "0x00400040:   ", .fill = fill_pattern,     .pattern = 0x00400040, .fade = 0   },
-        { .name = "0xFFBFFFBF:   ", .fill = fill_pattern,     .pattern = 0xFFBFFFBF, .fade = 0   },
-        { .name = "0x00800080:   ", .fill = fill_pattern,     .pattern = 0x00800080, .fade = 0   },
-        { .name = "0xFF7FFF7F:   ", .fill = fill_pattern,     .pattern = 0xFF7FFF7F, .fade = 0   },
+        { .name = "0x00100010:   ", .fill = fill_pattern,     .pattern = 0x00100010, .fade = 0  },
+        { .name = "0xFFEFFFEF:   ", .fill = fill_pattern,     .pattern = 0xFFEFFFEF, .fade = 0  },
+        { .name = "0x00200020:   ", .fill = fill_pattern,     .pattern = 0x00200020, .fade = 0  },
+        { .name = "0xFFDFFFDF:   ", .fill = fill_pattern,     .pattern = 0xFFDFFFDF, .fade = 0  },
+        { .name = "0x00400040:   ", .fill = fill_pattern,     .pattern = 0x00400040, .fade = 0  },
+        { .name = "0xFFBFFFBF:   ", .fill = fill_pattern,     .pattern = 0xFFBFFFBF, .fade = 0  },
+        { .name = "0x00800080:   ", .fill = fill_pattern,     .pattern = 0x00800080, .fade = 0  },
+        { .name = "0xFF7FFF7F:   ", .fill = fill_pattern,     .pattern = 0xFF7FFF7F, .fade = 0  },
         { .name = NULL },
     };
 
     sdram_test_t phase_3_tests[] = {
-        { .name = "0x01000100:   ", .fill = fill_pattern,     .pattern = 0x01000100, .fade = 0   },
-        { .name = "0xFEFFFEFF:   ", .fill = fill_pattern,     .pattern = 0xFEFFFEFF, .fade = 0   },
-        { .name = "0x02000200:   ", .fill = fill_pattern,     .pattern = 0x02000200, .fade = 0   },
-        { .name = "0xFDFFFDFF:   ", .fill = fill_pattern,     .pattern = 0xFDFFFDFF, .fade = 0   },
-        { .name = "0x04000400:   ", .fill = fill_pattern,     .pattern = 0x04000400, .fade = 0   },
-        { .name = "0xFBFFFBFF:   ", .fill = fill_pattern,     .pattern = 0xFBFFFBFF, .fade = 0   },
-        { .name = "0x08000800:   ", .fill = fill_pattern,     .pattern = 0x08000800, .fade = 0   },
-        { .name = "0xF7FFF7FF:   ", .fill = fill_pattern,     .pattern = 0xF7FFF7FF, .fade = 0   },
+        { .name = "0x01000100:   ", .fill = fill_pattern,     .pattern = 0x01000100, .fade = 0  },
+        { .name = "0xFEFFFEFF:   ", .fill = fill_pattern,     .pattern = 0xFEFFFEFF, .fade = 0  },
+        { .name = "0x02000200:   ", .fill = fill_pattern,     .pattern = 0x02000200, .fade = 0  },
+        { .name = "0xFDFFFDFF:   ", .fill = fill_pattern,     .pattern = 0xFDFFFDFF, .fade = 0  },
+        { .name = "0x04000400:   ", .fill = fill_pattern,     .pattern = 0x04000400, .fade = 0  },
+        { .name = "0xFBFFFBFF:   ", .fill = fill_pattern,     .pattern = 0xFBFFFBFF, .fade = 0  },
+        { .name = "0x08000800:   ", .fill = fill_pattern,     .pattern = 0x08000800, .fade = 0  },
+        { .name = "0xF7FFF7FF:   ", .fill = fill_pattern,     .pattern = 0xF7FFF7FF, .fade = 0  },
         { .name = NULL },
     };
 
     sdram_test_t phase_4_tests[] = {
-        { .name = "0x10001000:   ", .fill = fill_pattern,     .pattern = 0x10001000, .fade = 0   },
-        { .name = "0xEFFFEFFF:   ", .fill = fill_pattern,     .pattern = 0xEFFFEFFF, .fade = 0   },
-        { .name = "0x20002000:   ", .fill = fill_pattern,     .pattern = 0x20002000, .fade = 0   },
-        { .name = "0xDFFFDFFF:   ", .fill = fill_pattern,     .pattern = 0xDFFFDFFF, .fade = 0   },
-        { .name = "0x40004000:   ", .fill = fill_pattern,     .pattern = 0x40004000, .fade = 0   },
-        { .name = "0xBFFFBFFF:   ", .fill = fill_pattern,     .pattern = 0xBFFFBFFF, .fade = 0   },
-        { .name = "0x80008000:   ", .fill = fill_pattern,     .pattern = 0x80008000, .fade = 0   },
-        { .name = "0x7FFF7FFF:   ", .fill = fill_pattern,     .pattern = 0x7FFF7FFF, .fade = 0   },
+        { .name = "0x10001000:   ", .fill = fill_pattern,     .pattern = 0x10001000, .fade = 0  },
+        { .name = "0xEFFFEFFF:   ", .fill = fill_pattern,     .pattern = 0xEFFFEFFF, .fade = 0  },
+        { .name = "0x20002000:   ", .fill = fill_pattern,     .pattern = 0x20002000, .fade = 0  },
+        { .name = "0xDFFFDFFF:   ", .fill = fill_pattern,     .pattern = 0xDFFFDFFF, .fade = 0  },
+        { .name = "0x40004000:   ", .fill = fill_pattern,     .pattern = 0x40004000, .fade = 0  },
+        { .name = "0xBFFFBFFF:   ", .fill = fill_pattern,     .pattern = 0xBFFFBFFF, .fade = 0  },
+        { .name = "0x80008000:   ", .fill = fill_pattern,     .pattern = 0x80008000, .fade = 0  },
+        { .name = "0x7FFF7FFF:   ", .fill = fill_pattern,     .pattern = 0x7FFF7FFF, .fade = 0  },
         { .name = NULL },
     };
 
     sdram_test_t phase_5_tests[] = {
-        { .name = "Fadeout L (0):", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 300 },
-        { .name = "Fadeout L (1):", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 300 },
+        { .name = "Fadeout (0):  ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 60 },
+        { .name = "Fadeout (1):  ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 60 },
         { .name = NULL },
     };
 
@@ -317,14 +441,14 @@ static void test_sdram (void) {
 
         srand(random_seed);
 
-        for (int offset = 0; offset < SDRAM_SIZE; offset += SDRAM_BUFFER_SIZE) {
+        for (int offset = 0; offset < SDRAM_SIZE; offset += TEST_BUFFER_SIZE) {
             if ((offset % (SDRAM_SIZE / 16)) == 0) {
                 display_printf("w");
             }
 
-            test->fill(w_buffer, SDRAM_BUFFER_SIZE, test->pattern, offset);
+            test->fill(w_buffer, TEST_BUFFER_SIZE, test->pattern, offset);
 
-            pi_dma_write((io32_t *) (SDRAM_ADDRESS + offset), w_buffer, SDRAM_BUFFER_SIZE);
+            pi_dma_write((io32_t *) (SDRAM_ADDRESS + offset), w_buffer, TEST_BUFFER_SIZE);
         }
 
         for (int fade = test->fade; fade > 0; fade--) {
@@ -335,19 +459,19 @@ static void test_sdram (void) {
 
         srand(random_seed);
 
-        for (int offset = 0; offset < SDRAM_SIZE; offset += SDRAM_BUFFER_SIZE) {
+        for (int offset = 0; offset < SDRAM_SIZE; offset += TEST_BUFFER_SIZE) {
             if ((offset % (SDRAM_SIZE / 16)) == 0) {
                 display_printf("r");
             }
 
-            test->fill(w_buffer, SDRAM_BUFFER_SIZE, test->pattern, offset);
+            test->fill(w_buffer, TEST_BUFFER_SIZE, test->pattern, offset);
 
-            pi_dma_read((io32_t *) (SDRAM_ADDRESS + offset), r_buffer, SDRAM_BUFFER_SIZE);
+            pi_dma_read((io32_t *) (SDRAM_ADDRESS + offset), r_buffer, TEST_BUFFER_SIZE);
 
             uint64_t *test_data = (uint64_t *) (w_buffer);
             uint64_t *check_data = (uint64_t *) (r_buffer);
 
-            for (int i = 0; i < SDRAM_BUFFER_SIZE / sizeof(uint64_t); i++) {
+            for (int i = 0; i < TEST_BUFFER_SIZE / sizeof(uint64_t); i++) {
                 if (test_data[i] != check_data[i]) {
                     display_printf(
                         "\n"
@@ -399,7 +523,8 @@ static struct {
 } tests[] = {
     { "SC64 CFG", test_sc64_cfg },
     { "PI", test_pi },
-    { "SD card", test_sd_card },
+    { "SD card (I/O)", test_sd_card_io },
+    { "SD card (FatFs)", test_sd_card_fatfs },
     { "SDRAM (1/6)", test_sdram },
     { "SDRAM (2/6)", test_sdram },
     { "SDRAM (3/6)", test_sdram },
@@ -415,12 +540,10 @@ void test_execute (void) {
 
     if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true))) {
         error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed: %d", error);
-        return;
     }
 
     if ((error = sc64_set_config(CFG_ID_ROM_SHADOW_ENABLE, false))) {
         error_display("Command CONFIG_SET [ROM_SHADOW_ENABLE] failed: %d", error);
-        return;
     }
 
     random_seed = __entropy + c0_count();

@@ -884,69 +884,68 @@ fn handle_firmware_command(
 fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, false)?;
 
-    println!("{}: SDRAM", "[SC64 Tests]".bold());
+    println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
 
-    let sdram_tests = [
-        (sc64::MemoryTestType::OwnAddress, None),
-        (sc64::MemoryTestType::AllZeros, None),
-        (sc64::MemoryTestType::AllOnes, None),
-        (sc64::MemoryTestType::Random, None),
-        (sc64::MemoryTestType::Random, None),
-        (sc64::MemoryTestType::Random, None),
-        (sc64::MemoryTestType::AllZeros, Some(60)),
-        (sc64::MemoryTestType::AllOnes, Some(60)),
-        (sc64::MemoryTestType::Pattern(0x00010001), None),
-        (sc64::MemoryTestType::Pattern(0xFFFEFFFE), None),
-        (sc64::MemoryTestType::Pattern(0x00020002), None),
-        (sc64::MemoryTestType::Pattern(0xFFFDFFFD), None),
-        (sc64::MemoryTestType::Pattern(0x00040004), None),
-        (sc64::MemoryTestType::Pattern(0xFFFBFFFB), None),
-        (sc64::MemoryTestType::Pattern(0x00080008), None),
-        (sc64::MemoryTestType::Pattern(0xFFF7FFF7), None),
-        (sc64::MemoryTestType::Pattern(0x00100010), None),
-        (sc64::MemoryTestType::Pattern(0xFFEFFFEF), None),
-        (sc64::MemoryTestType::Pattern(0x00200020), None),
-        (sc64::MemoryTestType::Pattern(0xFFDFFFDF), None),
-        (sc64::MemoryTestType::Pattern(0x00400040), None),
-        (sc64::MemoryTestType::Pattern(0xFFBFFFBF), None),
-        (sc64::MemoryTestType::Pattern(0x00800080), None),
-        (sc64::MemoryTestType::Pattern(0xFF7FFF7F), None),
-        (sc64::MemoryTestType::Pattern(0x01000100), None),
-        (sc64::MemoryTestType::Pattern(0xFEFFFEFF), None),
-        (sc64::MemoryTestType::Pattern(0x02000200), None),
-        (sc64::MemoryTestType::Pattern(0xFDFFFDFF), None),
-        (sc64::MemoryTestType::Pattern(0x04000400), None),
-        (sc64::MemoryTestType::Pattern(0xFBFFFBFF), None),
-        (sc64::MemoryTestType::Pattern(0x08000800), None),
-        (sc64::MemoryTestType::Pattern(0xF7FFF7FF), None),
-        (sc64::MemoryTestType::Pattern(0x10001000), None),
-        (sc64::MemoryTestType::Pattern(0xEFFFEFFF), None),
-        (sc64::MemoryTestType::Pattern(0x20002000), None),
-        (sc64::MemoryTestType::Pattern(0xDFFFDFFF), None),
-        (sc64::MemoryTestType::Pattern(0x40004000), None),
-        (sc64::MemoryTestType::Pattern(0xBFFFBFFF), None),
-        (sc64::MemoryTestType::Pattern(0x80008000), None),
-        (sc64::MemoryTestType::Pattern(0x7FFF7FFF), None),
-        (sc64::MemoryTestType::AllZeros, Some(300)),
-        (sc64::MemoryTestType::AllOnes, Some(300)),
+    let sdram_pattern_tests = [
+        (sc64::MemoryTestPattern::OwnAddress, None),
+        (sc64::MemoryTestPattern::AllZeros, None),
+        (sc64::MemoryTestPattern::AllOnes, None),
+        (sc64::MemoryTestPattern::Custom(0xAAAA5555), None),
+        (sc64::MemoryTestPattern::Custom(0x5555AAAA), None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Custom(0x00010001), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFEFFFE), None),
+        (sc64::MemoryTestPattern::Custom(0x00020002), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFDFFFD), None),
+        (sc64::MemoryTestPattern::Custom(0x00040004), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFBFFFB), None),
+        (sc64::MemoryTestPattern::Custom(0x00080008), None),
+        (sc64::MemoryTestPattern::Custom(0xFFF7FFF7), None),
+        (sc64::MemoryTestPattern::Custom(0x00100010), None),
+        (sc64::MemoryTestPattern::Custom(0xFFEFFFEF), None),
+        (sc64::MemoryTestPattern::Custom(0x00200020), None),
+        (sc64::MemoryTestPattern::Custom(0xFFDFFFDF), None),
+        (sc64::MemoryTestPattern::Custom(0x00400040), None),
+        (sc64::MemoryTestPattern::Custom(0xFFBFFFBF), None),
+        (sc64::MemoryTestPattern::Custom(0x00800080), None),
+        (sc64::MemoryTestPattern::Custom(0xFF7FFF7F), None),
+        (sc64::MemoryTestPattern::Custom(0x01000100), None),
+        (sc64::MemoryTestPattern::Custom(0xFEFFFEFF), None),
+        (sc64::MemoryTestPattern::Custom(0x02000200), None),
+        (sc64::MemoryTestPattern::Custom(0xFDFFFDFF), None),
+        (sc64::MemoryTestPattern::Custom(0x04000400), None),
+        (sc64::MemoryTestPattern::Custom(0xFBFFFBFF), None),
+        (sc64::MemoryTestPattern::Custom(0x08000800), None),
+        (sc64::MemoryTestPattern::Custom(0xF7FFF7FF), None),
+        (sc64::MemoryTestPattern::Custom(0x10001000), None),
+        (sc64::MemoryTestPattern::Custom(0xEFFFEFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x20002000), None),
+        (sc64::MemoryTestPattern::Custom(0xDFFFDFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x40004000), None),
+        (sc64::MemoryTestPattern::Custom(0xBFFFBFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x80008000), None),
+        (sc64::MemoryTestPattern::Custom(0x7FFF7FFF), None),
+        (sc64::MemoryTestPattern::AllZeros, Some(60)),
+        (sc64::MemoryTestPattern::AllOnes, Some(60)),
     ];
-    let sdram_tests_count = sdram_tests.len();
+    let sdram_pattern_tests_count = sdram_pattern_tests.len();
 
     let mut sdram_tests_failed = false;
 
-    for (i, (test_type, fade)) in sdram_tests.into_iter().enumerate() {
+    for (i, (pattern, fade)) in sdram_pattern_tests.into_iter().enumerate() {
         let fadeout_text = if let Some(fade) = fade {
             format!(", fadeout {fade} seconds")
         } else {
             "".to_string()
         };
         print!(
-            " ({} / {sdram_tests_count}) Testing {test_type}{fadeout_text}... ",
+            " ({} / {sdram_pattern_tests_count}) Testing {pattern}{fadeout_text}... ",
             i + 1
         );
         stdout().flush().unwrap();
 
-        let result = sc64.test_sdram(test_type, fade)?;
+        let result = sc64.test_sdram_pattern(pattern, fade)?;
 
         if let Some((address, (written, read))) = result.first_error {
             sdram_tests_failed = true;

@@ -983,27 +983,27 @@ impl Display for DiagnosticData {
     }
 }
 
-pub enum MemoryTestType {
+pub enum MemoryTestPattern {
     OwnAddress,
     AllZeros,
     AllOnes,
-    Pattern(u32),
     Random,
+    Custom(u32),
 }
 
-pub struct MemoryTestResult {
+pub struct MemoryTestPatternResult {
     pub first_error: Option<(usize, (u32, u32))>,
     pub all_errors: Vec<(usize, (u32, u32))>,
 }
 
-impl Display for MemoryTestType {
+impl Display for MemoryTestPattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MemoryTestType::OwnAddress => f.write_str("Own address"),
-            MemoryTestType::AllZeros => f.write_str("All zeros"),
-            MemoryTestType::AllOnes => f.write_str("All ones"),
-            MemoryTestType::Random => f.write_str("Random"),
-            MemoryTestType::Pattern(pattern) => {
+            MemoryTestPattern::OwnAddress => f.write_str("Own address"),
+            MemoryTestPattern::AllZeros => f.write_str("All zeros"),
+            MemoryTestPattern::AllOnes => f.write_str("All ones"),
+            MemoryTestPattern::Random => f.write_str("Random"),
+            MemoryTestPattern::Custom(pattern) => {
                 f.write_fmt(format_args!("Pattern 0x{pattern:08X}"))
             }
         }
