@@ -89,6 +89,61 @@ static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
 }
 
 
+const char *sc64_error_description (sc64_error_t error) {
+    sc64_error_type_t type = (sc64_error_type_t) ((error >> 24) & 0xFF);
+    error &= 0xFFFFFF;
+
+    if (type == ERROR_TYPE_CFG) {
+        switch ((sc64_cfg_error_t) (error)) {
+            case SC64_OK: return "No error";
+            case CFG_ERROR_UNKNOWN_COMMAND: return "Unknown command";
+            case CFG_ERROR_INVALID_ARGUMENT: return "Invalid argument";
+            case CFG_ERROR_INVALID_ADDRESS: return "Invalid address";
+            case CFG_ERROR_INVALID_ID: return "Invalid ID";
+            default: return "Unknown error (CFG)";
+        }
+    }
+
+    if (type == ERROR_TYPE_SD_CARD) {
+        switch ((sc64_sd_error_t) (error)) {
+            case SD_OK: return "No error (SD)";
+            case SD_ERROR_NO_CARD_IN_SLOT: return "No SD card in the slot";
+            case SD_ERROR_NOT_INITIALIZED: return "SD card is not initialized";
+            case SD_ERROR_INVALID_ARGUMENT: return "Invalid argument (SD)";
+            case SD_ERROR_INVALID_ADDRESS: return "Invalid address (SD)";
+            case SD_ERROR_INVALID_OPERATION: return "Invalid operation (SD)";
+            case SD_ERROR_CMD2_IO: return "CMD2 I/O";
+            case SD_ERROR_CMD3_IO: return "CMD3 I/O";
+            case SD_ERROR_CMD6_CHECK_IO: return "CMD6 I/O (check)";
+            case SD_ERROR_CMD6_CHECK_CRC: return "CMD6 CRC (check)";
+            case SD_ERROR_CMD6_CHECK_TIMEOUT: return "CMD6 timeout (check)";
+            case SD_ERROR_CMD6_CHECK_RESPONSE: return "CMD6 invalid response (check)";
+            case SD_ERROR_CMD6_SWITCH_IO: return "CMD6 I/O (switch)";
+            case SD_ERROR_CMD6_SWITCH_CRC: return "CMD6 CRC (switch)";
+            case SD_ERROR_CMD6_SWITCH_TIMEOUT: return "CMD6 timeout (switch)";
+            case SD_ERROR_CMD6_SWITCH_RESPONSE: return "CMD6 invalid response (switch)";
+            case SD_ERROR_CMD7_IO: return "CMD7 I/O";
+            case SD_ERROR_CMD8_IO: return "CMD8 I/O";
+            case SD_ERROR_CMD9_IO: return "CMD9 I/O";
+            case SD_ERROR_CMD10_IO: return "CMD10 I/O";
+            case SD_ERROR_CMD18_IO: return "CMD18 I/O";
+            case SD_ERROR_CMD18_CRC: return "CMD18 CRC";
+            case SD_ERROR_CMD18_TIMEOUT: return "CMD18 timeout";
+            case SD_ERROR_CMD25_IO: return "CMD25 I/O";
+            case SD_ERROR_CMD25_CRC: return "CMD25 CRC";
+            case SD_ERROR_CMD25_TIMEOUT: return "CMD25 timeout";
+            case SD_ERROR_ACMD6_IO: return "ACMD6 I/O";
+            case SD_ERROR_ACMD41_IO: return "ACMD41 I/O";
+            case SD_ERROR_ACMD41_OCR: return "ACMD41 OCR";
+            case SD_ERROR_ACMD41_TIMEOUT: return "ACMD41 timeout";
+            default: return "Unknown error (SD)";
+        }
+    }
+
+    return "Unknown error (type)";
+}
+
+
 void sc64_unlock (void) {
     pi_io_write(&SC64_REGS->KEY, SC64_KEY_RESET);
     pi_io_write(&SC64_REGS->KEY, SC64_KEY_UNLOCK_1);
@@ -396,8 +451,7 @@ sc64_error_t sc64_writeback_enable (void *address) {
 sc64_error_t sc64_writeback_disable (void) {
     sc64_error_t error;
     uint32_t save_type;
-    error = sc64_get_config(CFG_ID_SAVE_TYPE, &save_type);
-    if (error != SC64_OK) {
+    if ((error = sc64_get_config(CFG_ID_SAVE_TYPE, &save_type)) != SC64_OK) {
         return error;
     }
     return sc64_set_config(CFG_ID_SAVE_TYPE, save_type);

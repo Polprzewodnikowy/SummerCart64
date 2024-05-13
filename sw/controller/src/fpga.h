@@ -61,7 +61,6 @@ typedef enum {
 
 
 #define ALIGN(value, align)             (((value) + ((typeof(value))(align) - 1)) & ~((typeof(value))(align) - 1))
-#define SWAP16(x)                       ((((x) & 0xFF) << 8) | (((x) & 0xFF00) >> 8))
 #define SWAP32(x)                       (((x) & 0xFF) << 24 | ((x) & 0xFF00) << 8 | ((x) & 0xFF0000) >> 8 | ((x) & 0xFF000000) >> 24)
 
 #define FPGA_ID                         (0x64)

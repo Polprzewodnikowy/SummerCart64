@@ -28,7 +28,7 @@ void init (init_tv_type_t tv_type, init_reset_type_t reset_type, uint32_t entrop
     exception_enable_interrupts();
 
     if ((error = sc64_set_config(CFG_ID_BOOTLOADER_SWITCH, false)) != SC64_OK) {
-        error_display("Command CONFIG_SET [BOOTLOADER_SWITCH] failed: %d", error);
+        error_display("Command CONFIG_SET [BOOTLOADER_SWITCH] failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if (test_check()) {

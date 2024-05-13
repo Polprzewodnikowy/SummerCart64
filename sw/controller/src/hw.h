@@ -27,10 +27,10 @@ typedef enum {
 
 typedef enum {
     I2C_OK,
-    I2C_ERR_BUSY,
-    I2C_ERR_TIMEOUT,
-    I2C_ERR_NACK,
-} i2c_err_t;
+    I2C_ERROR_BUSY,
+    I2C_ERROR_TIMEOUT,
+    I2C_ERROR_NACK,
+} i2c_error_t;
 
 typedef uint64_t hw_flash_t;
 
@@ -72,7 +72,7 @@ void hw_spi_stop (void);
 void hw_spi_rx (uint8_t *data, int length);
 void hw_spi_tx (uint8_t *data, int length);
 
-i2c_err_t hw_i2c_trx (uint8_t i2c_address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length);
+i2c_error_t hw_i2c_trx (uint8_t i2c_address, uint8_t *tx_data, uint8_t tx_length, uint8_t *rx_data, uint8_t rx_length);
 
 void hw_crc32_reset (void);
 uint32_t hw_crc32_calculate (uint8_t *data, uint32_t length);

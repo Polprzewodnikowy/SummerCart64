@@ -63,22 +63,22 @@ static void test_sc64_cfg (void) {
 
     do {
         if ((error = sc64_get_config(CFG_ID_BUTTON_STATE, &button_state)) != SC64_OK) {
-            error_display("Command CONFIG_GET [BUTTON_STATE] failed: %d", error);
+            error_display("Command CONFIG_GET [BUTTON_STATE] failed\n (%08X) - %s", error, sc64_error_description(error));
         }
     } while (button_state != 0);
 
     display_printf("done\n\n");
 
     if ((error = sc64_get_identifier(&identifier)) != SC64_OK) {
-        error_display("Command IDENTIFIER_GET failed: %d", error);
+        error_display("Command IDENTIFIER_GET failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((error = sc64_get_version(&major, &minor, &revision)) != SC64_OK) {
-        error_display("Command VERSION_GET failed: %d", error);
+        error_display("Command VERSION_GET failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((error = sc64_get_diagnostic(DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE, &tmp)) != SC64_OK) {
-        error_display("Command DIAGNOSTIC_GET failed: %d", error);
+        error_display("Command DIAGNOSTIC_GET failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     uint16_t voltage = (uint16_t) (tmp >> 16);
@@ -104,7 +104,7 @@ static void test_sc64_cfg (void) {
     sc64_rtc_time_t t;
 
     if ((error = sc64_get_time(&t)) != SC64_OK) {
-        error_display("Command TIME_GET failed: %d", error);
+        error_display("Command TIME_GET failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     display_printf("RTC current time:\n ");
@@ -136,16 +136,14 @@ static void test_pi (void) {
 
         for (int i = 0; i < size / sizeof(uint32_t); i++) {
             if (w_buffer[i] != r_buffer[i]) {
-                display_printf(
-                    "\n"
+                error_display(
+                    "PI test failed:\n"
                     " > Mismatch error at address 0x%08lX\n"
                     " > 0x%08lX (W) != 0x%08lX (R)",
                     (uint32_t) (SC64_BUFFERS->BUFFER) + (i * sizeof(uint32_t)),
                     w_buffer[i],
                     r_buffer[i]
                 );
-
-                while (true);
             }
         }
     }
@@ -162,7 +160,7 @@ static void test_sd_card_io (void) {
     uint8_t sector[512] __attribute__((aligned(8)));
 
     if ((error = sc64_sd_card_get_status(&card_status)) != SC64_OK) {
-        error_display("Could not get SD card info: %d", error);
+        error_display("Could not get SD card info\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if (card_status & SD_CARD_STATUS_INSERTED) {
@@ -172,15 +170,15 @@ static void test_sd_card_io (void) {
     }
 
     if ((error = sc64_sd_card_deinit()) != SC64_OK) {
-        return display_printf("SD card deinit error: %d", error);
+        error_display("SD card deinit error\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((error = sc64_sd_card_init()) != SC64_OK) {
-        return display_printf("SD card init error: %d\n", error);
+        return display_printf("SD card init error\n (%08X) - %s\n", error, sc64_error_description(error));
     }
 
     if ((error = sc64_sd_card_get_status(&card_status)) != SC64_OK) {
-        error_display("Could not get SD card info: %d", error);
+        error_display("Could not get SD card info\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if (card_status & SD_CARD_STATUS_INITIALIZED) {
@@ -197,7 +195,7 @@ static void test_sd_card_io (void) {
     }
 
     if ((error = sc64_sd_card_get_info((uint32_t *) (SC64_BUFFERS->BUFFER))) != SC64_OK) {
-        return display_printf("SD card get info error: %d\n", error);
+        error_display("SD card get info error\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), card_info, sizeof(card_info));
@@ -217,7 +215,7 @@ static void test_sd_card_io (void) {
     display_printf("\n");
 
     if ((error = sc64_sd_read_sectors((void *) (SC64_BUFFERS->BUFFER), 0, 1)) != SC64_OK) {
-        return display_printf("SD card read sector 0 error: %d\n", error);
+        return display_printf("SD card read sector 0 error\n (%08X) - %s\n", error, sc64_error_description(error));
     }
 
     pi_dma_read((io32_t *) (SC64_BUFFERS->BUFFER), sector, sizeof(sector));
@@ -245,21 +243,21 @@ static void test_sd_card_fatfs (void) {
     UINT bytes;
 
     if ((error = sc64_sd_card_deinit()) != SC64_OK) {
-        return display_printf("SD card deinit error: %d", error);
+        error_display("SD card deinit error\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((fresult = f_mount(&fs, "", 1)) != FR_OK) {
-        return display_printf("f_mount error: %d\n", fresult);
+        display_printf("f_mount error: %d\n", fresult);
     }
 
     if ((fresult = f_getlabel("", label, &vsn)) != FR_OK) {
-        return display_printf("f_getlabel error: %d\n", fresult);
+        display_printf("f_getlabel error: %d\n", fresult);
+    } else {
+        display_printf("Volume [%s] / [%08lX]\n\n", label, vsn);
     }
 
-    display_printf("Volume [%s] / [%08lX]\n\n", label, vsn);
-
     if ((fresult = f_open(&fil, "sc64test.bin", FA_CREATE_ALWAYS | FA_WRITE)) != FR_OK) {
-        return display_printf("f_open (write) error: %d\n", fresult);
+        display_printf("f_open (write) error: %d\n", fresult);
     }
 
     srand(random_seed);
@@ -276,11 +274,13 @@ static void test_sd_card_fatfs (void) {
         fill_random(w_buffer, block_size, 0, 0);
 
         if ((fresult = f_write(&fil, w_buffer, block_size, &bytes)) != FR_OK) {
-            return display_printf("\nf_write error: %d\n", fresult);
+            display_printf("\nf_write error: %d", fresult);
+            break;
         }
 
         if (bytes != block_size) {
-            return display_printf("\nf_write (%ld!=%ld) error: %d\n", bytes, block_size, fresult);
+            display_printf("\nf_write (%ld!=%ld) error: %d", bytes, block_size, fresult);
+            break;
         }
 
         left -= block_size;
@@ -289,15 +289,15 @@ static void test_sd_card_fatfs (void) {
     display_printf("\n");
 
     if ((fresult = f_close(&fil)) != FR_OK) {
-        return display_printf("f_close (write) error: %d\n", fresult);
+        display_printf("f_close (write) error: %d\n", fresult);
     }
 
     if ((fresult = f_open(&fil, "sc64test.bin", FA_OPEN_EXISTING | FA_READ)) != FR_OK) {
-        return display_printf("f_open (read) error: %d\n", fresult);
+        display_printf("f_open (read) error: %d\n", fresult);
     }
 
     if (f_size(&fil) != SD_TEST_FILE_SIZE) {
-        return display_printf("f_size (%d!=%d) error\n", f_size(&fil), SD_TEST_FILE_SIZE);
+        display_printf("f_size (%d!=%d) error\n", f_size(&fil), SD_TEST_FILE_SIZE);
     }
 
     srand(random_seed);
@@ -314,25 +314,25 @@ static void test_sd_card_fatfs (void) {
         fill_random(w_buffer, block_size, 0, 0);
 
         if ((fresult = f_read(&fil, r_buffer, block_size, &bytes)) != FR_OK) {
-            return display_printf("\nf_read error: %d\n", fresult);
+            display_printf("\nf_read error: %d", fresult);
+            break;
         }
 
         if (bytes != block_size) {
-            return display_printf("\nf_read (%ld!=%ld) error: %d\n", bytes, block_size, fresult);
+            display_printf("\nf_read (%ld!=%ld) error: %d", bytes, block_size, fresult);
+            break;
         }
 
         for (UINT i = 0; i < (block_size / sizeof(uint32_t)); i++) {
             if (w_buffer[i] != r_buffer[i]) {
-                display_printf(
-                    "\n"
+                error_display(
+                    "SD card (FatFs) test failed:\n"
                     " > Mismatch error at file offset 0x%08lX\n"
                     " > 0x%08lX (W) != 0x%08lX (R)",
                     f_tell(&fil) + (i * sizeof(uint32_t)),
                     w_buffer[i],
                     r_buffer[i]
                 );
-
-                while (true);
             }
         }
 
@@ -342,15 +342,15 @@ static void test_sd_card_fatfs (void) {
     display_printf("\n");
 
     if ((fresult = f_close(&fil)) != FR_OK) {
-        return display_printf("f_close (read) error: %d\n", fresult);
+        display_printf("f_close (read) error: %d\n", fresult);
     }
 
     if ((fresult = f_unlink("sc64test.bin")) != FR_OK) {
-        return display_printf("f_unlink error: %d\n", fresult);
+        display_printf("f_unlink error: %d\n", fresult);
     }
 
     if ((fresult = f_unmount("")) != FR_OK) {
-        return display_printf("f_unmount error: %d\n", fresult);
+        display_printf("f_unmount error: %d\n", fresult);
     }
 
     random_seed += c0_count();
@@ -473,16 +473,15 @@ static void test_sdram (void) {
 
             for (int i = 0; i < TEST_BUFFER_SIZE / sizeof(uint64_t); i++) {
                 if (test_data[i] != check_data[i]) {
-                    display_printf(
-                        "\n"
+                    error_display(
+                        "SDRAM test failed, %s\n"
                         " > Mismatch error at address 0x%08lX\n"
                         " > 0x%016llX (W) != 0x%016llX (R)",
+                        test->name,
                         SDRAM_ADDRESS + offset + (i * sizeof(uint64_t)),
                         test_data[i],
                         check_data[i]
                     );
-
-                    while (true);
                 }
             }
         }
@@ -511,7 +510,7 @@ bool test_check (void) {
     }
 
     if ((error = sc64_get_config(CFG_ID_BUTTON_STATE, &button_state)) != SC64_OK) {
-        error_display("Command CONFIG_GET [BUTTON_STATE] failed: %d", error);
+        error_display("Command CONFIG_GET [BUTTON_STATE] failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     return (button_state != 0);
@@ -538,12 +537,12 @@ void test_execute (void) {
 
     pi_io_config(0x0F, 0x05, 0x0C, 0x02);
 
-    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true))) {
-        error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed: %d", error);
+    if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true)) != SC64_OK) {
+        error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
-    if ((error = sc64_set_config(CFG_ID_ROM_SHADOW_ENABLE, false))) {
-        error_display("Command CONFIG_SET [ROM_SHADOW_ENABLE] failed: %d", error);
+    if ((error = sc64_set_config(CFG_ID_ROM_SHADOW_ENABLE, false)) != SC64_OK) {
+        error_display("Command CONFIG_SET [ROM_SHADOW_ENABLE] failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     random_seed = __entropy + c0_count();

@@ -8,8 +8,11 @@
 #define ROM_ADDRESS     (0x10000000)
 
 
+extern sc64_error_t sc64_error_fatfs;
+
+
 static const char *fatfs_error_codes[] = {
-    "Succeeded",
+    "No error",
     "A hard error occurred in the low level disk I/O layer",
     "Assertion failed",
     "The physical drive cannot work",
@@ -35,7 +38,14 @@ static const char *fatfs_error_codes[] = {
 #define FF_CHECK(x, message, ...) { \
     fresult = x; \
     if (fresult != FR_OK) { \
-        error_display(message ".\nReason: %s", __VA_ARGS__ __VA_OPT__(,) fatfs_error_codes[fresult]); \
+        error_display( \
+            message "\n" \
+            " > FatFs error: %s\n" \
+            " > SD card error: %s (%08X)", \
+            __VA_ARGS__ __VA_OPT__(,) \
+            fatfs_error_codes[fresult], \
+            sc64_error_description(sc64_error_fatfs), sc64_error_fatfs \
+        ); \
     } \
 }
 
@@ -55,15 +65,15 @@ void menu_load (void) {
 
     do {
         if ((error = sc64_writeback_pending(&writeback_pending)) != SC64_OK) {
-            error_display("Command WRITEBACK_PENDING failed: %d", error);
+            error_display("Command WRITEBACK_PENDING failed\n (%08X) - %s", error, sc64_error_description(error));
         }
     } while (writeback_pending);
 
     if ((error = sc64_writeback_disable()) != SC64_OK) {
-        error_display("Could not disable writeback: %d", error);
+        error_display("Could not disable save writeback\n (%08X) - %s", error, sc64_error_description(error));
     }
 
-    FF_CHECK(f_mount(&fs, "", 1), "SD card initialize error. No SD card or invalid partition table");
+    FF_CHECK(f_mount(&fs, "", 1), "SD card initialize error");
     FF_CHECK(f_open(&fil, "sc64menu.n64", FA_READ), "Could not open menu executable (sc64menu.n64)");
     fix_menu_file_size(&fil);
     FF_CHECK(f_read(&fil, (void *) (ROM_ADDRESS), f_size(&fil), &bytes_read), "Could not read menu file");
