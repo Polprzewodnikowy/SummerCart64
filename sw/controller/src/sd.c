@@ -266,13 +266,12 @@ static bool sd_dat_check_crc16 (uint8_t *data, uint32_t length) {
 static cmd6_error_t sd_cmd6 (uint32_t arg, uint8_t *buffer) {
     uint32_t rsp;
     sd_dat_prepare(SD_INIT_BUFFER_ADDRESS, 1, DAT_READ);
-    if (sd_cmd(6, arg, RSP_R1, &rsp)) {
+    if (sd_cmd(6, arg, RSP_R1, NULL)) {
         sd_dat_abort();
+        if ((!sd_cmd(13, p.rca, RSP_R1, &rsp)) && (rsp & R1_ILLEGAL_COMMAND)) {
+            return CMD6_ERROR_ILLEGAL_CMD;
+        }
         return CMD6_ERROR_IO;
-    }
-    if (rsp & R1_ILLEGAL_COMMAND) {
-        sd_dat_abort();
-        return CMD6_ERROR_ILLEGAL_CMD;
     }
     if (sd_dat_wait(DAT_TIMEOUT_INIT_MS) == DAT_ERROR_TIMEOUT) {
         return CMD6_ERROR_TIMEOUT;
@@ -281,14 +280,13 @@ static cmd6_error_t sd_cmd6 (uint32_t arg, uint8_t *buffer) {
     if (sd_dat_check_crc16(buffer, CMD6_DATA_LENGTH)) {
         return CMD6_ERROR_CRC;
     }
-    return SD_OK;
+    return CMD6_OK;
 }
 
 
 sd_error_t sd_card_init (void) {
     uint32_t arg;
     uint32_t rsp;
-    cmd6_error_t cmd6_error;
     uint8_t cmd6_buffer[CMD6_DATA_LENGTH + DAT_CRC16_LENGTH];
 
     p.byte_swap = false;
@@ -308,8 +306,7 @@ sd_error_t sd_card_init (void) {
 
     sd_cmd(0, 0, RSP_NONE, NULL);
 
-    arg = (CMD8_ARG_SUPPLY_VOLTAGE_27_36_V | CMD8_ARG_CHECK_PATTERN);
-    if (sd_cmd(8, arg, RSP_R7, &rsp)) {
+    if (sd_cmd(8, (CMD8_ARG_SUPPLY_VOLTAGE_27_36_V | CMD8_ARG_CHECK_PATTERN), RSP_R7, &rsp)) {
         arg = ACMD41_ARG_OCR;
     } else {
         if (rsp != (R7_SUPPLY_VOLTAGE_27_36_V | R7_CHECK_PATTERN)) {
@@ -339,6 +336,8 @@ sd_error_t sd_card_init (void) {
         }
     } while (true);
 
+    sd_set_clock(CLOCK_25MHZ);
+
     if (sd_cmd(2, 0, RSP_R2, NULL)) {
         sd_card_deinit();
         return SD_ERROR_CMD2_IO;
@@ -350,66 +349,74 @@ sd_error_t sd_card_init (void) {
     }
     p.rca = (rsp & R6_RCA_MASK);
 
-    if (sd_cmd(9, p.rca, RSP_R2, p.csd)) {
-        sd_card_deinit();
-        return SD_ERROR_CMD9_IO;
-    }
-
-    if (sd_cmd(10, p.rca, RSP_R2, p.cid)) {
-        sd_card_deinit();
-        return SD_ERROR_CMD10_IO;
-    }
-
     if (sd_cmd(7, p.rca, RSP_R1b, NULL)) {
         sd_card_deinit();
         return SD_ERROR_CMD7_IO;
     }
-
-    sd_set_clock(CLOCK_25MHZ);
 
     if (sd_acmd(6, ACMD6_ARG_BUS_WIDTH_4BIT, RSP_R1, NULL)) {
         sd_card_deinit();
         return SD_ERROR_ACMD6_IO;
     }
 
-    if ((cmd6_error = sd_cmd6(CMD6_ARG_CHECK_HS, cmd6_buffer)) == CMD6_ERROR_ILLEGAL_CMD) {
-        return SD_OK;
-    }
-
-    if (cmd6_error != CMD6_OK) {
-        sd_card_deinit();
-        switch (cmd6_error) {
-            case CMD6_ERROR_IO: return SD_ERROR_CMD6_CHECK_IO;
-            case CMD6_ERROR_CRC: return SD_ERROR_CMD6_CHECK_CRC;
-            case CMD6_ERROR_TIMEOUT: return SD_ERROR_CMD6_CHECK_TIMEOUT;
-            default: return SD_ERROR_CMD6_CHECK_IO;
-        }
-    }
-
-    if (CMD6_INVALID_CURRENT_LIMIT(cmd6_buffer)) {
-        sd_card_deinit();
-        return SD_ERROR_CMD6_CHECK_RESPONSE;
-    }
-
-    if (CMD6_HS_SUPPORTED(cmd6_buffer)) {
-        if ((cmd6_error = sd_cmd6(CMD6_ARG_SWITCH_HS, cmd6_buffer)) != CMD6_OK) {
-            sd_card_deinit();
-            switch (cmd6_error) {
-                case CMD6_ERROR_IO: return SD_ERROR_CMD6_SWITCH_IO;
-                case CMD6_ERROR_CRC: return SD_ERROR_CMD6_SWITCH_CRC;
-                case CMD6_ERROR_TIMEOUT: return SD_ERROR_CMD6_SWITCH_TIMEOUT;
-                default: return SD_ERROR_CMD6_SWITCH_IO;
+    switch (sd_cmd6(CMD6_ARG_CHECK_HS, cmd6_buffer)) {
+        case CMD6_OK: {
+            if (CMD6_INVALID_CURRENT_LIMIT(cmd6_buffer)) {
+                sd_card_deinit();
+                return SD_ERROR_CMD6_CHECK_RESPONSE;
             }
+            if (CMD6_HS_SUPPORTED(cmd6_buffer)) {
+                switch (sd_cmd6(CMD6_ARG_SWITCH_HS, cmd6_buffer)) {
+                    case CMD6_OK: {
+                        if (CMD6_INVALID_CURRENT_LIMIT(cmd6_buffer)) {
+                            sd_card_deinit();
+                            return SD_ERROR_CMD6_SWITCH_RESPONSE;
+                        }
+                        if (CMD6_HS_ENABLED(cmd6_buffer)) {
+                            sd_set_clock(CLOCK_50MHZ);
+                        }
+                        break;
+                    }
+                    case CMD6_ERROR_IO:
+                        sd_card_deinit();
+                        return SD_ERROR_CMD6_SWITCH_IO;
+                    case CMD6_ERROR_CRC:
+                        sd_card_deinit();
+                        return SD_ERROR_CMD6_SWITCH_CRC;
+                    case CMD6_ERROR_TIMEOUT:
+                        sd_card_deinit();
+                        return SD_ERROR_CMD6_SWITCH_TIMEOUT;
+                    case CMD6_ERROR_ILLEGAL_CMD:
+                        break;
+                }
+            }
+            break;
         }
-
-        if (CMD6_INVALID_CURRENT_LIMIT(cmd6_buffer)) {
+        case CMD6_ERROR_IO:
             sd_card_deinit();
-            return SD_ERROR_CMD6_SWITCH_RESPONSE;
-        }
+            return SD_ERROR_CMD6_CHECK_IO;
+        case CMD6_ERROR_CRC:
+            sd_card_deinit();
+            return SD_ERROR_CMD6_CHECK_CRC;
+        case CMD6_ERROR_TIMEOUT:
+            sd_card_deinit();
+            return SD_ERROR_CMD6_CHECK_TIMEOUT;
+        case CMD6_ERROR_ILLEGAL_CMD:
+            break;
+    }
 
-        if (CMD6_HS_ENABLED(cmd6_buffer)) {
-            sd_set_clock(CLOCK_50MHZ);
-        }
+    sd_cmd(7, 0, RSP_NONE, NULL);
+
+    if (sd_cmd(9, p.rca, RSP_R2, p.csd)) {
+        return SD_ERROR_CMD9_IO;
+    }
+
+    if (sd_cmd(10, p.rca, RSP_R2, p.cid)) {
+        return SD_ERROR_CMD10_IO;
+    }
+
+    if (sd_cmd(7, p.rca, RSP_R1b, NULL)) {
+        return SD_ERROR_CMD7_IO;
     }
 
     return SD_OK;
