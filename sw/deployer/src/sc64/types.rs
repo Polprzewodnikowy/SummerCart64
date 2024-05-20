@@ -984,7 +984,7 @@ impl Display for DiagnosticData {
 }
 
 pub enum MemoryTestPattern {
-    OwnAddress,
+    OwnAddress(bool),
     AllZeros,
     AllOnes,
     Random,
@@ -999,7 +999,10 @@ pub struct MemoryTestPatternResult {
 impl Display for MemoryTestPattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MemoryTestPattern::OwnAddress => f.write_str("Own address"),
+            MemoryTestPattern::OwnAddress(inverted) => f.write_fmt(format_args!(
+                "Own address{}",
+                if *inverted { "~" } else { "" }
+            )),
             MemoryTestPattern::AllZeros => f.write_str("All zeros"),
             MemoryTestPattern::AllOnes => f.write_str("All ones"),
             MemoryTestPattern::Random => f.write_str("Random"),

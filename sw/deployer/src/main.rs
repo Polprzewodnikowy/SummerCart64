@@ -887,11 +887,14 @@ fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
     println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
 
     let sdram_pattern_tests = [
-        (sc64::MemoryTestPattern::OwnAddress, None),
+        (sc64::MemoryTestPattern::OwnAddress(false), None),
+        (sc64::MemoryTestPattern::OwnAddress(true), None),
         (sc64::MemoryTestPattern::AllZeros, None),
         (sc64::MemoryTestPattern::AllOnes, None),
         (sc64::MemoryTestPattern::Custom(0xAAAA5555), None),
         (sc64::MemoryTestPattern::Custom(0x5555AAAA), None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Random, None),
         (sc64::MemoryTestPattern::Random, None),
         (sc64::MemoryTestPattern::Random, None),
         (sc64::MemoryTestPattern::Custom(0x00010001), None),

@@ -759,9 +759,13 @@ impl SC64 {
         let mut test_data = vec![0u32; SDRAM_LENGTH / item_size];
 
         match pattern {
-            MemoryTestPattern::OwnAddress => {
+            MemoryTestPattern::OwnAddress(inverted) => {
                 for (index, item) in test_data.iter_mut().enumerate() {
-                    *item = (index * item_size) as u32;
+                    let mut value = (index * item_size) as u32;
+                    if inverted {
+                        value ^= 0xFFFFFFFFu32;
+                    }
+                    *item = value;
                 }
             }
             MemoryTestPattern::AllZeros => test_data.fill(0x00000000u32),

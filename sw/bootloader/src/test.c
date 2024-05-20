@@ -33,7 +33,9 @@ static uint32_t r_buffer[TEST_BUFFER_SIZE / sizeof(uint32_t)] __attribute__((ali
 
 static void fill_own_address (uint32_t *buffer, int size, uint32_t pattern, uint32_t offset) {
     for (int i = 0; i < (size / sizeof(uint32_t)); i++) {
-        buffer[i] = offset + (i * sizeof(uint32_t));
+        uint32_t value = offset + (i * sizeof(uint32_t));
+        value ^= pattern;
+        buffer[i] = value;
     }
 }
 
@@ -361,13 +363,15 @@ static void test_sdram (void) {
 
     sdram_test_t phase_0_tests[] = {
         { .name = "Own address:  ", .fill = fill_own_address, .pattern = 0x00000000, .fade = 0  },
+        { .name = "Own address~: ", .fill = fill_own_address, .pattern = 0xFFFFFFFF, .fade = 0  },
         { .name = "All zeros:    ", .fill = fill_pattern,     .pattern = 0x00000000, .fade = 0  },
         { .name = "All ones:     ", .fill = fill_pattern,     .pattern = 0xFFFFFFFF, .fade = 0  },
         { .name = "0xAAAA5555:   ", .fill = fill_pattern,     .pattern = 0xAAAA5555, .fade = 0  },
         { .name = "0x5555AAAA:   ", .fill = fill_pattern,     .pattern = 0x5555AAAA, .fade = 0  },
-        { .name = "Random (1/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
-        { .name = "Random (2/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
-        { .name = "Random (3/3): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (1/4): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (2/4): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (3/4): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
+        { .name = "Random (4/4): ", .fill = fill_random,      .pattern = 0x00000000, .fade = 0  },
         { .name = NULL },
     };
 
