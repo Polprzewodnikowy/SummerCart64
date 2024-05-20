@@ -128,6 +128,10 @@ module n64_cfg (
                         end
                     end
 
+                    REG_IDENTIFIER_H: begin
+                        mcu_irq <= 1'b0;
+                    end
+
                     REG_KEY_H, REG_KEY_L: begin
                         lock_sequence_counter <= lock_sequence_counter + 1'd1;
                         if (reg_bus.wdata != 16'hFFFF) begin
