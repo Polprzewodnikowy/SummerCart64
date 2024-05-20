@@ -8,14 +8,52 @@
 
 
 typedef enum {
-    SC64_OK,
-    SC64_ERROR_BAD_ARGUMENT,
-    SC64_ERROR_BAD_ADDRESS,
-    SC64_ERROR_BAD_CONFIG_ID,
-    SC64_ERROR_TIMEOUT,
-    SC64_ERROR_SD_CARD,
-    SC64_ERROR_UNKNOWN_CMD = -1
-} sc64_error_t;
+    ERROR_TYPE_CFG = 0,
+    ERROR_TYPE_SD_CARD = 1,
+} sc64_error_type_t;
+
+typedef enum {
+    SC64_OK = 0,
+    CFG_ERROR_UNKNOWN_COMMAND = 1,
+    CFG_ERROR_INVALID_ARGUMENT = 2,
+    CFG_ERROR_INVALID_ADDRESS = 3,
+    CFG_ERROR_INVALID_ID = 4,
+} sc64_cfg_error_t;
+
+typedef enum {
+    SD_OK = 0,
+    SD_ERROR_NO_CARD_IN_SLOT = 1,
+    SD_ERROR_NOT_INITIALIZED = 2,
+    SD_ERROR_INVALID_ARGUMENT = 3,
+    SD_ERROR_INVALID_ADDRESS = 4,
+    SD_ERROR_INVALID_OPERATION = 5,
+    SD_ERROR_CMD2_IO = 6,
+    SD_ERROR_CMD3_IO = 7,
+    SD_ERROR_CMD6_CHECK_IO = 8,
+    SD_ERROR_CMD6_CHECK_CRC = 9,
+    SD_ERROR_CMD6_CHECK_TIMEOUT = 10,
+    SD_ERROR_CMD6_CHECK_RESPONSE = 11,
+    SD_ERROR_CMD6_SWITCH_IO = 12,
+    SD_ERROR_CMD6_SWITCH_CRC = 13,
+    SD_ERROR_CMD6_SWITCH_TIMEOUT = 14,
+    SD_ERROR_CMD6_SWITCH_RESPONSE = 15,
+    SD_ERROR_CMD7_IO = 16,
+    SD_ERROR_CMD8_IO = 17,
+    SD_ERROR_CMD9_IO = 18,
+    SD_ERROR_CMD10_IO = 19,
+    SD_ERROR_CMD18_IO = 20,
+    SD_ERROR_CMD18_CRC = 21,
+    SD_ERROR_CMD18_TIMEOUT = 22,
+    SD_ERROR_CMD25_IO = 23,
+    SD_ERROR_CMD25_CRC = 24,
+    SD_ERROR_CMD25_TIMEOUT = 25,
+    SD_ERROR_ACMD6_IO = 26,
+    SD_ERROR_ACMD41_IO = 27,
+    SD_ERROR_ACMD41_OCR = 28,
+    SD_ERROR_ACMD41_TIMEOUT = 29,
+} sc64_sd_error_t;
+
+typedef uint32_t sc64_error_t;
 
 typedef enum {
     CFG_ID_BOOTLOADER_SWITCH,
@@ -132,6 +170,8 @@ typedef struct {
 #define SC64_BUFFERS_BASE   (0x1FFE0000UL)
 #define SC64_BUFFERS        ((sc64_buffers_t *) SC64_BUFFERS_BASE)
 
+
+const char *sc64_error_description (sc64_error_t error);
 
 void sc64_unlock (void);
 void sc64_lock (void);

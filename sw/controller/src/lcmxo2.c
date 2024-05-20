@@ -133,9 +133,9 @@ static bool lcmxo2_execute_cmd (uint8_t cmd, uint32_t arg, cmd_type_t type, uint
         packet_length += length;
     }
 
-    i2c_err_t err = hw_i2c_trx(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
+    i2c_error_t error = hw_i2c_trx(LCMXO2_I2C_ADDR_CFG, packet, packet_length, buffer, (write ? 0 : length));
 
-    return (err != I2C_OK);
+    return (error != I2C_OK);
 #else
     lcmxo2_reg_set(LCMXO2_CFGCR, CFGCR_WBCE);
 

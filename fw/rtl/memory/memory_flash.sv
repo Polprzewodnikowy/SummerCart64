@@ -234,7 +234,7 @@ module memory_flash (
         if (reset) begin
             state <= STATE_IDLE;
         end else begin
-            if (!busy && (start || finish)) begin
+            if ((start || finish) && !busy) begin
                 counter <= counter + 1'd1;
             end
 
@@ -248,6 +248,7 @@ module memory_flash (
                     end else if (mem_bus.request) begin
                         current_address <= {mem_bus.address[23:1], 1'b0};
                         if (mem_bus.write) begin
+                            current_address[0] <= (~mem_bus.wmask[1]);
                             state <= STATE_WRITE_ENABLE;
                         end else begin
                             state <= STATE_READ_START;
@@ -263,7 +264,7 @@ module memory_flash (
                         end
                         3'd1: begin
                             finish <= 1'b1;
-                            wdata <= 8'd4;
+                            wdata <= 8'd5;
                             if (!busy) begin
                                 counter <= 3'd0;
                                 if (flash_scb.erase_pending) begin
@@ -296,7 +297,7 @@ module memory_flash (
                         end
                         3'd4: begin
                             finish <= 1'b1;
-                            wdata <= 8'd4;
+                            wdata <= 8'd5;
                             if (!busy) begin
                                 flash_scb.erase_done <= 1'b1;
                                 counter <= 3'd0;
@@ -314,17 +315,17 @@ module memory_flash (
                         end
                         3'd1: begin
                             start <= 1'b1;
-                            wdata <= mem_bus.address[23:16];
+                            wdata <= current_address[23:16];
                         end
                         3'd2: begin
                             start <= 1'b1;
-                            wdata <= mem_bus.address[15:8];
+                            wdata <= current_address[15:8];
                         end
                         3'd3: begin
                             start <= 1'b1;
-                            wdata <= mem_bus.address[7:0];
+                            wdata <= current_address[7:0];
                             if (!busy) begin
-                                counter <= 3'd0;
+                                counter <= 3'd0 + current_address[0];
                                 state <= STATE_PROGRAM;
                             end
                         end
@@ -336,26 +337,33 @@ module memory_flash (
                         3'd0: begin
                             start <= 1'b1;
                             wdata <= mem_bus.wdata[15:8];
+                            if (start && !busy) begin
+                                current_address <= current_address + 1'd1;
+                                if (!mem_bus.wmask[0]) begin
+                                    counter <= 3'd2;
+                                    mem_bus.ack <= 1'b1;
+                                end
+                            end
                         end
                         3'd1: begin
                             start <= 1'b1;
                             wdata <= mem_bus.wdata[7:0];
                             if (!busy) begin
                                 mem_bus.ack <= 1'b1;
-                                current_address <= current_address + 2'd2;
+                                current_address <= current_address + 1'd1;
                             end
                         end
                         3'd2: begin
                             if (current_address[7:0] == 8'h00) begin
                                 state <= STATE_PROGRAM_END;
-                            end else if (flash_scb.erase_pending) begin
-                                state <= STATE_PROGRAM_END;
                             end else if (mem_bus.request && !mem_bus.ack) begin
-                                if (!mem_bus.write || (mem_bus.address[23:0] != current_address)) begin
-                                    state <= STATE_PROGRAM_END;
-                                end else begin
+                                if (mem_bus.write && mem_bus.wmask[1] && (mem_bus.address[23:0] == current_address)) begin
                                     counter <= 3'd0;
+                                end else begin
+                                    state <= STATE_PROGRAM_END;
                                 end
+                            end else if (!busy) begin
+                                state <= STATE_PROGRAM_END;
                             end
                         end
                     endcase
@@ -363,8 +371,8 @@ module memory_flash (
 
                 STATE_PROGRAM_END: begin
                     finish <= 1'b1;
-                    wdata <= 8'd4;
-                    if (!busy) begin
+                    wdata <= 8'd5;
+                    if (finish && !busy) begin
                         counter <= 3'd0;
                         state <= STATE_WAIT;
                     end
@@ -407,15 +415,15 @@ module memory_flash (
                         3'd1: begin
                             start <= 1'b1;
                             quad_enable <= 1'b1;
-                            wdata <= mem_bus.address[23:16];
+                            wdata <= current_address[23:16];
                         end
                         3'd2: begin
                             start <= 1'b1;
-                            wdata <= mem_bus.address[15:8];
+                            wdata <= current_address[15:8];
                         end
                         3'd3: begin
                             start <= 1'b1;
-                            wdata <= mem_bus.address[7:0];
+                            wdata <= current_address[7:0];
                         end
                         3'd4: begin
                             start <= 1'b1;

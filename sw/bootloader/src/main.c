@@ -12,7 +12,7 @@ void main (void) {
     sc64_boot_params_t sc64_boot_params;
 
     if ((error = sc64_get_boot_params(&sc64_boot_params)) != SC64_OK) {
-        error_display("Could not obtain boot info: %d", error);
+        error_display("Could not obtain boot info\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     boot_params_t boot_params;
@@ -40,7 +40,7 @@ void main (void) {
             break;
 
         default:
-            error_display("Unknown boot mode selected [%d]\n", sc64_boot_params.boot_mode);
+            error_display("Unknown boot mode selected (%d)\n", sc64_boot_params.boot_mode);
             break;
     }
 

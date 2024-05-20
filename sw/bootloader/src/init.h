@@ -2,6 +2,9 @@
 #define INIT_H__
 
 
+#include <stdint.h>
+
+
 typedef enum {
     INIT_TV_TYPE_PAL = 0,
     INIT_TV_TYPE_NTSC = 1,
@@ -16,9 +19,10 @@ typedef enum {
 
 extern init_tv_type_t __tv_type;
 extern init_reset_type_t __reset_type;
+extern uint32_t __entropy;
 
 
-void init (init_tv_type_t tv_type, init_reset_type_t reset_type);
+void init (init_tv_type_t tv_type, init_reset_type_t reset_type, uint32_t entropy);
 void deinit (void);
 
 

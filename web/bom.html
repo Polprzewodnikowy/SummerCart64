@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>SummerCart64 - Bill of materials</title>
+    <meta property="og:title" content="SummerCart64 - Bill of materials" />
+    <meta property="og:description" content="SummerCart64 - a fully open source N64 flashcart" />
+    <meta property="og:url" content="https://summercart64.dev/bom.html" />
+    <meta property="og:image" content="https://summercart64.dev/sc64-embed.png" />
+    <meta property="og:type" content="website" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.svg" sizes="any" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./script.js"></script>
+</head>
+
+<body>
+    <div class="menu-container">
+        <div class="menu-bar">
+            <div class="menu-buttons">
+                <a href="/"><img src="sc64.svg"></a>
+                <div class="menu-button" onclick="showMenu(event)">
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                </div>
+            </div>
+            <menu class="mobile-hidden">
+                <li><a href="/">Home</a></li>
+                <li><a href="/features.html">Features</a></li>
+                <li><a href="https://menu.summercart64.dev">Menu</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64/releases/latest">Downloads</a></li>
+                <li class="active"><a href="/bom.html">Bill of materials</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64">GitHub</a></li>
+            </menu>
+        </div>
+    </div>
+
+    <iframe class="bom" src="/sc64v2_bom.html"></iframe>
+
+    <footer>
+        <span>© 2020 - 2024 <a href="https://mateuszfaderewski.pl">Mateusz Faderewski</a></span>
+    </footer>
+</body>
+
+</html>

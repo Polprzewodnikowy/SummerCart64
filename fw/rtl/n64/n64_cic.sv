@@ -37,8 +37,13 @@ module n64_cic (
     end
 
     logic cic_dq_out;
+    logic cic_dq_oe;
 
-    assign n64_cic_dq = cic_dq_out ? 1'bZ : 1'b0;
+    always_ff @(posedge clk) begin
+        cic_dq_oe <= ~cic_dq_out;
+    end
+
+    assign n64_cic_dq = cic_dq_oe ? 1'b0 : 1'bZ;
 
 
     // Timer (divider and counter)

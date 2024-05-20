@@ -12,8 +12,8 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, SaveType,
-        SaveWriteback, Switch, TvType,
+        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestPattern,
+        MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
     },
 };
 
@@ -26,10 +26,12 @@ use self::{
     },
 };
 use chrono::{DateTime, Local};
+use rand::Rng;
 use std::{
+    cmp::min,
     io::{Read, Seek, Write},
-    time::Instant,
-    {cmp::min, time::Duration},
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
 pub struct SC64 {
@@ -89,7 +91,8 @@ const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
-const FIRMWARE_ADDRESS: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
+const FIRMWARE_ADDRESS_SDRAM: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
+const FIRMWARE_ADDRESS_FLASH: u32 = 0x0410_0000; // Arbitrary offset in Flash memory
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
@@ -668,19 +671,43 @@ impl SC64 {
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
         self.command_state_reset()?;
-        let (status, length) = self.command_firmware_backup(FIRMWARE_ADDRESS)?;
+        let (status, length) = self.command_firmware_backup(FIRMWARE_ADDRESS_SDRAM)?;
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
                 format!("Firmware backup error: {}", status).as_str(),
             ));
         }
-        self.command_memory_read(FIRMWARE_ADDRESS, length as usize)
+        self.command_memory_read(FIRMWARE_ADDRESS_SDRAM, length as usize)
     }
 
-    pub fn update_firmware(&mut self, data: &[u8]) -> Result<(), Error> {
-        self.command_state_reset()?;
-        self.command_memory_write(FIRMWARE_ADDRESS, data)?;
-        let status = self.command_firmware_update(FIRMWARE_ADDRESS, data.len())?;
+    pub fn update_firmware(&mut self, data: &[u8], use_flash_memory: bool) -> Result<(), Error> {
+        const FLASH_UPDATE_SUPPORTED_MINOR_VERSION: u16 = 19;
+        let status = if use_flash_memory {
+            let unsupported_version_error = Error::new(format!(
+                "Your firmware doesn't support updating from Flash memory, minimum required version: {}.{}.x",
+                SUPPORTED_MAJOR_VERSION, FLASH_UPDATE_SUPPORTED_MINOR_VERSION
+            ).as_str());
+            self.command_version_get()
+                .and_then(|(major, minor, revision)| {
+                    if major != SUPPORTED_MAJOR_VERSION
+                        || minor < FLASH_UPDATE_SUPPORTED_MINOR_VERSION
+                    {
+                        return Err(unsupported_version_error.clone());
+                    } else {
+                        Ok((major, minor, revision))
+                    }
+                })
+                .map_err(|_| unsupported_version_error.clone())?;
+            self.command_state_reset()?;
+            self.flash_erase(FIRMWARE_ADDRESS_FLASH, data.len())?;
+            self.command_memory_write(FIRMWARE_ADDRESS_FLASH, data)?;
+            self.command_flash_wait_busy(true)?;
+            self.command_firmware_update(FIRMWARE_ADDRESS_FLASH, data.len())?
+        } else {
+            self.command_state_reset()?;
+            self.command_memory_write(FIRMWARE_ADDRESS_SDRAM, data)?;
+            self.command_firmware_update(FIRMWARE_ADDRESS_SDRAM, data.len())?
+        };
         if !matches!(status, FirmwareStatus::Ok) {
             return Err(Error::new(
                 format!("Firmware update verify error: {}", status).as_str(),
@@ -721,6 +748,65 @@ impl SC64 {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    pub fn test_sdram_pattern(
+        &mut self,
+        pattern: MemoryTestPattern,
+        fade: Option<u64>,
+    ) -> Result<MemoryTestPatternResult, Error> {
+        let item_size = std::mem::size_of::<u32>();
+        let mut test_data = vec![0u32; SDRAM_LENGTH / item_size];
+
+        match pattern {
+            MemoryTestPattern::OwnAddress(inverted) => {
+                for (index, item) in test_data.iter_mut().enumerate() {
+                    let mut value = (index * item_size) as u32;
+                    if inverted {
+                        value ^= 0xFFFFFFFFu32;
+                    }
+                    *item = value;
+                }
+            }
+            MemoryTestPattern::AllZeros => test_data.fill(0x00000000u32),
+            MemoryTestPattern::AllOnes => test_data.fill(0xFFFFFFFFu32),
+            MemoryTestPattern::Custom(pattern) => test_data.fill(pattern),
+            MemoryTestPattern::Random => rand::thread_rng().fill(&mut test_data[..]),
+        };
+
+        let raw_test_data: Vec<u8> = test_data.iter().flat_map(|v| v.to_be_bytes()).collect();
+        let mut writer: &[u8] = &raw_test_data;
+        self.memory_write_chunked(&mut writer, SDRAM_ADDRESS, SDRAM_LENGTH, None)?;
+
+        if let Some(fade) = fade {
+            sleep(Duration::from_secs(fade));
+        }
+
+        let mut raw_check_data = vec![0u8; SDRAM_LENGTH];
+        let mut reader: &mut [u8] = &mut raw_check_data;
+        self.memory_read_chunked(&mut reader, SDRAM_ADDRESS, SDRAM_LENGTH)?;
+        let check_data = raw_check_data
+            .chunks(4)
+            .map(|a| u32::from_be_bytes(a[0..4].try_into().unwrap()));
+
+        let all_errors: Vec<(usize, (u32, u32))> = test_data
+            .into_iter()
+            .zip(check_data)
+            .enumerate()
+            .filter(|(_, (a, b))| a != b)
+            .map(|(i, (a, b))| (i * item_size, (a, b)))
+            .collect();
+
+        let first_error = if all_errors.len() > 0 {
+            Some(all_errors.get(0).copied().unwrap())
+        } else {
+            None
+        };
+
+        return Ok(MemoryTestPatternResult {
+            first_error,
+            all_errors,
+        });
     }
 
     fn memory_read_chunked(

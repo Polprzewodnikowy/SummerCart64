@@ -1,4 +1,4 @@
-# SummerCart64 - a fully open source Nintendo 64 flashcart
+# SummerCart64 - a fully open source N64 flashcart
 [<img src="assets/sc64_logo.svg" />](assets/sc64_logo.svg)
 
 **For non-technical description of the SummerCart64, please head to the https://summercart64.dev website!**
@@ -52,7 +52,7 @@ Note that my time is limited so I can't answer all questions.
 
 Most up to date information about purchasing/manufacturing options is available on https://summercart64.dev website!
 
-If you want to order it yourself then I've prepared all necessary manufacturing files on the [PCBWay Shared Project](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) site.
+If you want to order it yourself then I've prepared all necessary manufacturing files on the [PCBWay Shared Project](https://www.pcbway.com/project/member/shareproject/?bmbno=1046ED64-8AEE-44) site.
 
 **Be careful**: this is an advanced project and it is assumed that you have enough knowledge about electronics.
 Selecting wrong options or giving PCB manufacturer wrong information might result in an undesired time and/or money loss.
@@ -61,7 +61,7 @@ Boards also come unprogrammed from the manufacturer - you need to do **initial p
 To avoid problems _**please**_ read **both** [build guide](./docs/06_build_guide.md) and description on the shared project page **in full**.
 If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the [n64brew Discord server](https://discord.gg/WqFgNWf) if that's the case.
 
-**Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/shareproject/SC64_an_open_source_Nintendo_64_flashcart_14b9688a.html) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
+**Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/member/shareproject/?bmbno=1046ED64-8AEE-44) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
 
 If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
 
@@ -87,8 +87,10 @@ If you don't need a physical product but still want to support me then check my 
 
 This project wouldn't be possible without these contributions:
 
-- [64drive](https://64drive.retroactive.be) orders being on permanent hold long before creating this repository.
+- [64drive](https://64drive.retroactive.be) ([archived](https://web.archive.org/web/20240406215731/https://64drive.retroactive.be/)) orders being on permanent hold long before creating this repository.
 - [EverDrive-64 X7](https://krikzz.com/our-products/cartridges/ed64x7.html) being disappointment for homebrew development (slow USB upload, unjustified price and overcomplicated SD card access).
+  - Context: Both aforementioned products were priced at $199 in 2020. 64drive features made it a vastly more useful tool for homebrew development.
+    Since then, 64drive had never been restocked and EverDrive-64 X7 price was lowered to $159 (as of May 2024).
 - [Jan Goldacker (@jago85)](https://github.com/jago85) and his projects:
   - [Brutzelkarte](https://github.com/jago85/Brutzelkarte_FPGA) providing solid base for starting this project and sparking hope for true open source N64 flashcarts.
   - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) reimplementation for easy integration in modern microcontrollers. Thanks also goes to everyone involved in N64 CIC reverse engineering.

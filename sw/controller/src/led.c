@@ -56,10 +56,7 @@ void led_blink_error (led_error_t error) {
             break;
     }
 
-    error_active = (
-        cic_error |
-        rtc_error
-    );
+    error_active = true;
 }
 
 void led_clear_error (led_error_t error) {
@@ -71,17 +68,6 @@ void led_clear_error (led_error_t error) {
         case LED_ERROR_RTC:
             rtc_error = false;
             break;
-    }
-
-    error_active = (
-        cic_error |
-        rtc_error
-    );
-
-    if (!error_active) {
-        activity_pulse = false;
-        activity_pulse_timer = 0;
-        error_timer = 0;
     }
 }
 
@@ -105,6 +91,13 @@ void led_process (void) {
             blinks = CIC_ERROR_BLINKS;
         } else if (rtc_error) {
             blinks = RTC_ERROR_BLINKS;
+        } else {
+            activity_pulse = false;
+            activity_pulse_timer = 0;
+            error_active = false;
+            error_timer = 0;
+            hw_gpio_reset(GPIO_ID_LED);
+            return;
         }
 
         bool led_on = false;

@@ -42,7 +42,7 @@ Please download latest release before proceeding with the instructions.
 
 ### **Components**
 
-  1. Locate interactive BOM file inside `hw/pcb` folder
+  1. Locate interactive BOM file inside `hw/pcb` folder (alternatively, check out this [BOM discussion](https://github.com/Polprzewodnikowy/SummerCart64/discussions/27))
   2. Order all parts listed in the BOM file or use PCB assembly service together with your PCB order
 
 ---
@@ -75,6 +75,7 @@ You will require the following hardware:
  - A USB to UART (serial) adapter (with 3.3V signaling is required, e.g. TTL-232R-3V3).
 
 You will require the following applications and packages:
+ - [Latest FTDI drivers](https://ftdichip.com/drivers/)
  - [FT_PROG](https://ftdichip.com/utilities/#ft_prog) - FTDI FT232H EEPROM programming software.
  - [Python 3](https://www.python.org/downloads/) with `pip3` - necessary for initial programming script: `primer.py` (Windows install: check option add python to PATH).
  - [`sc64-extra-{version}.zip`](https://github.com/Polprzewodnikowy/SummerCart64/releases) - programming scripts and firmware files, download the latest version.
@@ -82,10 +83,11 @@ You will require the following applications and packages:
 **Programming must be done in specific order for `primer.py` script to work correctly.**
 
 Preparations:
- 1. Install FT_PROG.
- 2. Install Python 3.
- 3. Unpack `sc64-extra-{version}.zip` into a folder.
- 4. Open terminal and navigate to the folder you've unpacked SC64 files.
+ 1. Install latest FTDI drivers (especially on Windows 10).
+ 2. Install FT_PROG.
+ 3. Install Python 3.
+ 4. Unpack `sc64-extra-{version}.zip` into a folder.
+ 5. Open terminal and navigate to the folder you've unpacked SC64 files.
 
 First, program the ***FT232H EEPROM***:
  1. Connect the SC64 board to your PC with a USB-C cable.

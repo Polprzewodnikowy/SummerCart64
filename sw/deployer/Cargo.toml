@@ -19,6 +19,7 @@ image = "0.24.5"
 include-flate = { version = "0.2.0", features = ["stable"] }
 md5 = "0.7.0"
 panic-message = "0.3.0"
+rand = "0.8.5"
 rust-ini = "0.18.0"
 serial2 = "0.2.20"
 serialport = "4.3.0"

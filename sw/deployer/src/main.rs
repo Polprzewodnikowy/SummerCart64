@@ -75,6 +75,9 @@ enum Commands {
         command: FirmwareCommands,
     },
 
+    /// Test SC64 hardware
+    Test,
+
     /// Expose SC64 device over network
     Server(ServerArgs),
 }
@@ -212,13 +215,23 @@ enum FirmwareCommands {
     Backup(FirmwareArgs),
 
     /// Update SC64 firmware from provided file
-    Update(FirmwareArgs),
+    Update(FirmwareUpdateArgs),
 }
 
 #[derive(Args)]
 struct FirmwareArgs {
     /// Path to the firmware file
     firmware: PathBuf,
+}
+
+#[derive(Args)]
+struct FirmwareUpdateArgs {
+    /// Path to the firmware file
+    firmware: PathBuf,
+
+    /// Put firmware update in the Flash memory instead of SDRAM
+    #[arg(long)]
+    use_flash_memory: bool,
 }
 
 #[derive(Args)]
@@ -323,6 +336,7 @@ fn handle_command(command: &Commands, port: Option<String>, remote: Option<Strin
         Commands::Reset => handle_reset_command(connection),
         Commands::Set { command } => handle_set_command(connection, command),
         Commands::Firmware { command } => handle_firmware_command(connection, command),
+        Commands::Test => handle_test_command(connection),
         Commands::Server(args) => handle_server_command(connection, args),
     };
     match result {
@@ -738,8 +752,14 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" LED blink:           {}", state.led_enable);
     println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
     println!("{}", "SummerCart64 diagnostic information:".bold());
-    println!(" Last PI address:     0x{:08X}", state.fpga_debug_data.last_pi_address);
-    println!(" PI FIFO flags:       {}", state.fpga_debug_data.pi_fifo_flags);
+    println!(
+        " Last PI address:     0x{:08X}",
+        state.fpga_debug_data.last_pi_address
+    );
+    println!(
+        " PI FIFO flags:       {}",
+        state.fpga_debug_data.pi_fifo_flags
+    );
     println!(" Current CIC step:    {}", state.fpga_debug_data.cic_step);
     println!(" Diagnostic data:     {}", state.diagnostic_data);
 
@@ -765,7 +785,7 @@ fn handle_set_command(connection: Connection, command: &SetCommands) -> Result<(
             sc64.set_datetime(datetime)?;
             println!(
                 "SC64 RTC datetime synchronized to: {}",
-                datetime.format("%Y-%m-%d %H:%M:%S %Z").to_string().green()
+                datetime.format("%Y-%m-%d %H:%M:%S").to_string().green()
             );
         }
 
@@ -835,6 +855,12 @@ fn handle_firmware_command(
             println!("{}", "Firmware metadata:".bold());
             println!("{}", format!("{}", metadata).bright_blue().to_string());
             println!("{}", "Firmware file verification was successful".green());
+            if args.use_flash_memory {
+                println!(
+                    "{}",
+                    "Warning: using Flash memory to perform firmware update".yellow()
+                );
+            }
             let answer = prompt(format!("{}", "Continue with update process? [y/N] ".bold()));
             if answer.to_ascii_lowercase() != "y" {
                 println!("{}", "Firmware update process aborted".red());
@@ -847,12 +873,104 @@ fn handle_firmware_command(
 
             log_wait(
                 format!("Updating firmware, this might take a while [{update_name}]"),
-                || sc64.update_firmware(&firmware),
+                || sc64.update_firmware(&firmware, args.use_flash_memory),
             )?;
 
             Ok(())
         }
     }
+}
+
+fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, false)?;
+
+    println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
+
+    let sdram_pattern_tests = [
+        (sc64::MemoryTestPattern::OwnAddress(false), None),
+        (sc64::MemoryTestPattern::OwnAddress(true), None),
+        (sc64::MemoryTestPattern::AllZeros, None),
+        (sc64::MemoryTestPattern::AllOnes, None),
+        (sc64::MemoryTestPattern::Custom(0xAAAA5555), None),
+        (sc64::MemoryTestPattern::Custom(0x5555AAAA), None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Random, None),
+        (sc64::MemoryTestPattern::Custom(0x00010001), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFEFFFE), None),
+        (sc64::MemoryTestPattern::Custom(0x00020002), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFDFFFD), None),
+        (sc64::MemoryTestPattern::Custom(0x00040004), None),
+        (sc64::MemoryTestPattern::Custom(0xFFFBFFFB), None),
+        (sc64::MemoryTestPattern::Custom(0x00080008), None),
+        (sc64::MemoryTestPattern::Custom(0xFFF7FFF7), None),
+        (sc64::MemoryTestPattern::Custom(0x00100010), None),
+        (sc64::MemoryTestPattern::Custom(0xFFEFFFEF), None),
+        (sc64::MemoryTestPattern::Custom(0x00200020), None),
+        (sc64::MemoryTestPattern::Custom(0xFFDFFFDF), None),
+        (sc64::MemoryTestPattern::Custom(0x00400040), None),
+        (sc64::MemoryTestPattern::Custom(0xFFBFFFBF), None),
+        (sc64::MemoryTestPattern::Custom(0x00800080), None),
+        (sc64::MemoryTestPattern::Custom(0xFF7FFF7F), None),
+        (sc64::MemoryTestPattern::Custom(0x01000100), None),
+        (sc64::MemoryTestPattern::Custom(0xFEFFFEFF), None),
+        (sc64::MemoryTestPattern::Custom(0x02000200), None),
+        (sc64::MemoryTestPattern::Custom(0xFDFFFDFF), None),
+        (sc64::MemoryTestPattern::Custom(0x04000400), None),
+        (sc64::MemoryTestPattern::Custom(0xFBFFFBFF), None),
+        (sc64::MemoryTestPattern::Custom(0x08000800), None),
+        (sc64::MemoryTestPattern::Custom(0xF7FFF7FF), None),
+        (sc64::MemoryTestPattern::Custom(0x10001000), None),
+        (sc64::MemoryTestPattern::Custom(0xEFFFEFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x20002000), None),
+        (sc64::MemoryTestPattern::Custom(0xDFFFDFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x40004000), None),
+        (sc64::MemoryTestPattern::Custom(0xBFFFBFFF), None),
+        (sc64::MemoryTestPattern::Custom(0x80008000), None),
+        (sc64::MemoryTestPattern::Custom(0x7FFF7FFF), None),
+        (sc64::MemoryTestPattern::AllZeros, Some(60)),
+        (sc64::MemoryTestPattern::AllOnes, Some(60)),
+    ];
+    let sdram_pattern_tests_count = sdram_pattern_tests.len();
+
+    let mut sdram_tests_failed = false;
+
+    for (i, (pattern, fade)) in sdram_pattern_tests.into_iter().enumerate() {
+        let fadeout_text = if let Some(fade) = fade {
+            format!(", fadeout {fade} seconds")
+        } else {
+            "".to_string()
+        };
+        print!(
+            " ({} / {sdram_pattern_tests_count}) Testing {pattern}{fadeout_text}... ",
+            i + 1
+        );
+        stdout().flush().unwrap();
+
+        let result = sc64.test_sdram_pattern(pattern, fade)?;
+
+        if let Some((address, (written, read))) = result.first_error {
+            sdram_tests_failed = true;
+            println!("{}", "error!".bright_red());
+            println!("  Found a mismatch at address 0x{address:08X}",);
+            println!("   0x{written:08X} (W) != 0x{read:08X} (R)");
+            println!("   Total errors found: {}", result.all_errors.len());
+        } else {
+            println!("{}", "ok".bright_green());
+        }
+    }
+
+    if sdram_tests_failed {
+        println!(
+            "{}",
+            "Some SDRAM tests failed, SDRAM chip might be defective".bright_red()
+        );
+    } else {
+        println!("{}", "All SDRAM tests passed without error".bright_green());
+    }
+
+    Ok(())
 }
 
 fn handle_server_command(connection: Connection, args: &ServerArgs) -> Result<(), sc64::Error> {

@@ -147,6 +147,9 @@ jobs:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v4
 
+      - name: Copy BOM file to the website folder
+        run: cp ./hw/pcb/sc64v2_bom.html ./web
+
       - name: Setup GitHub pages
         uses: actions/configure-pages@v4
 

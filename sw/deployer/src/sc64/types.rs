@@ -983,6 +983,36 @@ impl Display for DiagnosticData {
     }
 }
 
+pub enum MemoryTestPattern {
+    OwnAddress(bool),
+    AllZeros,
+    AllOnes,
+    Random,
+    Custom(u32),
+}
+
+pub struct MemoryTestPatternResult {
+    pub first_error: Option<(usize, (u32, u32))>,
+    pub all_errors: Vec<(usize, (u32, u32))>,
+}
+
+impl Display for MemoryTestPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MemoryTestPattern::OwnAddress(inverted) => f.write_fmt(format_args!(
+                "Own address{}",
+                if *inverted { "~" } else { "" }
+            )),
+            MemoryTestPattern::AllZeros => f.write_str("All zeros"),
+            MemoryTestPattern::AllOnes => f.write_str("All ones"),
+            MemoryTestPattern::Random => f.write_str("Random"),
+            MemoryTestPattern::Custom(pattern) => {
+                f.write_fmt(format_args!("Pattern 0x{pattern:08X}"))
+            }
+        }
+    }
+}
+
 macro_rules! get_config {
     ($sc64:ident, $config:ident) => {{
         if let Config::$config(value) = $sc64.command_config_get(ConfigId::$config)? {
