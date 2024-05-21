@@ -115,6 +115,22 @@ static void test_sc64_cfg (void) {
     display_printf("%02d:%02d:%02d", FROM_BCD(t.hour), FROM_BCD(t.minute), FROM_BCD(t.second));
     display_printf(" (%s)", weekdays[FROM_BCD(t.weekday)]);
     display_printf("\n");
+
+    int count = 65536;
+
+    for (int i = 0; i < count; i++) {
+        if ((i % (count / 64)) == 0) {
+            display_printf(".");
+        }
+        if ((error = sc64_get_identifier(&identifier)) != SC64_OK) {
+            error_display("Command IDENTIFIER_GET failed\n (%08X) - %s", error, sc64_error_description(error));
+        }
+        if (identifier != 0x53437632) {
+            error_display("Invalid identifier received: 0x%08X", identifier);
+        }
+    }
+
+    display_printf("\n");
 }
 
 static void test_pi (void) {
@@ -539,7 +555,17 @@ static struct {
 void test_execute (void) {
     sc64_error_t error;
 
+    const int test_count = sizeof(tests) / sizeof(tests[0]);
+    int current = 0;
+
+    display_init(NULL);
+    display_printf("SC64 Test suite (%d / %d)\n\n", 0, test_count);
+
+    display_printf("Initializing...\n");
+
     pi_io_config(0x0F, 0x05, 0x0C, 0x02);
+
+    sc64_cmd_irq_enable(true);
 
     if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true)) != SC64_OK) {
         error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed\n (%08X) - %s", error, sc64_error_description(error));
@@ -550,9 +576,6 @@ void test_execute (void) {
     }
 
     random_seed = __entropy + c0_count();
-
-    const int test_count = sizeof(tests) / sizeof(tests[0]);
-    int current = 0;
 
     while (true) {
         display_init(NULL);

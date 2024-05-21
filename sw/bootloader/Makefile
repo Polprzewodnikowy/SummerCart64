@@ -11,7 +11,7 @@ N64_ELFCOMPRESS = $(N64_BINDIR)/n64elfcompress
 N64_TOOL = $(N64_BINDIR)/n64tool
 PYTHON = python3
 
-FLAGS = -march=vr4300 -mtune=vr4300 $(USER_FLAGS)
+FLAGS = -march=vr4300 -mtune=vr4300 -mfix4300 $(USER_FLAGS)
 CFLAGS = -Os -Wall -ffunction-sections -fdata-sections -ffreestanding -MMD -MP
 ASFLAGS = -Wa,-I$(N64_INST)/mips64-elf/lib
 LDFLAGS = -lc -nostartfiles -Wl,--gc-sections

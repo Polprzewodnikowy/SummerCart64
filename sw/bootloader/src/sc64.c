@@ -1,5 +1,6 @@
 #include "io.h"
 #include "sc64.h"
+#include "error.h"
 
 
 typedef struct {
@@ -7,13 +8,16 @@ typedef struct {
     io32_t DATA[2];
     io32_t IDENTIFIER;
     io32_t KEY;
+    io32_t IRQ;
 } sc64_regs_t;
 
 #define SC64_REGS_BASE              (0x1FFF0000UL)
 #define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
 
 
-#define SC64_SR_IRQ_PENDING         (1 << 29)
+#define SC64_SR_CMD_IRQ_REQUEST     (1 << 8)
+#define SC64_SR_CMD_IRQ_PENDING     (1 << 28)
+#define SC64_SR_MCU_IRQ_PENDING     (1 << 29)
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)
 
@@ -23,6 +27,9 @@ typedef struct {
 #define SC64_KEY_UNLOCK_1           (0x5F554E4CUL)
 #define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
+
+#define SC64_IRQ_CMD_CLEAR          (1 << 30)
+#define SC64_IRQ_MCU_CLEAR          (1 << 31)
 
 
 typedef enum {
@@ -67,16 +74,30 @@ typedef struct {
 } sc64_cmd_t;
 
 
+static bool use_cmd_irq = false;
+static volatile bool wait_cmd_irq = false;
+
+
 static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
+    uint32_t sr;
+
     pi_io_write(&SC64_REGS->DATA[0], cmd->arg[0]);
     pi_io_write(&SC64_REGS->DATA[1], cmd->arg[1]);
 
-    pi_io_write(&SC64_REGS->SR_CMD, (cmd->id & 0xFF));
-
-    uint32_t sr;
-    do {
+    if (use_cmd_irq) {
+        wait_cmd_irq = true;
+        pi_io_write(&SC64_REGS->SR_CMD, (SC64_SR_CMD_IRQ_REQUEST | (cmd->id & 0xFF)));
+        while (wait_cmd_irq);
         sr = pi_io_read(&SC64_REGS->SR_CMD);
-    } while (sr & SC64_SR_CPU_BUSY);
+        if (sr & SC64_SR_CPU_BUSY) {
+            error_display("[Unexpected] SC64 CMD busy flag set");
+        }
+    } else {
+        pi_io_write(&SC64_REGS->SR_CMD, (cmd->id & 0xFF));
+        do {
+            sr = pi_io_read(&SC64_REGS->SR_CMD);
+        } while (sr & SC64_SR_CPU_BUSY);
+    }
 
     if (sr & SC64_SR_CMD_ERROR) {
         return (sc64_error_t) (pi_io_read(&SC64_REGS->DATA[0]));
@@ -86,6 +107,18 @@ static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
     cmd->rsp[1] = pi_io_read(&SC64_REGS->DATA[1]);
 
     return SC64_OK;
+}
+
+static void sc64_mcu_irq_callback (void) {
+    error_display("[Unexpected] SC64 MCU interrupt received");
+}
+
+static void sc64_cmd_irq_callback (void) {
+    if (wait_cmd_irq) {
+        wait_cmd_irq = false;
+    } else {
+        error_display("[Unexpected] SC64 CMD interrupt received");
+    }
 }
 
 
@@ -164,12 +197,31 @@ bool sc64_check_presence (void) {
 }
 
 
-bool sc64_irq_pending (void) {
-    return (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_IRQ_PENDING);
+void sc64_cmd_irq_enable (bool enable) {
+    use_cmd_irq = enable;
 }
 
-void sc64_irq_clear (void) {
-    pi_io_write(&SC64_REGS->IDENTIFIER, 0);
+sc64_irq_t sc64_irq_pending (void) {
+    uint32_t sr = pi_io_read(&SC64_REGS->SR_CMD);
+    sc64_irq_t irq = SC64_IRQ_NONE;
+    if (sr & SC64_SR_MCU_IRQ_PENDING) {
+        irq |= SC64_IRQ_MCU;
+    }
+    if (sr & SC64_SR_CMD_IRQ_PENDING) {
+        irq |= SC64_IRQ_CMD;
+    }
+    return irq;
+}
+
+void sc64_irq_callback (sc64_irq_t irq) {
+    if (irq & SC64_IRQ_MCU) {
+        sc64_mcu_irq_callback();
+        pi_io_write(&SC64_REGS->IRQ, SC64_IRQ_MCU_CLEAR);
+    }
+    if (irq & SC64_IRQ_CMD) {
+        sc64_cmd_irq_callback();
+        pi_io_write(&SC64_REGS->IRQ, SC64_IRQ_CMD_CLEAR);
+    }
 }
 
 

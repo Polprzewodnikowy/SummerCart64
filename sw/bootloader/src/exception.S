@@ -96,17 +96,11 @@ exception_handler:
     move $sp, $k0
 
 exception_check_type:
-    mfc0 $a0, C0_CAUSE
-    sw $a0, C0_CAUSE_OFFSET($k0)
-    move $a1, $a0
-    move $t0, $a0
-    andi $t0, C0_CR_IP7
-    andi $a0, C0_CR_EC_MASK
-    srl $a0, $a0, C0_CR_EC_BIT
-    andi $a1, C0_CR_IP_MASK
-    srl $a1, $a1, C0_CR_IP_BIT
-    bne $t0, $zero, exception_fatal
-    beq $a0, $zero, exception_interrupt
+    mfc0 $t0, C0_CAUSE
+    sw $t0, C0_CAUSE_OFFSET($k0)
+    andi $a0, $t0, C0_CR_EC_MASK
+    srl $a0, C0_CR_EC_BIT
+    beqz $a0, exception_interrupt
 
 exception_fatal:
     sd $k0, K0_OFFSET($k0)
@@ -117,16 +111,16 @@ exception_fatal:
     sd $t0, C0_EPC_OFFSET($k0)
     dmfc0 $t0, C0_BADVADDR
     sd $t0, C0_BADVADDR_OFFSET($k0)
-    move $a2, $k0
-    la $t1, exception_fatal_handler
-    jalr $t1
+    move $a1, $k0
+    jal exception_fatal_handler
     ld $t0, C0_EPC_OFFSET($k0)
     dmtc0 $t0, C0_EPC
     j exception_restore
 
 exception_interrupt:
-    la $t1, exception_interrupt_handler
-    jalr $t1
+    andi $a0, $t0, C0_CR_IP_MASK
+    srl $a0, C0_CR_IP_BIT
+    jal exception_interrupt_handler
 
 exception_restore:
     .set noat
@@ -169,8 +163,8 @@ exception_enable_interrupts:
     .type exception_enable_interrupts, %function
     .global exception_enable_interrupts
     mfc0 $t0, C0_STATUS
-    li $t1, C0_SR_IE
-    or $t0, $t0, $t1
+    li $t1, (C0_SR_IM4 | C0_SR_IM3 | C0_SR_IE)
+    or $t0, $t1
     mtc0 $t0, C0_STATUS
     jr $ra
 
@@ -180,8 +174,8 @@ exception_disable_interrupts:
     .type exception_disable_interrupts, %function
     .global exception_disable_interrupts
     mfc0 $t0, C0_STATUS
-    li $t1, ~(C0_SR_IE)
-    and $t0, $t0, $t1
+    li $t1, ~(C0_SR_IM4 | C0_SR_IM3 | C0_SR_IE)
+    and $t0, $t1
     mtc0 $t0, C0_STATUS
     jr $ra
 
@@ -195,7 +189,7 @@ exception_enable_watchdog:
     mtc0 $t1, C0_COMPARE
     mfc0 $t0, C0_STATUS
     li $t1, C0_SR_IM7
-    or $t0, $t0, $t1
+    or $t0, $t1
     mtc0 $t0, C0_STATUS
     jr $ra
 
@@ -206,7 +200,7 @@ exception_disable_watchdog:
     .global exception_disable_watchdog
     mfc0 $t0, C0_STATUS
     li $t1, ~(C0_SR_IM7)
-    and $t0, $t0, $t1
+    and $t0, $t1
     mtc0 $t0, C0_STATUS
     mtc0 $zero, C0_COMPARE
     jr $ra

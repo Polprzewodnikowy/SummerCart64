@@ -159,6 +159,12 @@ typedef enum {
     SD_CARD_STATUS_BYTE_SWAP = (1 << 4),
 } sc64_sd_card_status_t;
 
+typedef enum {
+    SC64_IRQ_NONE = 0,
+    SC64_IRQ_MCU = (1 << 0),
+    SC64_IRQ_CMD = (1 << 1),
+} sc64_irq_t;
+
 
 typedef struct {
     volatile uint8_t BUFFER[8192];
@@ -177,8 +183,9 @@ void sc64_unlock (void);
 void sc64_lock (void);
 bool sc64_check_presence (void);
 
-bool sc64_irq_pending (void);
-void sc64_irq_clear (void);
+void sc64_cmd_irq_enable (bool enable);
+sc64_irq_t sc64_irq_pending (void);
+void sc64_irq_callback (sc64_irq_t irq);
 
 sc64_error_t sc64_get_identifier (uint32_t *identifier);
 sc64_error_t sc64_get_version (uint16_t *major, uint16_t *minor, uint32_t *revision);
