@@ -138,7 +138,12 @@ module n64_cfg (
                             lock_sequence_counter <= 1'd0;
                         end
                         if (lock_sequence_counter == 1'd1) begin
-                            n64_scb.cfg_unlock <= (reg_bus.wdata != 16'hFFFF);
+                            if (reg_bus.wdata == 16'hFFFF) begin
+                                n64_scb.cfg_unlock <= 1'b0;
+                                cmd_irq_request <= 1'b0;
+                                cmd_irq <= 1'b0;
+                                mcu_irq <= 1'b0;
+                            end
                         end
                     end
 
