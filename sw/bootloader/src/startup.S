@@ -1,11 +1,16 @@
-.section .text.entry_handler, "ax", %progbits
+#include "vr4300.h"
 
+
+.section .text.entry_handler, "ax", %progbits
 entry_handler:
     .type entry_handler, %function
     .global entry_handler
 
     la $gp, _gp
     la $sp, _sp
+
+    li $v0, (C0_SR_CU0)
+	mtc0 $v0, C0_STATUS
 
     lui $t0, 0xA400
     lbu $a0, 9($t0)     # TV type
