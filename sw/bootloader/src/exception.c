@@ -48,5 +48,5 @@ void exception_fatal_handler (uint32_t exception_code, exception_t *e) {
     display_printf(" t8: 0x%08lX  t9: 0x%08lX  k0: 0x%08lX  k1: 0x%08lX\n", e->t8.u32, e->t9.u32, e->k0.u32, e->k1.u32);
     display_printf(" gp: 0x%08lX  sp: 0x%08lX  s8: 0x%08lX  ra: 0x%08lX\n\n", e->gp.u32, e->sp.u32, e->s8.u32, e->ra.u32);
 
-    while (1);
+    while (true);
 }

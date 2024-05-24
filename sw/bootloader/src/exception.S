@@ -120,6 +120,10 @@ exception_fatal:
 exception_interrupt:
     andi $a0, $t0, C0_CR_IP_MASK
     srl $a0, C0_CR_IP_BIT
+    mfc0 $t0, C0_STATUS
+    andi $t0, C0_SR_IM_MASK
+    srl $t0, C0_SR_IM_BIT
+    and $a0, $t0
     jal exception_interrupt_handler
 
 exception_restore:

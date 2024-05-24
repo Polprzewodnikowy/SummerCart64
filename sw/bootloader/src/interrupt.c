@@ -5,6 +5,7 @@
 
 
 typedef enum {
+    INTERRUPT_NONE = 0,
     INTERRUPT_SW_0 = (1 << 0),
     INTERRUPT_SW_1 = (1 << 1),
     INTERRUPT_RCP = (1 << 2),
@@ -16,54 +17,71 @@ typedef enum {
 } interrupt_t;
 
 
-static void exception_interrupt_unhandled (uint8_t interrupt) {
-    display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
+void exception_interrupt_handler (uint8_t interrupt) {
+    if (interrupt == INTERRUPT_NONE) {
+        display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
 
-    version_print();
-    display_printf("[ Unhandled interrupt ]\n");
-    display_printf("Pending (0x%02X):\n", interrupt);
-    for (int i = 0; i < 8; i++) {
-        switch (interrupt & (1 << i)) {
-            case INTERRUPT_SW_0: display_printf(" Software interrupt (0)\n"); break;
-            case INTERRUPT_SW_1: display_printf(" Software interrupt (1)\n"); break;
-            case INTERRUPT_RCP: display_printf(" RCP interrupt (2)\n"); break;
-            case INTERRUPT_CART: display_printf(" CART interrupt (3)\n"); break;
-            case INTERRUPT_PRENMI: display_printf(" Pre NMI interrupt (4)\n"); break;
-            case INTERRUPT_HW_5: display_printf(" Hardware interrupt (5)\n"); break;
-            case INTERRUPT_HW_6: display_printf(" Hardware interrupt (6)\n"); break;
-            case INTERRUPT_TIMER: display_printf(" Timer interrupt (7)\n"); break;
-            default: break;
-        }
+        version_print();
+        display_printf("[ Empty interrupt ]\n");
+        display_printf("There is no interrupt to handle\n");
+
+        while (true);
     }
 
-    while (1);
-}
-
-
-void exception_interrupt_handler (uint8_t interrupt) {
     if (interrupt & INTERRUPT_CART) {
+        interrupt &= ~(INTERRUPT_CART);
+
         sc64_irq_t irq = sc64_irq_pending();
 
         if (irq != SC64_IRQ_NONE) {
-            return sc64_irq_callback(irq);
+            sc64_irq_callback(irq);
         }
     }
 
     if (interrupt & INTERRUPT_PRENMI) {
+        interrupt &= ~(INTERRUPT_PRENMI);
+
         if (display_ready()) {
             display_init(NULL);
+
             display_printf("Resetting...\n");
         }
-        while (1);
+
+        while (true);
     }
 
     if (interrupt & INTERRUPT_TIMER) {
+        interrupt &= ~(INTERRUPT_TIMER);
+
         display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
+
         version_print();
         display_printf("[ Watchdog ]\n");
         display_printf("SC64 bootloader did not finish loading in 5 seconds\n");
-        while (1);
+
+        while (true);
     }
 
-    exception_interrupt_unhandled(interrupt);
+    if (interrupt != INTERRUPT_NONE) {
+        display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
+
+        version_print();
+        display_printf("[ Unhandled interrupt ]\n");
+        display_printf("Pending (0x%02X):\n", interrupt);
+        for (int i = 0; i < 8; i++) {
+            switch (interrupt & (1 << i)) {
+                case INTERRUPT_SW_0: display_printf(" (0) Software interrupt\n"); break;
+                case INTERRUPT_SW_1: display_printf(" (1) Software interrupt\n"); break;
+                case INTERRUPT_RCP: display_printf(" (2) RCP interrupt\n"); break;
+                case INTERRUPT_CART: display_printf(" (3) CART interrupt\n"); break;
+                case INTERRUPT_PRENMI: display_printf(" (4) Pre NMI interrupt\n"); break;
+                case INTERRUPT_HW_5: display_printf(" (5) Hardware interrupt\n"); break;
+                case INTERRUPT_HW_6: display_printf(" (6) Hardware interrupt\n"); break;
+                case INTERRUPT_TIMER: display_printf(" (7) Timer interrupt\n"); break;
+                default: break;
+            }
+        }
+
+        while (true);
+    }
 }

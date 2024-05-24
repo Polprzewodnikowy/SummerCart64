@@ -146,5 +146,5 @@ void boot (boot_params_t *params) {
         "t3"
     );
 
-    while (1);
+    while (true);
 }

@@ -19,5 +19,5 @@ void error_display (const char *fmt, ...) {
     va_end(args);
     display_printf("\n");
 
-    while (1);
+    while (true);
 }
