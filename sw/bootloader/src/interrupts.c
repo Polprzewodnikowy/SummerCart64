@@ -17,8 +17,8 @@ typedef enum {
 } interrupt_t;
 
 
-void exception_interrupt_handler (uint8_t interrupt) {
-    if (interrupt == INTERRUPT_NONE) {
+void interrupts_handler (uint8_t interrupts) {
+    if (interrupts == INTERRUPT_NONE) {
         display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
 
         version_print();
@@ -28,8 +28,8 @@ void exception_interrupt_handler (uint8_t interrupt) {
         while (true);
     }
 
-    if (interrupt & INTERRUPT_CART) {
-        interrupt &= ~(INTERRUPT_CART);
+    if (interrupts & INTERRUPT_CART) {
+        interrupts &= ~(INTERRUPT_CART);
 
         sc64_irq_t irq = sc64_irq_pending();
 
@@ -38,8 +38,8 @@ void exception_interrupt_handler (uint8_t interrupt) {
         }
     }
 
-    if (interrupt & INTERRUPT_PRENMI) {
-        interrupt &= ~(INTERRUPT_PRENMI);
+    if (interrupts & INTERRUPT_PRENMI) {
+        interrupts &= ~(INTERRUPT_PRENMI);
 
         if (display_ready()) {
             display_init(NULL);
@@ -50,8 +50,8 @@ void exception_interrupt_handler (uint8_t interrupt) {
         while (true);
     }
 
-    if (interrupt & INTERRUPT_TIMER) {
-        interrupt &= ~(INTERRUPT_TIMER);
+    if (interrupts & INTERRUPT_TIMER) {
+        interrupts &= ~(INTERRUPT_TIMER);
 
         display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
 
@@ -62,14 +62,14 @@ void exception_interrupt_handler (uint8_t interrupt) {
         while (true);
     }
 
-    if (interrupt != INTERRUPT_NONE) {
+    if (interrupts != INTERRUPT_NONE) {
         display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
 
         version_print();
-        display_printf("[ Unhandled interrupt ]\n");
-        display_printf("Pending (0x%02X):\n", interrupt);
+        display_printf("[ Unhandled interrupt(s) ]\n");
+        display_printf("Pending (0x%02X):\n", interrupts);
         for (int i = 0; i < 8; i++) {
-            switch (interrupt & (1 << i)) {
+            switch (interrupts & (1 << i)) {
                 case INTERRUPT_SW_0: display_printf(" (0) Software interrupt\n"); break;
                 case INTERRUPT_SW_1: display_printf(" (1) Software interrupt\n"); break;
                 case INTERRUPT_RCP: display_printf(" (2) RCP interrupt\n"); break;

@@ -1,8 +1,6 @@
 #include "vr4300.h"
 
 
-#define WATCHDOG_TIMEOUT            (5 * (93750000UL / 2))
-
 #define ZR_OFFSET                   (0)
 #define AT_OFFSET                   (8)
 #define V0_OFFSET                   (16)
@@ -51,14 +49,18 @@ exception_xtlb_miss:
     .org 0x0080
     j exception_handler
 
+exception_ecc:
+    .org 0x0100
+    j exception_handler
+
 exception_other:
     .org 0x0180
     j exception_handler
 
 
 .section .text.exception_handler
+.type exception_handler, %function
 exception_handler:
-    .type exception_handler, %function
     .set noat
     la $k0, (_esp - SAVE_REGISTERS_SIZE)
     sd $zero, ZR_OFFSET($k0)
@@ -124,7 +126,7 @@ exception_interrupt:
     andi $t0, C0_SR_IM_MASK
     srl $t0, C0_SR_IM_BIT
     and $a0, $t0
-    jal exception_interrupt_handler
+    jal interrupts_handler
 
 exception_restore:
     .set noat
@@ -160,51 +162,3 @@ exception_restore:
     .set at
 
     eret
-
-
-.section .text.exception_enable_interrupts
-exception_enable_interrupts:
-    .type exception_enable_interrupts, %function
-    .global exception_enable_interrupts
-    mfc0 $t0, C0_STATUS
-    li $t1, (C0_SR_IM4 | C0_SR_IM3 | C0_SR_IE)
-    or $t0, $t1
-    mtc0 $t0, C0_STATUS
-    jr $ra
-
-
-.section .text.exception_disable_interrupts
-exception_disable_interrupts:
-    .type exception_disable_interrupts, %function
-    .global exception_disable_interrupts
-    mfc0 $t0, C0_STATUS
-    li $t1, ~(C0_SR_IM4 | C0_SR_IM3 | C0_SR_IE)
-    and $t0, $t1
-    mtc0 $t0, C0_STATUS
-    jr $ra
-
-
-.section .text.exception_enable_watchdog
-exception_enable_watchdog:
-    .type exception_enable_watchdog, %function
-    .global exception_enable_watchdog
-    mtc0 $zero, C0_COUNT
-    li $t1, WATCHDOG_TIMEOUT
-    mtc0 $t1, C0_COMPARE
-    mfc0 $t0, C0_STATUS
-    li $t1, C0_SR_IM7
-    or $t0, $t1
-    mtc0 $t0, C0_STATUS
-    jr $ra
-
-
-.section .text.exception_disable_watchdog
-exception_disable_watchdog:
-    .type exception_disable_watchdog, %function
-    .global exception_disable_watchdog
-    mfc0 $t0, C0_STATUS
-    li $t1, ~(C0_SR_IM7)
-    and $t0, $t1
-    mtc0 $t0, C0_STATUS
-    mtc0 $zero, C0_COMPARE
-    jr $ra

@@ -1,6 +1,6 @@
 #include "error.h"
-#include "exception.h"
 #include "init.h"
+#include "interrupts.h"
 #include "io.h"
 #include "sc64.h"
 #include "test.h"
@@ -24,22 +24,22 @@ void init (init_tv_type_t tv_type, init_reset_type_t reset_type, uint32_t entrop
         error_display("SC64 hardware not detected");
     }
 
-    exception_enable_watchdog();
-    exception_enable_interrupts();
+    interrupts_init();
+    interrupts_start_watchdog();
 
     if ((error = sc64_set_config(CFG_ID_BOOTLOADER_SWITCH, false)) != SC64_OK) {
         error_display("Command CONFIG_SET [BOOTLOADER_SWITCH] failed\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if (test_check()) {
-        exception_disable_watchdog();
+        interrupts_stop_watchdog();
         test_execute();
     }
 }
 
 void deinit (void) {
-    exception_disable_interrupts();
-    exception_disable_watchdog();
+    interrupts_stop_watchdog();
+    interrupts_disable();
 
     sc64_lock();
 }

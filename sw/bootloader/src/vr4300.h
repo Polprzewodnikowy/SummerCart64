@@ -9,6 +9,7 @@
 #define CACHE_LINE_SIZE_I           (32)
 #define CACHE_LINE_SIZE_D           (16)
 
+
 #define C0_BADVADDR                 $8
 #define C0_COUNT                    $9
 #define C0_COMPARE                  $11

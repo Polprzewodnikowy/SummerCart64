@@ -214,14 +214,21 @@ sc64_irq_t sc64_irq_pending (void) {
 }
 
 void sc64_irq_callback (sc64_irq_t irq) {
+    uint32_t clear = 0;
+    if (irq & SC64_IRQ_MCU) {
+        clear |= SC64_IRQ_MCU_CLEAR;
+    }
+    if (irq & SC64_IRQ_CMD) {
+        clear |= SC64_IRQ_CMD_CLEAR;
+    }
+    pi_io_write(&SC64_REGS->IRQ, clear);
     if (irq & SC64_IRQ_MCU) {
         sc64_mcu_irq_callback();
-        pi_io_write(&SC64_REGS->IRQ, SC64_IRQ_MCU_CLEAR);
     }
     if (irq & SC64_IRQ_CMD) {
         sc64_cmd_irq_callback();
-        pi_io_write(&SC64_REGS->IRQ, SC64_IRQ_CMD_CLEAR);
     }
+    while (pi_busy());
 }
 
 

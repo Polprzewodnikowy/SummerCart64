@@ -31,7 +31,8 @@ SRC_FILES = \
 	exception.S \
 	font.c \
 	init.c \
-	interrupt.c \
+	interrupts.c \
+	interrupts.S \
 	io.c \
 	main.c \
 	menu.c \

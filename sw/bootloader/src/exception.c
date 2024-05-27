@@ -1,6 +1,5 @@
 #include <stdarg.h>
 #include "display.h"
-#include "exception_regs.h"
 #include "exception.h"
 #include "io.h"
 #include "version.h"
