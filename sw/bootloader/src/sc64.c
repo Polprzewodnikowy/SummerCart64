@@ -1,6 +1,6 @@
+#include "error.h"
 #include "io.h"
 #include "sc64.h"
-#include "error.h"
 
 
 typedef struct {

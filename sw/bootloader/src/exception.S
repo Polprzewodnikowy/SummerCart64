@@ -33,11 +33,13 @@
 #define SP_OFFSET                   (232)
 #define S8_OFFSET                   (240)
 #define RA_OFFSET                   (248)
-#define C0_STATUS_OFFSET            (256)
-#define C0_CAUSE_OFFSET             (260)
-#define C0_EPC_OFFSET               (264)
-#define C0_BADVADDR_OFFSET          (272)
-#define SAVE_REGISTERS_SIZE         (280)
+#define HI_OFFSET                   (256)
+#define LO_OFFSET                   (264)
+#define C0_EPC_OFFSET               (272)
+#define C0_BADVADDR_OFFSET          (280)
+#define C0_STATUS_OFFSET            (288)
+#define C0_CAUSE_OFFSET             (292)
+#define SAVE_REGISTERS_SIZE         (296)
 
 
 .section .text.exception_vector
@@ -93,6 +95,10 @@ exception_handler:
     sd $sp, SP_OFFSET($k0)
     sd $s8, S8_OFFSET($k0)
     sd $ra, RA_OFFSET($k0)
+    mfhi $t0
+    mflo $t1
+    sd $t0, HI_OFFSET($k0)
+    sd $t1, LO_OFFSET($k0)
     .set at
 
     move $sp, $k0
@@ -130,6 +136,10 @@ exception_interrupt:
 
 exception_restore:
     .set noat
+    ld $t0, HI_OFFSET($k0)
+    ld $t1, LO_OFFSET($k0)
+    mthi $t0
+    mtlo $t1
     ld $at, AT_OFFSET($k0)
     ld $v0, V0_OFFSET($k0)
     ld $v1, V1_OFFSET($k0)
