@@ -56,7 +56,7 @@ void interrupts_handler (uint8_t interrupts) {
         display_init((uint32_t *) (&assets_sc64_logo_640_240_dimmed));
 
         version_print();
-        display_printf("[ Watchdog ]\n");
+        display_printf("[ Watchdog timeout ]\n");
         display_printf("SC64 bootloader did not finish loading in 5 seconds\n");
 
         while (true);
