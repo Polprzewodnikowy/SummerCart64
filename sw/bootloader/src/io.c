@@ -73,38 +73,39 @@ uint32_t pi_busy (void) {
 }
 
 uint32_t pi_io_read (io32_t *address) {
-    uint32_t sr = interrupts_disable();
-    while (pi_busy());
-    uint32_t value = cpu_io_read(address);
-    interrupts_restore(sr);
+    uint32_t value;
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        value = cpu_io_read(address);
+    });
     return value;
 }
 
 void pi_io_write (io32_t *address, uint32_t value) {
-    uint32_t sr = interrupts_disable();
-    while (pi_busy());
-    cpu_io_write(address, value);
-    interrupts_restore(sr);
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(address, value);
+    });
 }
 
 void pi_dma_read (io32_t *address, void *buffer, size_t length) {
     cache_data_hit_writeback_invalidate(buffer, length);
-    uint32_t sr = interrupts_disable();
-    while (pi_busy());
-    cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
-    cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
-    cpu_io_write(&PI->WDMA, length - 1);
-    interrupts_restore(sr);
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
+        cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&PI->WDMA, length - 1);
+    });
     while (pi_busy());
 }
 
 void pi_dma_write (io32_t *address, void *buffer, size_t length) {
     cache_data_hit_writeback(buffer, length);
-    uint32_t sr = interrupts_disable();
-    while (pi_busy());
-    cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
-    cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
-    cpu_io_write(&PI->RDMA, length - 1);
-    interrupts_restore(sr);
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
+        cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&PI->RDMA, length - 1);
+    });
     while (pi_busy());
 }
