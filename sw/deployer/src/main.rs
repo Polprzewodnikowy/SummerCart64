@@ -781,7 +781,7 @@ fn handle_set_command(connection: Connection, command: &SetCommands) -> Result<(
 
     match command {
         SetCommands::Rtc => {
-            let datetime = Local::now();
+            let datetime = Local::now().naive_local();
             sc64.set_datetime(datetime)?;
             println!(
                 "SC64 RTC datetime synchronized to: {}",

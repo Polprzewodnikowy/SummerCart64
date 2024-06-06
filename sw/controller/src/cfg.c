@@ -437,8 +437,8 @@ save_type_t cfg_get_save_type (void) {
 void cfg_get_time (uint32_t *args) {
     rtc_time_t t;
     rtc_get_time(&t);
-    args[0] = ((t.hour << 16) | (t.minute << 8) | t.second);
-    args[1] = ((t.weekday << 24) | (t.year << 16) | (t.month << 8) | t.day);
+    args[0] = ((t.weekday << 24) | (t.hour << 16) | (t.minute << 8) | t.second);
+    args[1] = ((t.century << 24) | (t.year << 16) | (t.month << 8) | t.day);
 }
 
 void cfg_set_time (uint32_t *args) {
@@ -450,6 +450,7 @@ void cfg_set_time (uint32_t *args) {
     t.day = (args[1] & 0xFF);
     t.month = ((args[1] >> 8) & 0xFF);
     t.year = ((args[1] >> 16) & 0xFF);
+    t.century = ((args[1] >> 24) & 0xFF);
     rtc_set_time(&t);
 }
 
