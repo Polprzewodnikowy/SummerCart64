@@ -25,7 +25,7 @@ use self::{
         get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
     },
 };
-use chrono::{DateTime, Local};
+use chrono::NaiveDateTime;
 use rand::Rng;
 use std::{
     cmp::min,
@@ -55,7 +55,7 @@ pub struct DeviceState {
     pub button_mode: ButtonMode,
     pub rom_extended_enable: Switch,
     pub led_enable: Switch,
-    pub datetime: DateTime<Local>,
+    pub datetime: NaiveDateTime,
     pub fpga_debug_data: FpgaDebugData,
     pub diagnostic_data: DiagnosticData,
 }
@@ -210,7 +210,7 @@ impl SC64 {
         Ok(())
     }
 
-    fn command_time_get(&mut self) -> Result<DateTime<Local>, Error> {
+    fn command_time_get(&mut self) -> Result<NaiveDateTime, Error> {
         let data = self.link.execute_command(&Command {
             id: b't',
             args: [0, 0],
@@ -224,7 +224,7 @@ impl SC64 {
         Ok(convert_to_datetime(&data[0..8].try_into().unwrap())?)
     }
 
-    fn command_time_set(&mut self, datetime: DateTime<Local>) -> Result<(), Error> {
+    fn command_time_set(&mut self, datetime: NaiveDateTime) -> Result<(), Error> {
         self.link.execute_command(&Command {
             id: b'T',
             args: convert_from_datetime(datetime),
@@ -529,11 +529,11 @@ impl SC64 {
         self.command_config_set(Config::TvType(tv_type))
     }
 
-    pub fn get_datetime(&mut self) -> Result<DateTime<Local>, Error> {
+    pub fn get_datetime(&mut self) -> Result<NaiveDateTime, Error> {
         self.command_time_get()
     }
 
-    pub fn set_datetime(&mut self, datetime: DateTime<Local>) -> Result<(), Error> {
+    pub fn set_datetime(&mut self, datetime: NaiveDateTime) -> Result<(), Error> {
         self.command_time_set(datetime)
     }
 

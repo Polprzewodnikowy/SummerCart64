@@ -362,6 +362,7 @@ module n64_si (
     logic [2:0] rtc_time_weekday;
     logic [4:0] rtc_time_month;
     logic [7:0] rtc_time_year;
+    logic rtc_time_century;
 
     always_ff @(posedge clk) begin
         if (reset) begin
@@ -377,6 +378,7 @@ module n64_si (
 
         if (!(|rtc_stopped) && !n64_scb.rtc_pending && n64_scb.rtc_wdata_valid && (tx_state != TX_STATE_DATA)) begin
             {
+                rtc_time_century,
                 rtc_time_year,
                 rtc_time_month,
                 rtc_time_weekday,
@@ -408,6 +410,7 @@ module n64_si (
                     4'd5: rtc_time_weekday <= rx_byte_data[2:0];
                     4'd6: rtc_time_month <= rx_byte_data[4:0];
                     4'd7: rtc_time_year <= rx_byte_data;
+                    4'd8: rtc_time_century <= rx_byte_data[0];
                 endcase
             end
         end
@@ -415,6 +418,7 @@ module n64_si (
 
     always_comb begin
         n64_scb.rtc_rdata = {
+            rtc_time_century,
             rtc_time_year,
             rtc_time_month,
             rtc_time_weekday,
@@ -469,7 +473,7 @@ module n64_si (
                         4'd4: tx_byte_data = {5'd0, rtc_time_weekday};
                         4'd5: tx_byte_data = {3'd0, rtc_time_month};
                         4'd6: tx_byte_data = rtc_time_year;
-                        4'd7: tx_byte_data = 8'h01;
+                        4'd7: tx_byte_data = {7'd0, rtc_time_century};
                         4'd8: tx_byte_data = {(|rtc_stopped), 7'd0};
                     endcase
                 end

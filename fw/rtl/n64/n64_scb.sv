@@ -40,8 +40,8 @@ interface n64_scb ();
     logic rtc_pending;
     logic rtc_done;
     logic rtc_wdata_valid;
-    logic [41:0] rtc_rdata;
-    logic [41:0] rtc_wdata;
+    logic [42:0] rtc_rdata;
+    logic [42:0] rtc_wdata;
 
     logic cfg_unlock;
     logic cfg_pending;

@@ -328,18 +328,18 @@ Use this command to set value of persistent setting option. Available persistent
 _This command does not require arguments or data._
 
 #### `response` (time)
-| offset | type    | description                          |
-| ------ | ------- | ------------------------------------ |
-| `0`    | uint8_t | Weekday (1 - 7), 1 represents Monday |
-| `1`    | uint8_t | Hours (0 - 23)                       |
-| `2`    | uint8_t | Minutes (0 - 59)                     |
-| `3`    | uint8_t | Seconds (0 - 59)                     |
-| `4`    | uint8_t | _Unused_ (returns zero)              |
-| `5`    | uint8_t | Year (0 - 99)                        |
-| `6`    | uint8_t | Month (1 - 12)                       |
-| `7`    | uint8_t | Day (1 - 31)                         |
+| offset | type    | description                               |
+| ------ | ------- | ----------------------------------------- |
+| `0`    | uint8_t | Weekday (1 - 7), 1 represents Monday      |
+| `1`    | uint8_t | Hours (0 - 23)                            |
+| `2`    | uint8_t | Minutes (0 - 59)                          |
+| `3`    | uint8_t | Seconds (0 - 59)                          |
+| `4`    | uint8_t | Century (0 - 255), 0 represents year 1900 |
+| `5`    | uint8_t | Year (0 - 99)                             |
+| `6`    | uint8_t | Month (1 - 12)                            |
+| `7`    | uint8_t | Day (1 - 31)                              |
 
-Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decimal) format.
+Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decimal) format, except for the century field.
 
 ---
 
@@ -356,16 +356,16 @@ Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decima
 | `[7:0]`   | Seconds (0 - 59)                     |
 
 #### `arg1` (time_1)
-| bits      | description    |
-| --------- | -------------- |
-| `[31:24]` | _Unused_       |
-| `[23:16]` | Year (0 - 99)  |
-| `[15:8]`  | Month (1 - 12) |
-| `[7:0]`   | Day (1 - 31)   |
+| bits      | description                               |
+| --------- | ----------------------------------------- |
+| `[31:24]` | Century (0 - 255), 0 represents year 1900 |
+| `[23:16]` | Year (0 - 99)                             |
+| `[15:8]`  | Month (1 - 12)                            |
+| `[7:0]`   | Day (1 - 31)                              |
 
 _This command does not send response data._
 
-Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decimal) format.
+Date/time values use the [BCD](https://en.wikipedia.org/wiki/Binary-coded_decimal) format, except for the century field.
 
 ---
 

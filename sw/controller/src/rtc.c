@@ -20,6 +20,8 @@
 #define RTC_ADDRESS_SRAM_REGION     (0x24)
 #define RTC_ADDRESS_SRAM_VERSION    (0x28)
 #define RTC_ADDRESS_SRAM_SETTINGS   (0x2C)
+#define RTC_ADDRESS_SRAM_CENTURY    (0x40)
+#define RTC_ADDRESS_SRAM_LAST_YEAR  (0x41)
 
 #define RTC_RTCSEC_ST               (1 << 7)
 
@@ -37,8 +39,9 @@ static rtc_time_t rtc_time = {
     .hour       = 0x12,
     .weekday    = 0x01,
     .day        = 0x01,
-    .month      = 0x01,
-    .year       = 0x24
+    .month      = 0x06,
+    .year       = 0x24,
+    .century    = 0x01,
 };
 static bool rtc_time_pending = false;
 
@@ -102,8 +105,15 @@ static void rtc_osc_stop (void) {
 
 static void rtc_read_time (void) {
     uint8_t regs[7];
+    uint8_t last_year;
 
     if (rtc_read(RTC_ADDRESS_RTCSEC, regs, 7)) {
+        return;
+    }
+    if (rtc_read(RTC_ADDRESS_SRAM_CENTURY, &rtc_time.century, 1)) {
+        return;
+    }
+    if (rtc_read(RTC_ADDRESS_SRAM_LAST_YEAR, &last_year, 1)) {
         return;
     }
 
@@ -116,6 +126,15 @@ static void rtc_read_time (void) {
     rtc_time.day = regs[4];
     rtc_time.month = regs[5];
     rtc_time.year = regs[6];
+
+    if (rtc_time.year < last_year) {
+        rtc_time.century += 1;
+        rtc_write(RTC_ADDRESS_SRAM_CENTURY, &rtc_time.century, 1);
+    }
+
+    if (rtc_time.year != last_year) {
+        rtc_write(RTC_ADDRESS_SRAM_LAST_YEAR, &rtc_time.year, 1);
+    }
 }
 
 static void rtc_write_time (void) {
@@ -136,8 +155,12 @@ static void rtc_write_time (void) {
     regs[0] |= RTC_RTCSEC_ST;
     regs[3] |= RTC_RTCWKDAY_VBATEN;
 
+    rtc_write(RTC_ADDRESS_SRAM_CENTURY, &rtc_time.century, 1);
+    rtc_write(RTC_ADDRESS_SRAM_LAST_YEAR, &rtc_time.year, 1);
     rtc_write(RTC_ADDRESS_RTCMIN, &regs[1], 6);
     rtc_write(RTC_ADDRESS_RTCSEC, &regs[0], 1);
+
+    rtc_read_time();
 }
 
 static void rtc_read_region (void) {
@@ -165,6 +188,7 @@ void rtc_get_time (rtc_time_t *time) {
     time->day = rtc_time.day;
     time->month = rtc_time.month;
     time->year = rtc_time.year;
+    time->century = rtc_time.century;
 }
 
 void rtc_set_time (rtc_time_t *time) {
@@ -175,6 +199,7 @@ void rtc_set_time (rtc_time_t *time) {
     rtc_time.day = time->day;
     rtc_time.month = time->month;
     rtc_time.year = time->year;
+    rtc_time.century = time->century;
     rtc_time_pending = true;
 }
 
@@ -254,6 +279,7 @@ void rtc_process (void) {
         rtc_time.hour = ((data[0] >> 16) & 0xFF);
         rtc_time.minute = ((data[0] >> 8) & 0xFF);
         rtc_time.second = ((data[0] >> 0) & 0xFF);
+        rtc_time.century = ((data[1] >> 24) & 0xFF);
         rtc_time.year = ((data[1] >> 16) & 0xFF);
         rtc_time.month = ((data[1] >> 8) & 0xFF);
         rtc_time.day = ((data[1] >> 0) & 0xFF);
@@ -293,6 +319,7 @@ void rtc_process (void) {
             (rtc_time.second << 0)
         );
         data[1] = (
+            (rtc_time.century << 24) |
             (rtc_time.year << 16) |
             (rtc_time.month << 8) |
             (rtc_time.day << 0)

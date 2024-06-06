@@ -365,6 +365,7 @@ void dd_process (void) {
                 case DD_CMD_SET_RTC_MINUTE_SECOND:
                     p.time.minute = ((data >> 8) & 0xFF);
                     p.time.second = (data & 0xFF);
+                    p.time.century = (p.time.year >= 0x96) ? 0 : 1;
                     rtc_set_time(&p.time);
                     break;
 

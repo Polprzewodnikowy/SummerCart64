@@ -110,7 +110,7 @@ static void test_sc64_cfg (void) {
     }
 
     display_printf("RTC current time:\n ");
-    display_printf("%04d-%02d-%02d", 2000 + FROM_BCD(t.year), FROM_BCD(t.month), FROM_BCD(t.day));
+    display_printf("%04d-%02d-%02d", 1900 + (t.century * 100) + FROM_BCD(t.year), FROM_BCD(t.month), FROM_BCD(t.day));
     display_printf("T");
     display_printf("%02d:%02d:%02d", FROM_BCD(t.hour), FROM_BCD(t.minute), FROM_BCD(t.second));
     display_printf(" (%s)", weekdays[FROM_BCD(t.weekday)]);

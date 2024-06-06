@@ -506,7 +506,7 @@ module mcu_top (
 
                 REG_RTC_TIME_1: begin
                     reg_rdata <= {
-                        8'd0,
+                        7'd0, n64_scb.rtc_rdata[42],
                         n64_scb.rtc_rdata[41:34],
                         3'd0, n64_scb.rtc_rdata[33:29],
                         2'd0, n64_scb.rtc_rdata[25:20]
@@ -849,6 +849,7 @@ module mcu_top (
 
                 REG_RTC_TIME_1: begin
                     n64_scb.rtc_wdata_valid <= 1'b1;
+                    n64_scb.rtc_wdata[42] <= reg_wdata[24];
                     n64_scb.rtc_wdata[41:34] <= reg_wdata[23:16];
                     n64_scb.rtc_wdata[33:29] <= reg_wdata[12:8];
                     n64_scb.rtc_wdata[25:20] <= reg_wdata[5:0];

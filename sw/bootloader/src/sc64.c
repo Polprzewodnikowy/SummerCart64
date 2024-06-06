@@ -322,10 +322,11 @@ sc64_error_t sc64_get_time (sc64_rtc_time_t *t) {
         .id = CMD_ID_TIME_GET
     };
     sc64_error_t error = sc64_execute_cmd(&cmd);
+    t->weekday = ((cmd.rsp[0] >> 24) & 0xFF);
     t->hour = ((cmd.rsp[0] >> 16) & 0xFF);
     t->minute = ((cmd.rsp[0] >> 8) & 0xFF);
     t->second = (cmd.rsp[0] & 0xFF);
-    t->weekday = ((cmd.rsp[1] >> 24) & 0xFF);
+    t->century = ((cmd.rsp[1] >> 24) & 0xFF);
     t->year = ((cmd.rsp[1] >> 16) & 0xFF);
     t->month = ((cmd.rsp[1] >> 8) & 0xFF);
     t->day = (cmd.rsp[1] & 0xFF);
@@ -334,11 +335,12 @@ sc64_error_t sc64_get_time (sc64_rtc_time_t *t) {
 
 sc64_error_t sc64_set_time (sc64_rtc_time_t *t) {
     uint32_t time[2] = {(
+        ((t->weekday << 24) & 0xFF) |
         ((t->hour << 16) & 0xFF) |
         ((t->minute << 8) & 0xFF) |
         (t->second & 0xFF)
     ), (
-        ((t->weekday << 24) & 0xFF) |
+        ((t->century << 24) & 0xFF) |
         ((t->year << 16) & 0xFF) |
         ((t->month << 8) & 0xFF) |
         (t->day & 0xFF)
