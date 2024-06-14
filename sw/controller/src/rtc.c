@@ -117,12 +117,20 @@ static void rtc_sanitize_raw_time (rtc_raw_time_t *raw) {
     raw->century.value &= 0b00000111;
 }
 
-static int8_t rtc_calculate_raw_day_offset (uint8_t century, uint8_t year, uint8_t month, uint8_t day, bool adjust_forward) {
-    int8_t raw_day_offset = ((century + 2) / 4);
-    if (((century % 4) == 1) && ((year > 0x00) || (month > 0x02) || ((month == 0x02) && (day >= (0x29 - raw_day_offset))))) {
-        raw_day_offset += 1;
+static int8_t rtc_calculate_backwards_day_offset (uint8_t century, uint8_t year, uint8_t month, uint8_t day) {
+    int8_t day_offset = ((century + 2) / 4);
+    if (((century % 4) == 1) && ((year > 0x00) || (month > 0x02))) {
+        day_offset += 1;
     }
-    return adjust_forward ? raw_day_offset : (-raw_day_offset);
+    return (-day_offset);
+}
+
+static int8_t rtc_calculate_forwards_day_offset (uint8_t century, uint8_t year, uint8_t month, uint8_t day) {
+    int8_t day_offset = ((century + 2) / 4);
+    if (((century % 4) == 1) && ((year > 0x00) || (month > 0x02) || ((month == 0x02) && (RTC_FROM_BCD(day) >= (29 - day_offset))))) {
+        day_offset += 1;
+    }
+    return day_offset;
 }
 
 static uint8_t rtc_get_days_in_month (uint8_t century, uint8_t year, uint8_t month) {
@@ -130,7 +138,9 @@ static uint8_t rtc_get_days_in_month (uint8_t century, uint8_t year, uint8_t mon
         31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
     };
 
-    if (month < 1 || month > 12) {
+    if (month == 0) {
+        month = 12;
+    } else if (month > 12) {
         month = (((month - 1) % 12) + 1);
     }
 
@@ -159,48 +169,57 @@ static void rtc_adjust_date (uint8_t *century, uint8_t *year, uint8_t *month, ui
     int8_t year_offset = 0;
     int8_t month_offset = 0;
 
-    uint8_t current_month_days = rtc_get_days_in_month(dec_century, dec_year, dec_month);
-
     dec_day += day_offset;
     if (dec_day < 1) {
         month_offset = -1;
-    } else if (dec_day > current_month_days) {
-        dec_day %= current_month_days;
-        month_offset = 1;
+    } else {
+        uint8_t current_month_days = rtc_get_days_in_month(dec_century, dec_year, dec_month);
+        if (dec_day > current_month_days) {
+            dec_day %= current_month_days;
+            month_offset = 1;
+        }
     }
 
-    dec_month += month_offset;
-    if (dec_month < 1) {
-        dec_month = 12;
-        year_offset = -1;
-    } else if (dec_month > 12) {
-        dec_month = 1;
-        year_offset = 1;
+    if (month_offset != 0) {
+        dec_month += month_offset;
+        if (dec_month < 1) {
+            dec_month = 12;
+            year_offset = -1;
+        } else if (dec_month > 12) {
+            dec_month = 1;
+            year_offset = 1;
+        }
+        *month = RTC_TO_BCD(dec_month);
     }
-    *month = RTC_TO_BCD(dec_month);
 
-    dec_year += year_offset;
-    if (dec_year < 0) {
-        dec_year = 99;
-        century_offset = -1;
-    } else if (dec_year > 99) {
-        dec_year = 0;
-        century_offset = 1;
+    if (year_offset != 0) {
+        dec_year += year_offset;
+        if (dec_year < 0) {
+            dec_year = 99;
+            century_offset = -1;
+        } else if (dec_year > 99) {
+            dec_year = 0;
+            century_offset = 1;
+        }
+        *year = RTC_TO_BCD(dec_year);
     }
-    *year = RTC_TO_BCD(dec_year);
 
-    dec_century += century_offset;
-    if (dec_century < 0) {
-        dec_century = 7;
-    } else if (dec_century > 7) {
-        dec_century = 0;
+    if (century_offset != 0) {
+        dec_century += century_offset;
+        if (dec_century < 0) {
+            dec_century = 7;
+        } else if (dec_century > 7) {
+            dec_century = 0;
+        }
+        *century = RTC_TO_BCD(dec_century);
     }
-    *century = RTC_TO_BCD(dec_century);
 
-    if (dec_day <= 0) {
-        dec_day = rtc_get_days_in_month(dec_century, dec_year, dec_month) + dec_day;
+    if (day_offset != 0) {
+        if (dec_day <= 0) {
+            dec_day = (rtc_get_days_in_month(dec_century, dec_year, dec_month) + dec_day);
+        }
+        *day = RTC_TO_BCD(dec_day);
     }
-    *day = RTC_TO_BCD(dec_day);
 }
 
 static void rtc_raw_to_real (rtc_raw_time_t *raw, rtc_real_time_t *real) {
@@ -213,7 +232,7 @@ static void rtc_raw_to_real (rtc_raw_time_t *raw, rtc_real_time_t *real) {
     real->minute = raw->time.minute;
     real->second = raw->time.second;
 
-    int8_t day_offset = rtc_calculate_raw_day_offset(real->century, real->year, real->month, real->day, false);
+    int8_t day_offset = rtc_calculate_backwards_day_offset(real->century, real->year, real->month, real->day);
 
     rtc_adjust_date(&real->century, &real->year, &real->month, &real->day, day_offset);
 }
@@ -228,7 +247,7 @@ static void rtc_real_to_raw (rtc_raw_time_t *raw, rtc_real_time_t *real) {
     raw->time.minute = real->minute;
     raw->time.second = real->second;
 
-    int8_t day_offset = rtc_calculate_raw_day_offset(raw->century.value, raw->time.year, raw->time.month, raw->time.day, true);
+    int8_t day_offset = rtc_calculate_forwards_day_offset(raw->century.value, raw->time.year, raw->time.month, raw->time.day);
 
     rtc_adjust_date(&raw->century.value, &raw->time.year, &raw->time.month, &raw->time.day, day_offset);
 }
