@@ -15,15 +15,15 @@ typedef struct {
     uint8_t month;
     uint8_t year;
     uint8_t century;
-} rtc_time_t;
+} rtc_real_time_t;
 
 typedef struct {
     bool led_enabled;
 } rtc_settings_t;
 
 
-void rtc_get_time (rtc_time_t *time);
-void rtc_set_time (rtc_time_t *time);
+void rtc_get_time (rtc_real_time_t *time);
+void rtc_set_time (rtc_real_time_t *time);
 
 uint8_t rtc_get_region (void);
 void rtc_set_region (uint8_t region);

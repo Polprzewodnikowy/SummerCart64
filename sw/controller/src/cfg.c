@@ -435,14 +435,14 @@ save_type_t cfg_get_save_type (void) {
 }
 
 void cfg_get_time (uint32_t *args) {
-    rtc_time_t t;
+    rtc_real_time_t t;
     rtc_get_time(&t);
     args[0] = ((t.weekday << 24) | (t.hour << 16) | (t.minute << 8) | t.second);
     args[1] = ((t.century << 24) | (t.year << 16) | (t.month << 8) | t.day);
 }
 
 void cfg_set_time (uint32_t *args) {
-    rtc_time_t t;
+    rtc_real_time_t t;
     t.second = (args[0] & 0xFF);
     t.minute = ((args[0] >> 8) & 0xFF);
     t.hour = ((args[0] >> 16) & 0xFF);
