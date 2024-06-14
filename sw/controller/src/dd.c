@@ -71,7 +71,7 @@ typedef struct {
 
 struct process {
     enum state state;
-    rtc_time_t time;
+    rtc_real_time_t time;
     bool disk_spinning;
     bool cmd_response_delayed;
     bool bm_running;

@@ -15,12 +15,14 @@ pub fn convert_to_datetime(data: &[u8; 8]) -> Result<NaiveDateTime, Error> {
     let hour = u8_from_bcd(data[1]);
     let day = u8_from_bcd(data[7]);
     let month = u8_from_bcd(data[6]);
-    let year = 1900u32 + (data[4] as u32 * 100) + u8_from_bcd(data[5]) as u32;
+    let year = 1900u32 + (u8_from_bcd(data[4]) as u32 * 100) + u8_from_bcd(data[5]) as u32;
     NaiveDateTime::parse_from_str(
         &format!("{year:4}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}"),
         "%Y-%m-%dT%H:%M:%S",
     )
-    .map_err(|_| Error::new("Couldn't convert from bytes to NaiveDateTime"))
+    .map_err(|e| {
+        Error::new(format!("Couldn't convert time from bytes to NaiveDateTime: {e}").as_str())
+    })
 }
 
 pub fn convert_from_datetime(datetime: NaiveDateTime) -> [u32; 2] {
@@ -31,7 +33,7 @@ pub fn convert_from_datetime(datetime: NaiveDateTime) -> [u32; 2] {
     let day = bcd_from_u8(datetime.day() as u8);
     let month = bcd_from_u8(datetime.month() as u8);
     let year = bcd_from_u8((datetime.year() % 100) as u8);
-    let century = ((datetime.year() - 1900) / 100) as u8;
+    let century = bcd_from_u8(((datetime.year() - 1900) / 100) as u8);
     [
         u32::from_be_bytes([weekday, hour, minute, second]),
         u32::from_be_bytes([century, year, month, day]),

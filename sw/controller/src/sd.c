@@ -408,14 +408,17 @@ sd_error_t sd_card_init (void) {
     sd_cmd(7, 0, RSP_NONE, NULL);
 
     if (sd_cmd(9, p.rca, RSP_R2, p.csd)) {
+        sd_card_deinit();
         return SD_ERROR_CMD9_IO;
     }
 
     if (sd_cmd(10, p.rca, RSP_R2, p.cid)) {
+        sd_card_deinit();
         return SD_ERROR_CMD10_IO;
     }
 
     if (sd_cmd(7, p.rca, RSP_R1b, NULL)) {
+        sd_card_deinit();
         return SD_ERROR_CMD7_IO;
     }
 
