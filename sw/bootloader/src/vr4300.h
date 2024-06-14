@@ -9,6 +9,7 @@
 #define CACHE_LINE_SIZE_I           (32)
 #define CACHE_LINE_SIZE_D           (16)
 
+
 #define C0_BADVADDR                 $8
 #define C0_COUNT                    $9
 #define C0_COMPARE                  $11
@@ -47,6 +48,9 @@
 #define C0_SR_CU1                   (1 << 29)
 #define C0_SR_CU2                   (1 << 30)
 #define C0_SR_CU3                   (1 << 31)
+
+#define C0_SR_IM_MASK               (C0_SR_IM7 | C0_SR_IM6 | C0_SR_IM5 | C0_SR_IM4 | C0_SR_IM3 | C0_SR_IM2 | C0_SR_IM1 | C0_SR_IM0)
+#define C0_SR_IM_BIT                (8)
 
 
 #define C0_CR_EC0                   (1 << 2)
