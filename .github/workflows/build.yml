@@ -52,26 +52,27 @@ jobs:
   build-deployer:
     strategy:
       matrix:
-        version: [windows, windows-32bit, linux, macos]
+        # version: [windows, windows-32bit, linux, macos]
+        version: [linux, macos]
         include:
-          - version: windows
-            os: windows-latest
-            executable: target/release/sc64deployer.exe
-            package-name: sc64-deployer-windows
-            package-params: -c -a -f
-            package-extension: zip
+          # - version: windows
+          #   os: windows-latest
+          #   executable: target/release/sc64deployer.exe
+          #   package-name: sc64-deployer-windows
+          #   package-params: -c -a -f
+          #   package-extension: zip
 
-          - version: windows-32bit
-            os: windows-latest
-            build-params: --target=i686-pc-windows-msvc
-            executable: target/i686-pc-windows-msvc/release/sc64deployer.exe
-            package-name: sc64-deployer-windows-32bit
-            package-params: -c -a -f
-            package-extension: zip
+          # - version: windows-32bit
+          #   os: windows-latest
+          #   build-params: --target=i686-pc-windows-msvc
+          #   executable: target/i686-pc-windows-msvc/release/sc64deployer.exe
+          #   package-name: sc64-deployer-windows-32bit
+          #   package-params: -c -a -f
+          #   package-extension: zip
 
           - version: linux
             os: ubuntu-latest
-            linux-packages: libudev-dev
+            apt-packages: libftdi-dev libudev-dev
             executable: target/release/sc64deployer
             package-name: sc64-deployer-linux
             package-params: -czf
@@ -79,6 +80,7 @@ jobs:
 
           - version: macos
             os: macos-latest
+            brew-packages: libftdi
             executable: target/release/sc64deployer
             package-name: sc64-deployer-macos
             package-params: -czf
@@ -98,11 +100,15 @@ jobs:
           string: '${{ github.ref_name }}'
           replace-with: '-'
 
-      - name: Install linux packages
-        if: matrix.linux-packages
+      - name: Install apt packages
+        if: matrix.apt-packages
         run: |
           sudo apt-get update
-          sudo apt-get -y install ${{ matrix.linux-packages }}
+          sudo apt-get -y install ${{ matrix.apt-packages }}
+
+      - name: Install brew packages
+        if: matrix.brew-packages
+        run: yes | brew install ${{ matrix.brew-packages }}
 
       - name: Build deployer
         run: cargo b -r ${{ matrix.build-params }}
