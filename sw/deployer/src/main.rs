@@ -350,7 +350,13 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 
     println!("{}", "Found devices:".bold());
     for (i, d) in devices.iter().enumerate() {
-        println!(" {i}: [{}] at port [{}]", d.serial_number, d.port);
+        let index = i + 1;
+        println!(
+            " {index}: [{}] at port [{}] (using \"{}\" backend)",
+            d.serial.bold(),
+            d.port.bold(),
+            d.backend.to_string().bold()
+        );
     }
 
     Ok(())

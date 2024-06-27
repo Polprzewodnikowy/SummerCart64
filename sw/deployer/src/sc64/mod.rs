@@ -1,6 +1,7 @@
 mod cic;
 mod error;
 pub mod firmware;
+mod ftdi;
 mod link;
 pub mod server;
 mod time;

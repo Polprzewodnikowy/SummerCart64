@@ -1,3 +1,4 @@
+use super::ftdi::FtdiError;
 use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug, Clone)]
@@ -30,5 +31,11 @@ impl From<std::io::Error> for Error {
 impl From<serialport::Error> for Error {
     fn from(value: serialport::Error) -> Self {
         Error::new(format!("SerialPort error: {}", value.description).as_str())
+    }
+}
+
+impl From<FtdiError> for Error {
+    fn from(value: FtdiError) -> Self {
+        Error::new(format!("libftdi error: {}", value.description).as_str())
     }
 }
