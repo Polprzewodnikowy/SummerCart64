@@ -739,6 +739,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "libftdi1-source-lgpl",
+ "libusb1-sys",
  "pkg-config",
  "vcpkg",
 ]
@@ -772,6 +773,18 @@ checksum = "3c8469b4a23b962c1396b9b451dda50ef5b283e8dd309d69033475fa9b334324"
 dependencies = [
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "libusb1-sys"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17f6bace2f39082e9787c851afce469e7b2fe0f1cc64bbc68ca96653b63d8f17"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
 ]
 
 [[package]]
@@ -1221,6 +1234,7 @@ dependencies = [
  "image",
  "include-flate",
  "libftdi1-sys",
+ "libusb1-sys",
  "md5",
  "panic-message",
  "rand",
