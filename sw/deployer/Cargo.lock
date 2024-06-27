@@ -724,13 +724,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "libftdi1-source-lgpl"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4412918d38c7b78f59c5b0cefec46e2099876dfd95f07f9bb2269d1d7b09fdb1"
+
+[[package]]
 name = "libftdi1-sys"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "575286f9af093f56c7805f4f94874871b84216d1545f499d2cbad9e370000fe7"
 dependencies = [
+ "cc",
  "cfg-if",
  "libc",
+ "libftdi1-source-lgpl",
  "pkg-config",
  "vcpkg",
 ]
