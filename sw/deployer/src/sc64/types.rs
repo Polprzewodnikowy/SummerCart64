@@ -1,4 +1,4 @@
-use super::{link::Packet, Error};
+use super::{link::AsynchronousPacket, Error};
 use std::fmt::Display;
 
 #[derive(Clone, Copy)]
@@ -588,9 +588,9 @@ pub enum DataPacket {
     UpdateStatus(UpdateStatus),
 }
 
-impl TryFrom<Packet> for DataPacket {
+impl TryFrom<AsynchronousPacket> for DataPacket {
     type Error = Error;
-    fn try_from(value: Packet) -> Result<Self, Self::Error> {
+    fn try_from(value: AsynchronousPacket) -> Result<Self, Self::Error> {
         Ok(match value.id {
             b'B' => Self::Button,
             b'G' => Self::DataFlushed,

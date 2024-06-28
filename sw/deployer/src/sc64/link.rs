@@ -54,9 +54,14 @@ pub struct Response {
     pub error: bool,
 }
 
-pub struct Packet {
+pub struct AsynchronousPacket {
     pub id: u8,
     pub data: Vec<u8>,
+}
+
+pub enum UsbPacket {
+    Response(Response),
+    AsynchronousPacket(AsynchronousPacket),
 }
 
 const SERIAL_PREFIX: &str = "serial://";
@@ -68,15 +73,17 @@ const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub trait Backend {
-    fn reset(&mut self) -> Result<(), Error>;
-
-    fn close(&self);
-
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize>;
 
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<()>;
 
     fn flush(&mut self) -> std::io::Result<()>;
+
+    fn reset(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn close(&mut self) {}
 
     fn purge_incoming_data(&mut self) -> std::io::Result<()> {
         let timeout = Instant::now();
@@ -100,7 +107,7 @@ pub trait Backend {
         }
     }
 
-    fn try_read(&mut self, buffer: &mut [u8], block: bool) -> Result<Option<()>, Error> {
+    fn try_read_exact(&mut self, buffer: &mut [u8], block: bool) -> Result<Option<()>, Error> {
         let mut position = 0;
         let length = buffer.len();
         let timeout = Instant::now();
@@ -126,11 +133,11 @@ pub trait Backend {
 
     fn try_read_header(&mut self, block: bool) -> Result<Option<[u8; 4]>, Error> {
         let mut header = [0u8; 4];
-        Ok(self.try_read(&mut header, block)?.map(|_| header))
+        Ok(self.try_read_exact(&mut header, block)?.map(|_| header))
     }
 
     fn read_exact(&mut self, buffer: &mut [u8]) -> Result<(), Error> {
-        match self.try_read(buffer, true)? {
+        match self.try_read_exact(buffer, true)? {
             Some(()) => Ok(()),
             None => Err(Error::new("Unexpected end of data")),
         }
@@ -153,7 +160,7 @@ pub trait Backend {
     fn process_incoming_data(
         &mut self,
         data_type: DataType,
-        packets: &mut VecDeque<Packet>,
+        packets: &mut VecDeque<AsynchronousPacket>,
     ) -> Result<Option<Response>, Error> {
         let block = matches!(data_type, DataType::Response);
 
@@ -175,7 +182,7 @@ pub trait Backend {
             self.read_exact(&mut data)?;
 
             if packet_token {
-                packets.push_back(Packet { id, data });
+                packets.push_back(AsynchronousPacket { id, data });
                 if matches!(data_type, DataType::Packet) {
                     break;
                 }
@@ -193,6 +200,18 @@ pub struct SerialBackend {
 }
 
 impl Backend for SerialBackend {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.device.read(buffer)
+    }
+
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+        self.device.write_all(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.device.flush()
+    }
+
     fn reset(&mut self) -> Result<(), Error> {
         self.device.set_dtr(true)?;
         let timeout = Instant::now();
@@ -220,20 +239,6 @@ impl Backend for SerialBackend {
         }
 
         Ok(())
-    }
-
-    fn close(&self) {}
-
-    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
-        self.device.read(buffer)
-    }
-
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
-        self.device.write_all(buffer)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.device.flush()
     }
 }
 
@@ -249,6 +254,18 @@ struct FtdiBackend {
 }
 
 impl Backend for FtdiBackend {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.device.read(buffer)
+    }
+
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+        self.device.write_all(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
     fn reset(&mut self) -> Result<(), Error> {
         self.device.set_dtr(true)?;
         let timeout = Instant::now();
@@ -275,20 +292,6 @@ impl Backend for FtdiBackend {
             }
         }
 
-        Ok(())
-    }
-
-    fn close(&self) {}
-
-    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
-        self.device.read(buffer)
-    }
-
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
-        self.device.write_all(buffer)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -306,14 +309,6 @@ struct TcpBackend {
 }
 
 impl Backend for TcpBackend {
-    fn reset(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn close(&self) {
-        self.stream.shutdown(std::net::Shutdown::Both).ok();
-    }
-
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
         self.reader.read(buffer)
     }
@@ -324,6 +319,10 @@ impl Backend for TcpBackend {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.writer.flush()
+    }
+
+    fn close(&mut self) {
+        self.stream.shutdown(std::net::Shutdown::Both).ok();
     }
 
     fn send_command(&mut self, command: &Command) -> Result<(), Error> {
@@ -346,7 +345,7 @@ impl Backend for TcpBackend {
     fn process_incoming_data(
         &mut self,
         data_type: DataType,
-        packets: &mut VecDeque<Packet>,
+        packets: &mut VecDeque<AsynchronousPacket>,
     ) -> Result<Option<Response>, Error> {
         let block = matches!(data_type, DataType::Response);
         while let Some(header) = self.try_read_header(block)? {
@@ -379,7 +378,7 @@ impl Backend for TcpBackend {
                     let mut data = vec![0u8; packet_data_length];
                     self.read_exact(&mut data)?;
 
-                    packets.push_back(Packet {
+                    packets.push_back(AsynchronousPacket {
                         id: packet_info[0],
                         data,
                     });
@@ -397,18 +396,11 @@ impl Backend for TcpBackend {
 }
 
 fn new_tcp_backend(address: &str) -> Result<TcpBackend, Error> {
-    let stream = match TcpStream::connect(address) {
-        Ok(stream) => {
-            stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
-            stream.set_read_timeout(Some(POLL_TIMEOUT))?;
-            stream
-        }
-        Err(error) => {
-            return Err(Error::new(
-                format!("Couldn't connect to [{address}]: {error}").as_str(),
-            ))
-        }
-    };
+    let stream = TcpStream::connect(address).map_err(|error| {
+        Error::new(format!("Couldn't connect to [{address}]: {error}").as_str())
+    })?;
+    stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
+    stream.set_read_timeout(Some(POLL_TIMEOUT))?;
     let reader = BufReader::new(stream.try_clone()?);
     let writer = BufWriter::new(stream.try_clone()?);
     Ok(TcpBackend {
@@ -439,8 +431,8 @@ fn new_remote_backend(address: &str) -> Result<Box<dyn Backend>, Error> {
 }
 
 pub struct Link {
-    pub backend: Box<dyn Backend>,
-    packets: VecDeque<Packet>,
+    backend: Box<dyn Backend>,
+    packets: VecDeque<AsynchronousPacket>,
 }
 
 impl Link {
@@ -468,7 +460,7 @@ impl Link {
         Ok(response.data)
     }
 
-    fn receive_response(&mut self) -> Result<Response, Error> {
+    pub fn receive_response(&mut self) -> Result<Response, Error> {
         match self
             .backend
             .process_incoming_data(DataType::Response, &mut self.packets)
@@ -483,7 +475,7 @@ impl Link {
         }
     }
 
-    pub fn receive_packet(&mut self) -> Result<Option<Packet>, Error> {
+    pub fn receive_packet(&mut self) -> Result<Option<AsynchronousPacket>, Error> {
         if self.packets.len() == 0 {
             let response = self
                 .backend
@@ -493,6 +485,19 @@ impl Link {
             }
         }
         Ok(self.packets.pop_front())
+    }
+
+    pub fn receive_response_or_packet(&mut self) -> Result<Option<UsbPacket>, Error> {
+        let response = self
+            .backend
+            .process_incoming_data(DataType::Packet, &mut self.packets)?;
+        if let Some(response) = response {
+            return Ok(Some(UsbPacket::Response(response)));
+        }
+        if let Some(packet) = self.packets.pop_front() {
+            return Ok(Some(UsbPacket::AsynchronousPacket(packet)));
+        }
+        Ok(None)
     }
 }
 
