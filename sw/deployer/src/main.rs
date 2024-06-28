@@ -25,7 +25,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Connect to SC64 device on provided serial port
+    /// Connect to SC64 device on provided local port
     #[arg(short, long)]
     port: Option<String>,
 
