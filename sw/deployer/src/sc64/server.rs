@@ -5,7 +5,7 @@ use super::{
     },
 };
 use std::{
-    io::{BufReader, BufWriter, Read, Write},
+    io::{Read, Write},
     net::{TcpListener, TcpStream},
     time::{Duration, Instant},
 };
@@ -19,8 +19,6 @@ pub enum ServerEvent {
 
 struct StreamHandler {
     stream: TcpStream,
-    reader: BufReader<TcpStream>,
-    writer: BufWriter<TcpStream>,
 }
 
 const POLL_TIMEOUT: Duration = Duration::from_millis(1);
@@ -30,15 +28,9 @@ const KEEPALIVE_PERIOD: Duration = Duration::from_secs(5);
 
 impl StreamHandler {
     fn new(stream: TcpStream) -> std::io::Result<StreamHandler> {
-        let reader = BufReader::new(stream.try_clone()?);
-        let writer = BufWriter::new(stream.try_clone()?);
         stream.set_read_timeout(Some(READ_TIMEOUT))?;
         stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
-        Ok(StreamHandler {
-            stream,
-            reader,
-            writer,
-        })
+        Ok(StreamHandler { stream })
     }
 
     fn try_read_exact(&mut self, buffer: &mut [u8]) -> std::io::Result<Option<()>> {
@@ -49,7 +41,7 @@ impl StreamHandler {
         self.stream.set_read_timeout(Some(POLL_TIMEOUT))?;
 
         while position < length {
-            match self.reader.read(&mut buffer[position..length]) {
+            match self.stream.read(&mut buffer[position..length]) {
                 Ok(0) => return Err(std::io::ErrorKind::UnexpectedEof.into()),
                 Ok(bytes) => position += bytes,
                 Err(error) => match error.kind() {
@@ -96,18 +88,18 @@ impl StreamHandler {
             let mut id_buffer = [0u8; 1];
             let mut args = [0u32; 2];
 
-            self.reader.read_exact(&mut id_buffer)?;
+            self.stream.read_exact(&mut id_buffer)?;
             let id = id_buffer[0];
 
-            self.reader.read_exact(&mut buffer)?;
+            self.stream.read_exact(&mut buffer)?;
             args[0] = u32::from_be_bytes(buffer);
-            self.reader.read_exact(&mut buffer)?;
+            self.stream.read_exact(&mut buffer)?;
             args[1] = u32::from_be_bytes(buffer);
 
-            self.reader.read_exact(&mut buffer)?;
+            self.stream.read_exact(&mut buffer)?;
             let command_data_length = u32::from_be_bytes(buffer) as usize;
             let mut data = vec![0u8; command_data_length];
-            self.reader.read_exact(&mut data)?;
+            self.stream.read_exact(&mut data)?;
 
             Ok(Some(Command { id, args, data }))
         } else {
@@ -116,32 +108,32 @@ impl StreamHandler {
     }
 
     fn send_response(&mut self, response: Response) -> std::io::Result<()> {
-        self.writer
+        self.stream
             .write_all(&u32::to_be_bytes(DataType::Response.into()))?;
-        self.writer.write_all(&[response.id])?;
-        self.writer.write_all(&[response.error as u8])?;
-        self.writer
+        self.stream.write_all(&[response.id])?;
+        self.stream.write_all(&[response.error as u8])?;
+        self.stream
             .write_all(&(response.data.len() as u32).to_be_bytes())?;
-        self.writer.write_all(&response.data)?;
-        self.writer.flush()?;
+        self.stream.write_all(&response.data)?;
+        self.stream.flush()?;
         Ok(())
     }
 
     fn send_packet(&mut self, packet: AsynchronousPacket) -> std::io::Result<()> {
-        self.writer
+        self.stream
             .write_all(&u32::to_be_bytes(DataType::Packet.into()))?;
-        self.writer.write_all(&[packet.id])?;
-        self.writer
+        self.stream.write_all(&[packet.id])?;
+        self.stream
             .write_all(&(packet.data.len() as u32).to_be_bytes())?;
-        self.writer.write_all(&packet.data)?;
-        self.writer.flush()?;
+        self.stream.write_all(&packet.data)?;
+        self.stream.flush()?;
         Ok(())
     }
 
     fn send_keepalive(&mut self) -> std::io::Result<()> {
-        self.writer
+        self.stream
             .write_all(&u32::to_be_bytes(DataType::KeepAlive.into()))?;
-        self.writer.flush()?;
+        self.stream.flush()?;
         Ok(())
     }
 }
