@@ -36,24 +36,24 @@ struct Wrapper {
 impl Wrapper {
     const DEFAULT_POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(16);
     const DEFAULT_RW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-    const DEFAULT_CHUNKSIZE: usize = 4096;
+    const WRITE_CHUNK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(100);
 
     fn new(
         read_timeout: Option<std::time::Duration>,
         write_timeout: Option<std::time::Duration>,
-    ) -> std::io::Result<Wrapper> {
+    ) -> std::io::Result<Self> {
         let context = unsafe { libftdi1_sys::ftdi_new() };
         if context.is_null() {
             return Err(std::io::ErrorKind::OutOfMemory.into());
         }
-        let mut wrapper = Wrapper {
+        let mut wrapper = Self {
             context,
             unclog_buffer: std::collections::VecDeque::new(),
             write_buffer: vec![],
-            read_timeout: Wrapper::DEFAULT_RW_TIMEOUT,
-            write_timeout: Wrapper::DEFAULT_RW_TIMEOUT,
-            read_chunksize: Wrapper::DEFAULT_CHUNKSIZE,
-            write_chunksize: Wrapper::DEFAULT_CHUNKSIZE,
+            read_timeout: Self::DEFAULT_RW_TIMEOUT,
+            write_timeout: Self::DEFAULT_RW_TIMEOUT,
+            read_chunksize: 4096,
+            write_chunksize: 4096,
         };
         wrapper.set_timeouts(read_timeout, write_timeout)?;
         wrapper.read_data_set_chunksize(wrapper.read_chunksize)?;
@@ -62,7 +62,7 @@ impl Wrapper {
     }
 
     fn list_devices(vendor: u16, product: u16) -> std::io::Result<Vec<DeviceInfo>> {
-        let wrapper = Wrapper::new(None, None)?;
+        let wrapper = Self::new(None, None)?;
 
         let mut device_list: *mut libftdi1_sys::ftdi_device_list = std::ptr::null_mut();
         let devices = unsafe {
@@ -152,8 +152,8 @@ impl Wrapper {
         read_timeout: Option<std::time::Duration>,
         write_timeout: Option<std::time::Duration>,
     ) -> std::io::Result<()> {
-        let read_timeout = read_timeout.unwrap_or(Wrapper::DEFAULT_RW_TIMEOUT);
-        let write_timeout = write_timeout.unwrap_or(Wrapper::DEFAULT_RW_TIMEOUT);
+        let read_timeout = read_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT);
+        let write_timeout = write_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT);
         unsafe {
             (*self.context).usb_read_timeout = i32::try_from(read_timeout.as_millis())
                 .map_err(|_| std::io::ErrorKind::InvalidInput)?;
@@ -236,7 +236,7 @@ impl Wrapper {
     }
 
     fn set_latency_timer(&mut self, latency: Option<std::time::Duration>) -> std::io::Result<()> {
-        let latency = u8::try_from(latency.unwrap_or(Wrapper::DEFAULT_POLL_TIMEOUT).as_millis())
+        let latency = u8::try_from(latency.unwrap_or(Self::DEFAULT_POLL_TIMEOUT).as_millis())
             .map_err(|_| std::io::ErrorKind::InvalidInput)?;
         match unsafe { libftdi1_sys::ftdi_set_latency_timer(self.context, latency) } {
             0 => Ok(()),
@@ -320,7 +320,9 @@ impl Wrapper {
             match self.read(&mut vec![0u8; self.read_chunksize]) {
                 Ok(_) => {}
                 Err(error) => match error.kind() {
-                    std::io::ErrorKind::Interrupted | std::io::ErrorKind::WouldBlock => {
+                    std::io::ErrorKind::Interrupted
+                    | std::io::ErrorKind::TimedOut
+                    | std::io::ErrorKind::WouldBlock => {
                         return Ok(());
                     }
                     _ => return Err(error),
@@ -369,7 +371,7 @@ impl Wrapper {
                 Vec::from(buffer).as_mut_ptr(),
                 buffer.len() as i32,
                 &mut transferred,
-                100,
+                Self::WRITE_CHUNK_TIMEOUT.as_millis() as u32,
             )
         };
         *written = transferred as usize;
@@ -469,7 +471,7 @@ impl FtdiDevice {
         wrapper.set_module_detach_mode(ModuleDetachMode::AutoDetachReattach);
         wrapper.set_interface(InterfaceIndex::A)?;
 
-        const CHUNK_SIZE: usize = 64 * 1024;
+        const CHUNK_SIZE: usize = 16 * 1024;
 
         wrapper.read_data_set_chunksize(CHUNK_SIZE)?;
         wrapper.write_data_set_chunksize(CHUNK_SIZE)?;

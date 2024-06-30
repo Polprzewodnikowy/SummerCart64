@@ -3,6 +3,7 @@ mod error;
 pub mod firmware;
 mod ftdi;
 mod link;
+mod serial;
 pub mod server;
 mod time;
 mod types;

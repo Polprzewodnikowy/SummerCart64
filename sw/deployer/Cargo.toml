@@ -8,7 +8,7 @@ documentation = "https://github.com/Polprzewodnikowy/SummerCart64"
 
 [dependencies]
 chrono = "0.4.38"
-clap = { version = "4.5.7", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive"] }
 clap-num = "1.1.1"
 colored = "2.1.0"
 crc32fast = "1.4.2"
@@ -24,7 +24,7 @@ panic-message = "0.3.0"
 rand = "0.8.5"
 rust-ini = "0.18.0"
 serial2 = "0.2.26"
-serialport = "4.3.0"
+serialport = "4.4.0"
 
 [profile.release]
 lto = true

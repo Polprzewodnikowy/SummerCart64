@@ -1,4 +1,4 @@
-use super::{error::Error, ftdi::FtdiDevice};
+use super::{error::Error, ftdi::FtdiDevice, serial::SerialDevice};
 use std::{
     collections::VecDeque,
     fmt::Display,
@@ -75,34 +75,58 @@ pub trait Backend {
 
     fn flush(&mut self) -> std::io::Result<()>;
 
-    fn reset(&mut self) -> std::io::Result<()> {
+    fn discard_input(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+
+    fn discard_output(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn set_dtr(&mut self, _value: bool) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn read_dsr(&mut self) -> std::io::Result<bool> {
+        Ok(false)
     }
 
     fn close(&mut self) {}
 
-    fn purge_incoming_data(&mut self) -> std::io::Result<()> {
+    fn reset(&mut self) -> std::io::Result<()> {
+        self.discard_output()?;
+
         let timeout = Instant::now();
+        self.set_dtr(true)?;
         loop {
-            match self.read(&mut vec![0; 1]) {
-                Ok(length) => match length {
-                    0 => return Ok(()),
-                    _ => {}
-                },
-                Err(error) => match error.kind() {
-                    std::io::ErrorKind::Interrupted
-                    | std::io::ErrorKind::TimedOut
-                    | std::io::ErrorKind::WouldBlock => return Ok(()),
-                    _ => return Err(error),
-                },
+            if self.read_dsr()? {
+                break;
             }
-            if timeout.elapsed() >= RESET_TIMEOUT {
+            if timeout.elapsed() > RESET_TIMEOUT {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
-                    "SC64 read buffer flush took too long",
+                    "Couldn't reset SC64 device (on)",
                 ));
             }
         }
+
+        self.discard_input()?;
+
+        let timeout = Instant::now();
+        self.set_dtr(false)?;
+        loop {
+            if !self.read_dsr()? {
+                break;
+            }
+            if timeout.elapsed() > RESET_TIMEOUT {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Couldn't reset SC64 device (off)",
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     fn try_read_exact(&mut self, buffer: &mut [u8], block: bool) -> std::io::Result<Option<()>> {
@@ -196,7 +220,7 @@ pub trait Backend {
 }
 
 pub struct SerialBackend {
-    device: serial2::SerialPort,
+    device: SerialDevice,
 }
 
 impl Backend for SerialBackend {
@@ -212,47 +236,32 @@ impl Backend for SerialBackend {
         self.device.flush()
     }
 
-    fn reset(&mut self) -> std::io::Result<()> {
-        self.device.set_dtr(true)?;
-        let timeout = Instant::now();
-        loop {
-            self.device.discard_buffers()?;
-            if self.device.read_dsr()? {
-                break;
-            }
-            if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Couldn't reset SC64 device (on)",
-                ));
-            }
-        }
+    fn discard_input(&mut self) -> std::io::Result<()> {
+        self.device.discard_input()
+    }
 
-        self.purge_incoming_data()?;
+    fn discard_output(&mut self) -> std::io::Result<()> {
+        self.device.discard_output()
+    }
 
-        self.device.set_dtr(false)?;
-        let timeout = Instant::now();
-        loop {
-            if !self.device.read_dsr()? {
-                break;
-            }
-            if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Couldn't reset SC64 device (off)",
-                ));
-            }
-        }
+    fn set_dtr(&mut self, value: bool) -> std::io::Result<()> {
+        self.device.set_dtr(value)
+    }
 
-        Ok(())
+    fn read_dsr(&mut self) -> std::io::Result<bool> {
+        self.device.read_dsr()
     }
 }
 
 fn new_serial_backend(port: &str) -> std::io::Result<SerialBackend> {
-    let mut serial = serial2::SerialPort::open(port, 115_200)?;
-    serial.set_read_timeout(POLL_TIMEOUT)?;
-    serial.set_write_timeout(WRITE_TIMEOUT)?;
-    Ok(SerialBackend { device: serial })
+    Ok(SerialBackend {
+        device: SerialDevice::new(
+            port,
+            Some(POLL_TIMEOUT),
+            Some(READ_TIMEOUT),
+            Some(WRITE_TIMEOUT),
+        )?,
+    })
 }
 
 struct FtdiBackend {
@@ -272,40 +281,20 @@ impl Backend for FtdiBackend {
         self.device.flush()
     }
 
-    fn reset(&mut self) -> std::io::Result<()> {
-        self.device.discard_output()?;
+    fn discard_input(&mut self) -> std::io::Result<()> {
+        self.device.discard_input()
+    }
 
-        let timeout = Instant::now();
-        self.device.set_dtr(true)?;
-        loop {
-            if self.device.read_dsr()? {
-                break;
-            }
-            if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Couldn't reset SC64 device (on)",
-                ));
-            }
-        }
+    fn discard_output(&mut self) -> std::io::Result<()> {
+        self.device.discard_output()
+    }
 
-        self.device.discard_input()?;
+    fn set_dtr(&mut self, value: bool) -> std::io::Result<()> {
+        self.device.set_dtr(value)
+    }
 
-        let timeout = Instant::now();
-        self.device.set_dtr(false)?;
-        loop {
-            if !self.device.read_dsr()? {
-                break;
-            }
-            if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Couldn't reset SC64 device (off)",
-                ));
-            }
-        }
-
-        Ok(())
+    fn read_dsr(&mut self) -> std::io::Result<bool> {
+        self.device.read_dsr()
     }
 }
 
@@ -580,18 +569,14 @@ pub fn list_local_devices() -> Result<Vec<DeviceInfo>, Error> {
         }
     }
 
-    if let Ok(list) = serialport::available_ports() {
+    if let Ok(list) = SerialDevice::list(SC64_VID, SC64_PID) {
         for device in list.into_iter() {
-            if let serialport::SerialPortType::UsbPort(i) = device.port_type {
-                if let Some(serial) = i.serial_number {
-                    if i.vid == SC64_VID && i.pid == SC64_PID && serial.starts_with(SC64_SID) {
-                        devices.push(DeviceInfo {
-                            backend: BackendType::Serial,
-                            port: format!("{SERIAL_PREFIX}{}", device.port_name),
-                            serial,
-                        });
-                    }
-                }
+            if device.serial.starts_with(SC64_SID) {
+                devices.push(DeviceInfo {
+                    backend: BackendType::Serial,
+                    port: format!("{SERIAL_PREFIX}{}", device.port),
+                    serial: device.serial,
+                });
             }
         }
     }
