@@ -27,6 +27,7 @@ struct Wrapper {
     context: *mut libftdi1_sys::ftdi_context,
     unclog_buffer: std::collections::VecDeque<u8>,
     write_buffer: Vec<u8>,
+    read_timeout: std::time::Duration,
     write_timeout: std::time::Duration,
     read_chunksize: usize,
     write_chunksize: usize,
@@ -49,6 +50,7 @@ impl Wrapper {
             context,
             unclog_buffer: std::collections::VecDeque::new(),
             write_buffer: vec![],
+            read_timeout: Wrapper::DEFAULT_RW_TIMEOUT,
             write_timeout: Wrapper::DEFAULT_RW_TIMEOUT,
             read_chunksize: Wrapper::DEFAULT_CHUNKSIZE,
             write_chunksize: Wrapper::DEFAULT_CHUNKSIZE,
@@ -158,6 +160,7 @@ impl Wrapper {
             (*self.context).usb_write_timeout = i32::try_from(write_timeout.as_millis())
                 .map_err(|_| std::io::ErrorKind::InvalidInput)?;
         }
+        self.read_timeout = read_timeout;
         self.write_timeout = write_timeout;
         Ok(())
     }
@@ -217,6 +220,17 @@ impl Wrapper {
             -12 => Err(std::io::ErrorKind::InvalidData.into()),
             result => Err(std::io::Error::other(format!(
                 "Unexpected response from ftdi_usb_open_string: {result}"
+            ))),
+        }
+    }
+
+    fn usb_reset(&mut self) -> std::io::Result<()> {
+        match unsafe { libftdi1_sys::ftdi_usb_reset(self.context) } {
+            0 => Ok(()),
+            -1 => Err(std::io::ErrorKind::BrokenPipe.into()),
+            -2 => Err(std::io::ErrorKind::NotConnected.into()),
+            result => Err(std::io::Error::other(format!(
+                "Unexpected response from ftdi_usb_reset: {result}"
             ))),
         }
     }
@@ -300,14 +314,33 @@ impl Wrapper {
         }
     }
 
-    fn tcioflush(&mut self) -> std::io::Result<()> {
-        match unsafe { libftdi1_sys::ftdi_tcioflush(self.context) } {
+    fn tciflush(&mut self) -> std::io::Result<()> {
+        let timeout = std::time::Instant::now();
+        loop {
+            match self.read(&mut vec![0u8; self.read_chunksize]) {
+                Ok(_) => {}
+                Err(error) => match error.kind() {
+                    std::io::ErrorKind::Interrupted | std::io::ErrorKind::WouldBlock => {
+                        return Ok(());
+                    }
+                    _ => return Err(error),
+                },
+            };
+            if timeout.elapsed() > self.read_timeout {
+                return Err(std::io::ErrorKind::TimedOut.into());
+            }
+        }
+    }
+
+    fn tcoflush(&mut self) -> std::io::Result<()> {
+        self.write_buffer.clear();
+        match unsafe { libftdi1_sys::ftdi_tcoflush(self.context) } {
             0 => Ok(()),
             -1 => Err(std::io::ErrorKind::BrokenPipe.into()),
             -2 => Err(std::io::ErrorKind::BrokenPipe.into()),
             -3 => Err(std::io::ErrorKind::NotConnected.into()),
             result => Err(std::io::Error::other(format!(
-                "Unexpected response from ftdi_tcioflush: {result}"
+                "Unexpected response from ftdi_tcoflush: {result}"
             ))),
         }
     }
@@ -443,6 +476,8 @@ impl FtdiDevice {
 
         wrapper.usb_open_string(description)?;
 
+        wrapper.usb_reset()?;
+
         wrapper.set_latency_timer(poll_timeout)?;
 
         Ok(FtdiDevice { wrapper })
@@ -456,8 +491,12 @@ impl FtdiDevice {
         Ok(self.wrapper.poll_modem_status()?.dsr)
     }
 
-    pub fn discard_buffers(&mut self) -> std::io::Result<()> {
-        self.wrapper.tcioflush()
+    pub fn discard_input(&mut self) -> std::io::Result<()> {
+        self.wrapper.tciflush()
+    }
+
+    pub fn discard_output(&mut self) -> std::io::Result<()> {
+        self.wrapper.tcoflush()
     }
 }
 

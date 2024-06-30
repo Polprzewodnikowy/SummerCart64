@@ -1,5 +1,4 @@
 use super::{error::Error, ftdi::FtdiDevice};
-use serial2::SerialPort;
 use std::{
     collections::VecDeque,
     fmt::Display,
@@ -197,7 +196,7 @@ pub trait Backend {
 }
 
 pub struct SerialBackend {
-    device: SerialPort,
+    device: serial2::SerialPort,
 }
 
 impl Backend for SerialBackend {
@@ -250,7 +249,7 @@ impl Backend for SerialBackend {
 }
 
 fn new_serial_backend(port: &str) -> std::io::Result<SerialBackend> {
-    let mut serial = SerialPort::open(port, 115_200)?;
+    let mut serial = serial2::SerialPort::open(port, 115_200)?;
     serial.set_read_timeout(POLL_TIMEOUT)?;
     serial.set_write_timeout(WRITE_TIMEOUT)?;
     Ok(SerialBackend { device: serial })
@@ -274,10 +273,11 @@ impl Backend for FtdiBackend {
     }
 
     fn reset(&mut self) -> std::io::Result<()> {
-        self.device.set_dtr(true)?;
+        self.device.discard_output()?;
+
         let timeout = Instant::now();
+        self.device.set_dtr(true)?;
         loop {
-            self.device.discard_buffers()?;
             if self.device.read_dsr()? {
                 break;
             }
@@ -289,10 +289,10 @@ impl Backend for FtdiBackend {
             }
         }
 
-        self.purge_incoming_data()?;
+        self.device.discard_input()?;
 
-        self.device.set_dtr(false)?;
         let timeout = Instant::now();
+        self.device.set_dtr(false)?;
         loop {
             if !self.device.read_dsr()? {
                 break;
