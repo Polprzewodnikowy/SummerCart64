@@ -325,8 +325,7 @@ impl Wrapper {
     }
 
     fn write_data(&mut self, buffer: &[u8], written: &mut usize) -> std::io::Result<()> {
-        *written = 0;
-        let mut transferred: i32 = 0;
+        let mut transferred = 0;
         let result = unsafe {
             // NOTE: Nasty hack to overcome libftdi1 API limitation.
             //       Write can partially succeed, but the default ftdi_write_data
@@ -340,14 +339,14 @@ impl Wrapper {
                 100,
             )
         };
-        *written += transferred as usize;
+        *written = transferred as usize;
         if result < 0 {
             return Err(self.libusb_convert_result(result));
         }
         Ok(())
     }
 
-    fn try_unclog_pipe(&mut self) -> std::io::Result<()> {
+    fn unclog_pipe(&mut self) -> std::io::Result<()> {
         let mut buffer = vec![0u8; self.read_chunksize];
         let read = match self.read_data(&mut buffer) {
             Ok(read) => read,
@@ -368,7 +367,7 @@ impl Wrapper {
             self.write_buffer.drain(..written);
             if let Err(error) = result {
                 match error.kind() {
-                    std::io::ErrorKind::TimedOut => self.try_unclog_pipe()?,
+                    std::io::ErrorKind::TimedOut => self.unclog_pipe()?,
                     _ => return Err(error),
                 }
             }
@@ -385,16 +384,14 @@ impl Wrapper {
         } else if self.unclog_buffer.is_empty() {
             self.read_data(buffer)
         } else {
-            let mut read = 0;
-            for item in buffer.iter_mut() {
+            for (index, item) in buffer.iter_mut().enumerate() {
                 if let Some(byte) = self.unclog_buffer.pop_front() {
                     *item = byte;
-                    read += 1;
                 } else {
-                    break;
+                    return Ok(index);
                 }
             }
-            Ok(read)
+            Ok(buffer.len())
         }
     }
 

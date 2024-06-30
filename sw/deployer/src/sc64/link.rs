@@ -419,8 +419,8 @@ fn new_tcp_backend(address: &str) -> Result<TcpBackend, Error> {
     let stream = TcpStream::connect(address).map_err(|error| {
         Error::new(format!("Couldn't connect to [{address}]: {error}").as_str())
     })?;
-    stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
     stream.set_read_timeout(Some(POLL_TIMEOUT))?;
+    stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
     let reader = BufReader::new(stream.try_clone()?);
     let writer = BufWriter::new(stream.try_clone()?);
     Ok(TcpBackend {
