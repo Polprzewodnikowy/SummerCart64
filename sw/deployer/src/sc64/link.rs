@@ -1,12 +1,9 @@
-use super::{
-    error::Error,
-    ftdi::{list_ftdi_devices, FtdiDevice, FtdiError},
-};
+use super::{error::Error, ftdi::FtdiDevice};
 use serial2::SerialPort;
 use std::{
     collections::VecDeque,
     fmt::Display,
-    io::{BufReader, BufWriter, ErrorKind, Read, Write},
+    io::{BufReader, BufWriter, Read, Write},
     net::TcpStream,
     time::{Duration, Instant},
 };
@@ -68,18 +65,18 @@ const SERIAL_PREFIX: &str = "serial://";
 const FTDI_PREFIX: &str = "ftdi://";
 
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);
-const POLL_TIMEOUT: Duration = Duration::from_millis(1);
+const POLL_TIMEOUT: Duration = Duration::from_millis(10);
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub trait Backend {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize>;
 
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()>;
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()>;
 
     fn flush(&mut self) -> std::io::Result<()>;
 
-    fn reset(&mut self) -> Result<(), Error> {
+    fn reset(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 
@@ -94,29 +91,33 @@ pub trait Backend {
                     _ => {}
                 },
                 Err(error) => match error.kind() {
-                    ErrorKind::TimedOut => return Ok(()),
+                    std::io::ErrorKind::Interrupted
+                    | std::io::ErrorKind::TimedOut
+                    | std::io::ErrorKind::WouldBlock => return Ok(()),
                     _ => return Err(error),
                 },
             }
             if timeout.elapsed() >= RESET_TIMEOUT {
                 return Err(std::io::Error::new(
-                    ErrorKind::TimedOut,
+                    std::io::ErrorKind::TimedOut,
                     "SC64 read buffer flush took too long",
                 ));
             }
         }
     }
 
-    fn try_read_exact(&mut self, buffer: &mut [u8], block: bool) -> Result<Option<()>, Error> {
+    fn try_read_exact(&mut self, buffer: &mut [u8], block: bool) -> std::io::Result<Option<()>> {
         let mut position = 0;
         let length = buffer.len();
         let timeout = Instant::now();
         while position < length {
             match self.read(&mut buffer[position..length]) {
-                Ok(0) => return Err(Error::new("Unexpected end of stream data")),
+                Ok(0) => return Err(std::io::ErrorKind::UnexpectedEof.into()),
                 Ok(bytes) => position += bytes,
                 Err(error) => match error.kind() {
-                    ErrorKind::Interrupted | ErrorKind::TimedOut | ErrorKind::WouldBlock => {
+                    std::io::ErrorKind::Interrupted
+                    | std::io::ErrorKind::TimedOut
+                    | std::io::ErrorKind::WouldBlock => {
                         if !block && position == 0 {
                             return Ok(None);
                         }
@@ -125,32 +126,32 @@ pub trait Backend {
                 },
             }
             if timeout.elapsed() > READ_TIMEOUT {
-                return Err(Error::new("Read timeout"));
+                return Err(std::io::ErrorKind::TimedOut.into());
             }
         }
         Ok(Some(()))
     }
 
-    fn try_read_header(&mut self, block: bool) -> Result<Option<[u8; 4]>, Error> {
+    fn try_read_header(&mut self, block: bool) -> std::io::Result<Option<[u8; 4]>> {
         let mut header = [0u8; 4];
         Ok(self.try_read_exact(&mut header, block)?.map(|_| header))
     }
 
-    fn read_exact(&mut self, buffer: &mut [u8]) -> Result<(), Error> {
+    fn read_exact(&mut self, buffer: &mut [u8]) -> std::io::Result<()> {
         match self.try_read_exact(buffer, true)? {
             Some(()) => Ok(()),
-            None => Err(Error::new("Unexpected end of data")),
+            None => Err(std::io::ErrorKind::UnexpectedEof.into()),
         }
     }
 
-    fn send_command(&mut self, command: &Command) -> Result<(), Error> {
-        self.write(b"CMD")?;
-        self.write(&command.id.to_be_bytes())?;
+    fn send_command(&mut self, command: &Command) -> std::io::Result<()> {
+        self.write_all(b"CMD")?;
+        self.write_all(&command.id.to_be_bytes())?;
 
-        self.write(&command.args[0].to_be_bytes())?;
-        self.write(&command.args[1].to_be_bytes())?;
+        self.write_all(&command.args[0].to_be_bytes())?;
+        self.write_all(&command.args[1].to_be_bytes())?;
 
-        self.write(&command.data)?;
+        self.write_all(&command.data)?;
 
         self.flush()?;
 
@@ -161,16 +162,16 @@ pub trait Backend {
         &mut self,
         data_type: DataType,
         packets: &mut VecDeque<AsynchronousPacket>,
-    ) -> Result<Option<Response>, Error> {
+    ) -> std::io::Result<Option<Response>> {
         let block = matches!(data_type, DataType::Response);
 
         while let Some(header) = self.try_read_header(block)? {
-            let (packet_token, error) = (match &header[0..3] {
-                b"CMP" => Ok((false, false)),
-                b"PKT" => Ok((true, false)),
-                b"ERR" => Ok((false, true)),
-                _ => Err(Error::new("Unknown response token")),
-            })?;
+            let (packet_token, error) = match &header[0..3] {
+                b"CMP" => (false, false),
+                b"PKT" => (true, false),
+                b"ERR" => (false, true),
+                _ => return Err(std::io::ErrorKind::InvalidData.into()),
+            };
             let id = header[3];
 
             let mut buffer = [0u8; 4];
@@ -204,7 +205,7 @@ impl Backend for SerialBackend {
         self.device.read(buffer)
     }
 
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
         self.device.write_all(buffer)
     }
 
@@ -212,7 +213,7 @@ impl Backend for SerialBackend {
         self.device.flush()
     }
 
-    fn reset(&mut self) -> Result<(), Error> {
+    fn reset(&mut self) -> std::io::Result<()> {
         self.device.set_dtr(true)?;
         let timeout = Instant::now();
         loop {
@@ -221,7 +222,10 @@ impl Backend for SerialBackend {
                 break;
             }
             if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(Error::new("Couldn't reset SC64 device (on)"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Couldn't reset SC64 device (on)",
+                ));
             }
         }
 
@@ -234,7 +238,10 @@ impl Backend for SerialBackend {
                 break;
             }
             if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(Error::new("Couldn't reset SC64 device (off)"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Couldn't reset SC64 device (off)",
+                ));
             }
         }
 
@@ -258,15 +265,15 @@ impl Backend for FtdiBackend {
         self.device.read(buffer)
     }
 
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
         self.device.write_all(buffer)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
+        self.device.flush()
     }
 
-    fn reset(&mut self) -> Result<(), Error> {
+    fn reset(&mut self) -> std::io::Result<()> {
         self.device.set_dtr(true)?;
         let timeout = Instant::now();
         loop {
@@ -275,7 +282,10 @@ impl Backend for FtdiBackend {
                 break;
             }
             if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(Error::new("Couldn't reset SC64 device (on)"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Couldn't reset SC64 device (on)",
+                ));
             }
         }
 
@@ -288,7 +298,10 @@ impl Backend for FtdiBackend {
                 break;
             }
             if timeout.elapsed() > RESET_TIMEOUT {
-                return Err(Error::new("Couldn't reset SC64 device (off)"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Couldn't reset SC64 device (off)",
+                ));
             }
         }
 
@@ -296,9 +309,14 @@ impl Backend for FtdiBackend {
     }
 }
 
-fn new_ftdi_backend(port: &str) -> Result<FtdiBackend, FtdiError> {
+fn new_ftdi_backend(port: &str) -> std::io::Result<FtdiBackend> {
     Ok(FtdiBackend {
-        device: FtdiDevice::open(port, POLL_TIMEOUT, WRITE_TIMEOUT)?,
+        device: FtdiDevice::open(
+            port,
+            Some(POLL_TIMEOUT),
+            Some(READ_TIMEOUT),
+            Some(WRITE_TIMEOUT),
+        )?,
     })
 }
 
@@ -313,7 +331,7 @@ impl Backend for TcpBackend {
         self.reader.read(buffer)
     }
 
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
         self.writer.write_all(buffer)
     }
 
@@ -325,17 +343,17 @@ impl Backend for TcpBackend {
         self.stream.shutdown(std::net::Shutdown::Both).ok();
     }
 
-    fn send_command(&mut self, command: &Command) -> Result<(), Error> {
+    fn send_command(&mut self, command: &Command) -> std::io::Result<()> {
         let payload_data_type: u32 = DataType::Command.into();
-        self.write(&payload_data_type.to_be_bytes())?;
+        self.write_all(&payload_data_type.to_be_bytes())?;
 
-        self.write(&command.id.to_be_bytes())?;
-        self.write(&command.args[0].to_be_bytes())?;
-        self.write(&command.args[1].to_be_bytes())?;
+        self.write_all(&command.id.to_be_bytes())?;
+        self.write_all(&command.args[0].to_be_bytes())?;
+        self.write_all(&command.args[1].to_be_bytes())?;
 
         let command_data_length = command.data.len() as u32;
-        self.write(&command_data_length.to_be_bytes())?;
-        self.write(&command.data)?;
+        self.write_all(&command_data_length.to_be_bytes())?;
+        self.write_all(&command.data)?;
 
         self.flush()?;
 
@@ -346,10 +364,12 @@ impl Backend for TcpBackend {
         &mut self,
         data_type: DataType,
         packets: &mut VecDeque<AsynchronousPacket>,
-    ) -> Result<Option<Response>, Error> {
+    ) -> std::io::Result<Option<Response>> {
         let block = matches!(data_type, DataType::Response);
         while let Some(header) = self.try_read_header(block)? {
-            let payload_data_type: DataType = u32::from_be_bytes(header).try_into()?;
+            let payload_data_type: DataType = u32::from_be_bytes(header)
+                .try_into()
+                .map_err(|_| std::io::ErrorKind::InvalidData)?;
             let mut buffer = [0u8; 4];
             match payload_data_type {
                 DataType::Response => {
@@ -387,7 +407,7 @@ impl Backend for TcpBackend {
                     }
                 }
                 DataType::KeepAlive => {}
-                _ => return Err(Error::new("Unexpected payload data type received")),
+                _ => return Err(std::io::ErrorKind::InvalidData.into()),
             };
         }
 
@@ -548,7 +568,7 @@ pub fn list_local_devices() -> Result<Vec<DeviceInfo>, Error> {
 
     let mut devices: Vec<DeviceInfo> = Vec::new();
 
-    if let Ok(list) = list_ftdi_devices(SC64_VID, SC64_PID) {
+    if let Ok(list) = FtdiDevice::list(SC64_VID, SC64_PID) {
         for device in list.into_iter() {
             if device.serial.starts_with(SC64_SID) {
                 devices.push(DeviceInfo {
