@@ -71,7 +71,7 @@ jobs:
 
           - version: linux
             os: ubuntu-latest
-            apt-packages: libftdi1-dev libudev-dev libusb-1.0-0-dev
+            apt-packages: libudev-dev
             executable: target/release/sc64deployer
             package-name: sc64-deployer-linux
             package-params: -czf
