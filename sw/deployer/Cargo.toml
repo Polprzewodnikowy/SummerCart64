@@ -17,14 +17,18 @@ encoding_rs = "0.8.34"
 hex = "0.4.3"
 image = "0.25.1"
 include-flate = { version = "0.2.0", features = ["stable"] }
-libftdi1-sys = { version = "1.1.3", features = ["libusb1-sys", "vendored"] }
-libusb1-sys = { version = "0.6.5", features = ["vendored"] }
+libftdi1-sys = { version = "1.1.3", features = ["libusb1-sys"] }
+libusb1-sys = "0.6.5"
 md5 = "0.7.0"
 panic-message = "0.3.0"
 rand = "0.8.5"
 rust-ini = "0.18.0"
 serial2 = "0.2.26"
 serialport = "4.4.0"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+libftdi1-sys = { version = "1.1.3", features = ["vendored"] }
+libusb1-sys = { version = "0.6.5", features = ["vendored"] }
 
 [profile.release]
 lto = true
