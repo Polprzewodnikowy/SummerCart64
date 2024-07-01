@@ -553,13 +553,14 @@ pub struct DeviceInfo {
 pub fn list_local_devices() -> Result<Vec<DeviceInfo>, Error> {
     const SC64_VID: u16 = 0x0403;
     const SC64_PID: u16 = 0x6014;
-    const SC64_SID: &str = "SC64";
+    const SC64_SERIAL_PREFIX: &str = "SC64";
+    const SC64_DESCRIPTION: &str = "SC64";
 
     let mut devices: Vec<DeviceInfo> = Vec::new();
 
     if let Ok(list) = FtdiDevice::list(SC64_VID, SC64_PID) {
         for device in list.into_iter() {
-            if device.serial.starts_with(SC64_SID) {
+            if device.description == SC64_DESCRIPTION {
                 devices.push(DeviceInfo {
                     backend: BackendType::Ftdi,
                     port: format!("{FTDI_PREFIX}{}", device.port),
@@ -571,7 +572,9 @@ pub fn list_local_devices() -> Result<Vec<DeviceInfo>, Error> {
 
     if let Ok(list) = SerialDevice::list(SC64_VID, SC64_PID) {
         for device in list.into_iter() {
-            if device.serial.starts_with(SC64_SID) {
+            let is_sc64_device = device.description == SC64_DESCRIPTION
+                || device.serial.starts_with(SC64_SERIAL_PREFIX);
+            if is_sc64_device {
                 devices.push(DeviceInfo {
                     backend: BackendType::Serial,
                     port: format!("{SERIAL_PREFIX}{}", device.port),

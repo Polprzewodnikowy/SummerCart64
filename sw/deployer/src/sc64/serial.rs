@@ -1,5 +1,6 @@
 pub struct DeviceInfo {
     pub port: String,
+    pub description: String,
     pub serial: String,
 }
 
@@ -40,10 +41,11 @@ impl SerialDevice {
 
         for port in serialport::available_ports()? {
             if let serialport::SerialPortType::UsbPort(info) = port.port_type {
-                if info.vid == vendor && info.pid == product && info.serial_number.is_some() {
+                if info.vid == vendor && info.pid == product {
                     devices.push(DeviceInfo {
                         port: port.port_name,
-                        serial: info.serial_number.unwrap(),
+                        description: info.product.unwrap_or_default(),
+                        serial: info.serial_number.unwrap_or_default(),
                     })
                 }
             }

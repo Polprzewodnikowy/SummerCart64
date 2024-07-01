@@ -1,5 +1,6 @@
 pub struct DeviceInfo {
     pub port: String,
+    pub description: String,
     pub serial: String,
 }
 
@@ -77,6 +78,7 @@ impl Wrapper {
         let result = if devices > 0 {
             let mut list: Vec<DeviceInfo> = vec![];
 
+            let mut description = [0i8; 128];
             let mut serial = [0i8; 128];
 
             let mut device = device_list;
@@ -88,8 +90,8 @@ impl Wrapper {
                         (*device).dev,
                         std::ptr::null_mut(),
                         0,
-                        std::ptr::null_mut(),
-                        0,
+                        description.as_mut_ptr(),
+                        description.len() as i32,
                         serial.as_mut_ptr(),
                         serial.len() as i32,
                     )
@@ -98,6 +100,9 @@ impl Wrapper {
                 if result == 0 {
                     list.push(DeviceInfo {
                         port: format!("i:0x{vendor:04X}:0x{product:04X}:{index}"),
+                        description: unsafe { std::ffi::CStr::from_ptr(description.as_ptr()) }
+                            .to_string_lossy()
+                            .into_owned(),
                         serial: unsafe { std::ffi::CStr::from_ptr(serial.as_ptr()) }
                             .to_string_lossy()
                             .into_owned(),
