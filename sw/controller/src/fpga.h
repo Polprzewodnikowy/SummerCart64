@@ -79,8 +79,8 @@ typedef enum {
 #define USB_SCR_FIFO_FLUSH              (1 << 0)
 #define USB_SCR_RXNE                    (1 << 1)
 #define USB_SCR_TXE                     (1 << 2)
-#define USB_SCR_RESET_PENDING           (1 << 3)
-#define USB_SCR_RESET_ACK               (1 << 4)
+#define USB_SCR_RESET_ON_ACK            (1 << 3)
+#define USB_SCR_RESET_OFF_ACK           (1 << 4)
 #define USB_SCR_WRITE_FLUSH             (1 << 5)
 #define USB_SCR_RX_COUNT_BIT            (6)
 #define USB_SCR_RX_COUNT_MASK           (0x7FF << USB_SCR_RX_COUNT_BIT)
@@ -88,6 +88,7 @@ typedef enum {
 #define USB_SCR_TX_COUNT_MASK           (0x7FF << USB_SCR_TX_COUNT_BIT)
 #define USB_SCR_RESET_STATE             (1 << 28)
 #define USB_SCR_PWRSAV                  (1 << 29)
+#define USB_SCR_FIFO_FLUSH_BUSY         (1 << 30)
 
 #define DMA_SCR_START                   (1 << 0)
 #define DMA_SCR_STOP                    (1 << 1)

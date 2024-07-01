@@ -26,9 +26,3 @@ impl From<std::io::Error> for Error {
         Error::new(format!("IO error: {}", value).as_str())
     }
 }
-
-impl From<serialport::Error> for Error {
-    fn from(value: serialport::Error) -> Self {
-        Error::new(format!("SerialPort error: {}", value.description).as_str())
-    }
-}

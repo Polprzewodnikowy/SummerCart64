@@ -45,10 +45,24 @@ module memory_dma (
 
     logic dma_start;
     logic dma_stop;
+    logic dma_stop_requested;
 
     always_comb begin
         dma_start = dma_scb.start && !dma_scb.stop && !dma_scb.busy;
         dma_stop = dma_scb.stop;
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            dma_stop_requested <= 1'b0;
+        end else begin
+            if (dma_stop) begin
+                dma_stop_requested <= 1'b1;
+            end
+            if (dma_start) begin
+                dma_stop_requested <= 1'b0;
+            end
+        end
     end
 
 
@@ -197,7 +211,7 @@ module memory_dma (
                 remaining <= dma_scb.transfer_length;
             end
 
-            if ((mem_bus.write && rx_rdata_pop) || (!mem_bus.write && tx_wdata_push)) begin
+            if (!dma_stop_requested && ((mem_bus.write && rx_rdata_pop) || (!mem_bus.write && tx_wdata_push))) begin
                 remaining <= remaining - 1'd1;
             end
         end

@@ -1,7 +1,9 @@
 mod cic;
 mod error;
 pub mod firmware;
+mod ftdi;
 mod link;
+mod serial;
 pub mod server;
 mod time;
 mod types;
@@ -875,13 +877,8 @@ impl SC64 {
 
 impl SC64 {
     pub fn open_local(port: Option<String>) -> Result<Self, Error> {
-        let port = if let Some(port) = port {
-            port
-        } else {
-            list_local_devices()?[0].port.clone()
-        };
         let mut sc64 = SC64 {
-            link: link::new_local(&port)?,
+            link: link::new_local(&port.unwrap_or(list_local_devices()?[0].port.clone()))?,
         };
         sc64.check_device()?;
         Ok(sc64)

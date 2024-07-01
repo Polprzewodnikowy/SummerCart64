@@ -1,34 +1,37 @@
 interface usb_scb ();
 
     logic fifo_flush;
-    logic reset_pending;
-    logic reset_ack;
+    logic fifo_flush_busy;
     logic write_buffer_flush;
     logic [10:0] rx_count;
     logic [10:0] tx_count;
     logic pwrsav;
     logic reset_state;
+    logic reset_on_ack;
+    logic reset_off_ack;
 
     modport controller (
         output fifo_flush,
-        input reset_pending,
-        output reset_ack,
+        input fifo_flush_busy,
         output write_buffer_flush,
         input rx_count,
         input tx_count,
         input pwrsav,
-        input reset_state
+        input reset_state,
+        output reset_on_ack,
+        output reset_off_ack
     );
 
     modport usb (
         input fifo_flush,
-        output reset_pending,
-        input reset_ack,
+        output fifo_flush_busy,
         input write_buffer_flush,
         output rx_count,
         output tx_count,
         output pwrsav,
-        output reset_state
+        output reset_state,
+        input reset_on_ack,
+        input reset_off_ack
     );
 
 endinterface
@@ -59,9 +62,11 @@ module usb_ft1248 (
     logic tx_read;
     logic [7:0] tx_rdata;
 
+    logic fifo_flush;
+
     fifo_8kb fifo_8kb_rx_inst (
         .clk(clk),
-        .reset(reset || usb_scb.fifo_flush),
+        .reset(reset || fifo_flush),
 
         .empty(fifo_bus.rx_empty),
         .almost_empty(fifo_bus.rx_almost_empty),
@@ -78,7 +83,7 @@ module usb_ft1248 (
 
     fifo_8kb fifo_8kb_tx_inst (
         .clk(clk),
-        .reset(reset || usb_scb.fifo_flush),
+        .reset(reset || fifo_flush),
 
         .empty(tx_empty),
         .almost_empty(tx_almost_empty),
@@ -142,7 +147,6 @@ module usb_ft1248 (
     logic [3:0] phase;
     logic last_tx_failed;
     logic reset_reply;
-    logic last_reset_status;
     logic [4:0] modem_status_counter;
     logic write_modem_status_pending;
     logic write_buffer_flush_pending;
@@ -152,7 +156,7 @@ module usb_ft1248 (
         cmd <= next_cmd;
 
         usb_scb.pwrsav <= !ft_pwrsav;
-        usb_scb.reset_state <= last_reset_status;
+        fifo_flush <= 1'b0;
 
         phase <= {phase[2:0], phase[3]};
         if (state == STATE_IDLE) begin
@@ -160,16 +164,25 @@ module usb_ft1248 (
         end
 
         if (reset) begin
+            usb_scb.fifo_flush_busy <= 1'b0;
+            usb_scb.reset_state <= 1'b0;
             last_tx_failed <= 1'b0;
-            usb_scb.reset_pending <= 1'b0;
-            last_reset_status <= 1'b0;
+            reset_reply <= 1'b0;
             modem_status_counter <= 5'd0;
-            write_modem_status_pending <= 1'b0;
+            write_modem_status_pending <= 1'b1;
             write_buffer_flush_pending <= 1'b0;
         end else begin
-            if (usb_scb.reset_ack) begin
-                usb_scb.reset_pending <= 1'b0;
+            if (usb_scb.fifo_flush) begin
+                usb_scb.fifo_flush_busy <= 1'b1;
+            end
+
+            if (usb_scb.reset_on_ack) begin
                 reset_reply <= 1'b1;
+                write_modem_status_pending <= 1'b1;
+            end
+
+            if (usb_scb.reset_off_ack) begin
+                reset_reply <= 1'b0;
                 write_modem_status_pending <= 1'b1;
             end
 
@@ -179,6 +192,10 @@ module usb_ft1248 (
 
             if (state == STATE_IDLE) begin
                 modem_status_counter <= modem_status_counter + 1'd1;
+                if (usb_scb.fifo_flush_busy) begin
+                    usb_scb.fifo_flush_busy <= 1'b0;
+                    fifo_flush <= 1'b1;
+                end
             end
 
             if ((state == STATE_DATA) && (cmd == CMD_WRITE) && phase[3]) begin
@@ -187,14 +204,7 @@ module usb_ft1248 (
 
             if (!ft_miso && (state == STATE_DATA) && phase[3]) begin
                 if (cmd == CMD_READ_MODEM_STATUS) begin
-                    last_reset_status <= ft_miosi_in[0];
-                    if (!last_reset_status && ft_miosi_in[0]) begin
-                        usb_scb.reset_pending <= 1'b1;
-                    end
-                    if (last_reset_status && !ft_miosi_in[0]) begin
-                        reset_reply <= 1'b0;
-                        write_modem_status_pending <= 1'b1;
-                    end
+                    usb_scb.reset_state <= ft_miosi_in[0];
                 end
                 if (cmd == CMD_WRITE_MODEM_STATUS) begin
                     write_modem_status_pending <= 1'b0;
@@ -283,7 +293,7 @@ module usb_ft1248 (
         end else begin
             case (state)
                 STATE_IDLE: begin
-                    if (ft_pwrsav) begin
+                    if (ft_pwrsav && !(usb_scb.fifo_flush || usb_scb.fifo_flush_busy || fifo_flush)) begin
                         if (write_modem_status_pending) begin
                             next_state = STATE_SELECT;
                             next_cmd = CMD_WRITE_MODEM_STATUS;
