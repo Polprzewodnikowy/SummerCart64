@@ -64,7 +64,7 @@ const SERIAL_PREFIX: &str = "serial://";
 const FTDI_PREFIX: &str = "ftdi://";
 
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);
-const POLL_TIMEOUT: Duration = Duration::from_millis(10);
+const POLL_TIMEOUT: Duration = Duration::from_millis(5);
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
