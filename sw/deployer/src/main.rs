@@ -739,35 +739,35 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S");
 
     println!("{}", "SummerCart64 state information:".bold());
-    println!(" Firmware version:    v{}.{}.{}", major, minor, revision);
-    println!(" RTC datetime:        {}", datetime);
-    println!(" Boot mode:           {}", state.boot_mode);
-    println!(" Save type:           {}", state.save_type);
-    println!(" CIC seed:            {}", state.cic_seed);
-    println!(" TV type:             {}", state.tv_type);
-    println!(" Bootloader switch:   {}", state.bootloader_switch);
-    println!(" ROM write:           {}", state.rom_write_enable);
-    println!(" ROM shadow:          {}", state.rom_shadow_enable);
-    println!(" ROM extended:        {}", state.rom_extended_enable);
-    println!(" 64DD mode:           {}", state.dd_mode);
-    println!(" 64DD SD card mode:   {}", state.dd_sd_enable);
-    println!(" 64DD drive type:     {}", state.dd_drive_type);
-    println!(" 64DD disk state:     {}", state.dd_disk_state);
-    println!(" Button mode:         {}", state.button_mode);
-    println!(" Button state:        {}", state.button_state);
-    println!(" LED blink:           {}", state.led_enable);
-    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
+    println!(" Firmware version:  v{}.{}.{}", major, minor, revision);
+    println!(" RTC datetime:      {}", datetime);
+    println!(" Boot mode:         {}", state.boot_mode);
+    println!(" Save type:         {}", state.save_type);
+    println!(" CIC seed:          {}", state.cic_seed);
+    println!(" TV type:           {}", state.tv_type);
+    println!(" Bootloader switch: {}", state.bootloader_switch);
+    println!(" ROM write:         {}", state.rom_write_enable);
+    println!(" ROM shadow:        {}", state.rom_shadow_enable);
+    println!(" ROM extended:      {}", state.rom_extended_enable);
+    println!(" 64DD mode:         {}", state.dd_mode);
+    println!(" 64DD SD card mode: {}", state.dd_sd_enable);
+    println!(" 64DD drive type:   {}", state.dd_drive_type);
+    println!(" 64DD disk state:   {}", state.dd_disk_state);
+    println!(" Button mode:       {}", state.button_mode);
+    println!(" Button state:      {}", state.button_state);
+    println!(" LED blink:         {}", state.led_enable);
+    println!(" IS-Viewer 64:      {}", state.isviewer);
     println!("{}", "SummerCart64 diagnostic information:".bold());
     println!(
-        " Last PI address:     0x{:08X}",
+        " Last PI address:   0x{:08X}",
         state.fpga_debug_data.last_pi_address
     );
     println!(
-        " PI FIFO flags:       {}",
+        " PI FIFO flags:     {}",
         state.fpga_debug_data.pi_fifo_flags
     );
-    println!(" Current CIC step:    {}", state.fpga_debug_data.cic_step);
-    println!(" Diagnostic data:     {}", state.diagnostic_data);
+    println!(" Current CIC step:  {}", state.fpga_debug_data.cic_step);
+    println!(" Diagnostic data:   {}", state.diagnostic_data);
 
     Ok(())
 }

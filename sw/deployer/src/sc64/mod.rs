@@ -14,8 +14,8 @@ pub use self::{
     server::ServerEvent,
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestPattern,
-        MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
+        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, ISViewer,
+        MemoryTestPattern, MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
     },
 };
 
@@ -45,7 +45,7 @@ pub struct DeviceState {
     pub rom_write_enable: Switch,
     pub rom_shadow_enable: Switch,
     pub dd_mode: DdMode,
-    pub isv_address: u32,
+    pub isviewer: ISViewer,
     pub boot_mode: BootMode,
     pub save_type: SaveType,
     pub cic_seed: CicSeed,
@@ -549,7 +549,7 @@ impl SC64 {
             rom_write_enable: get_config!(self, RomWriteEnable)?,
             rom_shadow_enable: get_config!(self, RomShadowEnable)?,
             dd_mode: get_config!(self, DdMode)?,
-            isv_address: get_config!(self, IsvAddress)?,
+            isviewer: get_config!(self, ISViewer)?,
             boot_mode: get_config!(self, BootMode)?,
             save_type: get_config!(self, SaveType)?,
             cic_seed: get_config!(self, CicSeed)?,
@@ -599,10 +599,10 @@ impl SC64 {
                 }
             }
             self.command_config_set(Config::RomWriteEnable(Switch::On))?;
-            self.command_config_set(Config::IsvAddress(offset))?;
+            self.command_config_set(Config::ISViewer(ISViewer::Enabled(offset)))?;
         } else {
             self.command_config_set(Config::RomWriteEnable(Switch::Off))?;
-            self.command_config_set(Config::IsvAddress(0))?;
+            self.command_config_set(Config::ISViewer(ISViewer::Disabled))?;
         }
         Ok(())
     }
