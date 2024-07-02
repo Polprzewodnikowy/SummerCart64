@@ -1,7 +1,7 @@
 pub struct DeviceInfo {
-    pub port: String,
     pub description: String,
     pub serial: String,
+    pub port: String,
 }
 
 #[allow(dead_code)]
@@ -97,21 +97,31 @@ impl Wrapper {
                     )
                 };
 
+                let description = unsafe { std::ffi::CStr::from_ptr(description.as_ptr()) }
+                    .to_string_lossy()
+                    .into_owned();
+                let serial = unsafe { std::ffi::CStr::from_ptr(serial.as_ptr()) }
+                    .to_string_lossy()
+                    .into_owned();
+                let port = if list.binary_search_by(|d| d.serial.cmp(&serial)).is_ok() {
+                    format!("i:0x{vendor:04X}:0x{product:04X}:{index}")
+                } else {
+                    format!("s:0x{vendor:04X}:0x{product:04X}:{serial}")
+                };
+
                 if result == 0 {
                     list.push(DeviceInfo {
-                        port: format!("i:0x{vendor:04X}:0x{product:04X}:{index}"),
-                        description: unsafe { std::ffi::CStr::from_ptr(description.as_ptr()) }
-                            .to_string_lossy()
-                            .into_owned(),
-                        serial: unsafe { std::ffi::CStr::from_ptr(serial.as_ptr()) }
-                            .to_string_lossy()
-                            .into_owned(),
+                        description,
+                        serial,
+                        port,
                     });
                 }
 
                 device = unsafe { (*device).next };
                 index += 1;
             }
+
+            list.sort_by(|a, b| a.serial.cmp(&b.serial));
 
             Ok(list)
         } else {

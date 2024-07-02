@@ -1,7 +1,7 @@
 pub struct DeviceInfo {
-    pub port: String,
     pub description: String,
     pub serial: String,
+    pub port: String,
 }
 
 pub struct SerialDevice {
@@ -43,13 +43,15 @@ impl SerialDevice {
             if let serialport::SerialPortType::UsbPort(info) = port.port_type {
                 if info.vid == vendor && info.pid == product {
                     devices.push(DeviceInfo {
-                        port: port.port_name,
                         description: info.product.unwrap_or_default(),
                         serial: info.serial_number.unwrap_or_default(),
+                        port: port.port_name,
                     })
                 }
             }
         }
+
+        devices.sort_by(|a, b| a.serial.cmp(&b.serial));
 
         Ok(devices)
     }
