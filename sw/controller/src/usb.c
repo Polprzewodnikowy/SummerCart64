@@ -174,9 +174,9 @@ static void usb_flush_packet (void) {
         p.packet_pending = false;
         p.packet_info.done_callback();
     }
-
     if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
         p.tx_info.done_callback();
+        p.tx_info.done_callback = NULL;
     }
 }
 
@@ -461,27 +461,34 @@ static void usb_rx_process (void) {
     }
 
     if (p.rx_state == RX_STATE_FLUSH) {
-        if (usb_dma_ready()) {
-            if (p.rx_args[1] != 0) {
+        if (p.rx_args[1] > 0) {
+            if (usb_dma_ready()) {
                 uint32_t length = (p.rx_args[1] > RX_FLUSH_LENGTH) ? RX_FLUSH_LENGTH : p.rx_args[1];
-                fpga_reg_set(REG_USB_DMA_ADDRESS, RX_FLUSH_ADDRESS);
-                fpga_reg_set(REG_USB_DMA_LENGTH, length);
-                fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
-                p.rx_args[1] -= length;
-            } else {
-                if (p.flush_response) {
-                    p.rx_state = RX_STATE_IDLE;
-                    p.response_pending = true;
-                    p.response_error = true;
-                } else if (p.flush_packet) {
-                    usb_tx_info_t packet_info;
-                    usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
-                    if (usb_enqueue_packet(&packet_info)) {
-                        p.rx_state = RX_STATE_IDLE;
-                    }
+                if (!p.rx_dma_running) {
+                    fpga_reg_set(REG_USB_DMA_ADDRESS, RX_FLUSH_ADDRESS);
+                    fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                    fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                    p.rx_dma_running = true;
                 } else {
+                    p.rx_args[1] -= length;
+                    p.rx_dma_running = false;
+                }
+            }
+        }
+
+        if (p.rx_args[1] == 0) {
+            if (p.flush_response) {
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = true;
+            } else if (p.flush_packet) {
+                usb_tx_info_t packet_info;
+                usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
+                if (usb_enqueue_packet(&packet_info)) {
                     p.rx_state = RX_STATE_IDLE;
                 }
+            } else {
+                p.rx_state = RX_STATE_IDLE;
             }
         }
     }
