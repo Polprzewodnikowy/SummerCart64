@@ -14,29 +14,36 @@ module memory_sdram (
     inout [15:0] sdram_dq
 );
 
-    localparam [2:0] CAS_LATENCY = 3'd2;
+    // in Hz
+    localparam real FREQUENCY = 100_000_000.0;
 
-    localparam real T_INIT      = 100_000.0;
-    localparam real T_RC        = 60.0;
-    localparam real T_RP        = 15.0;
-    localparam real T_RCD       = 15.0;
-    localparam real T_MRD       = 14.0;
-    localparam real T_REF       = 7_800.0;
+    // in clocks
+    localparam bit [2:0] CAS_LATENCY = 3'd2;
 
-    localparam real T_CLK       = (1.0 / 100_000_000) * 1_000_000_000.0;
-    localparam int C_INIT       = int'((T_INIT + T_CLK - 1) / T_CLK);
-    localparam int C_RC         = int'((T_RC + T_CLK - 1) / T_CLK);
-    localparam int C_RP         = int'((T_RP + T_CLK - 1) / T_CLK);
-    localparam int C_RCD        = int'((T_RCD + T_CLK - 1) / T_CLK);
-    localparam int C_MRD        = int'((T_MRD + T_CLK - 1) / T_CLK);
-    localparam int C_REF        = int'((T_REF + T_CLK - 1) / T_CLK);
+    // in nanoseconds
+    localparam real T_INIT = 100_000.0;
+    localparam real T_RC = 60.0;
+    localparam real T_RP = 15.0;
+    localparam real T_RCD = 15.0;
+    localparam real T_MRD = 14.0;
+    localparam real T_REF = 7_812.5;
 
-    localparam INIT_PRECHARGE   = 4'd0;
-    localparam INIT_REFRESH_1   = C_RP;
-    localparam INIT_REFRESH_2   = C_RP + C_RC;
-    localparam INIT_MODE_REG    = C_RP + (2 * C_RC);
-    localparam INIT_DONE        = C_RP + (2 * C_RC) + C_MRD;
+    localparam real T_CLK = (1.0 / FREQUENCY) * 1_000_000_000.0;
 
+    const bit [13:0] C_INIT = 14'(int'($ceil(T_INIT / T_CLK)));
+    const bit [4:0] C_RC = 5'(int'($ceil(T_RC / T_CLK)));
+    const bit [4:0] C_RP = 5'(int'($ceil(T_RP / T_CLK)));
+    const bit [4:0] C_RCD = 5'(int'($ceil(T_RCD / T_CLK)));
+    const bit [4:0] C_MRD = 5'(int'($ceil(T_MRD / T_CLK)));
+    const bit [13:0] C_REF = 14'(int'($ceil(T_REF / T_CLK)));
+
+    const bit [4:0] INIT_PRECHARGE = 5'd0;
+    const bit [4:0] INIT_REFRESH_1 = INIT_PRECHARGE + C_RP;
+    const bit [4:0] INIT_REFRESH_2 = INIT_REFRESH_1 + C_RC;
+    const bit [4:0] INIT_MODE_REG = INIT_REFRESH_2 + C_RC;
+    const bit [4:0] INIT_DONE = INIT_MODE_REG + C_MRD;
+
+    // /CS, /RAS, /CAS, /WE
     typedef enum bit [3:0] {
         CMD_DESL    = 4'b1111,
         CMD_NOP     = 4'b0111,
@@ -58,13 +65,10 @@ module memory_sdram (
 
     always_ff @(posedge clk) begin
         {sdram_cs, sdram_ras, sdram_cas, sdram_we} <= 4'(sdram_next_cmd);
-
         {sdram_ba, sdram_a} <= 15'd0;
         sdram_dqm <= 2'b00;
-
         sdram_dq_input <= sdram_dq;
         sdram_dq_output <= mem_bus.wdata;
-    
         sdram_dq_output_enable <= 1'b0;
 
         case (sdram_next_cmd)
@@ -76,19 +80,31 @@ module memory_sdram (
 
             CMD_ACT: begin
                 {sdram_ba, sdram_a} <= mem_bus.address[25:11];
-                sdram_dqm <= 2'b00;
                 current_active_bank_row <= mem_bus.address[25:11];
             end
 
             CMD_PRE: begin
-                {sdram_ba, sdram_a} <= {2'b00, 2'b00, 1'b1, 10'd0};
-                sdram_dqm <= 2'b00;
+                {sdram_ba, sdram_a} <= {
+                    2'b00,          // [BA1:BA0] Don't care
+                    2'b00,          // [A12:A11] Don't care
+                    1'b1,           // [A10] Precharge all banks
+                    10'd0           // [A9:A0] Don't care
+                };
             end
 
             CMD_MRS: begin
-                {sdram_ba, sdram_a} <= {2'b00, 1'b0, 1'b0, 2'b00, CAS_LATENCY, 1'b0, 3'b000};
-                sdram_dqm <= 2'b00;
+                {sdram_ba, sdram_a} <= {
+                    2'b00,          // [BA1:BA0] Reserved = 0
+                    3'b00,          // [A12:A10] Reserved = 0
+                    1'b0,           // [A9] Write Burst Mode = Programmed Burst Length
+                    2'b00,          // [A8:A7] Operating Mode = Standard Operation
+                    CAS_LATENCY,    // [A6:A4] Latency Mode = 2
+                    1'b0,           // [A3] Burst Type = Sequential
+                    3'b000          // [A2:A0] Burst Length = 1
+                };
             end
+
+            default: begin end
         endcase
     end
 
@@ -121,35 +137,38 @@ module memory_sdram (
         end
     end
 
-    logic [13:0] powerup_coutner;
-    logic powerup_done;
+    logic [13:0] refresh_counter;
     logic [4:0] wait_counter;
-    logic [9:0] refresh_counter;
+    logic powerup_done;
     logic pending_refresh;
 
     always_ff @(posedge clk) begin
-        if (reset) begin
-            powerup_coutner <= 14'd0;
-            powerup_done <= 1'b0;
-        end else if (powerup_coutner < C_INIT) begin
-            powerup_coutner <= powerup_coutner + 1'd1;
-        end else begin
+        refresh_counter <= refresh_counter + 1'd1;
+
+        if (refresh_counter == C_INIT) begin
+            refresh_counter <= 14'd0;
             powerup_done <= 1'b1;
         end
 
-        if (reset || state != next_state) begin
-            wait_counter <= 5'd0;
-        end else begin
-            wait_counter <= wait_counter + 1'd1;
+        if (powerup_done && refresh_counter == C_REF - 14'd1) begin
+            refresh_counter <= 14'd0;
+            pending_refresh <= 1'b1;
         end
 
         if (sdram_next_cmd == CMD_REF) begin
-            refresh_counter <= 10'd0;
             pending_refresh <= 1'b0;
-        end else if (refresh_counter < C_REF) begin
-            refresh_counter <= refresh_counter + 1'd1;
-        end else begin
-            pending_refresh <= 1'b1;
+        end
+
+        if (reset) begin
+            refresh_counter <= 14'd0;
+            powerup_done <= 1'b0;
+            pending_refresh <= 1'b0;
+        end
+
+        wait_counter <= wait_counter + 1'd1;
+
+        if (state != next_state) begin
+            wait_counter <= 5'd0;
         end
     end
 
@@ -157,6 +176,7 @@ module memory_sdram (
 
     always_ff @(posedge clk) begin
         mem_bus.ack <= 1'b0;
+
         read_cmd_ack_delay <= {sdram_next_cmd == CMD_READ, read_cmd_ack_delay[(CAS_LATENCY):1]};
 
         if (sdram_next_cmd == CMD_WRITE || read_cmd_ack_delay[0]) begin
@@ -202,7 +222,7 @@ module memory_sdram (
             end
 
             S_ACTIVATING: begin
-                if (wait_counter == C_RCD) begin
+                if (wait_counter == C_RCD - 5'd2) begin
                     next_state = S_ACTIVE;
                 end
             end
@@ -229,18 +249,13 @@ module memory_sdram (
             end
 
             S_PRECHARGE: begin
-                if (wait_counter == C_RP) begin
-                    if (pending_refresh) begin
-                        next_state = S_REFRESH;
-                        sdram_next_cmd = CMD_REF;
-                    end else begin
-                        next_state = S_IDLE;
-                    end
+                if (wait_counter == C_RP - 5'd2) begin
+                    next_state = S_IDLE;
                 end
             end
 
             S_REFRESH: begin
-                if (wait_counter == C_RC) begin
+                if (wait_counter == C_RC - 5'd2) begin
                     next_state = S_IDLE;
                 end
             end
