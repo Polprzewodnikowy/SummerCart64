@@ -37,26 +37,26 @@ module memory_sdram_mock (
 
     assign sdram_dq = sdram_dq_driven;
 
-    initial begin
-        cas_delay = 2'b00;
-        data_from_sdram = 16'h0102;
-        data_to_sdram = 16'hFFFF;
-    end
-
     always_ff @(posedge clk) begin
-        cas_delay <= {cas_delay[0], 1'b0};
+        if (reset) begin
+            cas_delay <= 2'b00;
+            data_from_sdram <= 16'h0102;
+            data_to_sdram <= 16'hFFFF;
+        end else begin
+            cas_delay <= {cas_delay[0], 1'b0};
 
-        if ({sdram_cs, sdram_ras, sdram_cas, sdram_we} == 4'b0101) begin
-            cas_delay[0] <= 1'b1;
-        end
+            if ({sdram_cs, sdram_ras, sdram_cas, sdram_we} == 4'b0101) begin
+                cas_delay[0] <= 1'b1;
+            end
 
-        if (cas_delay[1]) begin
-            data_from_sdram <= data_from_sdram + 16'h0202;
-        end
+            if (cas_delay[1]) begin
+                data_from_sdram <= data_from_sdram + 16'h0202;
+            end
 
-        if ({sdram_cs, sdram_ras, sdram_cas, sdram_we} == 4'b0100) begin
-            if (!sdram_dqm[0]) data_to_sdram[7:0] <= sdram_dq[7:0];
-            if (!sdram_dqm[1]) data_to_sdram[15:8] <= sdram_dq[15:8];
+            if ({sdram_cs, sdram_ras, sdram_cas, sdram_we} == 4'b0100) begin
+                if (!sdram_dqm[0]) data_to_sdram[7:0] <= sdram_dq[7:0];
+                if (!sdram_dqm[1]) data_to_sdram[15:8] <= sdram_dq[15:8];
+            end
         end
     end
 

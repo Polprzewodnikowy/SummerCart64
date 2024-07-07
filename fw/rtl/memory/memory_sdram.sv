@@ -95,7 +95,7 @@ module memory_sdram (
             CMD_MRS: begin
                 {sdram_ba, sdram_a} <= {
                     2'b00,          // [BA1:BA0] Reserved = 0
-                    3'b00,          // [A12:A10] Reserved = 0
+                    3'b000,         // [A12:A10] Reserved = 0
                     1'b0,           // [A9] Write Burst Mode = Programmed Burst Length
                     2'b00,          // [A8:A7] Operating Mode = Standard Operation
                     CAS_LATENCY,    // [A6:A4] Latency Mode = 2

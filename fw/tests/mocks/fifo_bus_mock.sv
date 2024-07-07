@@ -16,6 +16,7 @@ module fifo_bus_mock #(
 
     localparam int PTR_BITS = $clog2(DEPTH);
 
+
     // RX FIFO mock
 
     logic [7:0] rx_fifo_mem [0:(DEPTH - 1)];
