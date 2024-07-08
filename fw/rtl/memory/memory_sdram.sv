@@ -22,20 +22,22 @@ module memory_sdram (
 
     // in nanoseconds
     localparam real T_INIT = 100_000.0;
-    localparam real T_RC = 60.0;
-    localparam real T_RP = 15.0;
-    localparam real T_RCD = 15.0;
     localparam real T_MRD = 14.0;
+    localparam real T_RAS = 37.0;
+    localparam real T_RC = 60.0;
+    localparam real T_RCD = 15.0;
     localparam real T_REF = 7_812.5;
+    localparam real T_RP = 15.0;
 
     localparam real T_CLK = (1.0 / FREQUENCY) * 1_000_000_000.0;
 
     const bit [13:0] C_INIT = 14'(int'($ceil(T_INIT / T_CLK)));
-    const bit [4:0] C_RC = 5'(int'($ceil(T_RC / T_CLK)));
-    const bit [4:0] C_RP = 5'(int'($ceil(T_RP / T_CLK)));
-    const bit [4:0] C_RCD = 5'(int'($ceil(T_RCD / T_CLK)));
     const bit [4:0] C_MRD = 5'(int'($ceil(T_MRD / T_CLK)));
+    const bit [2:0] C_RAS = 3'(int'($ceil(T_RAS / T_CLK)));
+    const bit [4:0] C_RC = 5'(int'($ceil(T_RC / T_CLK)));
+    const bit [4:0] C_RCD = 5'(int'($ceil(T_RCD / T_CLK)));
     const bit [13:0] C_REF = 14'(int'($ceil(T_REF / T_CLK)));
+    const bit [4:0] C_RP = 5'(int'($ceil(T_RP / T_CLK)));
 
     const bit [4:0] INIT_PRECHARGE = 5'd0;
     const bit [4:0] INIT_REFRESH_1 = INIT_PRECHARGE + C_RP;
@@ -139,8 +141,10 @@ module memory_sdram (
 
     logic [13:0] refresh_counter;
     logic [4:0] wait_counter;
+    logic [2:0] precharge_counter;
     logic powerup_done;
     logic pending_refresh;
+    logic precharge_valid;
 
     always_ff @(posedge clk) begin
         refresh_counter <= refresh_counter + 1'd1;
@@ -169,6 +173,17 @@ module memory_sdram (
 
         if (state != next_state) begin
             wait_counter <= 5'd0;
+        end
+
+        precharge_counter <= precharge_counter + 1'd1;
+
+        if (precharge_counter >= C_RAS - 2'd2) begin
+            precharge_valid <= 1'b1;
+        end
+
+        if (sdram_next_cmd == CMD_ACT) begin
+            precharge_counter <= 3'd0;
+            precharge_valid <= 1'b0;
         end
     end
 
@@ -228,14 +243,14 @@ module memory_sdram (
             end
 
             S_ACTIVE: begin
-                if (pending_refresh) begin
+                if (pending_refresh && precharge_valid) begin
                     next_state = S_PRECHARGE;
                     sdram_next_cmd = CMD_PRE;
                 end else if (mem_bus.request) begin
                     if (request_in_current_active_bank_row) begin
                         next_state = S_BUSY;
                         sdram_next_cmd = mem_bus.write ? CMD_WRITE : CMD_READ;
-                    end else begin
+                    end else if (precharge_valid) begin
                         next_state = S_PRECHARGE;
                         sdram_next_cmd = CMD_PRE;
                     end

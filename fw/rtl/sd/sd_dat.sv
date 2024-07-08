@@ -36,12 +36,10 @@ module sd_dat (
     // FIFO
 
     logic rx_full;
-    logic rx_almost_full;
     logic rx_write;
     logic [7:0] rx_wdata;
 
     logic tx_empty;
-    logic tx_almost_empty;
     logic tx_read;
     logic [7:0] tx_rdata;
 
@@ -50,12 +48,10 @@ module sd_dat (
         .reset(reset || sd_scb.dat_fifo_flush),
 
         .empty(fifo_bus.rx_empty),
-        .almost_empty(fifo_bus.rx_almost_empty),
         .read(fifo_bus.rx_read),
         .rdata(fifo_bus.rx_rdata),
 
         .full(rx_full),
-        .almost_full(rx_almost_full),
         .write(rx_write),
         .wdata(rx_wdata),
 
@@ -67,12 +63,10 @@ module sd_dat (
         .reset(reset || sd_scb.dat_fifo_flush),
 
         .empty(tx_empty),
-        .almost_empty(tx_almost_empty),
         .read(tx_read),
         .rdata(tx_rdata),
 
         .full(fifo_bus.tx_full),
-        .almost_full(fifo_bus.tx_almost_full),
         .write(fifo_bus.tx_write),
         .wdata(fifo_bus.tx_wdata),
 

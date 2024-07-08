@@ -41,11 +41,11 @@ module memory_dma_tb;
         .transfer_length(transfer_length)
     );
 
-    fifo_bus_mock #(
+    fifo_bus_fifo_mock #(
         .DEPTH(16),
         .FILL_RATE(16),
         .DRAIN_RATE(16)
-    ) fifo_bus_mock (
+    ) fifo_bus_fifo_mock (
         .clk(clk),
         .reset(reset),
 
@@ -103,7 +103,7 @@ module memory_dma_tb;
         #1;
         stop = 1'b0;
 
-        #99;
+        #165;
 
         start = 1'b1;
         direction = 1'b1;
