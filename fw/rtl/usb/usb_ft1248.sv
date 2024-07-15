@@ -25,7 +25,7 @@ module usb_ft1248 (
 
     fifo_8kb fifo_8kb_rx_inst (
         .clk(clk),
-        .reset(reset || fifo_flush),
+        .reset(fifo_flush),
 
         .empty(fifo_bus.rx_empty),
         .read(fifo_bus.rx_read),
@@ -40,7 +40,7 @@ module usb_ft1248 (
 
     fifo_8kb fifo_8kb_tx_inst (
         .clk(clk),
-        .reset(reset || fifo_flush),
+        .reset(fifo_flush),
 
         .empty(tx_empty),
         .read(tx_read),
