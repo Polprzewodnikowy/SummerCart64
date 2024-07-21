@@ -1,42 +1,3 @@
-interface usb_scb ();
-
-    logic fifo_flush;
-    logic fifo_flush_busy;
-    logic write_buffer_flush;
-    logic [10:0] rx_count;
-    logic [10:0] tx_count;
-    logic pwrsav;
-    logic reset_state;
-    logic reset_on_ack;
-    logic reset_off_ack;
-
-    modport controller (
-        output fifo_flush,
-        input fifo_flush_busy,
-        output write_buffer_flush,
-        input rx_count,
-        input tx_count,
-        input pwrsav,
-        input reset_state,
-        output reset_on_ack,
-        output reset_off_ack
-    );
-
-    modport usb (
-        input fifo_flush,
-        output fifo_flush_busy,
-        input write_buffer_flush,
-        output rx_count,
-        output tx_count,
-        output pwrsav,
-        output reset_state,
-        input reset_on_ack,
-        input reset_off_ack
-    );
-
-endinterface
-
-
 module usb_ft1248 (
     input clk,
     input reset,
@@ -53,12 +14,10 @@ module usb_ft1248 (
 );
 
     logic rx_full;
-    logic rx_almost_full;
-    logic rx_write;
+    logic rx_write_delayed;
     logic [7:0] rx_wdata;
 
     logic tx_empty;
-    logic tx_almost_empty;
     logic tx_read;
     logic [7:0] tx_rdata;
 
@@ -66,16 +25,14 @@ module usb_ft1248 (
 
     fifo_8kb fifo_8kb_rx_inst (
         .clk(clk),
-        .reset(reset || fifo_flush),
+        .reset(fifo_flush),
 
         .empty(fifo_bus.rx_empty),
-        .almost_empty(fifo_bus.rx_almost_empty),
         .read(fifo_bus.rx_read),
         .rdata(fifo_bus.rx_rdata),
 
         .full(rx_full),
-        .almost_full(rx_almost_full),
-        .write(rx_write),
+        .write(rx_write_delayed),
         .wdata(rx_wdata),
 
         .count(usb_scb.rx_count)
@@ -83,15 +40,13 @@ module usb_ft1248 (
 
     fifo_8kb fifo_8kb_tx_inst (
         .clk(clk),
-        .reset(reset || fifo_flush),
+        .reset(fifo_flush),
 
         .empty(tx_empty),
-        .almost_empty(tx_almost_empty),
         .read(tx_read),
         .rdata(tx_rdata),
 
         .full(fifo_bus.tx_full),
-        .almost_full(fifo_bus.tx_almost_full),
         .write(fifo_bus.tx_write),
         .wdata(fifo_bus.tx_wdata),
 
@@ -145,6 +100,8 @@ module usb_ft1248 (
     e_cmd cmd;
     e_cmd next_cmd;
     logic [3:0] phase;
+    logic rx_write;
+    logic last_rx_failed;
     logic last_tx_failed;
     logic reset_reply;
     logic [4:0] modem_status_counter;
@@ -158,6 +115,8 @@ module usb_ft1248 (
         usb_scb.pwrsav <= !ft_pwrsav;
         fifo_flush <= 1'b0;
 
+        rx_write_delayed <= rx_write;
+
         phase <= {phase[2:0], phase[3]};
         if (state == STATE_IDLE) begin
             phase <= 4'b0100;
@@ -166,6 +125,7 @@ module usb_ft1248 (
         if (reset) begin
             usb_scb.fifo_flush_busy <= 1'b0;
             usb_scb.reset_state <= 1'b0;
+            last_rx_failed <= 1'b0;
             last_tx_failed <= 1'b0;
             reset_reply <= 1'b0;
             modem_status_counter <= 5'd0;
@@ -195,7 +155,17 @@ module usb_ft1248 (
                 if (usb_scb.fifo_flush_busy) begin
                     usb_scb.fifo_flush_busy <= 1'b0;
                     fifo_flush <= 1'b1;
+                    last_rx_failed <= 1'b0;
+                    last_tx_failed <= 1'b0;
+                end else if (last_rx_failed && !rx_full) begin
+                    last_rx_failed <= 1'b0;
+                    rx_write_delayed <= 1'b1;
                 end
+            end
+
+            if ((state == STATE_DATA) && (cmd == CMD_READ) && phase[3]) begin
+                rx_wdata <= ft_miosi_in;
+                last_rx_failed <= !ft_miso && rx_full;
             end
 
             if ((state == STATE_DATA) && (cmd == CMD_WRITE) && phase[3]) begin
@@ -262,8 +232,6 @@ module usb_ft1248 (
         rx_write = 1'b0;
         tx_read = 1'b0;
 
-        rx_wdata = ft_miosi_in;
-
         if (!ft_miso && phase[3]) begin
             case (state)
                 STATE_STATUS: begin
@@ -273,13 +241,15 @@ module usb_ft1248 (
                 end
 
                 STATE_DATA: begin
-                    if (cmd == CMD_READ) begin
+                    if (cmd == CMD_READ && !rx_full) begin
                         rx_write = 1'b1;
                     end
                     if (cmd == CMD_WRITE && !tx_empty) begin
                         tx_read = 1'b1;
                     end
                 end
+
+                default: begin end
             endcase
         end
     end
@@ -340,7 +310,7 @@ module usb_ft1248 (
                         if (ft_miso) begin
                             next_state = STATE_DESELECT;
                         end else if (cmd == CMD_READ) begin
-                            if (rx_almost_full) begin
+                            if (rx_full) begin
                                 next_state = STATE_DESELECT;
                             end
                         end else if (cmd == CMD_WRITE) begin

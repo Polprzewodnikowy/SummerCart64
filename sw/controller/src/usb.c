@@ -201,6 +201,9 @@ static bool usb_dma_ready (void) {
 }
 
 static bool usb_validate_address_length (uint32_t address, uint32_t length, bool exclude_bootloader) {
+    if (length == 0) {
+        return true;
+    }
     if ((address >= MEMORY_LENGTH) || (length > MEMORY_LENGTH)) {
         return true;
     }
