@@ -71,7 +71,7 @@ jobs:
 
           - version: linux
             os: ubuntu-latest
-            linux-packages: libudev-dev
+            apt-packages: libudev-dev
             executable: target/release/sc64deployer
             package-name: sc64-deployer-linux
             package-params: -czf
@@ -98,11 +98,11 @@ jobs:
           string: '${{ github.ref_name }}'
           replace-with: '-'
 
-      - name: Install linux packages
-        if: matrix.linux-packages
+      - name: Install apt packages
+        if: matrix.apt-packages
         run: |
           sudo apt-get update
-          sudo apt-get -y install ${{ matrix.linux-packages }}
+          sudo apt-get -y install ${{ matrix.apt-packages }}
 
       - name: Build deployer
         run: cargo b -r ${{ matrix.build-params }}
