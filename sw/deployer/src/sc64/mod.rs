@@ -752,6 +752,22 @@ impl SC64 {
         }
     }
 
+    pub fn test_usb_speed(&mut self) -> Result<(f64, f64), Error> {
+        const TEST_ADDRESS: u32 = SDRAM_ADDRESS;
+        const TEST_LENGTH: usize = SDRAM_LENGTH;
+        const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
+
+        let read_time = std::time::Instant::now();
+        let data = self.command_memory_read(TEST_ADDRESS, TEST_LENGTH)?;
+        let read_speed = (TEST_LENGTH as f64 / MIB_DIVIDER) / read_time.elapsed().as_secs_f64();
+
+        let write_time = std::time::Instant::now();
+        self.command_memory_write(TEST_ADDRESS, &data)?;
+        let write_speed = (TEST_LENGTH as f64 / MIB_DIVIDER) / write_time.elapsed().as_secs_f64();
+
+        Ok((read_speed, write_speed))
+    }
+
     pub fn test_sdram_pattern(
         &mut self,
         pattern: MemoryTestPattern,

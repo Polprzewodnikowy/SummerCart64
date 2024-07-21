@@ -890,6 +890,15 @@ fn handle_firmware_command(
 fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, false)?;
 
+    println!("{}: USB", "[SC64 Tests]".bold());
+
+    print!(" Performing USB speed test... ");
+    stdout().flush().unwrap();
+
+    let (read_speed, write_speed) = sc64.test_usb_speed()?;
+
+    println!("Read speed: {read_speed:.2} MiB/s, Write speed: {write_speed:.2} MiB/s");
+
     println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
 
     let sdram_pattern_tests = [
