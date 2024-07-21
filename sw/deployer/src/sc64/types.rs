@@ -1,4 +1,4 @@
-use super::{link::Packet, Error};
+use super::{link::AsynchronousPacket, Error};
 use std::fmt::Display;
 
 #[derive(Clone, Copy)]
@@ -7,7 +7,7 @@ pub enum ConfigId {
     RomWriteEnable,
     RomShadowEnable,
     DdMode,
-    IsvAddress,
+    ISViewer,
     BootMode,
     SaveType,
     CicSeed,
@@ -25,7 +25,7 @@ pub enum Config {
     RomWriteEnable(Switch),
     RomShadowEnable(Switch),
     DdMode(DdMode),
-    IsvAddress(u32),
+    ISViewer(ISViewer),
     BootMode(BootMode),
     SaveType(SaveType),
     CicSeed(CicSeed),
@@ -45,7 +45,7 @@ impl From<ConfigId> for u32 {
             ConfigId::RomWriteEnable => 1,
             ConfigId::RomShadowEnable => 2,
             ConfigId::DdMode => 3,
-            ConfigId::IsvAddress => 4,
+            ConfigId::ISViewer => 4,
             ConfigId::BootMode => 5,
             ConfigId::SaveType => 6,
             ConfigId::CicSeed => 7,
@@ -69,7 +69,7 @@ impl TryFrom<(ConfigId, u32)> for Config {
             ConfigId::RomWriteEnable => Self::RomWriteEnable(config.try_into()?),
             ConfigId::RomShadowEnable => Self::RomShadowEnable(config.try_into()?),
             ConfigId::DdMode => Self::DdMode(config.try_into()?),
-            ConfigId::IsvAddress => Self::IsvAddress(config),
+            ConfigId::ISViewer => Self::ISViewer(config.try_into()?),
             ConfigId::BootMode => Self::BootMode(config.try_into()?),
             ConfigId::SaveType => Self::SaveType(config.try_into()?),
             ConfigId::CicSeed => Self::CicSeed(config.try_into()?),
@@ -91,7 +91,7 @@ impl From<Config> for [u32; 2] {
             Config::RomWriteEnable(val) => [ConfigId::RomWriteEnable.into(), val.into()],
             Config::RomShadowEnable(val) => [ConfigId::RomShadowEnable.into(), val.into()],
             Config::DdMode(val) => [ConfigId::DdMode.into(), val.into()],
-            Config::IsvAddress(val) => [ConfigId::IsvAddress.into(), val.into()],
+            Config::ISViewer(val) => [ConfigId::ISViewer.into(), val.into()],
             Config::BootMode(val) => [ConfigId::BootMode.into(), val.into()],
             Config::SaveType(val) => [ConfigId::SaveType.into(), val.into()],
             Config::CicSeed(val) => [ConfigId::CicSeed.into(), val.into()],
@@ -195,6 +195,41 @@ impl From<DdMode> for u32 {
             DdMode::Regs => 1,
             DdMode::DdIpl => 2,
             DdMode::Full => 3,
+        }
+    }
+}
+
+pub enum ISViewer {
+    Disabled,
+    Enabled(u32),
+}
+
+impl Display for ISViewer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disabled => f.write_str("Not listening"),
+            Self::Enabled(offset) => {
+                f.write_fmt(format_args!("Listening at 0x{:08X}", 0x1000_0000 + offset))
+            }
+        }
+    }
+}
+
+impl TryFrom<u32> for ISViewer {
+    type Error = Error;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Disabled,
+            offset => Self::Enabled(offset),
+        })
+    }
+}
+
+impl From<ISViewer> for u32 {
+    fn from(value: ISViewer) -> Self {
+        match value {
+            ISViewer::Disabled => 0,
+            ISViewer::Enabled(offset) => offset,
         }
     }
 }
@@ -588,9 +623,9 @@ pub enum DataPacket {
     UpdateStatus(UpdateStatus),
 }
 
-impl TryFrom<Packet> for DataPacket {
+impl TryFrom<AsynchronousPacket> for DataPacket {
     type Error = Error;
-    fn try_from(value: Packet) -> Result<Self, Self::Error> {
+    fn try_from(value: AsynchronousPacket) -> Result<Self, Self::Error> {
         Ok(match value.id {
             b'B' => Self::Button,
             b'G' => Self::DataFlushed,

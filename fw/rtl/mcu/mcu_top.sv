@@ -394,13 +394,13 @@ module mcu_top (
 
                 REG_USB_SCR: begin
                     reg_rdata <= {
-                        2'd0,
+                        1'd0,
+                        usb_scb.fifo_flush_busy,
                         usb_scb.pwrsav,
                         usb_scb.reset_state,
                         usb_scb.tx_count,
                         usb_scb.rx_count,
-                        2'b00,
-                        usb_scb.reset_pending,
+                        3'b000,
                         ~fifo_bus.tx_full,
                         ~fifo_bus.rx_empty,
                         1'b0
@@ -681,9 +681,10 @@ module mcu_top (
         mem_start <= 1'b0;
         mem_stop <= 1'b0;
 
-        usb_scb.write_buffer_flush <= 1'b0;
-        usb_scb.reset_ack <= 1'b0;
         usb_scb.fifo_flush <= 1'b0;
+        usb_scb.write_buffer_flush <= 1'b0;
+        usb_scb.reset_on_ack <= 1'b0;
+        usb_scb.reset_off_ack <= 1'b0;
 
         usb_dma_scb.start <= 1'b0;
         usb_dma_scb.stop <= 1'b0;
@@ -770,11 +771,10 @@ module mcu_top (
                 end
 
                 REG_USB_SCR: begin
-                    {
-                        usb_scb.write_buffer_flush,
-                        usb_scb.reset_ack,
-                        usb_scb.fifo_flush
-                    } <= {reg_wdata[5:4], reg_wdata[0]};
+                    usb_scb.write_buffer_flush <= reg_wdata[5];
+                    usb_scb.reset_off_ack <= reg_wdata[4];
+                    usb_scb.reset_on_ack <= reg_wdata[3];
+                    usb_scb.fifo_flush <= reg_wdata[0];
                 end
 
                 REG_USB_DMA_ADDRESS: begin
