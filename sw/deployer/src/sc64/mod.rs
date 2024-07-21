@@ -101,7 +101,7 @@ const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
 pub const MEMORY_LENGTH: usize = 0x0500_2980;
 
-const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
+const MEMORY_CHUNK_LENGTH: usize = 8 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<[u8; 4], Error> {

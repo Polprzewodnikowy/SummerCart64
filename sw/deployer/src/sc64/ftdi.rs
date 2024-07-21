@@ -486,7 +486,7 @@ impl FtdiDevice {
         wrapper.set_module_detach_mode(ModuleDetachMode::AutoDetachReattach);
         wrapper.set_interface(InterfaceIndex::A)?;
 
-        const CHUNK_SIZE: usize = 2 * 1024 * 1024;
+        const CHUNK_SIZE: usize = 1 * 1024 * 1024;
 
         wrapper.read_data_set_chunksize(CHUNK_SIZE)?;
         wrapper.write_data_set_chunksize(CHUNK_SIZE)?;
