@@ -101,7 +101,7 @@ const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
 pub const MEMORY_LENGTH: usize = 0x0500_2980;
 
-const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
+const MEMORY_CHUNK_LENGTH: usize = 8 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<[u8; 4], Error> {
@@ -750,6 +750,24 @@ impl SC64 {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    pub fn test_usb_speed(&mut self, write: bool) -> Result<f64, Error> {
+        const TEST_ADDRESS: u32 = SDRAM_ADDRESS;
+        const TEST_LENGTH: usize = 8 * 1024 * 1024;
+        const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
+
+        let data = vec![0x00; TEST_LENGTH];
+
+        let time = std::time::Instant::now();
+
+        if write {
+            self.command_memory_write(TEST_ADDRESS, &data)?;
+        } else {
+            self.command_memory_read(TEST_ADDRESS, TEST_LENGTH)?;
+        }
+
+        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / time.elapsed().as_secs_f64())
     }
 
     pub fn test_sdram_pattern(

@@ -8,8 +8,8 @@
 
 
 typedef enum {
-    ERROR_TYPE_CFG = 0,
-    ERROR_TYPE_SD_CARD = 1,
+    ERROR_TYPE_CFG = 1,
+    ERROR_TYPE_SD_CARD = 2,
 } sc64_error_type_t;
 
 typedef enum {
