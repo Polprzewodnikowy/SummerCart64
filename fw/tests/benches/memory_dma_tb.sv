@@ -42,9 +42,9 @@ module memory_dma_tb;
     );
 
     fifo_bus_fifo_mock #(
-        .DEPTH(16),
-        .FILL_RATE(16),
-        .DRAIN_RATE(16)
+        .DEPTH(8),
+        .FILL_RATE(3),
+        .DRAIN_RATE(3)
     ) fifo_bus_fifo_mock (
         .clk(clk),
         .reset(reset),
@@ -90,8 +90,8 @@ module memory_dma_tb;
         start = 1'b1;
         direction = 1'b0;
         byte_swap = 1'b0;
-        starting_address = 27'hFFF0;
-        transfer_length = 27'd32;
+        starting_address = 27'hFFF1;
+        transfer_length = 27'd64;
         #1;
         start = 1'b0;
 
