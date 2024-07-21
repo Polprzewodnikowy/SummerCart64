@@ -892,12 +892,19 @@ fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
 
     println!("{}: USB", "[SC64 Tests]".bold());
 
-    print!(" Performing USB speed test... ");
+    print!(" Performing USB write speed test... ");
     stdout().flush().unwrap();
+    println!(
+        "{}",
+        format!("{:.2} MiB/s", sc64.test_usb_speed(true)?).bright_green()
+    );
 
-    let (read_speed, write_speed) = sc64.test_usb_speed()?;
-
-    println!("Read speed: {read_speed:.2} MiB/s, Write speed: {write_speed:.2} MiB/s");
+    print!(" Performing USB read speed test... ");
+    stdout().flush().unwrap();
+    println!(
+        "{}",
+        format!("{:.2} MiB/s", sc64.test_usb_speed(false)?).bright_green()
+    );
 
     println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
 
