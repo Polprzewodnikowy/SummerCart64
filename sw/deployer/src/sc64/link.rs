@@ -38,12 +38,6 @@ impl TryFrom<u32> for DataType {
     }
 }
 
-pub struct Command {
-    pub id: u8,
-    pub args: [u32; 2],
-    pub data: Vec<u8>,
-}
-
 pub struct Response {
     pub id: u8,
     pub data: Vec<u8>,
@@ -167,14 +161,14 @@ pub trait Backend {
         }
     }
 
-    fn send_command(&mut self, command: &Command) -> std::io::Result<()> {
+    fn send_command(&mut self, id: u8, args: [u32; 2], data: &[u8]) -> std::io::Result<()> {
         self.write_all(b"CMD")?;
-        self.write_all(&command.id.to_be_bytes())?;
+        self.write_all(&id.to_be_bytes())?;
 
-        self.write_all(&command.args[0].to_be_bytes())?;
-        self.write_all(&command.args[1].to_be_bytes())?;
+        self.write_all(&args[0].to_be_bytes())?;
+        self.write_all(&args[1].to_be_bytes())?;
 
-        self.write_all(&command.data)?;
+        self.write_all(data)?;
 
         self.flush()?;
 
@@ -332,17 +326,17 @@ impl Backend for TcpBackend {
         self.stream.shutdown(std::net::Shutdown::Both).ok();
     }
 
-    fn send_command(&mut self, command: &Command) -> std::io::Result<()> {
+    fn send_command(&mut self, id: u8, args: [u32; 2], data: &[u8]) -> std::io::Result<()> {
         let payload_data_type: u32 = DataType::Command.into();
         self.write_all(&payload_data_type.to_be_bytes())?;
 
-        self.write_all(&command.id.to_be_bytes())?;
-        self.write_all(&command.args[0].to_be_bytes())?;
-        self.write_all(&command.args[1].to_be_bytes())?;
+        self.write_all(&id.to_be_bytes())?;
+        self.write_all(&args[0].to_be_bytes())?;
+        self.write_all(&args[1].to_be_bytes())?;
 
-        let command_data_length = command.data.len() as u32;
+        let command_data_length = data.len() as u32;
         self.write_all(&command_data_length.to_be_bytes())?;
-        self.write_all(&command.data)?;
+        self.write_all(data)?;
 
         self.flush()?;
 
@@ -445,22 +439,29 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn execute_command(&mut self, command: &Command) -> Result<Vec<u8>, Error> {
-        self.execute_command_raw(command, false, false)
+    pub fn execute_command(
+        &mut self,
+        id: u8,
+        args: [u32; 2],
+        data: &[u8],
+    ) -> Result<Vec<u8>, Error> {
+        self.execute_command_raw(id, args, data, false, false)
     }
 
     pub fn execute_command_raw(
         &mut self,
-        command: &Command,
+        id: u8,
+        args: [u32; 2],
+        data: &[u8],
         no_response: bool,
         ignore_error: bool,
     ) -> Result<Vec<u8>, Error> {
-        self.backend.send_command(command)?;
+        self.backend.send_command(id, args, data)?;
         if no_response {
             return Ok(vec![]);
         }
         let response = self.receive_response()?;
-        if command.id != response.id {
+        if id != response.id {
             return Err(Error::new("Command response ID didn't match"));
         }
         if !ignore_error && response.error {
