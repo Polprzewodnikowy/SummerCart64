@@ -4,24 +4,36 @@
 **For non-technical description of the SummerCart64, please head to the https://summercart64.dev website!**
 
 ## Features
- - 64 MiB SDRAM memory for game and save data
- - 16 MiB FLASH memory for bootloader and extended game data
- - 8 kiB on-chip buffer for general use
- - ~23.8 MiB/s peak transfer rate USB interface for data upload/download and debug functionality
- - ~23.8 MiB/s peak transfer rate SD card interface
- - EEPROM, SRAM and FlashRAM save types with automatic writeback to SD card
- - Battery backed real time clock (RTC)
- - Status LED and button for general use
- - 64DD add-on emulation
- - IS-Viewer 64 debug interface
- - N64 bootloader with support for IPL3 registers spoofing and loading menu from SD card
- - Dedicated open source menu written specifically for this flashcart - [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu)
- - Enhanced [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
- - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug terminal)
- - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
- - Initial programming via UART header or dedicated JTAG/SWD interfaces
- - Software and firmware updatable via USB interface
- - 3D printable plastic shell
+ - **Hardware-Dependent Game Features**
+   - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
+   - 64DD add-on emulation
+   - Battery backed real time clock (RTC)
+
+ - **Game Saves**
+   - 64 MiB SDRAM memory for game and save data
+   - 16 MiB FLASH memory for bootloader and extended game data
+   - EEPROM, SRAM and FlashRAM save types with automatic writeback to SD card (no reset required)
+
+ - **Menu**
+   - Dedicated open source menu written specifically for this flashcart - [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu)
+
+ - **Game Development**
+   - ~23.8 MiB/s peak transfer rate SD card interface
+   - ~23.8 MiB/s peak transfer rate USB interface for data upload/download and debug functionality
+   - PC app for communicating with flashcart
+     - Game/save data upload/download (feature enable control and debug terminal)
+
+   - IS-Viewer 64 debug interface
+   - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
+   - 8 kiB on-chip buffer for general use
+   - Status LED and button for general use
+   - N64 bootloader with support for IPL3 registers spoofing and loading menu from SD card
+
+ - **Cartridge Production**
+   - Initial programming via UART header or dedicated JTAG/SWD interfaces
+   - Software and firmware updatable via USB interface
+   - 3D printable plastic shell
+
 
 ---
 
