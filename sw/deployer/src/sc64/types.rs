@@ -1018,6 +1018,11 @@ impl Display for DiagnosticData {
     }
 }
 
+pub enum SpeedTestDirection {
+    Read,
+    Write
+}
+
 pub enum MemoryTestPattern {
     OwnAddress(bool),
     AllZeros,

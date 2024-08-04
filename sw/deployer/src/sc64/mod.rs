@@ -15,13 +15,14 @@ pub use self::{
     types::{
         BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
         DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, ISViewer,
-        MemoryTestPattern, MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
+        MemoryTestPattern, MemoryTestPatternResult, SaveType, SaveWriteback, SpeedTestDirection,
+        Switch, TvType,
     },
 };
 
 use self::{
     cic::{sign_ipl3, IPL3_LENGTH, IPL3_OFFSET},
-    link::{Command, Link},
+    link::Link,
     time::{convert_from_datetime, convert_to_datetime},
     types::{
         get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
@@ -105,11 +106,7 @@ const MEMORY_CHUNK_LENGTH: usize = 8 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<[u8; 4], Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'v',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'v', [0, 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for identifier get command",
@@ -119,11 +116,7 @@ impl SC64 {
     }
 
     fn command_version_get(&mut self) -> Result<(u16, u16, u32), Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'V',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'V', [0, 0], &[])?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for version get command",
@@ -136,11 +129,7 @@ impl SC64 {
     }
 
     fn command_state_reset(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'R',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'R', [0, 0], &[])?;
         Ok(())
     }
 
@@ -156,20 +145,14 @@ impl SC64 {
             ((if disable { 1 } else { 0 }) << 24) | ((seed as u32) << 16) | checksum_high,
             checksum_low,
         ];
-        self.link.execute_command(&Command {
-            id: b'B',
-            args,
-            data: vec![],
-        })?;
+        self.link.execute_command(b'B', args, &[])?;
         Ok(())
     }
 
     fn command_config_get(&mut self, config_id: ConfigId) -> Result<Config, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'c',
-            args: [config_id.into(), 0],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'c', [config_id.into(), 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for config get command",
@@ -180,20 +163,14 @@ impl SC64 {
     }
 
     fn command_config_set(&mut self, config: Config) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'C',
-            args: config.into(),
-            data: vec![],
-        })?;
+        self.link.execute_command(b'C', config.into(), &[])?;
         Ok(())
     }
 
     fn command_setting_get(&mut self, setting_id: SettingId) -> Result<Setting, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'a',
-            args: [setting_id.into(), 0],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'a', [setting_id.into(), 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for setting get command",
@@ -204,20 +181,12 @@ impl SC64 {
     }
 
     fn command_setting_set(&mut self, setting: Setting) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'A',
-            args: setting.into(),
-            data: vec![],
-        })?;
+        self.link.execute_command(b'A', setting.into(), &[])?;
         Ok(())
     }
 
     fn command_time_get(&mut self) -> Result<NaiveDateTime, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b't',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b't', [0, 0], &[])?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for time get command",
@@ -227,20 +196,15 @@ impl SC64 {
     }
 
     fn command_time_set(&mut self, datetime: NaiveDateTime) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'T',
-            args: convert_from_datetime(datetime),
-            data: vec![],
-        })?;
+        self.link
+            .execute_command(b'T', convert_from_datetime(datetime), &[])?;
         Ok(())
     }
 
     fn command_memory_read(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'm',
-            args: [address, length as u32],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'm', [address, length as u32], &[])?;
         if data.len() != length {
             return Err(Error::new(
                 "Invalid data length received for memory read command",
@@ -250,21 +214,16 @@ impl SC64 {
     }
 
     fn command_memory_write(&mut self, address: u32, data: &[u8]) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'M',
-            args: [address, data.len() as u32],
-            data: data.to_vec(),
-        })?;
+        self.link
+            .execute_command(b'M', [address, data.len() as u32], data)?;
         Ok(())
     }
 
     fn command_usb_write(&mut self, datatype: u8, data: &[u8]) -> Result<(), Error> {
         self.link.execute_command_raw(
-            &Command {
-                id: b'U',
-                args: [datatype as u32, data.len() as u32],
-                data: data.to_vec(),
-            },
+            b'U',
+            [datatype as u32, data.len() as u32],
+            data,
             true,
             false,
         )?;
@@ -272,29 +231,17 @@ impl SC64 {
     }
 
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'D',
-            args: [error as u32, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'D', [error as u32, 0], &[])?;
         Ok(())
     }
 
     fn command_writeback_enable(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'W',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'W', [0, 0], &[])?;
         Ok(())
     }
 
     fn command_flash_wait_busy(&mut self, wait: bool) -> Result<u32, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'p',
-            args: [wait as u32, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'p', [wait as u32, 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for flash wait busy command",
@@ -305,24 +252,14 @@ impl SC64 {
     }
 
     fn command_flash_erase_block(&mut self, address: u32) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'P',
-            args: [address, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'P', [address, 0], &[])?;
         Ok(())
     }
 
     fn command_firmware_backup(&mut self, address: u32) -> Result<(FirmwareStatus, u32), Error> {
-        let data = self.link.execute_command_raw(
-            &Command {
-                id: b'f',
-                args: [address, 0],
-                data: vec![],
-            },
-            false,
-            true,
-        )?;
+        let data = self
+            .link
+            .execute_command_raw(b'f', [address, 0], &[], false, true)?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for firmware backup command",
@@ -338,15 +275,9 @@ impl SC64 {
         address: u32,
         length: usize,
     ) -> Result<FirmwareStatus, Error> {
-        let data = self.link.execute_command_raw(
-            &Command {
-                id: b'F',
-                args: [address, length as u32],
-                data: vec![],
-            },
-            false,
-            true,
-        )?;
+        let data =
+            self.link
+                .execute_command_raw(b'F', [address, length as u32], &[], false, true)?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for firmware update command",
@@ -356,20 +287,12 @@ impl SC64 {
     }
 
     fn command_fpga_debug_data_get(&mut self) -> Result<FpgaDebugData, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'?',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'?', [0, 0], &[])?;
         Ok(data.try_into()?)
     }
 
     fn command_diagnostic_data_get(&mut self) -> Result<DiagnosticData, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'%',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'%', [0, 0], &[])?;
         Ok(data.try_into()?)
     }
 }
@@ -752,22 +675,27 @@ impl SC64 {
         }
     }
 
-    pub fn test_usb_speed(&mut self, write: bool) -> Result<f64, Error> {
+    pub fn test_usb_speed(&mut self, direction: SpeedTestDirection) -> Result<f64, Error> {
         const TEST_ADDRESS: u32 = SDRAM_ADDRESS;
-        const TEST_LENGTH: usize = 8 * 1024 * 1024;
+        const TEST_LENGTH: usize = 16 * 1024 * 1024;
         const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
 
         let data = vec![0x00; TEST_LENGTH];
 
         let time = std::time::Instant::now();
 
-        if write {
-            self.command_memory_write(TEST_ADDRESS, &data)?;
-        } else {
-            self.command_memory_read(TEST_ADDRESS, TEST_LENGTH)?;
+        match direction {
+            SpeedTestDirection::Read => {
+                self.command_memory_read(TEST_ADDRESS, TEST_LENGTH)?;
+            }
+            SpeedTestDirection::Write => {
+                self.command_memory_write(TEST_ADDRESS, &data)?;
+            }
         }
 
-        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / time.elapsed().as_secs_f64())
+        let elapsed = time.elapsed();
+
+        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / elapsed.as_secs_f64())
     }
 
     pub fn test_sdram_pattern(

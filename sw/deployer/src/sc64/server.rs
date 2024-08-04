@@ -1,8 +1,6 @@
 use super::{
     error::Error,
-    link::{
-        list_local_devices, new_local, AsynchronousPacket, Command, DataType, Response, UsbPacket,
-    },
+    link::{list_local_devices, new_local, AsynchronousPacket, DataType, Response, UsbPacket},
 };
 use std::io::{Read, Write};
 
@@ -50,7 +48,7 @@ impl StreamHandler {
         result
     }
 
-    fn receive_command(&mut self) -> std::io::Result<Option<Command>> {
+    fn receive_command(&mut self) -> std::io::Result<Option<(u8, [u32; 2], Vec<u8>)>> {
         if let Some(header) = self.try_read_header()? {
             if let Ok(data_type) = TryInto::<DataType>::try_into(u32::from_be_bytes(header)) {
                 if !matches!(data_type, DataType::Command) {
@@ -77,7 +75,7 @@ impl StreamHandler {
             let mut data = vec![0u8; command_data_length];
             self.reader.read_exact(&mut data)?;
 
-            Ok(Some(Command { id, args, data }))
+            Ok(Some((id, args, data)))
         } else {
             Ok(None)
         }
@@ -121,8 +119,8 @@ fn server_accept_connection(port: String, connection: &mut StreamHandler) -> Res
 
     loop {
         match connection.receive_command() {
-            Ok(Some(command)) => {
-                link.execute_command_raw(&command, true, true)?;
+            Ok(Some((id, args, data))) => {
+                link.execute_command_raw(id, args, &data, true, true)?;
             }
             Ok(None) => {}
             Err(error) => match error.kind() {
