@@ -123,12 +123,16 @@ static void sc64_cmd_irq_callback (void) {
 
 
 const char *sc64_error_description (sc64_error_t error) {
+    if (error == SC64_OK) {
+        return "No error";
+    }
+
     sc64_error_type_t type = (sc64_error_type_t) ((error >> 24) & 0xFF);
     error &= 0xFFFFFF;
 
     if (type == ERROR_TYPE_CFG) {
         switch ((sc64_cfg_error_t) (error)) {
-            case SC64_OK: return "No error";
+            case CFG_OK: return "No error (CFG)";
             case CFG_ERROR_UNKNOWN_COMMAND: return "Unknown command";
             case CFG_ERROR_INVALID_ARGUMENT: return "Invalid argument";
             case CFG_ERROR_INVALID_ADDRESS: return "Invalid address";

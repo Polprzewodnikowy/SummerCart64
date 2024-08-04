@@ -7,13 +7,17 @@
 #include <stdint.h>
 
 
+#define SC64_OK (0)
+
+
 typedef enum {
+    ERROR_TYPE_OBSOLETE = 0,
     ERROR_TYPE_CFG = 1,
     ERROR_TYPE_SD_CARD = 2,
 } sc64_error_type_t;
 
 typedef enum {
-    SC64_OK = 0,
+    CFG_OK = 0,
     CFG_ERROR_UNKNOWN_COMMAND = 1,
     CFG_ERROR_INVALID_ARGUMENT = 2,
     CFG_ERROR_INVALID_ADDRESS = 3,
