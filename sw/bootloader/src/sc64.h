@@ -166,8 +166,10 @@ typedef enum {
 
 typedef enum {
     SC64_IRQ_NONE = 0,
-    SC64_IRQ_MCU = (1 << 0),
+    SC64_IRQ_BTN = (1 << 0),
     SC64_IRQ_CMD = (1 << 1),
+    SC64_IRQ_USB = (1 << 2),
+    SC64_IRQ_AUX = (1 << 3),
 } sc64_irq_t;
 
 
@@ -189,6 +191,8 @@ void sc64_lock (void);
 bool sc64_check_presence (void);
 
 void sc64_cmd_irq_enable (bool enable);
+void sc64_usb_irq_enable (bool enable);
+void sc64_aux_irq_enable (bool enable);
 sc64_irq_t sc64_irq_pending (void);
 void sc64_irq_callback (sc64_irq_t irq);
 

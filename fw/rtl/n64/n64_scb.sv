@@ -47,11 +47,18 @@ interface n64_scb ();
     logic cfg_pending;
     logic cfg_done;
     logic cfg_error;
-    logic cfg_irq;
     logic [7:0] cfg_cmd;
     logic [31:0] cfg_rdata [0:1];
     logic [31:0] cfg_wdata [0:1];
     logic [31:0] cfg_identifier;
+
+    logic btn_irq;
+    logic usb_irq;
+    logic aux_irq;
+
+    logic aux_pending;
+    logic [31:0] aux_rdata;
+    logic [31:0] aux_wdata;
 
     logic [15:0] save_count;
 
@@ -98,11 +105,18 @@ interface n64_scb ();
         input cfg_pending,
         output cfg_done,
         output cfg_error,
-        output cfg_irq,
         input cfg_cmd,
         input cfg_rdata,
         output cfg_wdata,
         output cfg_identifier,
+
+        output btn_irq,
+        output usb_irq,
+        output aux_irq,
+
+        input aux_pending,
+        input aux_rdata,
+        output aux_wdata,
 
         input save_count,
 
@@ -206,11 +220,18 @@ interface n64_scb ();
         output cfg_pending,
         input cfg_done,
         input cfg_error,
-        input cfg_irq,
         output cfg_cmd,
         output cfg_rdata,
         input cfg_wdata,
-        input cfg_identifier
+        input cfg_identifier,
+
+        input btn_irq,
+        input usb_irq,
+        input aux_irq,
+
+        output aux_pending,
+        output aux_rdata,
+        input aux_wdata
     );
 
     modport save_counter (

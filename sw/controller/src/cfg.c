@@ -141,9 +141,19 @@ static struct process p;
 
 
 static bool cfg_cmd_check (void) {
-    if (!p.cmd_queued) {
-        uint32_t reg = fpga_reg_get(REG_CFG_CMD);
+    uint32_t reg = fpga_reg_get(REG_CFG_CMD);
 
+    if (reg & CFG_CMD_AUX_PENDING) {
+        usb_tx_info_t packet_info;
+        usb_create_packet(&packet_info, PACKET_CMD_AUX_DATA);
+        packet_info.data_length = 4;
+        packet_info.data[0] = fpga_reg_get(REG_AUX);
+        if (usb_enqueue_packet(&packet_info)) {
+            fpga_reg_set(REG_CFG_CMD, CFG_CMD_AUX_DONE);
+        }
+    }
+
+    if (!p.cmd_queued) {
         if (!(reg & CFG_CMD_PENDING)) {
             return true;
         }

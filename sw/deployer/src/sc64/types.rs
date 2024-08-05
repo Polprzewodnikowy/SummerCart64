@@ -614,6 +614,7 @@ impl From<Setting> for [u32; 2] {
 }
 
 pub enum DataPacket {
+    AuxData(u32),
     Button,
     DataFlushed,
     DebugData(DebugPacket),
@@ -627,6 +628,7 @@ impl TryFrom<AsynchronousPacket> for DataPacket {
     type Error = Error;
     fn try_from(value: AsynchronousPacket) -> Result<Self, Self::Error> {
         Ok(match value.id {
+            b'X' => Self::AuxData(u32::from_be_bytes(value.data[0..4].try_into().unwrap())),
             b'B' => Self::Button,
             b'G' => Self::DataFlushed,
             b'U' => Self::DebugData(value.data.try_into()?),
@@ -1020,7 +1022,7 @@ impl Display for DiagnosticData {
 
 pub enum SpeedTestDirection {
     Read,
-    Write
+    Write,
 }
 
 pub enum MemoryTestPattern {

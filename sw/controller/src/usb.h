@@ -7,6 +7,7 @@
 
 
 typedef enum packet_cmd {
+    PACKET_CMD_AUX_DATA = 'X',
     PACKET_CMD_BUTTON_TRIGGER = 'B',
     PACKET_CMD_DATA_FLUSHED = 'G',
     PACKET_CMD_DEBUG_OUTPUT = 'U',

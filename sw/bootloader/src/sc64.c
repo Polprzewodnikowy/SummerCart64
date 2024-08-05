@@ -9,6 +9,7 @@ typedef struct {
     io32_t IDENTIFIER;
     io32_t KEY;
     io32_t IRQ;
+    io32_t AUX;
 } sc64_regs_t;
 
 #define SC64_REGS_BASE              (0x1FFF0000UL)
@@ -16,8 +17,10 @@ typedef struct {
 
 
 #define SC64_SR_CMD_IRQ_REQUEST     (1 << 8)
+#define SC64_SR_AUX_IRQ_PENDING     (1 << 26)
+#define SC64_SR_USB_IRQ_PENDING     (1 << 27)
 #define SC64_SR_CMD_IRQ_PENDING     (1 << 28)
-#define SC64_SR_MCU_IRQ_PENDING     (1 << 29)
+#define SC64_SR_BTN_IRQ_PENDING     (1 << 29)
 #define SC64_SR_CMD_ERROR           (1 << 30)
 #define SC64_SR_CPU_BUSY            (1 << 31)
 
@@ -28,8 +31,20 @@ typedef struct {
 #define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
 
+#define SC64_IRQ_AUX_ENABLE         (1 << 8)
+#define SC64_IRQ_AUX_DISABLE        (1 << 9)
+#define SC64_IRQ_USB_ENABLE         (1 << 10)
+#define SC64_IRQ_USB_DISABLE        (1 << 11)
+
+#define SC64_IRQ_AUX_MASK           (1 << 20)
+#define SC64_IRQ_USB_MASK           (1 << 21)
+#define SC64_IRQ_CMD_MASK           (1 << 22)
+#define SC64_IRQ_BTN_MASK           (1 << 23)
+
+#define SC64_IRQ_AUX_CLEAR          (1 << 28)
+#define SC64_IRQ_USB_CLEAR          (1 << 29)
 #define SC64_IRQ_CMD_CLEAR          (1 << 30)
-#define SC64_IRQ_MCU_CLEAR          (1 << 31)
+#define SC64_IRQ_BTN_CLEAR          (1 << 31)
 
 
 typedef enum {
@@ -109,16 +124,24 @@ static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
     return SC64_OK;
 }
 
-static void sc64_mcu_irq_callback (void) {
-    error_display("[Unexpected] SC64 MCU interrupt received");
+static void sc64_btn_irq_callback (void) {
+    error_display("[Unexpected] SC64 button pressed interrupt received");
 }
 
 static void sc64_cmd_irq_callback (void) {
     if (wait_cmd_irq) {
         wait_cmd_irq = false;
     } else {
-        error_display("[Unexpected] SC64 CMD interrupt received");
+        error_display("[Unexpected] SC64 command finish interrupt received");
     }
+}
+
+static void sc64_usb_irq_callback (void) {
+    error_display("[Unexpected] SC64 USB not empty interrupt received");
+}
+
+static void sc64_aux_irq_callback (void) {
+    error_display("[Unexpected] SC64 AUX not empty interrupt received");
 }
 
 
@@ -205,32 +228,58 @@ void sc64_cmd_irq_enable (bool enable) {
     use_cmd_irq = enable;
 }
 
+void sc64_usb_irq_enable (bool enable) {
+    pi_io_write(&SC64_REGS->IRQ, enable ? SC64_IRQ_USB_ENABLE : SC64_IRQ_USB_DISABLE);
+}
+
+void sc64_aux_irq_enable (bool enable) {
+    pi_io_write(&SC64_REGS->IRQ, enable ? SC64_IRQ_AUX_ENABLE : SC64_IRQ_AUX_DISABLE);
+}
+
 sc64_irq_t sc64_irq_pending (void) {
     uint32_t sr = pi_io_read(&SC64_REGS->SR_CMD);
     sc64_irq_t irq = SC64_IRQ_NONE;
-    if (sr & SC64_SR_MCU_IRQ_PENDING) {
-        irq |= SC64_IRQ_MCU;
+    if (sr & SC64_SR_BTN_IRQ_PENDING) {
+        irq |= SC64_IRQ_BTN;
     }
     if (sr & SC64_SR_CMD_IRQ_PENDING) {
         irq |= SC64_IRQ_CMD;
+    }
+    if (sr & SC64_SR_USB_IRQ_PENDING) {
+        irq |= SC64_IRQ_USB;
+    }
+    if (sr & SC64_SR_AUX_IRQ_PENDING) {
+        irq |= SC64_IRQ_AUX;
     }
     return irq;
 }
 
 void sc64_irq_callback (sc64_irq_t irq) {
     uint32_t clear = 0;
-    if (irq & SC64_IRQ_MCU) {
-        clear |= SC64_IRQ_MCU_CLEAR;
+    if (irq & SC64_IRQ_BTN) {
+        clear |= SC64_IRQ_BTN_CLEAR;
     }
     if (irq & SC64_IRQ_CMD) {
         clear |= SC64_IRQ_CMD_CLEAR;
     }
+    if (irq & SC64_IRQ_USB) {
+        clear |= SC64_IRQ_USB_CLEAR;
+    }
+    if (irq & SC64_IRQ_AUX) {
+        clear |= SC64_IRQ_AUX_CLEAR;
+    }
     pi_io_write(&SC64_REGS->IRQ, clear);
-    if (irq & SC64_IRQ_MCU) {
-        sc64_mcu_irq_callback();
+    if (irq & SC64_IRQ_BTN) {
+        sc64_btn_irq_callback();
     }
     if (irq & SC64_IRQ_CMD) {
         sc64_cmd_irq_callback();
+    }
+    if (irq & SC64_IRQ_USB) {
+        sc64_usb_irq_callback();
+    }
+    if (irq & SC64_IRQ_AUX) {
+        sc64_aux_irq_callback();
     }
     while (pi_busy());
 }

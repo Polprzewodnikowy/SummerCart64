@@ -360,7 +360,8 @@ module mcu_top (
         REG_DEBUG_0,
         REG_DEBUG_1,
         REG_CIC_0,
-        REG_CIC_1
+        REG_CIC_1,
+        REG_AUX
     } reg_address_e;
 
     logic bootloader_skip;
@@ -371,6 +372,8 @@ module mcu_top (
     logic dd_bm_ack;
 
     logic cic_invalid_region;
+
+    logic aux_pending;
 
 
     // Register read logic
@@ -459,7 +462,9 @@ module mcu_top (
 
                 REG_CFG_CMD: begin
                     reg_rdata <= {
-                        23'd0,
+                        19'd0,
+                        aux_pending,
+                        3'd0,
                         n64_scb.cfg_pending,
                         n64_scb.cfg_cmd
                     };
@@ -670,6 +675,10 @@ module mcu_top (
                 REG_CIC_1: begin
                     reg_rdata <= n64_scb.cic_checksum[31:0];
                 end
+
+                REG_AUX: begin
+                    reg_rdata <= n64_scb.aux_rdata;
+                end
             endcase
         end
     end
@@ -700,7 +709,10 @@ module mcu_top (
 
         n64_scb.cfg_done <= 1'b0;
         n64_scb.cfg_error <= 1'b0;
-        n64_scb.cfg_irq <= 1'b0;
+
+        n64_scb.btn_irq <= 1'b0;
+        n64_scb.usb_irq <= 1'b0;
+        n64_scb.aux_irq <= 1'b0;
 
         n64_scb.flashram_done <= 1'b0;
 
@@ -731,6 +743,10 @@ module mcu_top (
             cic_invalid_region <= 1'b1;
         end
 
+        if (n64_scb.aux_pending) begin
+            aux_pending <= 1'b1;
+        end
+
         if (reset) begin
             mcu_int <= 1'b0;
             sd_scb.clock_mode <= 2'd0;
@@ -755,6 +771,7 @@ module mcu_top (
             n64_scb.cic_region <= 1'b0;
             n64_scb.cic_seed <= 8'h3F;
             n64_scb.cic_checksum <= 48'hA536C0F1D859;
+            aux_pending <= 1'b0;
         end else if (reg_write) begin
             case (address)
                 REG_MEM_ADDRESS: begin
@@ -771,6 +788,7 @@ module mcu_top (
                 end
 
                 REG_USB_SCR: begin
+                    n64_scb.usb_irq <= reg_wdata[31];
                     usb_scb.write_buffer_flush <= reg_wdata[5];
                     usb_scb.reset_off_ack <= reg_wdata[4];
                     usb_scb.reset_on_ack <= reg_wdata[3];
@@ -820,10 +838,13 @@ module mcu_top (
 
                 REG_CFG_CMD: begin
                     {
-                        n64_scb.cfg_irq,
+                        n64_scb.btn_irq,
                         n64_scb.cfg_error,
                         n64_scb.cfg_done
                     } <= reg_wdata[11:9];
+                    if (reg_wdata[13]) begin
+                        aux_pending <= 1'b0;
+                    end
                 end
 
                 REG_FLASHRAM_SCR: begin
@@ -946,6 +967,11 @@ module mcu_top (
 
                 REG_CIC_1: begin
                     n64_scb.cic_checksum[31:0] <= reg_wdata;
+                end
+
+                REG_AUX: begin
+                    n64_scb.aux_irq <= 1'b1;
+                    n64_scb.aux_wdata <= reg_wdata;
                 end
             endcase
         end

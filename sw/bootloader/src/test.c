@@ -566,6 +566,8 @@ void test_execute (void) {
     pi_io_config(0x0F, 0x05, 0x0C, 0x02);
 
     sc64_cmd_irq_enable(true);
+    sc64_usb_irq_enable(true);
+    sc64_aux_irq_enable(true);
 
     if ((error = sc64_set_config(CFG_ID_ROM_WRITE_ENABLE, true)) != SC64_OK) {
         error_display("Command CONFIG_SET [ROM_WRITE_ENABLE] failed\n (%08X) - %s", error, sc64_error_description(error));

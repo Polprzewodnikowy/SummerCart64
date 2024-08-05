@@ -21,16 +21,29 @@ module n64_cfg (
         REG_KEY_H,
         REG_KEY_L,
         REG_IRQ_H,
-        REG_IRQ_L
+        REG_IRQ_L,
+        REG_AUX_H,
+        REG_AUX_L
     } e_reg;
 
     logic cmd_error;
     logic cmd_irq_request;
     logic cmd_irq;
-    logic mcu_irq;
+
+    logic btn_irq;
+    logic usb_irq;
+    logic aux_irq;
+
+    logic usb_irq_enabled;
+    logic aux_irq_enabled;
 
     always_ff @(posedge clk) begin
-        irq <= (cmd_irq || mcu_irq);
+        irq <= (
+            cmd_irq ||
+            btn_irq ||
+            (usb_irq_enabled && usb_irq) ||
+            (aux_irq_enabled && aux_irq)
+        );
     end
 
     always_comb begin
@@ -40,9 +53,11 @@ module n64_cfg (
                 REG_STATUS: reg_bus.rdata = {
                     n64_scb.cfg_pending,
                     cmd_error,
-                    mcu_irq,
+                    btn_irq,
                     cmd_irq,
-                    12'd0
+                    usb_irq,
+                    aux_irq,
+                    10'd0
                 };
                 REG_COMMAND: reg_bus.rdata = {7'd0, cmd_irq_request, n64_scb.cfg_cmd};
                 REG_DATA_0_H: reg_bus.rdata = n64_scb.cfg_wdata[0][31:16];
@@ -53,8 +68,17 @@ module n64_cfg (
                 REG_IDENTIFIER_L: reg_bus.rdata = n64_scb.cfg_identifier[15:0];
                 REG_KEY_H: reg_bus.rdata = 16'd0;
                 REG_KEY_L: reg_bus.rdata = 16'd0;
-                REG_IRQ_H: reg_bus.rdata = 16'd0;
+                REG_IRQ_H: reg_bus.rdata = {
+                    8'd0,
+                    1'b1,
+                    1'b1,
+                    usb_irq_enabled,
+                    aux_irq_enabled,
+                    4'd0
+                };
                 REG_IRQ_L: reg_bus.rdata = 16'd0;
+                REG_AUX_H: reg_bus.rdata = n64_scb.aux_wdata[31:16];
+                REG_AUX_L: reg_bus.rdata = n64_scb.aux_wdata[15:0];
             endcase
         end
     end
@@ -63,14 +87,26 @@ module n64_cfg (
     logic lock_sequence_counter;
 
     always_ff @(posedge clk) begin
+        n64_scb.aux_pending <= 1'b0;
+
         if (n64_scb.cfg_pending && n64_scb.cfg_done) begin
             n64_scb.cfg_pending <= 1'b0;
             cmd_irq <= cmd_irq_request;
             cmd_error <= n64_scb.cfg_error;
         end
 
-        if (n64_scb.cfg_irq) begin
-            mcu_irq <= 1'b1;
+        if (n64_scb.cfg_unlock) begin
+            if (n64_scb.btn_irq) begin
+                btn_irq <= 1'b1;
+            end
+
+            if (n64_scb.usb_irq) begin
+                usb_irq <= 1'b1;
+            end
+
+            if (n64_scb.aux_irq) begin
+                aux_irq <= 1'b1;
+            end
         end
 
         if (unlock_flag) begin
@@ -84,13 +120,21 @@ module n64_cfg (
             cmd_error <= 1'b0;
             cmd_irq_request <= 1'b0;
             cmd_irq <= 1'b0;
-            mcu_irq <= 1'b0;
+            btn_irq <= 1'b0;
+            usb_irq <= 1'b0;
+            aux_irq <= 1'b0;
+            usb_irq_enabled <= 1'b0;
+            aux_irq_enabled <= 1'b0;
             lock_sequence_counter <= 1'd0;
         end else if (n64_scb.n64_reset || n64_scb.n64_nmi) begin
             n64_scb.cfg_unlock <= 1'b0;
             cmd_irq_request <= 1'b0;
             cmd_irq <= 1'b0;
-            mcu_irq <= 1'b0;
+            btn_irq <= 1'b0;
+            usb_irq <= 1'b0;
+            aux_irq <= 1'b0;
+            usb_irq_enabled <= 1'b0;
+            aux_irq_enabled <= 1'b0;
             lock_sequence_counter <= 1'd0;
         end else if (n64_scb.cfg_unlock) begin
             if (reg_bus.write && reg_bus.address[16] && (reg_bus.address[15:5] == 11'd0)) begin
@@ -129,7 +173,7 @@ module n64_cfg (
                     end
 
                     REG_IDENTIFIER_H: begin
-                        mcu_irq <= 1'b0;
+                        btn_irq <= 1'b0;
                     end
 
                     REG_KEY_H, REG_KEY_L: begin
@@ -142,14 +186,44 @@ module n64_cfg (
                                 n64_scb.cfg_unlock <= 1'b0;
                                 cmd_irq_request <= 1'b0;
                                 cmd_irq <= 1'b0;
-                                mcu_irq <= 1'b0;
+                                btn_irq <= 1'b0;
+                                usb_irq <= 1'b0;
+                                aux_irq <= 1'b0;
+                                usb_irq_enabled <= 1'b0;
+                                aux_irq_enabled <= 1'b0;
                             end
                         end
                     end
 
                     REG_IRQ_H: begin
-                        mcu_irq <= (reg_bus.wdata[15] ? 1'b0 : mcu_irq);
+                        btn_irq <= (reg_bus.wdata[15] ? 1'b0 : btn_irq);
                         cmd_irq <= (reg_bus.wdata[14] ? 1'b0 : cmd_irq);
+                        usb_irq <= (reg_bus.wdata[13] ? 1'b0 : usb_irq);
+                        aux_irq <= (reg_bus.wdata[12] ? 1'b0 : aux_irq);
+                    end
+
+                    REG_IRQ_L: begin
+                        if (reg_bus.wdata[11]) begin
+                            usb_irq_enabled <= 1'b0;
+                        end
+                        if (reg_bus.wdata[10]) begin
+                            usb_irq_enabled <= 1'b1;
+                        end
+                        if (reg_bus.wdata[9]) begin
+                            aux_irq_enabled <= 1'b0;
+                        end
+                        if (reg_bus.wdata[8]) begin
+                            aux_irq_enabled <= 1'b1;
+                        end
+                    end
+
+                    REG_AUX_H: begin
+                        n64_scb.aux_rdata[31:16] <= reg_bus.wdata;
+                    end
+
+                    REG_AUX_L: begin
+                        n64_scb.aux_pending <= 1'b1;
+                        n64_scb.aux_rdata[15:0] <= reg_bus.wdata;
                     end
                 endcase
             end
