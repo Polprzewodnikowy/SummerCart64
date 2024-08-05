@@ -476,7 +476,11 @@ module n64_pi (
 
     // Reg bus controller
 
+    logic reg_bus_address_increment;
+
     always_ff @(posedge clk) begin
+        reg_bus_address_increment <= read_op || write_op;
+
         if (aleh_op) begin
             reg_bus.address[16] <= n64_pi_dq_in[0];
         end
@@ -485,15 +489,13 @@ module n64_pi (
             reg_bus.address[15:0] <= n64_pi_dq_in;
         end
 
-        if (read_op || write_op) begin
+        if (reg_bus_address_increment) begin
             reg_bus.address <= reg_bus.address + 2'd2;
         end
-    end
 
-    always_comb begin
-        reg_bus.read = read_op && (read_port == PORT_REG);
-        reg_bus.write = write_op && (write_port == PORT_REG);
-        reg_bus.wdata = n64_pi_dq_in;
+        reg_bus.read <= read_op && (read_port == PORT_REG);
+        reg_bus.write <= write_op && (write_port == PORT_REG);
+        reg_bus.wdata <= n64_pi_dq_in;
     end
 
 endmodule

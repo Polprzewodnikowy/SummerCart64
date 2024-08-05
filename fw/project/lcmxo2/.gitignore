@@ -11,6 +11,7 @@
 *.tcl
 *.tpf
 *.trc
+*.txt
 *.xml
 impl*/
 

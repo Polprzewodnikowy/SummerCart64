@@ -1,7 +1,12 @@
-#include "version.h"
+#include "display.h"
 
 
-static version_t version = {
+const struct {
+    const char *git_branch;
+    const char *git_tag;
+    const char *git_sha;
+    const char *git_message;
+} version = {
 #ifdef GIT_BRANCH
     .git_branch = GIT_BRANCH,
 #else
@@ -29,6 +34,10 @@ static version_t version = {
 };
 
 
-version_t *version_get (void) {
-    return &version;
+void version_print (void) {
+    display_printf("[ SC64 bootloader metadata ]\n");
+    display_printf("branch: %s | tag: %s\n", version.git_branch, version.git_tag);
+    display_printf("sha: %s\n", version.git_sha);
+    display_printf("msg: %s\n", version.git_message);
+    display_printf("\n");
 }

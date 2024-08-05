@@ -57,6 +57,7 @@ typedef enum {
     REG_DEBUG_1,
     REG_CIC_0,
     REG_CIC_1,
+    REG_AUX,
 } fpga_reg_t;
 
 
@@ -89,6 +90,7 @@ typedef enum {
 #define USB_SCR_RESET_STATE             (1 << 28)
 #define USB_SCR_PWRSAV                  (1 << 29)
 #define USB_SCR_FIFO_FLUSH_BUSY         (1 << 30)
+#define USB_SCR_IRQ                     (1 << 31)
 
 #define DMA_SCR_START                   (1 << 0)
 #define DMA_SCR_STOP                    (1 << 1)
@@ -115,7 +117,9 @@ typedef enum {
 #define CFG_CMD_PENDING                 (1 << 8)
 #define CFG_CMD_DONE                    (1 << 9)
 #define CFG_CMD_ERROR                   (1 << 10)
-#define CFG_CMD_IRQ                     (1 << 11)
+#define CFG_CMD_BTN_IRQ                 (1 << 11)
+#define CFG_CMD_AUX_PENDING             (1 << 12)
+#define CFG_CMD_AUX_DONE                (1 << 13)
 
 #define FLASHRAM_SCR_DONE               (1 << 0)
 #define FLASHRAM_SCR_PENDING            (1 << 1)

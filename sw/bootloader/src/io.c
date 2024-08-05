@@ -1,3 +1,4 @@
+#include "interrupts.h"
 #include "io.h"
 #include "vr4300.h"
 
@@ -11,7 +12,7 @@ static void cache_operation (uint8_t operation, uint8_t line_size, void *address
             [cache_address] "r" (cache_address)
         );
         cache_address += line_size;
-    }    
+    }
 }
 
 void cache_data_hit_writeback_invalidate (void *address, size_t length) {
@@ -72,26 +73,39 @@ uint32_t pi_busy (void) {
 }
 
 uint32_t pi_io_read (io32_t *address) {
-    return cpu_io_read(address);
+    uint32_t value;
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        value = cpu_io_read(address);
+    });
+    return value;
 }
 
 void pi_io_write (io32_t *address, uint32_t value) {
-    cpu_io_write(address, value);
-    while (pi_busy());
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(address, value);
+    });
 }
 
 void pi_dma_read (io32_t *address, void *buffer, size_t length) {
     cache_data_hit_writeback_invalidate(buffer, length);
-    cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
-    cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
-    cpu_io_write(&PI->WDMA, length - 1);
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
+        cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&PI->WDMA, length - 1);
+    });
     while (pi_busy());
 }
 
 void pi_dma_write (io32_t *address, void *buffer, size_t length) {
     cache_data_hit_writeback(buffer, length);
-    cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
-    cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
-    cpu_io_write(&PI->RDMA, length - 1);
+    WITH_INTERRUPTS_DISABLED({
+        while (pi_busy());
+        cpu_io_write(&PI->PADDR, (uint32_t) (PHYSICAL(address)));
+        cpu_io_write(&PI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&PI->RDMA, length - 1);
+    });
     while (pi_busy());
 }

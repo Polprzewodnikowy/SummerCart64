@@ -230,6 +230,11 @@ impl SC64 {
         Ok(())
     }
 
+    fn command_aux_write(&mut self, data: u32) -> Result<(), Error> {
+        self.link.execute_command(b'X', [data, 0], &[])?;
+        Ok(())
+    }
+
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
         self.link.execute_command(b'D', [error as u32, 0], &[])?;
         Ok(())
@@ -564,6 +569,33 @@ impl SC64 {
 
     pub fn send_debug_packet(&mut self, debug_packet: DebugPacket) -> Result<(), Error> {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
+    }
+
+    pub fn aux_send(&mut self, data: u32) -> Result<(), Error> {
+        self.command_aux_write(data)
+    }
+
+    pub fn aux_send_and_receive(
+        &mut self,
+        data: u32,
+        timeout: std::time::Duration,
+    ) -> Result<Option<u32>, Error> {
+        self.aux_send(data)?;
+        let reply_timeout = std::time::Instant::now();
+        loop {
+            match self.receive_data_packet()? {
+                Some(packet) => match packet {
+                    DataPacket::AuxData(data) => {
+                        return Ok(Some(data));
+                    }
+                    _ => {}
+                },
+                None => {}
+            }
+            if reply_timeout.elapsed() > timeout {
+                return Ok(None);
+            }
+        }
     }
 
     pub fn check_device(&mut self) -> Result<(), Error> {

@@ -231,9 +231,6 @@ static void usb_rx_process (void) {
             p.response_info.data_length = 0;
             p.response_info.dma_length = 0;
             p.response_info.done_callback = NULL;
-            if (p.rx_cmd == 'U') {
-                timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
-            }
         }
     }
 
@@ -243,6 +240,10 @@ static void usb_rx_process (void) {
             if (p.rx_counter == 2) {
                 p.rx_counter = 0;
                 p.rx_state = RX_STATE_DATA;
+                if ((p.rx_cmd == 'U') && (p.rx_args[0] > 0)) {
+                    fpga_reg_set(REG_USB_SCR, USB_SCR_IRQ);
+                    timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
+                }
                 break;
             }
         }
@@ -375,6 +376,12 @@ static void usb_rx_process (void) {
                         p.flush_packet = true;
                     }
                 }
+                break;
+
+            case 'X':
+                fpga_reg_set(REG_AUX, p.rx_args[0]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
                 break;
 
             case 'D':

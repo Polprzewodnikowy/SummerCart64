@@ -87,6 +87,10 @@ struct UploadArgs {
     /// Path to the ROM file
     rom: PathBuf,
 
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short, long)]
+    reboot: bool,
+
     /// Path to the save file
     #[arg(short, long)]
     save: Option<PathBuf>,
@@ -363,7 +367,28 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 }
 
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
+    const AUX_TOKEN_UPLOAD_START: u32 = 0xFF000001;
+    const AUX_TOKEN_REBOOT: u32 = 0xFF000002;
+
     let mut sc64 = init_sc64(connection, true)?;
+
+    if args.reboot {
+        match sc64.aux_send_and_receive(
+            AUX_TOKEN_UPLOAD_START,
+            std::time::Duration::from_millis(500),
+        )? {
+            Some(data) => println!(
+                "{}",
+                format!("N64 reboot prepare successful (0x{data:08X})")
+                    .bright_green()
+                    .bold()
+            ),
+            None => println!(
+                "{}",
+                "N64 reboot prepare unsuccessful".bright_yellow().bold()
+            ),
+        }
+    }
 
     sc64.reset_state()?;
 
@@ -409,6 +434,10 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
     }
 
     sc64.calculate_cic_parameters(args.cic_seed)?;
+
+    if args.reboot {
+        sc64.aux_send(AUX_TOKEN_REBOOT)?;
+    }
 
     Ok(())
 }

@@ -1,4 +1,3 @@
-#include <stdbool.h>
 #include <stdio.h>
 #include "display.h"
 #include "font.h"
@@ -179,6 +178,10 @@ void display_init (uint32_t *background) {
         cpu_io_write(&VI->V_SCALE, cfg->V_SCALE);
         cpu_io_write(&VI->CR, cfg->CR);
     }
+}
+
+bool display_ready (void) {
+    return vi_configured;
 }
 
 void display_vprintf (const char *fmt, va_list args) {

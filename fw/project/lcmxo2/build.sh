@@ -4,6 +4,8 @@ set -e
 
 source $bindir/diamond_env
 
+printf "[$(hostname)]\nSYSTEM=Linux\nCORENUM=$(nproc --all)\n" > $(dirname $0)/multicore.txt
+
 diamondc build.tcl
 
 MINIMUM_FREQ=$(cat impl1/sc64_impl1.twr \
