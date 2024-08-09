@@ -13,10 +13,10 @@ pub use self::{
     link::list_local_devices,
     server::ServerEvent,
     types::{
-        BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, ISViewer,
-        MemoryTestPattern, MemoryTestPatternResult, SaveType, SaveWriteback, SpeedTestDirection,
-        Switch, TvType,
+        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState,
+        DdDriveType, DdMode, DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind,
+        FpgaDebugData, ISViewer, MemoryTestPattern, MemoryTestPatternResult, SaveType,
+        SaveWriteback, SpeedTestDirection, Switch, TvType,
     },
 };
 
@@ -596,6 +596,15 @@ impl SC64 {
                 return Ok(None);
             }
         }
+    }
+
+    pub fn aux_try_notify(&mut self, message: AuxMessage) -> Result<bool, Error> {
+        let value: u32 = message.into();
+        let timeout = std::time::Duration::from_millis(500);
+        if let Some(response) = self.aux_send_and_receive(value, timeout)? {
+            return Ok(value == response);
+        }
+        Ok(false)
     }
 
     pub fn check_device(&mut self) -> Result<(), Error> {

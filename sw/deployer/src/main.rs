@@ -140,6 +140,10 @@ struct _64DDArgs {
     #[arg(short, long)]
     rom: Option<PathBuf>,
 
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short, long)]
+    reboot: bool,
+
     /// Path to the save file (also used by save writeback mechanism)
     #[arg(short, long, requires = "rom")]
     save: Option<PathBuf>,
@@ -367,27 +371,13 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 }
 
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
-    const AUX_TOKEN_UPLOAD_START: u32 = 0xFF000001;
-    const AUX_TOKEN_REBOOT: u32 = 0xFF000002;
-
     let mut sc64 = init_sc64(connection, true)?;
 
-    if args.reboot {
-        match sc64.aux_send_and_receive(
-            AUX_TOKEN_UPLOAD_START,
-            std::time::Duration::from_millis(500),
-        )? {
-            Some(data) => println!(
-                "{}",
-                format!("N64 reboot prepare successful (0x{data:08X})")
-                    .bright_green()
-                    .bold()
-            ),
-            None => println!(
-                "{}",
-                "N64 reboot prepare unsuccessful".bright_yellow().bold()
-            ),
-        }
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::IOHalt)? {
+        println!(
+            "{}",
+            "Warning: no response for [IOHalt] AUX message".bright_yellow()
+        );
     }
 
     sc64.reset_state()?;
@@ -435,8 +425,11 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
 
     sc64.calculate_cic_parameters(args.cic_seed)?;
 
-    if args.reboot {
-        sc64.aux_send(AUX_TOKEN_REBOOT)?;
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
     }
 
     Ok(())
@@ -476,6 +469,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin"
             .bright_green()
     );
+
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::IOHalt)? {
+        println!(
+            "{}",
+            "Warning: no response for [IOHalt] AUX message".bright_yellow()
+        );
+    }
 
     sc64.reset_state()?;
 
@@ -586,6 +586,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
 
     sc64.set_save_writeback(true)?;
+
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
+    }
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {

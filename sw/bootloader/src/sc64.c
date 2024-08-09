@@ -4,7 +4,7 @@
 
 
 typedef struct {
-    io32_t SR_CMD;
+    io32_t SCR;
     io32_t DATA[2];
     io32_t IDENTIFIER;
     io32_t KEY;
@@ -16,13 +16,17 @@ typedef struct {
 #define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
 
 
-#define SC64_SR_CMD_IRQ_REQUEST     (1 << 8)
-#define SC64_SR_AUX_IRQ_PENDING     (1 << 26)
-#define SC64_SR_USB_IRQ_PENDING     (1 << 27)
-#define SC64_SR_CMD_IRQ_PENDING     (1 << 28)
-#define SC64_SR_BTN_IRQ_PENDING     (1 << 29)
-#define SC64_SR_CMD_ERROR           (1 << 30)
-#define SC64_SR_CPU_BUSY            (1 << 31)
+#define SC64_SCR_CPU_BUSY           (1 << 31)
+#define SC64_SCR_CMD_ERROR          (1 << 30)
+#define SC64_SCR_BTN_IRQ_PENDING    (1 << 29)
+#define SC64_SCR_BTN_IRQ_MASK       (1 << 28)
+#define SC64_SCR_CMD_IRQ_PENDING    (1 << 27)
+#define SC64_SCR_CMD_IRQ_MASK       (1 << 26)
+#define SC64_SCR_USB_IRQ_PENDING    (1 << 25)
+#define SC64_SCR_USB_IRQ_MASK       (1 << 24)
+#define SC64_SCR_AUX_IRQ_PENDING    (1 << 23)
+#define SC64_SCR_AUX_IRQ_MASK       (1 << 22)
+#define SC64_SCR_CMD_IRQ_REQUEST    (1 << 8)
 
 #define SC64_V2_IDENTIFIER          (0x53437632)
 
@@ -31,20 +35,14 @@ typedef struct {
 #define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
 
-#define SC64_IRQ_AUX_ENABLE         (1 << 8)
-#define SC64_IRQ_AUX_DISABLE        (1 << 9)
-#define SC64_IRQ_USB_ENABLE         (1 << 10)
-#define SC64_IRQ_USB_DISABLE        (1 << 11)
-
-#define SC64_IRQ_AUX_MASK           (1 << 20)
-#define SC64_IRQ_USB_MASK           (1 << 21)
-#define SC64_IRQ_CMD_MASK           (1 << 22)
-#define SC64_IRQ_BTN_MASK           (1 << 23)
-
-#define SC64_IRQ_AUX_CLEAR          (1 << 28)
-#define SC64_IRQ_USB_CLEAR          (1 << 29)
-#define SC64_IRQ_CMD_CLEAR          (1 << 30)
 #define SC64_IRQ_BTN_CLEAR          (1 << 31)
+#define SC64_IRQ_CMD_CLEAR          (1 << 30)
+#define SC64_IRQ_USB_CLEAR          (1 << 29)
+#define SC64_IRQ_AUX_CLEAR          (1 << 28)
+#define SC64_IRQ_USB_DISABLE        (1 << 11)
+#define SC64_IRQ_USB_ENABLE         (1 << 10)
+#define SC64_IRQ_AUX_DISABLE        (1 << 9)
+#define SC64_IRQ_AUX_ENABLE         (1 << 8)
 
 
 typedef enum {
@@ -101,20 +99,20 @@ static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
 
     if (use_cmd_irq) {
         wait_cmd_irq = true;
-        pi_io_write(&SC64_REGS->SR_CMD, (SC64_SR_CMD_IRQ_REQUEST | (cmd->id & 0xFF)));
+        pi_io_write(&SC64_REGS->SCR, (SC64_SCR_CMD_IRQ_REQUEST | (cmd->id & 0xFF)));
         while (wait_cmd_irq);
-        sr = pi_io_read(&SC64_REGS->SR_CMD);
-        if (sr & SC64_SR_CPU_BUSY) {
+        sr = pi_io_read(&SC64_REGS->SCR);
+        if (sr & SC64_SCR_CPU_BUSY) {
             error_display("[Unexpected] SC64 CMD busy flag set");
         }
     } else {
-        pi_io_write(&SC64_REGS->SR_CMD, (cmd->id & 0xFF));
+        pi_io_write(&SC64_REGS->SCR, (cmd->id & 0xFF));
         do {
-            sr = pi_io_read(&SC64_REGS->SR_CMD);
-        } while (sr & SC64_SR_CPU_BUSY);
+            sr = pi_io_read(&SC64_REGS->SCR);
+        } while (sr & SC64_SCR_CPU_BUSY);
     }
 
-    if (sr & SC64_SR_CMD_ERROR) {
+    if (sr & SC64_SCR_CMD_ERROR) {
         return (sc64_error_t) (pi_io_read(&SC64_REGS->DATA[0]));
     }
 
@@ -218,7 +216,7 @@ void sc64_lock (void) {
 bool sc64_check_presence (void) {
     bool detected = (pi_io_read(&SC64_REGS->IDENTIFIER) == SC64_V2_IDENTIFIER);
     if (detected) {
-        while (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_CPU_BUSY);
+        while (pi_io_read(&SC64_REGS->SCR) & SC64_SCR_CPU_BUSY);
     }
     return detected;
 }
@@ -237,18 +235,18 @@ void sc64_aux_irq_enable (bool enable) {
 }
 
 sc64_irq_t sc64_irq_pending (void) {
-    uint32_t sr = pi_io_read(&SC64_REGS->SR_CMD);
+    uint32_t sr = pi_io_read(&SC64_REGS->SCR);
     sc64_irq_t irq = SC64_IRQ_NONE;
-    if (sr & SC64_SR_BTN_IRQ_PENDING) {
+    if ((sr & SC64_SCR_BTN_IRQ_MASK) && (sr & SC64_SCR_BTN_IRQ_PENDING)) {
         irq |= SC64_IRQ_BTN;
     }
-    if (sr & SC64_SR_CMD_IRQ_PENDING) {
+    if ((sr & SC64_SCR_CMD_IRQ_MASK) && (sr & SC64_SCR_CMD_IRQ_PENDING)) {
         irq |= SC64_IRQ_CMD;
     }
-    if (sr & SC64_SR_USB_IRQ_PENDING) {
+    if ((sr & SC64_SCR_USB_IRQ_MASK) && (sr & SC64_SCR_USB_IRQ_PENDING)) {
         irq |= SC64_IRQ_USB;
     }
-    if (sr & SC64_SR_AUX_IRQ_PENDING) {
+    if ((sr & SC64_SCR_AUX_IRQ_MASK) && (sr & SC64_SCR_AUX_IRQ_PENDING)) {
         irq |= SC64_IRQ_AUX;
     }
     return irq;

@@ -34,16 +34,23 @@ module n64_cfg (
     logic usb_irq;
     logic aux_irq;
 
-    logic usb_irq_enabled;
-    logic aux_irq_enabled;
+    logic btn_irq_mask;
+    logic cmd_irq_mask;
+    logic usb_irq_mask;
+    logic aux_irq_mask;
 
     always_ff @(posedge clk) begin
         irq <= (
-            cmd_irq ||
-            btn_irq ||
-            (usb_irq_enabled && usb_irq) ||
-            (aux_irq_enabled && aux_irq)
+            (btn_irq && btn_irq_mask) ||
+            (cmd_irq && cmd_irq_mask) ||
+            (usb_irq && usb_irq_mask) ||
+            (aux_irq && aux_irq_mask)
         );
+    end
+
+    always_comb begin
+        btn_irq_mask = 1'b1;
+        cmd_irq_mask = 1'b1;
     end
 
     always_comb begin
@@ -54,10 +61,14 @@ module n64_cfg (
                     n64_scb.cfg_pending,
                     cmd_error,
                     btn_irq,
+                    btn_irq_mask,
                     cmd_irq,
+                    cmd_irq_mask,
                     usb_irq,
+                    usb_irq_mask,
                     aux_irq,
-                    10'd0
+                    aux_irq_mask,
+                    6'd0
                 };
                 REG_COMMAND: reg_bus.rdata = {7'd0, cmd_irq_request, n64_scb.cfg_cmd};
                 REG_DATA_0_H: reg_bus.rdata = n64_scb.cfg_wdata[0][31:16];
@@ -68,14 +79,7 @@ module n64_cfg (
                 REG_IDENTIFIER_L: reg_bus.rdata = n64_scb.cfg_identifier[15:0];
                 REG_KEY_H: reg_bus.rdata = 16'd0;
                 REG_KEY_L: reg_bus.rdata = 16'd0;
-                REG_IRQ_H: reg_bus.rdata = {
-                    8'd0,
-                    1'b1,
-                    1'b1,
-                    usb_irq_enabled,
-                    aux_irq_enabled,
-                    4'd0
-                };
+                REG_IRQ_H: reg_bus.rdata = 16'd0;
                 REG_IRQ_L: reg_bus.rdata = 16'd0;
                 REG_AUX_H: reg_bus.rdata = n64_scb.aux_wdata[31:16];
                 REG_AUX_L: reg_bus.rdata = n64_scb.aux_wdata[15:0];
@@ -119,22 +123,22 @@ module n64_cfg (
             n64_scb.cfg_cmd <= 8'h00;
             cmd_error <= 1'b0;
             cmd_irq_request <= 1'b0;
-            cmd_irq <= 1'b0;
             btn_irq <= 1'b0;
+            cmd_irq <= 1'b0;
             usb_irq <= 1'b0;
             aux_irq <= 1'b0;
-            usb_irq_enabled <= 1'b0;
-            aux_irq_enabled <= 1'b0;
+            usb_irq_mask <= 1'b0;
+            aux_irq_mask <= 1'b0;
             lock_sequence_counter <= 1'd0;
         end else if (n64_scb.n64_reset || n64_scb.n64_nmi) begin
             n64_scb.cfg_unlock <= 1'b0;
             cmd_irq_request <= 1'b0;
-            cmd_irq <= 1'b0;
             btn_irq <= 1'b0;
+            cmd_irq <= 1'b0;
             usb_irq <= 1'b0;
             aux_irq <= 1'b0;
-            usb_irq_enabled <= 1'b0;
-            aux_irq_enabled <= 1'b0;
+            usb_irq_mask <= 1'b0;
+            aux_irq_mask <= 1'b0;
             lock_sequence_counter <= 1'd0;
         end else if (n64_scb.cfg_unlock) begin
             if (reg_bus.write && reg_bus.address[16] && (reg_bus.address[15:5] == 11'd0)) begin
@@ -185,12 +189,12 @@ module n64_cfg (
                             if (reg_bus.wdata == 16'hFFFF) begin
                                 n64_scb.cfg_unlock <= 1'b0;
                                 cmd_irq_request <= 1'b0;
-                                cmd_irq <= 1'b0;
                                 btn_irq <= 1'b0;
+                                cmd_irq <= 1'b0;
                                 usb_irq <= 1'b0;
                                 aux_irq <= 1'b0;
-                                usb_irq_enabled <= 1'b0;
-                                aux_irq_enabled <= 1'b0;
+                                usb_irq_mask <= 1'b0;
+                                aux_irq_mask <= 1'b0;
                             end
                         end
                     end
@@ -203,17 +207,18 @@ module n64_cfg (
                     end
 
                     REG_IRQ_L: begin
-                        if (reg_bus.wdata[11]) begin
-                            usb_irq_enabled <= 1'b0;
-                        end
                         if (reg_bus.wdata[10]) begin
-                            usb_irq_enabled <= 1'b1;
+                            usb_irq_mask <= 1'b1;
+                        end
+                        if (reg_bus.wdata[11]) begin
+                            usb_irq_mask <= 1'b0;
+                        end
+
+                        if (reg_bus.wdata[8]) begin
+                            aux_irq_mask <= 1'b1;
                         end
                         if (reg_bus.wdata[9]) begin
-                            aux_irq_enabled <= 1'b0;
-                        end
-                        if (reg_bus.wdata[8]) begin
-                            aux_irq_enabled <= 1'b1;
+                            aux_irq_mask <= 1'b0;
                         end
                     end
 
