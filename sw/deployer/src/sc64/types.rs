@@ -651,14 +651,14 @@ impl TryFrom<AsynchronousPacket> for DataPacket {
 }
 
 pub enum AuxMessage {
-    IOHalt,
+    Halt,
     Reboot,
 }
 
 impl From<AuxMessage> for u32 {
     fn from(value: AuxMessage) -> Self {
         match value {
-            AuxMessage::IOHalt => 0xFF000001,
+            AuxMessage::Halt => 0xFF000001,
             AuxMessage::Reboot => 0xFF000002,
         }
     }

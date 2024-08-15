@@ -205,9 +205,9 @@ All `DATA` values with upper 8 bits set to `1` (`0xFFxxxxxx`) are reserved for i
 Refrain from using these values in your app for uses other than listed below.
 Currently defined reserved `DATA` values are:
 
- - `0xFF000001` - **IO Halt** - causes the running app to stop all cartridge IO activity (PI bus and Joybus) in preparation for uploading new ROM to the SC64.
+ - `0xFF000001` - **Halt** - causes the running app to stop all activity and wait in preparation for uploading new ROM to the SC64.
  App still should listen to the AUX interrupt and respond to other messages.
- - `0xFF000002` - **Reboot** - causes the running app to perform soft reset by reloading IPL3 from the ROM and start executing it.
+ - `0xFF000002` - **Reboot** - causes the running app to perform soft reboot by reloading IPL3 from the ROM and start executing it.
 
 App running on the N64 shall respond to the AUX message with the same `DATA` value as incoming event for all events listed above, unless it's specified otherwise.
 

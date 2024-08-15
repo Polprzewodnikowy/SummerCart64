@@ -88,7 +88,7 @@ struct UploadArgs {
     rom: PathBuf,
 
     /// Attempt to reboot the console (requires specific support in the running game)
-    #[arg(short, long)]
+    #[arg(short = 'a', long)]
     reboot: bool,
 
     /// Path to the save file
@@ -141,7 +141,7 @@ struct _64DDArgs {
     rom: Option<PathBuf>,
 
     /// Attempt to reboot the console (requires specific support in the running game)
-    #[arg(short, long)]
+    #[arg(short = 'a', long)]
     reboot: bool,
 
     /// Path to the save file (also used by save writeback mechanism)
@@ -373,10 +373,10 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::IOHalt)? {
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Halt)? {
         println!(
             "{}",
-            "Warning: no response for [IOHalt] AUX message".bright_yellow()
+            "Warning: no response for [Halt] AUX message".bright_yellow()
         );
     }
 
@@ -470,10 +470,10 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
             .bright_green()
     );
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::IOHalt)? {
+    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Halt)? {
         println!(
             "{}",
-            "Warning: no response for [IOHalt] AUX message".bright_yellow()
+            "Warning: no response for [Halt] AUX message".bright_yellow()
         );
     }
 
