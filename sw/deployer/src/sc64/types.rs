@@ -833,6 +833,90 @@ impl TryFrom<u32> for UpdateStatus {
     }
 }
 
+pub enum PiIODirection {
+    Read,
+    Write,
+}
+
+impl Display for PiIODirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Read => "read",
+            Self::Write => "written",
+        })
+    }
+}
+
+pub struct PiIOAccess {
+    pub address: u32,
+    pub count: u32,
+    pub direction: PiIODirection,
+}
+
+impl From<&[u8; 8]> for PiIOAccess {
+    fn from(value: &[u8; 8]) -> Self {
+        let address = u32::from_be_bytes(value[0..4].try_into().unwrap());
+        let info = u32::from_be_bytes(value[4..8].try_into().unwrap());
+        let count = (info >> 8) & 0x1FFFF;
+        let direction = if (info & (1 << 25)) == 0 {
+            PiIODirection::Read
+        } else {
+            PiIODirection::Write
+        };
+        PiIOAccess {
+            address,
+            count,
+            direction,
+        }
+    }
+}
+
+impl Display for PiIOAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("0x{:08X}", self.address))?;
+        if self.count > 0 {
+            f.write_fmt(format_args!(" {} bytes {}", self.count * 2, self.direction))?;
+        }
+        Ok(())
+    }
+}
+
+pub struct PiFifoFlags {
+    pub read_fifo_wait: bool,
+    pub read_fifo_failure: bool,
+    pub write_fifo_wait: bool,
+    pub write_fifo_failure: bool,
+}
+
+impl Display for PiFifoFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mapping = vec![
+            (self.read_fifo_wait, "Read wait"),
+            (self.read_fifo_failure, "Read failure"),
+            (self.write_fifo_wait, "Write wait"),
+            (self.write_fifo_failure, "Write failure"),
+        ];
+        let filtered: Vec<&str> = mapping.into_iter().filter(|x| x.0).map(|x| x.1).collect();
+        if filtered.len() > 0 {
+            f.write_str(filtered.join(", ").as_str())?;
+        } else {
+            f.write_str("None")?;
+        }
+        Ok(())
+    }
+}
+
+impl From<&[u8; 8]> for PiFifoFlags {
+    fn from(value: &[u8; 8]) -> Self {
+        PiFifoFlags {
+            read_fifo_wait: (value[7] & (1 << 0)) != 0,
+            read_fifo_failure: (value[7] & (1 << 1)) != 0,
+            write_fifo_wait: (value[7] & (1 << 2)) != 0,
+            write_fifo_failure: (value[7] & (1 << 3)) != 0,
+        }
+    }
+}
+
 pub enum CicStep {
     Unavailable,
     PowerOff,
@@ -875,10 +959,10 @@ impl Display for CicStep {
     }
 }
 
-impl TryFrom<u8> for CicStep {
-    type Error = Error;
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl From<&[u8; 8]> for CicStep {
+    fn from(value: &[u8; 8]) -> Self {
+        let cic_step = (value[7] >> 4) & 0x0F;
+        match cic_step {
             0 => Self::Unavailable,
             1 => Self::PowerOff,
             2 => Self::ConfigLoad,
@@ -895,49 +979,12 @@ impl TryFrom<u8> for CicStep {
             13 => Self::DieInvalidRegion,
             14 => Self::DieCommand,
             _ => Self::Unknown,
-        })
-    }
-}
-
-pub struct PiFifoFlags {
-    pub read_fifo_wait: bool,
-    pub read_fifo_failure: bool,
-    pub write_fifo_wait: bool,
-    pub write_fifo_failure: bool,
-}
-
-impl Display for PiFifoFlags {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mapping = vec![
-            (self.read_fifo_wait, "Read wait"),
-            (self.read_fifo_failure, "Read failure"),
-            (self.write_fifo_wait, "Write wait"),
-            (self.write_fifo_failure, "Write failure"),
-        ];
-        let filtered: Vec<&str> = mapping.into_iter().filter(|x| x.0).map(|x| x.1).collect();
-        if filtered.len() > 0 {
-            f.write_str(filtered.join(", ").as_str())?;
-        } else {
-            f.write_str("None")?;
         }
-        Ok(())
-    }
-}
-
-impl TryFrom<u8> for PiFifoFlags {
-    type Error = Error;
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(PiFifoFlags {
-            read_fifo_wait: (value & (1 << 0)) != 0,
-            read_fifo_failure: (value & (1 << 1)) != 0,
-            write_fifo_wait: (value & (1 << 2)) != 0,
-            write_fifo_failure: (value & (1 << 3)) != 0,
-        })
     }
 }
 
 pub struct FpgaDebugData {
-    pub last_pi_address: u32,
+    pub pi_io_access: PiIOAccess,
     pub pi_fifo_flags: PiFifoFlags,
     pub cic_step: CicStep,
 }
@@ -948,10 +995,11 @@ impl TryFrom<Vec<u8>> for FpgaDebugData {
         if value.len() != 8 {
             return Err(Error::new("Invalid data length for FPGA debug data"));
         }
+        let data: &[u8; 8] = &value[0..8].try_into().unwrap();
         Ok(FpgaDebugData {
-            last_pi_address: u32::from_be_bytes(value[0..4].try_into().unwrap()),
-            pi_fifo_flags: (value[7] & 0x0F).try_into().unwrap(),
-            cic_step: ((value[7] >> 4) & 0x0F).try_into().unwrap(),
+            pi_io_access: data.into(),
+            pi_fifo_flags: data.into(),
+            cic_step: data.into(),
         })
     }
 }

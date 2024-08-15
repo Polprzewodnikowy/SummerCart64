@@ -794,10 +794,7 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" LED blink:         {}", state.led_enable);
     println!(" IS-Viewer 64:      {}", state.isviewer);
     println!("{}", "SummerCart64 diagnostic information:".bold());
-    println!(
-        " Last PI address:   0x{:08X}",
-        state.fpga_debug_data.last_pi_address
-    );
+    println!(" PI I/O access:     {}", state.fpga_debug_data.pi_io_access);
     println!(
         " PI FIFO flags:     {}",
         state.fpga_debug_data.pi_fifo_flags

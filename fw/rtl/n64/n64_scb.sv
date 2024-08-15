@@ -68,11 +68,14 @@ interface n64_scb ();
     logic cic_region;
     logic [7:0] cic_seed;
     logic [47:0] cic_checksum;
-    logic [3:0] cic_debug;
+    logic [3:0] cic_debug_step;
 
     logic pi_sdram_active;
     logic pi_flash_active;
-    logic [35:0] pi_debug;
+    logic [31:0] pi_debug_address;
+    logic [16:0] pi_debug_rw_count;
+    logic pi_debug_direction;
+    logic [3:0] pi_debug_fifo_flags;
 
     modport controller (
         input n64_reset,
@@ -126,9 +129,12 @@ interface n64_scb ();
         output cic_region,
         output cic_seed,
         output cic_checksum,
-        input cic_debug,
+        input cic_debug_step,
 
-        input pi_debug
+        input pi_debug_address,
+        input pi_debug_rw_count,
+        input pi_debug_direction,
+        input pi_debug_fifo_flags
     );
 
     modport pi (
@@ -153,7 +159,11 @@ interface n64_scb ();
 
         output pi_sdram_active,
         output pi_flash_active,
-        output pi_debug
+
+        output pi_debug_address,
+        output pi_debug_rw_count,
+        output pi_debug_direction,
+        output pi_debug_fifo_flags
     );
 
     modport flashram (
@@ -249,7 +259,7 @@ interface n64_scb ();
         input cic_region,
         input cic_seed,
         input cic_checksum,
-        output cic_debug
+        output cic_debug_step
     );
 
     modport arbiter (

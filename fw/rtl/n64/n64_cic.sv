@@ -192,7 +192,7 @@ module n64_cic (
                         end
 
                         2'b11: begin
-                            n64_scb.cic_debug <= dbus_wdata[3:0];
+                            n64_scb.cic_debug_step <= dbus_wdata[3:0];
                         end
                     endcase
                 end
@@ -200,7 +200,7 @@ module n64_cic (
         end
 
         if (reset) begin
-            n64_scb.cic_debug <= 3'd0;
+            n64_scb.cic_debug_step <= 3'd0;
         end
 
         if (reset || !cic_reset) begin
@@ -236,7 +236,7 @@ module n64_cic (
                         cic_dq
                     };
 
-                    2'b11: dbus_rdata = {28'd0, n64_scb.cic_debug};
+                    2'b11: dbus_rdata = {28'd0, n64_scb.cic_debug_step};
                 endcase
             end
         endcase

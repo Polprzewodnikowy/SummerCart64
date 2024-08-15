@@ -371,6 +371,8 @@ module mcu_top (
 
     logic dd_bm_ack;
 
+    logic [31:0] debug_buffer;
+
     logic cic_invalid_region;
 
     logic aux_pending;
@@ -649,15 +651,18 @@ module mcu_top (
                 end
 
                 REG_DEBUG_0: begin
-                    reg_rdata <= n64_scb.pi_debug[31:0];
+                    reg_rdata <= n64_scb.pi_debug_address;
+                    debug_buffer <= {
+                        6'd0,
+                        n64_scb.pi_debug_direction,
+                        n64_scb.pi_debug_rw_count,
+                        n64_scb.cic_debug_step,
+                        n64_scb.pi_debug_fifo_flags
+                    };
                 end
 
                 REG_DEBUG_1: begin
-                    reg_rdata <= {
-                        24'd0,
-                        n64_scb.cic_debug,
-                        n64_scb.pi_debug[35:32]
-                    };
+                    reg_rdata <= debug_buffer;
                 end
 
                 REG_CIC_0: begin
