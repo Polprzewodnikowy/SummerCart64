@@ -205,6 +205,7 @@ All `DATA` values with upper 8 bits set to `1` (`0xFFxxxxxx`) are reserved for i
 Refrain from using these values in your app for uses other than listed below.
 Currently defined reserved `DATA` values are:
 
+ - `0xFF000000` - **Ping** - no-op command to test if app running on the N64 is listening to the AUX events.
  - `0xFF000001` - **Halt** - causes the running app to stop all activity and wait in preparation for uploading new ROM to the SC64.
  App still should listen to the AUX interrupt and respond to other messages.
  - `0xFF000002` - **Reboot** - causes the running app to perform soft reboot by reloading IPL3 from the ROM and start executing it.

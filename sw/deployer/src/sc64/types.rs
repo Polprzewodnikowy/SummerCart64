@@ -651,6 +651,7 @@ impl TryFrom<AsynchronousPacket> for DataPacket {
 }
 
 pub enum AuxMessage {
+    Ping,
     Halt,
     Reboot,
 }
@@ -658,6 +659,7 @@ pub enum AuxMessage {
 impl From<AuxMessage> for u32 {
     fn from(value: AuxMessage) -> Self {
         match value {
+            AuxMessage::Ping => 0xFF000000,
             AuxMessage::Halt => 0xFF000001,
             AuxMessage::Reboot => 0xFF000002,
         }
