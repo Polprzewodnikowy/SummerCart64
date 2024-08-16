@@ -571,16 +571,16 @@ impl SC64 {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
     }
 
-    pub fn aux_send(&mut self, data: u32) -> Result<(), Error> {
-        self.command_aux_write(data)
+    pub fn send_aux_packet(&mut self, data: AuxMessage) -> Result<(), Error> {
+        self.command_aux_write(data.into())
     }
 
-    pub fn aux_send_and_receive(
+    pub fn send_and_receive_aux_packet(
         &mut self,
-        data: u32,
+        data: AuxMessage,
         timeout: std::time::Duration,
-    ) -> Result<Option<u32>, Error> {
-        self.aux_send(data)?;
+    ) -> Result<Option<AuxMessage>, Error> {
+        self.send_aux_packet(data)?;
         let reply_timeout = std::time::Instant::now();
         loop {
             match self.receive_data_packet()? {
@@ -598,11 +598,10 @@ impl SC64 {
         }
     }
 
-    pub fn aux_try_notify(&mut self, message: AuxMessage) -> Result<bool, Error> {
-        let value: u32 = message.into();
+    pub fn try_notify_via_aux(&mut self, message: AuxMessage) -> Result<bool, Error> {
         let timeout = std::time::Duration::from_millis(500);
-        if let Some(response) = self.aux_send_and_receive(value, timeout)? {
-            return Ok(value == response);
+        if let Some(response) = self.send_and_receive_aux_packet(message, timeout)? {
+            return Ok(message == response);
         }
         Ok(false)
     }

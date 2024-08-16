@@ -614,7 +614,7 @@ impl From<Setting> for [u32; 2] {
 }
 
 pub enum DataPacket {
-    AuxData(u32),
+    AuxData(AuxMessage),
     Button,
     DataFlushed,
     DebugData(DebugPacket),
@@ -628,32 +628,25 @@ impl TryFrom<AsynchronousPacket> for DataPacket {
     type Error = Error;
     fn try_from(value: AsynchronousPacket) -> Result<Self, Self::Error> {
         Ok(match value.id {
-            b'X' => Self::AuxData(u32::from_be_bytes(value.data[0..4].try_into().unwrap())),
+            b'X' => Self::AuxData(value.data.try_into()?),
             b'B' => Self::Button,
             b'G' => Self::DataFlushed,
             b'U' => Self::DebugData(value.data.try_into()?),
             b'D' => Self::DiskRequest(value.data.try_into()?),
             b'I' => Self::IsViewer64(value.data),
             b'S' => Self::SaveWriteback(value.data.try_into()?),
-            b'F' => {
-                if value.data.len() != 4 {
-                    return Err(Error::new(
-                        "Incorrect data length for update status data packet",
-                    ));
-                }
-                Self::UpdateStatus(
-                    u32::from_be_bytes(value.data[0..4].try_into().unwrap()).try_into()?,
-                )
-            }
+            b'F' => Self::UpdateStatus(value.data.try_into()?),
             _ => return Err(Error::new("Unknown data packet code")),
         })
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AuxMessage {
     Ping,
     Halt,
     Reboot,
+    Other(u32),
 }
 
 impl From<AuxMessage> for u32 {
@@ -662,7 +655,23 @@ impl From<AuxMessage> for u32 {
             AuxMessage::Ping => 0xFF000000,
             AuxMessage::Halt => 0xFF000001,
             AuxMessage::Reboot => 0xFF000002,
+            AuxMessage::Other(message) => message,
         }
+    }
+}
+
+impl TryFrom<Vec<u8>> for AuxMessage {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 4 {
+            return Err(Error::new("Invalid data length for AUX data packet"));
+        }
+        Ok(match u32::from_be_bytes(value[0..4].try_into().unwrap()) {
+            0xFF000000 => AuxMessage::Ping,
+            0xFF000001 => AuxMessage::Halt,
+            0xFF000002 => AuxMessage::Reboot,
+            message => AuxMessage::Other(message),
+        })
     }
 }
 
@@ -821,10 +830,15 @@ impl Display for UpdateStatus {
     }
 }
 
-impl TryFrom<u32> for UpdateStatus {
+impl TryFrom<Vec<u8>> for UpdateStatus {
     type Error = Error;
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        Ok(match value {
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 4 {
+            return Err(Error::new(
+                "Incorrect data length for update status data packet",
+            ));
+        }
+        Ok(match u32::from_be_bytes(value[0..4].try_into().unwrap()) {
             1 => Self::MCU,
             2 => Self::FPGA,
             3 => Self::Bootloader,

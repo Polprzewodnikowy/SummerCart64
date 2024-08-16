@@ -373,7 +373,7 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Halt)? {
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
         println!(
             "{}",
             "Warning: no response for [Halt] AUX message".bright_yellow()
@@ -425,7 +425,7 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
 
     sc64.calculate_cic_parameters(args.cic_seed)?;
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Reboot)? {
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
         println!(
             "{}",
             "Warning: no response for [Reboot] AUX message".bright_yellow()
@@ -470,7 +470,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
             .bright_green()
     );
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Halt)? {
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
         println!(
             "{}",
             "Warning: no response for [Halt] AUX message".bright_yellow()
@@ -587,7 +587,7 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
 
     sc64.set_save_writeback(true)?;
 
-    if args.reboot && !sc64.aux_try_notify(sc64::AuxMessage::Reboot)? {
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
         println!(
             "{}",
             "Warning: no response for [Reboot] AUX message".bright_yellow()
