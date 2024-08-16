@@ -127,12 +127,21 @@ module n64_pi (
 
     // Debug: last accessed PI address
 
+    logic [15:0] pi_debug_address_buffer;
+
     always_ff @(posedge clk) begin
         if (aleh_op) begin
-            n64_scb.pi_debug[31:16] <= n64_pi_dq_in;
+            pi_debug_address_buffer <= n64_pi_dq_in;
         end
         if (alel_op) begin
-            n64_scb.pi_debug[15:0] <= n64_pi_dq_in;
+            n64_scb.pi_debug_address <= {pi_debug_address_buffer, n64_pi_dq_in};
+            n64_scb.pi_debug_rw_count <= 17'd0;
+        end
+        if (pi_reset && (pi_mode == PI_MODE_VALID)) begin
+            if ((last_read && !pi_read) || (last_write && !pi_write)) begin
+                n64_scb.pi_debug_rw_count <= n64_scb.pi_debug_rw_count + 1'd1;
+                n64_scb.pi_debug_direction <= !pi_write;
+            end
         end
     end
 
@@ -296,11 +305,11 @@ module n64_pi (
         .reset(reset),
 
         .flush(reset || !pi_reset || alel_op),
-        
+
         .full(read_fifo_full),
         .write(read_fifo_write),
         .wdata(read_fifo_wdata),
-        
+
         .empty(read_fifo_empty),
         .read(read_fifo_read),
         .rdata(read_fifo_rdata)
@@ -310,7 +319,7 @@ module n64_pi (
         read_fifo_read <= 1'b0;
 
         if (!pi_reset) begin
-            n64_scb.pi_debug[33:32] <= 2'b00;
+            n64_scb.pi_debug_fifo_flags[1:0] <= 2'b00;
         end
 
         if (reset || !pi_reset || alel_op) begin
@@ -321,9 +330,9 @@ module n64_pi (
             if (read_op) begin
                 if (read_fifo_empty) begin
                     read_fifo_wait <= 1'b1;
-                    n64_scb.pi_debug[32] <= 1'b1;
+                    n64_scb.pi_debug_fifo_flags[0] <= 1'b1;
                     if (read_fifo_wait) begin
-                        n64_scb.pi_debug[33] <= 1'b1;
+                        n64_scb.pi_debug_fifo_flags[1] <= 1'b1;
                     end
                 end else begin
                     read_fifo_read <= 1'b1;
@@ -377,7 +386,7 @@ module n64_pi (
         write_fifo_write <= 1'b0;
 
         if (!pi_reset) begin
-            n64_scb.pi_debug[35:34] <= 2'b00;
+            n64_scb.pi_debug_fifo_flags[3:2] <= 2'b00;
         end
 
         if (reset) begin
@@ -388,9 +397,9 @@ module n64_pi (
             if (write_op) begin
                 if (write_fifo_full) begin
                     write_fifo_wait <= 1'b1;
-                    n64_scb.pi_debug[34] <= 1'b1;
+                    n64_scb.pi_debug_fifo_flags[2] <= 1'b1;
                     if (write_fifo_wait) begin
-                        n64_scb.pi_debug[35] <= 1'b1;
+                        n64_scb.pi_debug_fifo_flags[3] <= 1'b1;
                     end
                 end else begin
                     write_fifo_write <= 1'b1;
@@ -476,7 +485,11 @@ module n64_pi (
 
     // Reg bus controller
 
+    logic reg_bus_address_increment;
+
     always_ff @(posedge clk) begin
+        reg_bus_address_increment <= read_op || write_op;
+
         if (aleh_op) begin
             reg_bus.address[16] <= n64_pi_dq_in[0];
         end
@@ -485,15 +498,13 @@ module n64_pi (
             reg_bus.address[15:0] <= n64_pi_dq_in;
         end
 
-        if (read_op || write_op) begin
+        if (reg_bus_address_increment) begin
             reg_bus.address <= reg_bus.address + 2'd2;
         end
-    end
 
-    always_comb begin
-        reg_bus.read = read_op && (read_port == PORT_REG);
-        reg_bus.write = write_op && (write_port == PORT_REG);
-        reg_bus.wdata = n64_pi_dq_in;
+        reg_bus.read <= read_op && (read_port == PORT_REG);
+        reg_bus.write <= write_op && (write_port == PORT_REG);
+        reg_bus.wdata <= n64_pi_dq_in;
     end
 
 endmodule

@@ -13,10 +13,10 @@ pub use self::{
     link::list_local_devices,
     server::ServerEvent,
     types::{
-        BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, ISViewer,
-        MemoryTestPattern, MemoryTestPatternResult, SaveType, SaveWriteback, SpeedTestDirection,
-        Switch, TvType,
+        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState,
+        DdDriveType, DdMode, DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind,
+        FpgaDebugData, ISViewer, MemoryTestPattern, MemoryTestPatternResult, SaveType,
+        SaveWriteback, SpeedTestDirection, Switch, TvType,
     },
 };
 
@@ -227,6 +227,11 @@ impl SC64 {
             true,
             false,
         )?;
+        Ok(())
+    }
+
+    fn command_aux_write(&mut self, data: u32) -> Result<(), Error> {
+        self.link.execute_command(b'X', [data, 0], &[])?;
         Ok(())
     }
 
@@ -564,6 +569,41 @@ impl SC64 {
 
     pub fn send_debug_packet(&mut self, debug_packet: DebugPacket) -> Result<(), Error> {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
+    }
+
+    pub fn send_aux_packet(&mut self, data: AuxMessage) -> Result<(), Error> {
+        self.command_aux_write(data.into())
+    }
+
+    pub fn send_and_receive_aux_packet(
+        &mut self,
+        data: AuxMessage,
+        timeout: std::time::Duration,
+    ) -> Result<Option<AuxMessage>, Error> {
+        self.send_aux_packet(data)?;
+        let reply_timeout = std::time::Instant::now();
+        loop {
+            match self.receive_data_packet()? {
+                Some(packet) => match packet {
+                    DataPacket::AuxData(data) => {
+                        return Ok(Some(data));
+                    }
+                    _ => {}
+                },
+                None => {}
+            }
+            if reply_timeout.elapsed() > timeout {
+                return Ok(None);
+            }
+        }
+    }
+
+    pub fn try_notify_via_aux(&mut self, message: AuxMessage) -> Result<bool, Error> {
+        let timeout = std::time::Duration::from_millis(500);
+        if let Some(response) = self.send_and_receive_aux_packet(message, timeout)? {
+            return Ok(message == response);
+        }
+        Ok(false)
     }
 
     pub fn check_device(&mut self) -> Result<(), Error> {

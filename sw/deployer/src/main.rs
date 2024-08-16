@@ -87,6 +87,10 @@ struct UploadArgs {
     /// Path to the ROM file
     rom: PathBuf,
 
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short = 'a', long)]
+    reboot: bool,
+
     /// Path to the save file
     #[arg(short, long)]
     save: Option<PathBuf>,
@@ -135,6 +139,10 @@ struct _64DDArgs {
     /// Path to the ROM file
     #[arg(short, long)]
     rom: Option<PathBuf>,
+
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short = 'a', long)]
+    reboot: bool,
 
     /// Path to the save file (also used by save writeback mechanism)
     #[arg(short, long, requires = "rom")]
@@ -365,6 +373,13 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
+        println!(
+            "{}",
+            "Warning: no response for [Halt] AUX message".bright_yellow()
+        );
+    }
+
     sc64.reset_state()?;
 
     let (mut rom_file, rom_name, rom_length) = open_file(&args.rom)?;
@@ -410,6 +425,13 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
 
     sc64.calculate_cic_parameters(args.cic_seed)?;
 
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
+    }
+
     Ok(())
 }
 
@@ -447,6 +469,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin"
             .bright_green()
     );
+
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
+        println!(
+            "{}",
+            "Warning: no response for [Halt] AUX message".bright_yellow()
+        );
+    }
 
     sc64.reset_state()?;
 
@@ -557,6 +586,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
 
     sc64.set_save_writeback(true)?;
+
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
+    }
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
@@ -758,10 +794,7 @@ fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     println!(" LED blink:         {}", state.led_enable);
     println!(" IS-Viewer 64:      {}", state.isviewer);
     println!("{}", "SummerCart64 diagnostic information:".bold());
-    println!(
-        " Last PI address:   0x{:08X}",
-        state.fpga_debug_data.last_pi_address
-    );
+    println!(" PI I/O access:     {}", state.fpga_debug_data.pi_io_access);
     println!(
         " PI FIFO flags:     {}",
         state.fpga_debug_data.pi_fifo_flags

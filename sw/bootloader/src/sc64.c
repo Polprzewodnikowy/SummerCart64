@@ -1,21 +1,32 @@
+#include "error.h"
 #include "io.h"
 #include "sc64.h"
 
 
 typedef struct {
-    io32_t SR_CMD;
+    io32_t SCR;
     io32_t DATA[2];
     io32_t IDENTIFIER;
     io32_t KEY;
+    io32_t IRQ;
+    io32_t AUX;
 } sc64_regs_t;
 
 #define SC64_REGS_BASE              (0x1FFF0000UL)
 #define SC64_REGS                   ((sc64_regs_t *) SC64_REGS_BASE)
 
 
-#define SC64_SR_IRQ_PENDING         (1 << 29)
-#define SC64_SR_CMD_ERROR           (1 << 30)
-#define SC64_SR_CPU_BUSY            (1 << 31)
+#define SC64_SCR_CPU_BUSY           (1 << 31)
+#define SC64_SCR_CMD_ERROR          (1 << 30)
+#define SC64_SCR_BTN_IRQ_PENDING    (1 << 29)
+#define SC64_SCR_BTN_IRQ_MASK       (1 << 28)
+#define SC64_SCR_CMD_IRQ_PENDING    (1 << 27)
+#define SC64_SCR_CMD_IRQ_MASK       (1 << 26)
+#define SC64_SCR_USB_IRQ_PENDING    (1 << 25)
+#define SC64_SCR_USB_IRQ_MASK       (1 << 24)
+#define SC64_SCR_AUX_IRQ_PENDING    (1 << 23)
+#define SC64_SCR_AUX_IRQ_MASK       (1 << 22)
+#define SC64_SCR_CMD_IRQ_REQUEST    (1 << 8)
 
 #define SC64_V2_IDENTIFIER          (0x53437632)
 
@@ -23,6 +34,15 @@ typedef struct {
 #define SC64_KEY_UNLOCK_1           (0x5F554E4CUL)
 #define SC64_KEY_UNLOCK_2           (0x4F434B5FUL)
 #define SC64_KEY_LOCK               (0xFFFFFFFFUL)
+
+#define SC64_IRQ_BTN_CLEAR          (1 << 31)
+#define SC64_IRQ_CMD_CLEAR          (1 << 30)
+#define SC64_IRQ_USB_CLEAR          (1 << 29)
+#define SC64_IRQ_AUX_CLEAR          (1 << 28)
+#define SC64_IRQ_USB_DISABLE        (1 << 11)
+#define SC64_IRQ_USB_ENABLE         (1 << 10)
+#define SC64_IRQ_AUX_DISABLE        (1 << 9)
+#define SC64_IRQ_AUX_ENABLE         (1 << 8)
 
 
 typedef enum {
@@ -67,18 +87,32 @@ typedef struct {
 } sc64_cmd_t;
 
 
+static bool use_cmd_irq = false;
+static volatile bool wait_cmd_irq = false;
+
+
 static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
+    uint32_t sr;
+
     pi_io_write(&SC64_REGS->DATA[0], cmd->arg[0]);
     pi_io_write(&SC64_REGS->DATA[1], cmd->arg[1]);
 
-    pi_io_write(&SC64_REGS->SR_CMD, (cmd->id & 0xFF));
+    if (use_cmd_irq) {
+        wait_cmd_irq = true;
+        pi_io_write(&SC64_REGS->SCR, (SC64_SCR_CMD_IRQ_REQUEST | (cmd->id & 0xFF)));
+        while (wait_cmd_irq);
+        sr = pi_io_read(&SC64_REGS->SCR);
+        if (sr & SC64_SCR_CPU_BUSY) {
+            error_display("[Unexpected] SC64 CMD busy flag set");
+        }
+    } else {
+        pi_io_write(&SC64_REGS->SCR, (cmd->id & 0xFF));
+        do {
+            sr = pi_io_read(&SC64_REGS->SCR);
+        } while (sr & SC64_SCR_CPU_BUSY);
+    }
 
-    uint32_t sr;
-    do {
-        sr = pi_io_read(&SC64_REGS->SR_CMD);
-    } while (sr & SC64_SR_CPU_BUSY);
-
-    if (sr & SC64_SR_CMD_ERROR) {
+    if (sr & SC64_SCR_CMD_ERROR) {
         return (sc64_error_t) (pi_io_read(&SC64_REGS->DATA[0]));
     }
 
@@ -88,14 +122,38 @@ static sc64_error_t sc64_execute_cmd (sc64_cmd_t *cmd) {
     return SC64_OK;
 }
 
+static void sc64_btn_irq_callback (void) {
+    error_display("[Unexpected] SC64 button pressed interrupt received");
+}
+
+static void sc64_cmd_irq_callback (void) {
+    if (wait_cmd_irq) {
+        wait_cmd_irq = false;
+    } else {
+        error_display("[Unexpected] SC64 command finish interrupt received");
+    }
+}
+
+static void sc64_usb_irq_callback (void) {
+    error_display("[Unexpected] SC64 USB not empty interrupt received");
+}
+
+static void sc64_aux_irq_callback (void) {
+    error_display("[Unexpected] SC64 AUX not empty interrupt received");
+}
+
 
 const char *sc64_error_description (sc64_error_t error) {
+    if (error == SC64_OK) {
+        return "No error";
+    }
+
     sc64_error_type_t type = (sc64_error_type_t) ((error >> 24) & 0xFF);
     error &= 0xFFFFFF;
 
     if (type == ERROR_TYPE_CFG) {
         switch ((sc64_cfg_error_t) (error)) {
-            case SC64_OK: return "No error";
+            case CFG_OK: return "No error (CFG)";
             case CFG_ERROR_UNKNOWN_COMMAND: return "Unknown command";
             case CFG_ERROR_INVALID_ARGUMENT: return "Invalid argument";
             case CFG_ERROR_INVALID_ADDRESS: return "Invalid address";
@@ -158,18 +216,70 @@ void sc64_lock (void) {
 bool sc64_check_presence (void) {
     bool detected = (pi_io_read(&SC64_REGS->IDENTIFIER) == SC64_V2_IDENTIFIER);
     if (detected) {
-        while (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_CPU_BUSY);
+        while (pi_io_read(&SC64_REGS->SCR) & SC64_SCR_CPU_BUSY);
     }
     return detected;
 }
 
 
-bool sc64_irq_pending (void) {
-    return (pi_io_read(&SC64_REGS->SR_CMD) & SC64_SR_IRQ_PENDING);
+void sc64_cmd_irq_enable (bool enable) {
+    use_cmd_irq = enable;
 }
 
-void sc64_irq_clear (void) {
-    pi_io_write(&SC64_REGS->IDENTIFIER, 0);
+void sc64_usb_irq_enable (bool enable) {
+    pi_io_write(&SC64_REGS->IRQ, enable ? SC64_IRQ_USB_ENABLE : SC64_IRQ_USB_DISABLE);
+}
+
+void sc64_aux_irq_enable (bool enable) {
+    pi_io_write(&SC64_REGS->IRQ, enable ? SC64_IRQ_AUX_ENABLE : SC64_IRQ_AUX_DISABLE);
+}
+
+sc64_irq_t sc64_irq_pending (void) {
+    uint32_t sr = pi_io_read(&SC64_REGS->SCR);
+    sc64_irq_t irq = SC64_IRQ_NONE;
+    if ((sr & SC64_SCR_BTN_IRQ_MASK) && (sr & SC64_SCR_BTN_IRQ_PENDING)) {
+        irq |= SC64_IRQ_BTN;
+    }
+    if ((sr & SC64_SCR_CMD_IRQ_MASK) && (sr & SC64_SCR_CMD_IRQ_PENDING)) {
+        irq |= SC64_IRQ_CMD;
+    }
+    if ((sr & SC64_SCR_USB_IRQ_MASK) && (sr & SC64_SCR_USB_IRQ_PENDING)) {
+        irq |= SC64_IRQ_USB;
+    }
+    if ((sr & SC64_SCR_AUX_IRQ_MASK) && (sr & SC64_SCR_AUX_IRQ_PENDING)) {
+        irq |= SC64_IRQ_AUX;
+    }
+    return irq;
+}
+
+void sc64_irq_callback (sc64_irq_t irq) {
+    uint32_t clear = 0;
+    if (irq & SC64_IRQ_BTN) {
+        clear |= SC64_IRQ_BTN_CLEAR;
+    }
+    if (irq & SC64_IRQ_CMD) {
+        clear |= SC64_IRQ_CMD_CLEAR;
+    }
+    if (irq & SC64_IRQ_USB) {
+        clear |= SC64_IRQ_USB_CLEAR;
+    }
+    if (irq & SC64_IRQ_AUX) {
+        clear |= SC64_IRQ_AUX_CLEAR;
+    }
+    pi_io_write(&SC64_REGS->IRQ, clear);
+    if (irq & SC64_IRQ_BTN) {
+        sc64_btn_irq_callback();
+    }
+    if (irq & SC64_IRQ_CMD) {
+        sc64_cmd_irq_callback();
+    }
+    if (irq & SC64_IRQ_USB) {
+        sc64_usb_irq_callback();
+    }
+    if (irq & SC64_IRQ_AUX) {
+        sc64_aux_irq_callback();
+    }
+    while (pi_busy());
 }
 
 
