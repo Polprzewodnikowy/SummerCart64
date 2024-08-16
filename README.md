@@ -42,7 +42,7 @@
 For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab in GitHub repository.
 Using discussions tab is highly encouraged as it allows to have centralized knowledge database accessible for everyone interested in this project.
 
-I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab is a preferred option.
+I'm also active at [N64brew](https://discord.gg/8VNMKhxqQn) Discord server as `korgeaux` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab is a preferred option.
 
 Note that my time is limited so I can't answer all questions.
 
@@ -59,7 +59,7 @@ Selecting wrong options or giving PCB manufacturer wrong information might resul
 Boards also come unprogrammed from the manufacturer - you need to do **initial programming step** yourself after receiving the board.
 **Price of the components is not included in the initial quote at the checkout** - manufacturer will contact you later with updated price.
 To avoid problems _**please**_ read **both** [build guide](./docs/06_build_guide.md) and description on the shared project page **in full**.
-If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the [n64brew Discord server](https://discord.gg/WqFgNWf) if that's the case.
+If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the [N64brew Discord server](https://discord.gg/8VNMKhxqQn) if that's the case.
 
 **Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/member/shareproject/?bmbno=1046ED64-8AEE-44) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
 
