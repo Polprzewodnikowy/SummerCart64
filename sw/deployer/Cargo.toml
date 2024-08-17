@@ -1,6 +1,6 @@
 [package]
 name = "sc64deployer"
-version = "2.18.1"
+version = "2.19.0"
 edition = "2021"
 authors = ["Polprzewodnikowy"]
 description = "SummerCart64 loader and control software"
