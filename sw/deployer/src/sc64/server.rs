@@ -17,8 +17,8 @@ struct StreamHandler {
     writer: std::io::BufWriter<std::net::TcpStream>,
 }
 
-const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-const WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 const KEEPALIVE_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
 
 impl StreamHandler {

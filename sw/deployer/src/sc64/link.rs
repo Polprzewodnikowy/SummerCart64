@@ -59,8 +59,8 @@ const FTDI_PREFIX: &str = "ftdi://";
 
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);
 const POLL_TIMEOUT: Duration = Duration::from_millis(5);
-const READ_TIMEOUT: Duration = Duration::from_secs(5);
-const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+const READ_TIMEOUT: Duration = Duration::from_secs(10);
+const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub trait Backend {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize>;
