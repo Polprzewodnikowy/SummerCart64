@@ -211,6 +211,10 @@ main>h1 {
     margin: 0;
 }
 
+main>h3 {
+    margin-bottom: 0;
+}
+
 main p {
     margin: var(--main-paragraph-margin) 0;
 }
