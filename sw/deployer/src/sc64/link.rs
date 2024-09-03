@@ -59,8 +59,7 @@ const FTDI_PREFIX: &str = "ftdi://";
 
 const RESET_TIMEOUT: Duration = Duration::from_secs(1);
 const POLL_TIMEOUT: Duration = Duration::from_millis(5);
-const READ_TIMEOUT: Duration = Duration::from_secs(10);
-const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+const IO_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub trait Backend {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize>;
@@ -142,7 +141,7 @@ pub trait Backend {
                     _ => return Err(error.into()),
                 },
             }
-            if timeout.elapsed() > READ_TIMEOUT {
+            if timeout.elapsed() > IO_TIMEOUT {
                 return Err(std::io::ErrorKind::TimedOut.into());
             }
         }
@@ -249,12 +248,7 @@ impl Backend for SerialBackend {
 
 fn new_serial_backend(port: &str) -> std::io::Result<SerialBackend> {
     Ok(SerialBackend {
-        device: SerialDevice::new(
-            port,
-            Some(POLL_TIMEOUT),
-            Some(READ_TIMEOUT),
-            Some(WRITE_TIMEOUT),
-        )?,
+        device: SerialDevice::new(port, Some(POLL_TIMEOUT), Some(IO_TIMEOUT))?,
     })
 }
 
@@ -294,12 +288,7 @@ impl Backend for FtdiBackend {
 
 fn new_ftdi_backend(port: &str) -> std::io::Result<FtdiBackend> {
     Ok(FtdiBackend {
-        device: FtdiDevice::open(
-            port,
-            Some(POLL_TIMEOUT),
-            Some(READ_TIMEOUT),
-            Some(WRITE_TIMEOUT),
-        )?,
+        device: FtdiDevice::open(port, Some(POLL_TIMEOUT), Some(IO_TIMEOUT))?,
     })
 }
 
@@ -403,7 +392,7 @@ fn new_tcp_backend(address: &str) -> Result<TcpBackend, Error> {
         Error::new(format!("Couldn't connect to [{address}]: {error}").as_str())
     })?;
     stream.set_read_timeout(Some(POLL_TIMEOUT))?;
-    stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
+    stream.set_write_timeout(Some(IO_TIMEOUT))?;
     let reader = BufReader::new(stream.try_clone()?);
     let writer = BufWriter::new(stream.try_clone()?);
     Ok(TcpBackend {

@@ -6,10 +6,10 @@ pub struct DeviceInfo {
 
 pub struct SerialDevice {
     serial: serial2::SerialPort,
+    writer: std::io::BufWriter<serial2::SerialPort>,
     unclog_buffer: std::collections::VecDeque<u8>,
     poll_timeout: std::time::Duration,
-    read_timeout: std::time::Duration,
-    write_timeout: std::time::Duration,
+    io_timeout: std::time::Duration,
 }
 
 impl SerialDevice {
@@ -21,15 +21,16 @@ impl SerialDevice {
     pub fn new(
         port: &str,
         poll_timeout: Option<std::time::Duration>,
-        read_timeout: Option<std::time::Duration>,
-        write_timeout: Option<std::time::Duration>,
+        io_timeout: Option<std::time::Duration>,
     ) -> std::io::Result<Self> {
+        let serial = serial2::SerialPort::open(port, 115_200)?;
+        let writer = std::io::BufWriter::with_capacity(Self::BUFFER_SIZE, serial.try_clone()?);
         let mut device = Self {
-            serial: serial2::SerialPort::open(port, 115_200)?,
+            serial,
+            writer,
             unclog_buffer: std::collections::VecDeque::new(),
             poll_timeout: poll_timeout.unwrap_or(Self::DEFAULT_POLL_TIMEOUT),
-            read_timeout: read_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT),
-            write_timeout: write_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT),
+            io_timeout: io_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT),
         };
         device.serial.set_read_timeout(device.poll_timeout)?;
         device.serial.set_write_timeout(Self::WRITE_CHUNK_TIMEOUT)?;
@@ -73,14 +74,12 @@ impl SerialDevice {
                 Err(error) => match error.kind() {
                     std::io::ErrorKind::Interrupted
                     | std::io::ErrorKind::TimedOut
-                    | std::io::ErrorKind::WouldBlock => {
-                        return Ok(());
-                    }
+                    | std::io::ErrorKind::WouldBlock => {}
                     _ => return Err(error),
                 },
             };
-            if timeout.elapsed() > self.read_timeout {
-                return Err(std::io::ErrorKind::TimedOut.into());
+            if timeout.elapsed() > std::time::Duration::from_millis(1) {
+                return Ok(());
             }
         }
     }
@@ -128,14 +127,14 @@ impl std::io::Write for SerialDevice {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         let timeout = std::time::Instant::now();
         loop {
-            match self.serial.write(buffer) {
+            match self.writer.write(buffer) {
                 Ok(bytes) => return Ok(bytes),
                 Err(error) => match error.kind() {
                     std::io::ErrorKind::TimedOut => self.unclog_pipe()?,
                     _ => return Err(error),
                 },
             };
-            if timeout.elapsed() > self.write_timeout {
+            if timeout.elapsed() > self.io_timeout {
                 return Err(std::io::ErrorKind::TimedOut.into());
             }
         }
@@ -144,14 +143,14 @@ impl std::io::Write for SerialDevice {
     fn flush(&mut self) -> std::io::Result<()> {
         let timeout = std::time::Instant::now();
         loop {
-            match self.serial.flush() {
+            match self.writer.flush() {
                 Ok(()) => return Ok(()),
                 Err(error) => match error.kind() {
                     std::io::ErrorKind::TimedOut => self.unclog_pipe()?,
                     _ => return Err(error),
                 },
             };
-            if timeout.elapsed() > self.write_timeout {
+            if timeout.elapsed() > self.io_timeout {
                 return Err(std::io::ErrorKind::TimedOut.into());
             }
         }

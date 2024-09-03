@@ -28,21 +28,17 @@ struct Wrapper {
     context: *mut libftdi1_sys::ftdi_context,
     unclog_buffer: std::collections::VecDeque<u8>,
     write_buffer: Vec<u8>,
-    read_timeout: std::time::Duration,
-    write_timeout: std::time::Duration,
+    io_timeout: std::time::Duration,
     read_chunksize: usize,
     write_chunksize: usize,
 }
 
 impl Wrapper {
     const DEFAULT_POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(16);
-    const DEFAULT_RW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+    const DEFAULT_IO_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
     const WRITE_CHUNK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(100);
 
-    fn new(
-        read_timeout: Option<std::time::Duration>,
-        write_timeout: Option<std::time::Duration>,
-    ) -> std::io::Result<Self> {
+    fn new(io_timeout: Option<std::time::Duration>) -> std::io::Result<Self> {
         let context = unsafe { libftdi1_sys::ftdi_new() };
         if context.is_null() {
             return Err(std::io::ErrorKind::OutOfMemory.into());
@@ -51,19 +47,18 @@ impl Wrapper {
             context,
             unclog_buffer: std::collections::VecDeque::new(),
             write_buffer: vec![],
-            read_timeout: Self::DEFAULT_RW_TIMEOUT,
-            write_timeout: Self::DEFAULT_RW_TIMEOUT,
+            io_timeout: Self::DEFAULT_IO_TIMEOUT,
             read_chunksize: 4096,
             write_chunksize: 4096,
         };
-        wrapper.set_timeouts(read_timeout, write_timeout)?;
+        wrapper.set_io_timeout(io_timeout)?;
         wrapper.read_data_set_chunksize(wrapper.read_chunksize)?;
         wrapper.write_data_set_chunksize(wrapper.write_chunksize)?;
         Ok(wrapper)
     }
 
     fn list_devices(vendor: u16, product: u16) -> std::io::Result<Vec<DeviceInfo>> {
-        let wrapper = Self::new(None, None)?;
+        let wrapper = Self::new(None)?;
 
         let mut device_list: *mut libftdi1_sys::ftdi_device_list = std::ptr::null_mut();
         let devices = unsafe {
@@ -162,21 +157,15 @@ impl Wrapper {
         .into()
     }
 
-    fn set_timeouts(
-        &mut self,
-        read_timeout: Option<std::time::Duration>,
-        write_timeout: Option<std::time::Duration>,
-    ) -> std::io::Result<()> {
-        let read_timeout = read_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT);
-        let write_timeout = write_timeout.unwrap_or(Self::DEFAULT_RW_TIMEOUT);
+    fn set_io_timeout(&mut self, io_timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+        let io_timeout = io_timeout.unwrap_or(Self::DEFAULT_IO_TIMEOUT);
         unsafe {
-            (*self.context).usb_read_timeout = i32::try_from(read_timeout.as_millis())
+            (*self.context).usb_read_timeout = i32::try_from(io_timeout.as_millis())
                 .map_err(|_| std::io::ErrorKind::InvalidInput)?;
-            (*self.context).usb_write_timeout = i32::try_from(write_timeout.as_millis())
+            (*self.context).usb_write_timeout = i32::try_from(io_timeout.as_millis())
                 .map_err(|_| std::io::ErrorKind::InvalidInput)?;
         }
-        self.read_timeout = read_timeout;
-        self.write_timeout = write_timeout;
+        self.io_timeout = io_timeout;
         Ok(())
     }
 
@@ -330,6 +319,14 @@ impl Wrapper {
     }
 
     fn tciflush(&mut self) -> std::io::Result<()> {
+        match unsafe { libftdi1_sys::ftdi_tciflush(self.context) } {
+            0 => Ok(()),
+            -1 => Err(std::io::ErrorKind::BrokenPipe.into()),
+            -2 => Err(std::io::ErrorKind::NotConnected.into()),
+            result => Err(std::io::Error::other(format!(
+                "Unexpected response from ftdi_tciflush: {result}"
+            ))),
+        }?;
         let timeout = std::time::Instant::now();
         loop {
             match self.read(&mut vec![0u8; self.read_chunksize]) {
@@ -337,14 +334,12 @@ impl Wrapper {
                 Err(error) => match error.kind() {
                     std::io::ErrorKind::Interrupted
                     | std::io::ErrorKind::TimedOut
-                    | std::io::ErrorKind::WouldBlock => {
-                        return Ok(());
-                    }
+                    | std::io::ErrorKind::WouldBlock => {}
                     _ => return Err(error),
                 },
             };
-            if timeout.elapsed() > self.read_timeout {
-                return Err(std::io::ErrorKind::TimedOut.into());
+            if timeout.elapsed() > std::time::Duration::from_millis(1) {
+                return Ok(());
             }
         }
     }
@@ -354,8 +349,7 @@ impl Wrapper {
         match unsafe { libftdi1_sys::ftdi_tcoflush(self.context) } {
             0 => Ok(()),
             -1 => Err(std::io::ErrorKind::BrokenPipe.into()),
-            -2 => Err(std::io::ErrorKind::BrokenPipe.into()),
-            -3 => Err(std::io::ErrorKind::NotConnected.into()),
+            -2 => Err(std::io::ErrorKind::NotConnected.into()),
             result => Err(std::io::Error::other(format!(
                 "Unexpected response from ftdi_tcoflush: {result}"
             ))),
@@ -421,7 +415,7 @@ impl Wrapper {
                     _ => return Err(error),
                 }
             }
-            if timeout.elapsed() > self.write_timeout {
+            if timeout.elapsed() > self.io_timeout {
                 return Err(std::io::ErrorKind::TimedOut.into());
             }
         }
@@ -478,10 +472,9 @@ impl FtdiDevice {
     pub fn open(
         description: &str,
         poll_timeout: Option<std::time::Duration>,
-        read_timeout: Option<std::time::Duration>,
-        write_timeout: Option<std::time::Duration>,
+        io_timeout: Option<std::time::Duration>,
     ) -> std::io::Result<FtdiDevice> {
-        let mut wrapper = Wrapper::new(read_timeout, write_timeout)?;
+        let mut wrapper = Wrapper::new(io_timeout)?;
 
         wrapper.set_module_detach_mode(ModuleDetachMode::AutoDetachReattach);
         wrapper.set_interface(InterfaceIndex::A)?;
