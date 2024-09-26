@@ -4,7 +4,9 @@
 #include "flash.h"
 #include "fpga.h"
 #include "hw.h"
+#include "led.h"
 #include "rtc.h"
+#include "sd.h"
 #include "timer.h"
 #include "update.h"
 #include "usb.h"
@@ -268,6 +270,7 @@ static void usb_rx_process (void) {
             case 'R':
                 cfg_reset_state();
                 cic_reset_parameters();
+                sd_release_lock(SD_LOCK_USB);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;
@@ -383,6 +386,119 @@ static void usb_rx_process (void) {
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;
+
+            case 'i': {
+                sd_error_t error = SD_OK;
+                switch (p.rx_args[1]) {
+                    case 0:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            sd_card_deinit();
+                            sd_release_lock(SD_LOCK_USB);
+                        }
+                        break;
+
+                    case 1:
+                        error = sd_try_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            led_activity_on();
+                            error = sd_card_init();
+                            led_activity_off();
+                        }
+                        break;
+
+                    case 2:
+                        break;
+
+                    case 3:
+                        if (usb_validate_address_length(p.rx_args[0], SD_CARD_INFO_SIZE, true)) {
+                            error = SD_ERROR_INVALID_ADDRESS;
+                        } else {
+                            error = sd_get_lock(SD_LOCK_USB);
+                            if (error == SD_OK) {
+                                error = sd_card_get_info(p.rx_args[0]);
+                            }
+                        }
+                        break;
+
+                    case 4:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            error = sd_set_byte_swap(true);
+                        }
+                        break;
+
+                    case 5:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            error = sd_set_byte_swap(false);
+                        }
+                        break;
+
+                    default:
+                        error = SD_ERROR_INVALID_OPERATION;
+                        break;
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 8;
+                p.response_info.data[0] = error;
+                p.response_info.data[1] = sd_card_get_status();
+                break;
+            }
+
+            case 's': {
+                uint32_t sector = 0;
+                if (!usb_rx_word(&sector)) {
+                    break;
+                }
+                sd_error_t error = SD_OK;
+                if (p.rx_args[1] >= 0x800000) {
+                    error = SD_ERROR_INVALID_ARGUMENT;
+                } else if (usb_validate_address_length(p.rx_args[0], (p.rx_args[1] * SD_SECTOR_SIZE), true)) {
+                    error = SD_ERROR_INVALID_ADDRESS;
+                } else {
+                    error = sd_get_lock(SD_LOCK_USB);
+                    if (error == SD_OK) {
+                        led_activity_on();
+                        error = sd_read_sectors(p.rx_args[0], sector, p.rx_args[1]);
+                        led_activity_off();
+                    }
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = error;
+                break;
+            }
+
+            case 'S': {
+                uint32_t sector = 0;
+                if (!usb_rx_word(&sector)) {
+                    break;
+                }
+                sd_error_t error = SD_OK;
+                if (p.rx_args[1] >= 0x800000) {
+                    error = SD_ERROR_INVALID_ARGUMENT;
+                } else if (usb_validate_address_length(p.rx_args[0], (p.rx_args[1] * SD_SECTOR_SIZE), true)) {
+                    error = SD_ERROR_INVALID_ADDRESS;
+                } else {
+                    error = sd_get_lock(SD_LOCK_USB);
+                    if (error == SD_OK) {
+                        led_activity_on();
+                        error = sd_write_sectors(p.rx_args[0], sector, p.rx_args[1]);
+                        led_activity_off();
+                    }
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = error;
+                break;
+            }
 
             case 'D':
                 dd_set_block_ready(p.rx_args[0] == 0);
@@ -635,5 +751,6 @@ void usb_process (void) {
         usb_tx_process();
     } else {
         usb_flush_packet();
+        sd_release_lock(SD_LOCK_USB);
     }
 }

@@ -737,6 +737,241 @@ impl TryFrom<Vec<u8>> for DiskPacket {
     }
 }
 
+pub enum SdCardOp {
+    Deinit,
+    Init,
+    GetStatus,
+    GetInfo(u32),
+    ByteSwapOn,
+    ByteSwapOff,
+}
+
+impl From<SdCardOp> for [u32; 2] {
+    fn from(value: SdCardOp) -> Self {
+        match value {
+            SdCardOp::Deinit => [0, 0],
+            SdCardOp::Init => [0, 1],
+            SdCardOp::GetStatus => [0, 2],
+            SdCardOp::GetInfo(address) => [address, 3],
+            SdCardOp::ByteSwapOn => [0, 4],
+            SdCardOp::ByteSwapOff => [0, 5],
+        }
+    }
+}
+
+pub enum SdCardResult {
+    OK,
+    NoCardInSlot,
+    NotInitialized,
+    InvalidArgument,
+    InvalidAddress,
+    InvalidOperation,
+    Cmd2IO,
+    Cmd3IO,
+    Cmd6CheckIO,
+    Cmd6CheckCRC,
+    Cmd6CheckTimeout,
+    Cmd6CheckResponse,
+    Cmd6SwitchIO,
+    Cmd6SwitchCRC,
+    Cmd6SwitchTimeout,
+    Cmd6SwitchResponse,
+    Cmd7IO,
+    Cmd8IO,
+    Cmd9IO,
+    Cmd10IO,
+    Cmd18IO,
+    Cmd18CRC,
+    Cmd18Timeout,
+    Cmd25IO,
+    Cmd25CRC,
+    Cmd25Timeout,
+    Acmd6IO,
+    Acmd41IO,
+    Acmd41OCR,
+    Acmd41Timeout,
+    Locked,
+}
+
+impl Display for SdCardResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::OK => "OK",
+            Self::NoCardInSlot => "No card in slot",
+            Self::NotInitialized => "Not initialized",
+            Self::InvalidArgument => "Invalid argument",
+            Self::InvalidAddress => "Invalid address",
+            Self::InvalidOperation => "Invalid operation",
+            Self::Cmd2IO => "CMD2 I/O",
+            Self::Cmd3IO => "CMD3 I/O",
+            Self::Cmd6CheckIO => "CMD6 I/O (check)",
+            Self::Cmd6CheckCRC => "CMD6 CRC (check)",
+            Self::Cmd6CheckTimeout => "CMD6 timeout (check)",
+            Self::Cmd6CheckResponse => "CMD6 invalid response (check)",
+            Self::Cmd6SwitchIO => "CMD6 I/O (switch)",
+            Self::Cmd6SwitchCRC => "CMD6 CRC (switch)",
+            Self::Cmd6SwitchTimeout => "CMD6 timeout (switch)",
+            Self::Cmd6SwitchResponse => "CMD6 invalid response (switch)",
+            Self::Cmd7IO => "CMD7 I/O",
+            Self::Cmd8IO => "CMD8 I/O",
+            Self::Cmd9IO => "CMD9 I/O",
+            Self::Cmd10IO => "CMD10 I/O",
+            Self::Cmd18IO => "CMD18 I/O",
+            Self::Cmd18CRC => "CMD18 CRC",
+            Self::Cmd18Timeout => "CMD18 timeout",
+            Self::Cmd25IO => "CMD25 I/O",
+            Self::Cmd25CRC => "CMD25 CRC",
+            Self::Cmd25Timeout => "CMD25 timeout",
+            Self::Acmd6IO => "ACMD6 I/O",
+            Self::Acmd41IO => "ACMD41 I/O",
+            Self::Acmd41OCR => "ACMD41 OCR",
+            Self::Acmd41Timeout => "ACMD41 timeout",
+            Self::Locked => "SD card is locked by the N64 side",
+        })
+    }
+}
+
+impl TryFrom<Vec<u8>> for SdCardResult {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() < 4 {
+            return Err(Error::new(
+                "Incorrect data length for SD card result data packet",
+            ));
+        }
+        Ok(match u32::from_be_bytes(value[0..4].try_into().unwrap()) {
+            0 => Self::OK,
+            1 => Self::NoCardInSlot,
+            2 => Self::NotInitialized,
+            3 => Self::InvalidArgument,
+            4 => Self::InvalidAddress,
+            5 => Self::InvalidOperation,
+            6 => Self::Cmd2IO,
+            7 => Self::Cmd3IO,
+            8 => Self::Cmd6CheckIO,
+            9 => Self::Cmd6CheckCRC,
+            10 => Self::Cmd6CheckTimeout,
+            11 => Self::Cmd6CheckResponse,
+            12 => Self::Cmd6SwitchIO,
+            13 => Self::Cmd6SwitchCRC,
+            14 => Self::Cmd6SwitchTimeout,
+            15 => Self::Cmd6SwitchResponse,
+            16 => Self::Cmd7IO,
+            17 => Self::Cmd8IO,
+            18 => Self::Cmd9IO,
+            19 => Self::Cmd10IO,
+            20 => Self::Cmd18IO,
+            21 => Self::Cmd18CRC,
+            22 => Self::Cmd18Timeout,
+            23 => Self::Cmd25IO,
+            24 => Self::Cmd25CRC,
+            25 => Self::Cmd25Timeout,
+            26 => Self::Acmd6IO,
+            27 => Self::Acmd41IO,
+            28 => Self::Acmd41OCR,
+            29 => Self::Acmd41Timeout,
+            30 => Self::Locked,
+            _ => return Err(Error::new("Unknown SD card result code")),
+        })
+    }
+}
+
+pub struct SdCardStatus {
+    pub byte_swap: bool,
+    pub clock_mode_50mhz: bool,
+    pub card_type_block: bool,
+    pub card_initialized: bool,
+    pub card_inserted: bool,
+}
+
+impl Display for SdCardStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.card_initialized {
+            f.write_str("Initialized, ")?;
+            f.write_str(if self.clock_mode_50mhz {
+                "50 MHz"
+            } else {
+                "25 MHz"
+            })?;
+            if !self.card_type_block {
+                f.write_str(", byte addressed")?;
+            }
+            if self.byte_swap {
+                f.write_str(", byte swap enabled")?;
+            }
+        } else if self.card_inserted {
+            f.write_str("Not initialized")?;
+        } else {
+            f.write_str("Not inserted")?;
+        }
+        Ok(())
+    }
+}
+
+pub struct SdCardOpPacket {
+    pub result: SdCardResult,
+    pub status: SdCardStatus,
+}
+
+impl TryFrom<Vec<u8>> for SdCardStatus {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 8 {
+            return Err(Error::new(
+                "Incorrect data length for SD card status data packet",
+            ));
+        }
+        let status = u32::from_be_bytes(value[4..8].try_into().unwrap());
+        return Ok(Self {
+            byte_swap: status & (1 << 4) != 0,
+            clock_mode_50mhz: status & (1 << 3) != 0,
+            card_type_block: status & (1 << 2) != 0,
+            card_initialized: status & (1 << 1) != 0,
+            card_inserted: status & (1 << 0) != 0,
+        });
+    }
+}
+
+pub struct SdCardInfo {
+    pub sectors: u64,
+}
+
+impl TryFrom<Vec<u8>> for SdCardInfo {
+    type Error = Error;
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.len() != 32 {
+            return Err(Error::new(
+                "Incorrect data length for SD card info data packet",
+            ));
+        }
+        let csd = u128::from_be_bytes(value[0..16].try_into().unwrap());
+        let csd_structure = (csd >> 126) & 0x3;
+        match csd_structure {
+            0 => {
+                let c_size = ((csd >> 62) & 0xFFF) as u64;
+                let c_size_mult = ((csd >> 47) & 0x7) as u32;
+                let read_bl_len = ((csd >> 80) & 0xF) as u32;
+                Ok(SdCardInfo {
+                    sectors: (c_size + 1) * 2u64.pow(c_size_mult + 2) * 2u64.pow(read_bl_len) / 512,
+                })
+            }
+            1 => {
+                let c_size = ((csd >> 48) & 0x3FFFFF) as u64;
+                Ok(SdCardInfo {
+                    sectors: (c_size + 1) * 1024,
+                })
+            }
+            2 => {
+                let c_size = ((csd >> 48) & 0xFFFFFFF) as u64;
+                Ok(SdCardInfo {
+                    sectors: (c_size + 1) * 1024,
+                })
+            }
+            _ => Err(Error::new("Unknown CSD structure value")),
+        }
+    }
+}
+
 pub struct DiskBlock {
     pub address: u32,
     pub track: u32,

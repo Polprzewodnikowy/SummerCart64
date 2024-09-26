@@ -6,6 +6,10 @@ authors = ["Polprzewodnikowy"]
 description = "SummerCart64 loader and control software"
 documentation = "https://github.com/Polprzewodnikowy/SummerCart64"
 
+[build-dependencies]
+bindgen = "0.70.1"
+cc = "1.1.18"
+
 [dependencies]
 chrono = "0.4.38"
 clap = { version = "4.5.8", features = ["derive"] }

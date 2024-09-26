@@ -26,3 +26,9 @@ impl From<std::io::Error> for Error {
         Error::new(format!("IO error: {}", value).as_str())
     }
 }
+
+impl From<super::ff::Error> for Error {
+    fn from(value: super::ff::Error) -> Self {
+        Error::new(format!("FatFs error: {}", value).as_str())
+    }
+}
