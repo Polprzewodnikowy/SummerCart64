@@ -127,6 +127,20 @@ impl FF {
         }
     }
 
+    fn mount(&mut self) -> Result<(), Error> {
+        match unsafe { fatfs::f_mount(&mut *self.fs, fatfs::path("")?.as_ptr(), 0) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    fn unmount(&self) -> Result<(), Error> {
+        match unsafe { fatfs::f_mount(std::ptr::null_mut(), fatfs::path("")?.as_ptr(), 0) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
     pub fn open<P: AsRef<std::path::Path>>(&self, path: P) -> Result<File, Error> {
         File::open(
             path,
@@ -156,7 +170,7 @@ impl FF {
     pub fn list<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Vec<Entry>, Error> {
         let mut dir = self.opendir(path)?;
 
-        let mut list = Vec::<Entry>::new();
+        let mut list = vec![];
 
         while let Some(entry) = dir.read()? {
             list.push(entry);
@@ -187,42 +201,41 @@ impl FF {
             error => Err(error.into()),
         }
     }
-}
 
-pub fn run<F: FnOnce(FF) -> Result<(), super::Error>>(
-    driver: impl FFDriver + 'static,
-    runner: F,
-) -> Result<(), super::Error> {
-    let fs = start(driver)?;
-    let result = runner(fs);
-    stop()?;
-    result
-}
-
-fn start(fatfs_driver: impl FFDriver + 'static) -> Result<FF, Error> {
-    driver_install(fatfs_driver)?;
-    let mut ff = FF::new();
-    match unsafe { fatfs::f_mount(&mut *ff.fs, fatfs::path("")?.as_ptr(), 1) } {
-        fatfs::FRESULT_FR_OK => Ok(ff),
-        error => {
-            driver_uninstall().ok();
-            Err(error.into())
+    pub fn mkfs(&self) -> Result<(), Error> {
+        let mut work = [0u8; 16 * 1024];
+        match unsafe {
+            fatfs::f_mkfs(
+                fatfs::path("")?.as_ptr(),
+                std::ptr::null(),
+                work.as_mut_ptr().cast(),
+                size_of_val(&work) as u32,
+            )
+        } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
         }
     }
 }
 
-fn stop() -> Result<(), Error> {
-    match unsafe { fatfs::f_mount(std::ptr::null_mut(), fatfs::path("")?.as_ptr(), 0) } {
-        fatfs::FRESULT_FR_OK => driver_uninstall(),
-        error => Err(error.into()),
-    }
+pub fn run<F: FnOnce(&mut FF) -> Result<(), super::Error>>(
+    driver: impl FFDriver + 'static,
+    runner: F,
+) -> Result<(), super::Error> {
+    install_driver(driver)?;
+    let mut ff = FF::new();
+    ff.mount()?;
+    let result = runner(&mut ff);
+    ff.unmount().ok();
+    uninstall_driver().ok();
+    result
 }
 
-fn driver_install(new_driver: impl FFDriver + 'static) -> Result<(), Error> {
+fn install_driver(driver: impl FFDriver + 'static) -> Result<(), Error> {
     match unsafe { DRIVER.lock() } {
-        Ok(mut driver) => {
-            if driver.is_none() {
-                driver.replace(Box::new(new_driver));
+        Ok(mut d) => {
+            if d.is_none() {
+                d.replace(Box::new(driver));
                 Ok(())
             } else {
                 Err(Error::IntErr)
@@ -232,11 +245,11 @@ fn driver_install(new_driver: impl FFDriver + 'static) -> Result<(), Error> {
     }
 }
 
-fn driver_uninstall() -> Result<(), Error> {
+fn uninstall_driver() -> Result<(), Error> {
     match unsafe { DRIVER.lock() } {
-        Ok(mut driver) => {
-            if let Some(mut driver) = driver.take() {
-                driver.deinit();
+        Ok(mut d) => {
+            if let Some(mut d) = d.take() {
+                d.deinit();
                 Ok(())
             } else {
                 Err(Error::IntErr)
@@ -427,7 +440,7 @@ unsafe extern "C" fn disk_ioctl(
             return result;
         }
     }
-    fatfs::DRESULT_RES_OK
+    fatfs::DRESULT_RES_ERROR
 }
 
 #[no_mangle]
@@ -470,7 +483,7 @@ impl PartialOrd for EntryInfo {
     }
 }
 
-impl std::fmt::Display for Entry {
+impl std::fmt::Display for EntryInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let size_formatter = |size: u64| -> String {
             const UNITS: [&str; 4] = ["K", "M", "G", "T"];
@@ -490,18 +503,11 @@ impl std::fmt::Display for Entry {
                 format!("{:>3.0}{}", reduced_size, reduced_unit)
             }
         };
-        Ok(match self.info {
-            EntryInfo::Directory => f.write_fmt(format_args!(
-                "d ---- {} | {}",
-                self.datetime,
-                format!("/{}", self.name)
-            ))?,
-            EntryInfo::File { size } => f.write_fmt(format_args!(
-                "f {} {} | {}",
-                size_formatter(size),
-                self.datetime,
-                self.name
-            ))?,
+        Ok(match self {
+            EntryInfo::Directory => f.write_fmt(format_args!("d ----",))?,
+            EntryInfo::File { size } => {
+                f.write_fmt(format_args!("f {}", size_formatter(*size),))?
+            }
         })
     }
 }
@@ -544,7 +550,7 @@ pub struct Directory {
 
 impl Directory {
     fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Error> {
-        let mut dir: fatfs::DIR = unsafe { std::mem::zeroed() };
+        let mut dir = unsafe { std::mem::zeroed() };
         match unsafe { fatfs::f_opendir(&mut dir, fatfs::path(path)?.as_ptr()) } {
             fatfs::FRESULT_FR_OK => Ok(Self { dir }),
             error => Err(error.into()),
@@ -552,7 +558,7 @@ impl Directory {
     }
 
     pub fn read(&mut self) -> Result<Option<Entry>, Error> {
-        let mut fno: fatfs::FILINFO = unsafe { std::mem::zeroed() };
+        let mut fno = unsafe { std::mem::zeroed() };
         match unsafe { fatfs::f_readdir(&mut self.dir, &mut fno) } {
             fatfs::FRESULT_FR_OK => {
                 if fno.fname[0] == 0 {
@@ -578,7 +584,7 @@ pub struct File {
 
 impl File {
     fn open<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<File, Error> {
-        let mut fil: fatfs::FIL = unsafe { std::mem::zeroed() };
+        let mut fil = unsafe { std::mem::zeroed() };
         match unsafe { fatfs::f_open(&mut fil, fatfs::path(path)?.as_ptr(), mode as u8) } {
             fatfs::FRESULT_FR_OK => Ok(File { fil }),
             error => Err(error.into()),

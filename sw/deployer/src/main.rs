@@ -268,6 +268,10 @@ enum SDCommands {
         /// Path to the file on the SD card
         dst: Option<PathBuf>,
     },
+
+    /// Format the SD card
+    #[command(name = "mkfs")]
+    Format,
 }
 
 #[derive(Subcommand)]
@@ -854,12 +858,29 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
         match command {
             SDCommands::List { path } => {
                 for item in ff.list(path.clone().unwrap_or(PathBuf::from("/")))? {
-                    println!("{item}");
+                    let sc64::ff::Entry {
+                        info,
+                        datetime,
+                        name,
+                    } = item;
+                    let name = match info {
+                        sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
+                        sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
+                    };
+                    println!("{info} {datetime} | {name}");
                 }
             }
             SDCommands::Stat { path } => {
-                let info = ff.stat(path)?;
-                println!("{info}");
+                let sc64::ff::Entry {
+                    info,
+                    datetime,
+                    name,
+                } = ff.stat(path)?;
+                let name = match info {
+                    sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
+                    sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
+                };
+                println!("{info} {datetime} | {name}");
             }
             SDCommands::Move { src, dst } => {
                 ff.rename(src, dst)?;
@@ -933,6 +954,20 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                         bytes => dst_file.write_all(&buffer[0..bytes])?,
                     }
                 }
+                println!("{}", "done!".bright_green());
+            }
+            SDCommands::Format => {
+                let answer = prompt(format!(
+                    "{}",
+                    "Do you really want to format the SD card? [y/N] ".bold()
+                ));
+                if answer.to_ascii_lowercase() != "y" {
+                    println!("{}", "Format operation aborted".red());
+                    return Ok(());
+                }
+                print!("Formatting the SD card... ",);
+                stdout().flush().unwrap();
+                ff.mkfs()?;
                 println!("{}", "done!".bright_green());
             }
         }
