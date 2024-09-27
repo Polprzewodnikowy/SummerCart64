@@ -152,30 +152,33 @@ Available packet IDs are listed in the [asynchronous packets](#asynchronous-pack
 
 ## Supported commands
 
-| id  | name                                            | arg0         | arg1          | data | response         | description                                                    |
-| --- | ----------------------------------------------- | ------------ | ------------- | ---- | ---------------- | -------------------------------------------------------------- |
-| `v` | [**IDENTIFIER_GET**](#v-identifier_get)         | ---          | ---           | ---  | identifier       | Get flashcart identifier `SCv2`                                |
-| `V` | [**VERSION_GET**](#v-version_get)               | ---          | ---           | ---  | version          | Get flashcart firmware version                                 |
-| `R` | [**STATE_RESET**](#r-state_reset)               | ---          | ---           | ---  | ---              | Reset flashcart state (CIC params and config options)          |
-| `B` | [**CIC_PARAMS_SET**](#b-cic_params_set)         | cic_params_0 | cic_params_1  | ---  | ---              | Set CIC emulation parameters (disable/seed/checksum)           |
-| `c` | [**CONFIG_GET**](#c-config_get)                 | config_id    | ---           | ---  | config_value     | Get config option                                              |
-| `C` | [**CONFIG_SET**](#c-config_set)                 | config_id    | config_value  | ---  | ---              | Set config option                                              |
-| `a` | [**SETTING_GET**](#a-setting_get)               | setting_id   | ---           | ---  | setting_value    | Get persistent setting option                                  |
-| `A` | [**SETTING_SET**](#a-setting_set)               | setting_id   | setting_value | ---  | ---              | Set persistent setting option                                  |
-| `t` | [**TIME_GET**](#t-time_get)                     | ---          | ---           | ---  | time             | Get current RTC value                                          |
-| `T` | [**TIME_SET**](#t-time_set)                     | time_0       | time_1        | ---  | ---              | Set new RTC value                                              |
-| `m` | [**MEMORY_READ**](#m-memory_read)               | address      | length        | ---  | data             | Read data from specified memory address                        |
-| `M` | [**MEMORY_WRITE**](#m-memory_write)             | address      | length        | data | ---              | Write data to specified memory address                         |
-| `U` | [**USB_WRITE**](#u-usb_write)                   | type         | length        | data | N/A              | Send data to be received by app running on N64 (no response!)  |
-| `X` | [**AUX_WRITE**](#x-aux_write)                   | data         | ---           | ---  | ---              | Send small auxiliary data to be received by app running on N64 |
-| `D` | [**DD_SET_BLOCK_READY**](#d-dd_set_block_ready) | error        | ---           | ---  | ---              | Notify flashcart about 64DD block readiness                    |
-| `W` | [**WRITEBACK_ENABLE**](#w-writeback_enable)     | ---          | ---           | ---  | ---              | Enable save writeback through USB packet                       |
-| `p` | **FLASH_WAIT_BUSY**                             | wait         | ---           | ---  | erase_block_size | Wait until flash ready / Get flash block erase size            |
-| `P` | **FLASH_ERASE_BLOCK**                           | address      | ---           | ---  | ---              | Start flash block erase                                        |
-| `f` | **FIRMWARE_BACKUP**                             | address      | ---           | ---  | status/length    | Backup firmware to specified memory address                    |
-| `F` | **FIRMWARE_UPDATE**                             | address      | length        | ---  | status           | Update firmware from specified memory address                  |
-| `?` | **DEBUG_GET**                                   | ---          | ---           | ---  | debug_data       | Get internal FPGA debug info                                   |
-| `%` | **DIAGNOSTIC_GET**                              | ---          | ---           | ---  | diagnostic_data  | Get diagnostic data                                            |
+| id  | name                                            | arg0         | arg1          | data   | response         | description                                                    |
+| --- | ----------------------------------------------- | ------------ | ------------- | ------ | ---------------- | -------------------------------------------------------------- |
+| `v` | [**IDENTIFIER_GET**](#v-identifier_get)         | ---          | ---           | ---    | identifier       | Get flashcart identifier `SCv2`                                |
+| `V` | [**VERSION_GET**](#v-version_get)               | ---          | ---           | ---    | version          | Get flashcart firmware version                                 |
+| `R` | [**STATE_RESET**](#r-state_reset)               | ---          | ---           | ---    | ---              | Reset flashcart state (CIC params and config options)          |
+| `B` | [**CIC_PARAMS_SET**](#b-cic_params_set)         | cic_params_0 | cic_params_1  | ---    | ---              | Set CIC emulation parameters (disable/seed/checksum)           |
+| `c` | [**CONFIG_GET**](#c-config_get)                 | config_id    | ---           | ---    | config_value     | Get config option                                              |
+| `C` | [**CONFIG_SET**](#c-config_set)                 | config_id    | config_value  | ---    | ---              | Set config option                                              |
+| `a` | [**SETTING_GET**](#a-setting_get)               | setting_id   | ---           | ---    | setting_value    | Get persistent setting option                                  |
+| `A` | [**SETTING_SET**](#a-setting_set)               | setting_id   | setting_value | ---    | ---              | Set persistent setting option                                  |
+| `t` | [**TIME_GET**](#t-time_get)                     | ---          | ---           | ---    | time             | Get current RTC value                                          |
+| `T` | [**TIME_SET**](#t-time_set)                     | time_0       | time_1        | ---    | ---              | Set new RTC value                                              |
+| `m` | [**MEMORY_READ**](#m-memory_read)               | address      | length        | ---    | data             | Read data from specified memory address                        |
+| `M` | [**MEMORY_WRITE**](#m-memory_write)             | address      | length        | data   | ---              | Write data to specified memory address                         |
+| `U` | [**USB_WRITE**](#u-usb_write)                   | type         | length        | data   | N/A              | Send data to be received by app running on N64 (no response!)  |
+| `X` | [**AUX_WRITE**](#x-aux_write)                   | data         | ---           | ---    | ---              | Send small auxiliary data to be received by app running on N64 |
+| `i` | **SD_CARD_OP**                                  | address      | operation     | ---    | result/status    | Perform special operation on the SD card                       |
+| `s` | **SD_READ**                                     | address      | sector_count  | sector | result           | Read sectors from the SD card to flashcart memory space        |
+| `S` | **SD_WRITE**                                    | address      | sector_count  | sector | result           | Write sectors from the flashcart memory space to the SD card   |
+| `D` | [**DD_SET_BLOCK_READY**](#d-dd_set_block_ready) | error        | ---           | ---    | ---              | Notify flashcart about 64DD block readiness                    |
+| `W` | [**WRITEBACK_ENABLE**](#w-writeback_enable)     | ---          | ---           | ---    | ---              | Enable save writeback through USB packet                       |
+| `p` | **FLASH_WAIT_BUSY**                             | wait         | ---           | ---    | erase_block_size | Wait until flash ready / Get flash block erase size            |
+| `P` | **FLASH_ERASE_BLOCK**                           | address      | ---           | ---    | ---              | Start flash block erase                                        |
+| `f` | **FIRMWARE_BACKUP**                             | address      | ---           | ---    | status/length    | Backup firmware to specified memory address                    |
+| `F` | **FIRMWARE_UPDATE**                             | address      | length        | ---    | status           | Update firmware from specified memory address                  |
+| `?` | **DEBUG_GET**                                   | ---          | ---           | ---    | debug_data       | Get internal FPGA debug info                                   |
+| `%` | **DIAGNOSTIC_GET**                              | ---          | ---           | ---    | diagnostic_data  | Get diagnostic data                                            |
 
 ---
 
