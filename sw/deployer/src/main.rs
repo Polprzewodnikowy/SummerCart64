@@ -867,7 +867,7 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                         sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
                         sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
                     };
-                    println!("{info} {datetime} | {name}");
+                    println!("{info} {datetime} | {}", name.bold());
                 }
             }
             SDCommands::Stat { path } => {
@@ -880,7 +880,7 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                     sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
                     sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
                 };
-                println!("{info} {datetime} | {name}");
+                println!("{info} {datetime} | {}", name.bold());
             }
             SDCommands::Move { src, dst } => {
                 ff.rename(src, dst)?;
