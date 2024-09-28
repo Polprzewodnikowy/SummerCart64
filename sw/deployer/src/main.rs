@@ -852,6 +852,23 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
         }
     }
 
+    if sc64.is_console_powered_on()? {
+        println!(
+            "{}\n{}\n{}",
+            "========== [WARNING] ==========".bold().bright_yellow(),
+            "The console is powered on. To avoid potential data corruption it's strongly"
+                .bright_yellow(),
+            "recommended to access the SD card only when the console is powered off."
+                .bright_yellow()
+        );
+        let answer = prompt(format!("{}", "Continue anyways? [y/N] ".bold()));
+        if answer.to_ascii_lowercase() != "y" {
+            sc64.deinit_sd_card()?;
+            println!("{}", "SD card access aborted".red());
+            return Ok(());
+        }
+    }
+
     sc64.reset_state()?;
 
     sc64::ff::run(sc64, |ff| {

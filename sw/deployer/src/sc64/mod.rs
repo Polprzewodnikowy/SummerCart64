@@ -14,7 +14,7 @@ pub use self::{
     link::list_local_devices,
     server::ServerEvent,
     types::{
-        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState,
+        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, CicStep, DataPacket, DdDiskState,
         DdDriveType, DdMode, DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind,
         FpgaDebugData, ISViewer, MemoryTestPattern, MemoryTestPatternResult, SaveType,
         SaveWriteback, SdCardInfo, SdCardOpPacket, SdCardResult, SdCardStatus, SpeedTestDirection,
@@ -98,7 +98,7 @@ const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
-const SD_CARD_BUFFER_ADDRESS: u32 = 0x03BA_0000; // Arbitrary offset in SDRAM memory
+const SD_CARD_BUFFER_ADDRESS: u32 = 0x03FE_0000; // Arbitrary offset in SDRAM memory
 const SD_CARD_BUFFER_LENGTH: usize = 128 * 1024; // Arbitrary length in SDRAM memory
 
 pub const SD_CARD_SECTOR_SIZE: usize = 512;
@@ -765,6 +765,14 @@ impl SC64 {
 
     pub fn reset_state(&mut self) -> Result<(), Error> {
         self.command_state_reset()
+    }
+
+    pub fn is_console_powered_on(&mut self) -> Result<bool, Error> {
+        let debug_data = self.command_fpga_debug_data_get()?;
+        Ok(match debug_data.cic_step {
+            CicStep::Unavailable | CicStep::PowerOff => false,
+            _ => true,
+        })
     }
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
