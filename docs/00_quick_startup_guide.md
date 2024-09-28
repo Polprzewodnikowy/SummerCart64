@@ -77,7 +77,7 @@ Type `./sc64deployer debug` to activate it.
 
 ### Firmware backup/update
 
-Keeping SC64 firmware up to date is highly recommended.
+Keeping SC64 firmware up to date is strongly recommended.
 `sc64deployer` application is tightly coupled with specific firmware versions and will error out when it detects unsupported firmware version.
 
 To download and backup current version of the SC64 firmware run `./sc64deployer firmware backup sc64-firmware-backup.bin`

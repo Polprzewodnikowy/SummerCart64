@@ -504,7 +504,7 @@ This command puts 32 bits of data to the AUX register accessible from the N64 si
 | offset | type     | description                                                                                    |
 | ------ | -------- | ---------------------------------------------------------------------------------------------- |
 | `0`    | uint32_t | Operation result (valid values are listed in the [sd_error_t](../sw/controller/src/sd.h) enum) |
-| `4`    | uint32_t | SD card status (always returned regardless of the SD card operation result)                    |
+| `4`    | uint32_t | SD card status (always returned and valid regardless of the SD card operation result)          |
 
 This command performs special operation on the SD card. When operation result is not `SD_OK`, then `ERR` packet is returned.
 PC and N64 cannot use the SD card interface at the same time. Lock mechanism is implemented to prevent data corruption.
