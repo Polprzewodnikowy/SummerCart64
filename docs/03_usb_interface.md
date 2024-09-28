@@ -45,6 +45,22 @@
     - [`data` (data)](#data-data-1)
   - [`X`: **AUX\_WRITE**](#x-aux_write)
     - [`arg0` (data)](#arg0-data)
+  - [`i`: **SD\_CARD\_OP**](#i-sd_card_op)
+    - [`arg0` (address)](#arg0-address-2)
+    - [`arg1` (operation)](#arg1-operation)
+    - [`response` (result/status)](#response-resultstatus)
+    - [Available SD card operations](#available-sd-card-operations)
+    - [SD card status](#sd-card-status)
+  - [`s`: **SD\_READ**](#s-sd_read)
+    - [`arg0` (address)](#arg0-address-3)
+    - [`arg1` (sector\_count)](#arg1-sector_count)
+    - [`data` (sector)](#data-sector)
+    - [`response` (result)](#response-result)
+  - [`S`: **SD\_WRITE**](#s-sd_write)
+    - [`arg0` (address)](#arg0-address-4)
+    - [`arg1` (sector\_count)](#arg1-sector_count-1)
+    - [`data` (sector)](#data-sector-1)
+    - [`response` (result)](#response-result-1)
   - [`D`: **DD\_SET\_BLOCK\_READY**](#d-dd_set_block_ready)
     - [`arg0` (error)](#arg0-error)
   - [`W`: **WRITEBACK\_ENABLE**](#w-writeback_enable)
@@ -168,9 +184,9 @@ Available packet IDs are listed in the [asynchronous packets](#asynchronous-pack
 | `M` | [**MEMORY_WRITE**](#m-memory_write)             | address      | length        | data   | ---              | Write data to specified memory address                         |
 | `U` | [**USB_WRITE**](#u-usb_write)                   | type         | length        | data   | N/A              | Send data to be received by app running on N64 (no response!)  |
 | `X` | [**AUX_WRITE**](#x-aux_write)                   | data         | ---           | ---    | ---              | Send small auxiliary data to be received by app running on N64 |
-| `i` | **SD_CARD_OP**                                  | address      | operation     | ---    | result/status    | Perform special operation on the SD card                       |
-| `s` | **SD_READ**                                     | address      | sector_count  | sector | result           | Read sectors from the SD card to flashcart memory space        |
-| `S` | **SD_WRITE**                                    | address      | sector_count  | sector | result           | Write sectors from the flashcart memory space to the SD card   |
+| `i` | [**SD_CARD_OP**](#i-sd_card_op)                 | address      | operation     | ---    | result/status    | Perform special operation on the SD card                       |
+| `s` | [**SD_READ**](#s-sd_read)                       | address      | sector_count  | sector | result           | Read sectors from the SD card to flashcart memory space        |
+| `S` | [**SD_WRITE**](#s-sd_write)                     | address      | sector_count  | sector | result           | Write sectors from the flashcart memory space to the SD card   |
 | `D` | [**DD_SET_BLOCK_READY**](#d-dd_set_block_ready) | error        | ---           | ---    | ---              | Notify flashcart about 64DD block readiness                    |
 | `W` | [**WRITEBACK_ENABLE**](#w-writeback_enable)     | ---          | ---           | ---    | ---              | Enable save writeback through USB packet                       |
 | `p` | **FLASH_WAIT_BUSY**                             | wait         | ---           | ---    | erase_block_size | Wait until flash ready / Get flash block erase size            |
@@ -226,7 +242,7 @@ _This command does not require arguments or data._
 _This command does not send response data._
 
 This command is used to reset most of the config options to default state (same as on power-up).
-Additionally, CIC emulation is enabled and 6102/7101 seed/checksum values are set.
+Additionally, CIC emulation is enabled, 6102/7101 seed/checksum values are set and SD card lock is released.
 
 ---
 
@@ -467,6 +483,110 @@ If N64 acknowledge the request, then data is written to the flashcart memory to 
 _This command does not send response data._
 
 This command puts 32 bits of data to the AUX register accessible from the N64 side, and generates cart interrupt (if enabled).
+
+---
+
+### `i`: **SD_CARD_OP**
+
+**Perform special operation on the SD card**
+
+#### `arg0` (address)
+| bits     | description |
+| -------- | ----------- |
+| `[31:0]` | Address     |
+
+#### `arg1` (operation)
+| bits     | description |
+| -------- | ----------- |
+| `[31:0]` | Operation   |
+
+#### `response` (result/status)
+| offset | type     | description                                                                                    |
+| ------ | -------- | ---------------------------------------------------------------------------------------------- |
+| `0`    | uint32_t | Operation result (valid values are listed in the [sd_error_t](../sw/controller/src/sd.h) enum) |
+| `4`    | uint32_t | SD card status (always returned regardless of the SD card operation result)                    |
+
+This command performs special operation on the SD card. When operation result is not `SD_OK`, then `ERR` packet is returned.
+PC and N64 cannot use the SD card interface at the same time. Lock mechanism is implemented to prevent data corruption.
+SD card access is locked when PC or N64 requests SD card initialization, and unlocked when the card is uninitialized.
+Lock is also released when certain conditions occur - when N64 side lock is active then it is released when the console is powered off
+and save writeback operation is not pending. PC side lock is released when USB interface is in reset state, or the USB cable is unplugged.
+
+#### Available SD card operations
+| operation | description                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `0`       | Init SD card                                                                                   |
+| `1`       | Deinit SD card                                                                                 |
+| `2`       | Get SD card status                                                                             |
+| `3`       | Get SD card info (loads CSD and CID registers to a specified address, data length is 32 bytes) |
+| `4`       | Turn on byte swap                                                                              |
+| `5`       | Turn off byte swap                                                                             |
+
+#### SD card status
+| bits     | description                                                                |
+| -------- | -------------------------------------------------------------------------- |
+| `[31:5]` | _Unused_                                                                   |
+| `[4]`    | `0` - Byte swap disabled, `1` - Byte swap enabled (valid when initialized) |
+| `[3]`    | `0` - 25 MHz clock, `1` - 50 MHz clock (valid when initialized)            |
+| `[2]`    | `0` - Byte addressed, `1` - Sector addressed (valid when initialized)      |
+| `[1]`    | `0` - SD card not initialized, `1` - SD card initialized                   |
+| `[0]`    | `0` - SD card not inserted, `1` - SD card inserted                         |
+
+---
+
+### `s`: **SD_READ**
+
+**Read sectors from the SD card to flashcart memory space**
+
+#### `arg0` (address)
+| bits     | description |
+| -------- | ----------- |
+| `[31:0]` | Address     |
+
+#### `arg1` (sector_count)
+| bits     | description  |
+| -------- | ------------ |
+| `[31:0]` | Sector count |
+
+#### `data` (sector)
+| offset | type     | description     |
+| ------ | -------- | --------------- |
+| `0`    | uint32_t | Starting sector |
+
+#### `response` (result)
+| offset | type     | description                                                                                    |
+| ------ | -------- | ---------------------------------------------------------------------------------------------- |
+| `0`    | uint32_t | Operation result (valid values are listed in the [sd_error_t](../sw/controller/src/sd.h) enum) |
+
+This command reads sectors from the SD card to a specified memory address. When operation result is not `SD_OK`, then `ERR` packet is returned.
+
+---
+
+### `S`: **SD_WRITE**
+
+**Write sectors from the flashcart memory space to the SD card**
+
+#### `arg0` (address)
+| bits     | description |
+| -------- | ----------- |
+| `[31:0]` | Address     |
+
+#### `arg1` (sector_count)
+| bits     | description  |
+| -------- | ------------ |
+| `[31:0]` | Sector count |
+
+#### `data` (sector)
+| offset | type     | description     |
+| ------ | -------- | --------------- |
+| `0`    | uint32_t | Starting sector |
+
+#### `response` (result)
+| offset | type     | description                                                                                    |
+| ------ | -------- | ---------------------------------------------------------------------------------------------- |
+| `0`    | uint32_t | Operation result (valid values are listed in the [sd_error_t](../sw/controller/src/sd.h) enum) |
+
+This command writes sectors from a specified memory address to the SD card. When operation result is not `SD_OK`, then `ERR` packet is returned.
 
 ---
 
