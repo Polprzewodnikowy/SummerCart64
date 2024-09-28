@@ -390,6 +390,9 @@ fn main() {
         panic::set_hook(Box::new(|_| {}));
     }
 
+    #[cfg(windows)]
+    colored::control::set_virtual_terminal(true).ok();
+
     match panic::catch_unwind(|| handle_command(&cli.command, cli.port, cli.remote)) {
         Ok(_) => {}
         Err(payload) => {
