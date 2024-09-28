@@ -18,7 +18,7 @@
  - Dedicated open source menu written specifically for this flashcart - [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu)
  - Enhanced [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
  - PC app for communicating with flashcart (game/save data upload/download, feature enable control and debug terminal)
- - SD card accessible via USB interface with the use of the PC app
+ - Access to the SD card via USB interface with the use of the PC app
  - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
  - Initial programming via UART header or dedicated JTAG/SWD interfaces
  - Software and firmware updatable via USB interface
