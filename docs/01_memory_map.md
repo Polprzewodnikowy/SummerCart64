@@ -25,9 +25,9 @@ This mapping is used internally by FPGA/μC and when accessing flashcart from US
 | Flash [1]           | `0x0400_0000` | 16 MiB           | RW/R   | Flash    |
 | Data buffer         | `0x0500_0000` | 8 kiB            | RW     | BlockRAM |
 | EEPROM              | `0x0500_2000` | 2 kiB            | RW     | BlockRAM |
-| 64DD buffer         | `0x0500_2800` | 256 bytes        | RW     | BlockRAM |
-| FlashRAM buffer [2] | `0x0500_2900` | 128 bytes        | R      | BlockRAM |
-| N/A [3]             | `0x0500_2980` | to `0x07FF_FFFF` | R      | N/A      |
+| 64DD/MCU buffer     | `0x0500_2800` | 1 kiB            | RW     | BlockRAM |
+| FlashRAM buffer [2] | `0x0500_2C00` | 128 bytes        | R      | BlockRAM |
+| N/A [3]             | `0x0500_2C80` | to `0x07FF_FFFF` | R      | N/A      |
 
  - Note [1]: Flash memory region `0x04E0_0000` - `0x04FD_FFFF` is write protected as it contains N64 bootloader. This section can be overwritten only via firmware update process.
  - Note [2]: Due to BlockRAM usage optimization this section is read only.
@@ -53,8 +53,8 @@ This mapping is used when accessing flashcart from N64 side.
 | ROM shadow [7]      | `0x1FFC_0000` | 128 kiB   | R      | `0x04FE_0000` | Flash                 | mem bus     | SC64 register access is enabled   |
 | Data buffer         | `0x1FFE_0000` | 8 kiB     | RW     | `0x0500_0000` | Block RAM             | mem bus     | SC64 register access is enabled   |
 | EEPROM              | `0x1FFE_2000` | 2 kiB     | RW     | `0x0500_2000` | Block RAM             | mem bus     | SC64 register access is enabled   |
-| 64DD buffer [8]     | `0x1FFE_2800` | 256 bytes | RW     | `0x0500_2800` | Block RAM             | mem bus     | SC64 register access is enabled   |
-| FlashRAM buffer [8] | `0x1FFE_2900` | 128 bytes | R      | `0x0500_2900` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| 64DD/MCU buffer [8] | `0x1FFE_2800` | 1 kiB     | RW     | `0x0500_2800` | Block RAM             | mem bus     | SC64 register access is enabled   |
+| FlashRAM buffer [8] | `0x1FFE_2C00` | 128 bytes | R      | `0x0500_2C00` | Block RAM             | mem bus     | SC64 register access is enabled   |
 | SC64 registers      | `0x1FFF_0000` | 28 bytes  | RW     | N/A           | Flashcart Interface   | reg bus     | SC64 register access is enabled   |
 
  - Note [1]: 64DD IPL share SDRAM memory space with ROM (last 4 MiB minus 128 kiB for saves). Write access is always disabled for this section.

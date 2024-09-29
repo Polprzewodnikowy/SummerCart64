@@ -17,7 +17,7 @@
 #define BOOTLOADER_ADDRESS      (0x04E00000UL)
 #define BOOTLOADER_LENGTH       (1920 * 1024)
 
-#define MEMORY_LENGTH           (0x05002980UL)
+#define MEMORY_LENGTH           (0x05002C80UL)
 
 #define RX_FLUSH_ADDRESS        (0x07F00000UL)
 #define RX_FLUSH_LENGTH         (1 * 1024 * 1024)

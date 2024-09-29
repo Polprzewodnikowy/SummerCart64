@@ -109,7 +109,7 @@ const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
-pub const MEMORY_LENGTH: usize = 0x0500_2980;
+pub const MEMORY_LENGTH: usize = 0x0500_2C80;
 
 const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
@@ -679,12 +679,13 @@ impl SC64 {
     }
 
     pub fn get_sd_card_info(&mut self) -> Result<SdCardInfo, Error> {
+        const SD_CARD_INFO_BUFFER_ADDRESS: u32 = 0x0500_2BE0;
         let info =
-            match self.command_sd_card_operation(SdCardOp::GetInfo(SD_CARD_BUFFER_ADDRESS))? {
+            match self.command_sd_card_operation(SdCardOp::GetInfo(SD_CARD_INFO_BUFFER_ADDRESS))? {
                 SdCardOpPacket {
                     result: SdCardResult::OK,
                     status: _,
-                } => self.command_memory_read(SD_CARD_BUFFER_ADDRESS, 32)?,
+                } => self.command_memory_read(SD_CARD_INFO_BUFFER_ADDRESS, 32)?,
                 packet => {
                     return Err(Error::new(
                         format!("Couldn't get SD card info registers: {}", packet.result).as_str(),

@@ -4,7 +4,7 @@
 #include "timer.h"
 
 
-#define SD_INIT_BUFFER_ADDRESS          (0x05002800UL)
+#define SD_INIT_BUFFER_ADDRESS          (0x05002BB8UL)
 #define BYTE_SWAP_ADDRESS_END           (0x05000000UL)
 
 #define CMD6_ARG_CHECK_HS               (0x00FFFFF1UL)
