@@ -1293,7 +1293,7 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "sc64deployer"
-version = "2.19.0"
+version = "2.20.0"
 dependencies = [
  "bindgen",
  "cc",
