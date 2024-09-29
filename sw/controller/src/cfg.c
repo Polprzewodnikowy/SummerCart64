@@ -655,6 +655,9 @@ void cfg_process (void) {
                         led_activity_on();
                         error = sd_card_init();
                         led_activity_off();
+                        if (error != SD_OK) {
+                            sd_release_lock(SD_LOCK_N64);
+                        }
                     }
                     break;
 
