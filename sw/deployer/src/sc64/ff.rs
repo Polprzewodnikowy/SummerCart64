@@ -47,6 +47,8 @@ mod fatfs {
         NotEnoughCore,
         TooManyOpenFiles,
         InvalidParameter,
+        DriverInstalled,
+        DriverNotInstalled,
         Unknown,
     }
 
@@ -72,6 +74,8 @@ mod fatfs {
                 Self::NotEnoughCore => "LFN working buffer could not be allocated",
                 Self::TooManyOpenFiles => "Number of open files > FF_FS_LOCK",
                 Self::InvalidParameter => "Given parameter is invalid",
+                Self::DriverInstalled => "FatFs driver is already installed",
+                Self::DriverNotInstalled => "FatFs driver is not installed",
                 Self::Unknown => "Unknown error",
             })
         }
@@ -232,31 +236,21 @@ pub fn run<F: FnOnce(&mut FF) -> Result<(), super::Error>>(
 }
 
 fn install_driver(driver: impl FFDriver + 'static) -> Result<(), Error> {
-    match unsafe { DRIVER.lock() } {
-        Ok(mut d) => {
-            if d.is_none() {
-                d.replace(Box::new(driver));
-                Ok(())
-            } else {
-                Err(Error::IntErr)
-            }
-        }
-        Err(_) => Err(Error::IntErr),
+    let mut d = unsafe { DRIVER.lock().unwrap() };
+    if d.is_some() {
+        return Err(Error::DriverInstalled);
     }
+    d.replace(Box::new(driver));
+    Ok(())
 }
 
 fn uninstall_driver() -> Result<(), Error> {
-    match unsafe { DRIVER.lock() } {
-        Ok(mut d) => {
-            if let Some(mut d) = d.take() {
-                d.deinit();
-                Ok(())
-            } else {
-                Err(Error::IntErr)
-            }
-        }
-        Err(_) => Err(Error::IntErr),
+    let mut d = unsafe { DRIVER.lock().unwrap() };
+    if d.is_none() {
+        return Err(Error::DriverNotInstalled);
     }
+    d.take().unwrap().deinit();
+    Ok(())
 }
 
 pub enum IOCtl {
@@ -337,10 +331,8 @@ unsafe extern "C" fn disk_status(pdrv: fatfs::BYTE) -> fatfs::DSTATUS {
     if pdrv != 0 {
         return fatfs::DSTATUS_STA_NOINIT;
     }
-    if let Ok(mut driver) = DRIVER.lock() {
-        if let Some(driver) = driver.as_mut() {
-            return driver.status();
-        }
+    if let Some(d) = DRIVER.lock().unwrap().as_mut() {
+        return d.status();
     }
     fatfs::DSTATUS_STA_NOINIT
 }
@@ -350,10 +342,8 @@ unsafe extern "C" fn disk_initialize(pdrv: fatfs::BYTE) -> fatfs::DSTATUS {
     if pdrv != 0 {
         return fatfs::DSTATUS_STA_NOINIT;
     }
-    if let Ok(mut driver) = DRIVER.lock() {
-        if let Some(driver) = driver.as_mut() {
-            return driver.init();
-        }
+    if let Some(d) = DRIVER.lock().unwrap().as_mut() {
+        return d.init();
     }
     fatfs::DSTATUS_STA_NOINIT
 }
@@ -368,18 +358,13 @@ unsafe extern "C" fn disk_read(
     if pdrv != 0 {
         return fatfs::DRESULT_RES_PARERR;
     }
-    if let Ok(mut driver) = DRIVER.lock() {
-        if let Some(driver) = driver.as_mut() {
-            return driver.read(
-                &mut *std::ptr::slice_from_raw_parts_mut(
-                    buff,
-                    (count as usize) * SD_CARD_SECTOR_SIZE,
-                ),
-                sector,
-            );
-        }
+    if let Some(d) = DRIVER.lock().unwrap().as_mut() {
+        return d.read(
+            &mut *std::ptr::slice_from_raw_parts_mut(buff, (count as usize) * SD_CARD_SECTOR_SIZE),
+            sector,
+        );
     }
-    fatfs::DRESULT_RES_ERROR
+    fatfs::DRESULT_RES_NOTRDY
 }
 
 #[no_mangle]
@@ -392,15 +377,13 @@ unsafe extern "C" fn disk_write(
     if pdrv != 0 {
         return fatfs::DRESULT_RES_PARERR;
     }
-    if let Ok(mut driver) = DRIVER.lock() {
-        if let Some(driver) = driver.as_mut() {
-            return driver.write(
-                &*std::ptr::slice_from_raw_parts(buff, (count as usize) * SD_CARD_SECTOR_SIZE),
-                sector,
-            );
-        }
+    if let Some(d) = DRIVER.lock().unwrap().as_mut() {
+        return d.write(
+            &*std::ptr::slice_from_raw_parts(buff, (count as usize) * SD_CARD_SECTOR_SIZE),
+            sector,
+        );
     }
-    fatfs::DRESULT_RES_ERROR
+    fatfs::DRESULT_RES_NOTRDY
 }
 
 #[no_mangle]
@@ -420,27 +403,25 @@ unsafe extern "C" fn disk_ioctl(
         fatfs::CTRL_TRIM => IOCtl::Trim,
         _ => return fatfs::DRESULT_RES_PARERR,
     };
-    if let Ok(mut driver) = DRIVER.lock() {
-        if let Some(driver) = driver.as_mut() {
-            let result = driver.ioctl(&mut ioctl);
-            if result == fatfs::DRESULT_RES_OK {
-                match ioctl {
-                    IOCtl::GetSectorCount(count) => {
-                        buff.copy_from(std::ptr::addr_of!(count).cast(), size_of_val(&count))
-                    }
-                    IOCtl::GetSectorSize(size) => {
-                        buff.copy_from(std::ptr::addr_of!(size).cast(), size_of_val(&size))
-                    }
-                    IOCtl::GetBlockSize(size) => {
-                        buff.copy_from(std::ptr::addr_of!(size).cast(), size_of_val(&size))
-                    }
-                    _ => {}
+    if let Some(d) = DRIVER.lock().unwrap().as_mut() {
+        let result = d.ioctl(&mut ioctl);
+        if result == fatfs::DRESULT_RES_OK {
+            match ioctl {
+                IOCtl::GetSectorCount(count) => {
+                    buff.copy_from(std::ptr::addr_of!(count).cast(), size_of_val(&count))
                 }
+                IOCtl::GetSectorSize(size) => {
+                    buff.copy_from(std::ptr::addr_of!(size).cast(), size_of_val(&size))
+                }
+                IOCtl::GetBlockSize(size) => {
+                    buff.copy_from(std::ptr::addr_of!(size).cast(), size_of_val(&size))
+                }
+                _ => {}
             }
-            return result;
         }
+        return result;
     }
-    fatfs::DRESULT_RES_ERROR
+    fatfs::DRESULT_RES_NOTRDY
 }
 
 #[no_mangle]
@@ -485,28 +466,26 @@ impl PartialOrd for EntryInfo {
 
 impl std::fmt::Display for EntryInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let size_formatter = |size: u64| -> String {
-            const UNITS: [&str; 4] = ["K", "M", "G", "T"];
-            let mut reduced_size = size as f64;
-            let mut reduced_unit = "B";
-            for unit in UNITS {
-                if reduced_size >= 1000.0 {
-                    reduced_size /= 1024.0;
-                    reduced_unit = unit;
-                } else {
-                    break;
-                }
-            }
-            if size >= 1000 && reduced_size <= 9.9 {
-                format!("{:>1.1}{}", reduced_size, reduced_unit)
-            } else {
-                format!("{:>3.0}{}", reduced_size, reduced_unit)
-            }
-        };
         Ok(match self {
             EntryInfo::Directory => f.write_fmt(format_args!("d ----",))?,
             EntryInfo::File { size } => {
-                f.write_fmt(format_args!("f {}", size_formatter(*size),))?
+                const UNITS: [&str; 4] = ["K", "M", "G", "T"];
+                let mut reduced_size = *size as f64;
+                let mut reduced_unit = "B";
+                for unit in UNITS {
+                    if reduced_size >= 1000.0 {
+                        reduced_size /= 1024.0;
+                        reduced_unit = unit;
+                    } else {
+                        break;
+                    }
+                }
+                let formatted_size = if *size >= 1000 && reduced_size <= 9.9 {
+                    format!("{:>1.1}{}", reduced_size, reduced_unit)
+                } else {
+                    format!("{:>3.0}{}", reduced_size, reduced_unit)
+                };
+                f.write_fmt(format_args!("f {formatted_size}"))?
             }
         })
     }
