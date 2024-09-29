@@ -36,11 +36,11 @@ module memory_bram (
         eeprom_selected = 1'b0;
         dd_selected = 1'b0;
         flashram_selected = 1'b0;
-        if (mem_bus.address[25:24] == 2'b01 && mem_bus.address[23:14] == 10'd0) begin
-            buffer_selected = mem_bus.address[13] == 1'b0;
-            eeprom_selected = mem_bus.address[13:11] == 3'b100;
-            dd_selected = mem_bus.address[13:8] == 6'b101000;
-            flashram_selected = mem_bus.address[13:7] == 7'b1010010;
+        if (mem_bus.address[26:24] == 3'h5) begin
+            buffer_selected = (mem_bus.address[23:0] >= 24'h00_0000 && mem_bus.address[23:0] < 24'h00_2000);
+            eeprom_selected = (mem_bus.address[23:0] >= 24'h00_2000 && mem_bus.address[23:0] < 24'h00_2800);
+            dd_selected = (mem_bus.address[23:0] >= 24'h00_2800 && mem_bus.address[23:0] < 24'h00_2C00);
+            flashram_selected = (mem_bus.address[23:0] >= 24'h00_2C00 && mem_bus.address[23:0] < 24'h00_2C80);
         end
     end
 
@@ -112,26 +112,26 @@ module memory_bram (
     end
 
 
-    // DD memory
+    // 64DD/MCU buffer memory
 
-    logic [15:0] dd_bram [0:127];
+    logic [15:0] dd_bram [0:511];
     logic [15:0] dd_bram_rdata;
 
     always_ff @(posedge clk) begin
         if (write && dd_selected) begin
-            dd_bram[mem_bus.address[7:1]] <= mem_bus.wdata;
+            dd_bram[mem_bus.address[9:1]] <= mem_bus.wdata;
         end
         if (n64_scb.dd_write) begin
-            dd_bram[n64_scb.dd_address] <= n64_scb.dd_wdata;
+            dd_bram[{2'b00, n64_scb.dd_address}] <= n64_scb.dd_wdata;
         end
     end
 
     always_ff @(posedge clk) begin
-        dd_bram_rdata <= dd_bram[mem_bus.address[7:1]];
+        dd_bram_rdata <= dd_bram[mem_bus.address[9:1]];
     end
 
     always_ff @(posedge clk) begin
-        n64_scb.dd_rdata <= dd_bram[n64_scb.dd_address];
+        n64_scb.dd_rdata <= dd_bram[{2'b00, n64_scb.dd_address}];
     end
 
 

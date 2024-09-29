@@ -55,6 +55,7 @@ typedef enum {
     SD_ERROR_ACMD41_IO = 27,
     SD_ERROR_ACMD41_OCR = 28,
     SD_ERROR_ACMD41_TIMEOUT = 29,
+    SD_ERROR_LOCKED = 30,
 } sc64_sd_error_t;
 
 typedef uint32_t sc64_error_t;

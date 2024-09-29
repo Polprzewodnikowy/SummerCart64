@@ -194,6 +194,7 @@ const char *sc64_error_description (sc64_error_t error) {
             case SD_ERROR_ACMD41_IO: return "ACMD41 I/O";
             case SD_ERROR_ACMD41_OCR: return "ACMD41 OCR";
             case SD_ERROR_ACMD41_TIMEOUT: return "ACMD41 timeout";
+            case SD_ERROR_LOCKED: return "SD card is locked by the PC side";
             default: return "Unknown error (SD)";
         }
     }

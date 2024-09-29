@@ -4,7 +4,7 @@
 #include "timer.h"
 
 
-#define SD_INIT_BUFFER_ADDRESS          (0x05002800UL)
+#define SD_INIT_BUFFER_ADDRESS          (0x05002BB8UL)
 #define BYTE_SWAP_ADDRESS_END           (0x05000000UL)
 
 #define CMD6_ARG_CHECK_HS               (0x00FFFFF1UL)
@@ -86,6 +86,7 @@ struct process {
     uint8_t csd[16];
     uint8_t cid[16];
     bool byte_swap;
+    sd_lock_t lock;
 };
 
 
@@ -428,6 +429,7 @@ sd_error_t sd_card_init (void) {
 void sd_card_deinit (void) {
     if (p.card_initialized) {
         p.card_initialized = false;
+        p.card_type_block = false;
         p.byte_swap = false;
         sd_set_clock(CLOCK_400KHZ);
         sd_cmd(0, 0, RSP_NONE, NULL);
@@ -575,10 +577,32 @@ sd_error_t sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32
     return SD_OK;
 }
 
+sd_error_t sd_get_lock (sd_lock_t lock) {
+    if (p.lock == lock) {
+        return SD_OK;
+    }
+    return SD_ERROR_LOCKED;
+}
+
+sd_error_t sd_try_lock (sd_lock_t lock) {
+    if (p.lock == SD_LOCK_NONE) {
+        p.lock = lock;
+        return SD_OK;
+    }
+    return sd_get_lock(lock);
+}
+
+void sd_release_lock (sd_lock_t lock) {
+    if (p.lock == lock) {
+        p.lock = SD_LOCK_NONE;
+    }
+}
+
 
 void sd_init (void) {
     p.card_initialized = false;
     p.byte_swap = false;
+    p.lock = SD_LOCK_NONE;
     sd_set_clock(CLOCK_STOP);
 }
 

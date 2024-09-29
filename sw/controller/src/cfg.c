@@ -141,6 +141,10 @@ static struct process p;
 
 
 static bool cfg_cmd_check (void) {
+    if (!writeback_pending() && !hw_gpio_get(GPIO_ID_N64_RESET)) {
+        sd_release_lock(SD_LOCK_N64);
+    }
+
     uint32_t reg = fpga_reg_get(REG_CFG_CMD);
 
     if (reg & CFG_CMD_AUX_PENDING) {
@@ -634,21 +638,25 @@ void cfg_process (void) {
             p.data[0] = p.usb_output_ready ? 0 : (1 << 31);
             break;
 
-        case CMD_ID_SD_CARD_OP:
+        case CMD_ID_SD_CARD_OP: {
+            sd_error_t error = SD_OK;
             switch (p.data[1]) {
                 case SD_CARD_OP_DEINIT:
-                    sd_card_deinit();
-                    break;
-
-                case SD_CARD_OP_INIT: {
-                    led_activity_on();
-                    sd_error_t error = sd_card_init();
-                    led_activity_off();
-                    if (error != SD_OK) {
-                        return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
+                    error = sd_get_lock(SD_LOCK_N64);
+                    if (error == SD_OK) {
+                        sd_card_deinit();
+                        sd_release_lock(SD_LOCK_N64);
                     }
                     break;
-                }
+
+                case SD_CARD_OP_INIT:
+                    error = sd_try_lock(SD_LOCK_N64);
+                    if (error == SD_OK) {
+                        led_activity_on();
+                        error = sd_card_init();
+                        led_activity_off();
+                    }
+                    break;
 
                 case SD_CARD_OP_GET_STATUS:
                     p.data[1] = sd_card_get_status();
@@ -658,36 +666,44 @@ void cfg_process (void) {
                     if (cfg_translate_address(&p.data[0], SD_CARD_INFO_SIZE, (SDRAM | BRAM))) {
                         return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, SD_ERROR_INVALID_ADDRESS);
                     }
-                    sd_error_t error = sd_card_get_info(p.data[0]);
-                    if (error != SD_OK) {
-                        return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
+                    error = sd_get_lock(SD_LOCK_N64);
+                    if (error == SD_OK) {
+                        error = sd_card_get_info(p.data[0]);
                     }
                     break;
 
-                case SD_CARD_OP_BYTE_SWAP_ON: {
-                    sd_error_t error = sd_set_byte_swap(true);
-                    if (error != SD_OK) {
-                        return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
+                case SD_CARD_OP_BYTE_SWAP_ON:
+                    error = sd_get_lock(SD_LOCK_N64);
+                    if (error == SD_OK) {
+                        error = sd_set_byte_swap(true);
                     }
                     break;
-                }
 
-                case SD_CARD_OP_BYTE_SWAP_OFF: {
-                    sd_error_t error = sd_set_byte_swap(false);
-                    if (error != SD_OK) {
-                        return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
+                case SD_CARD_OP_BYTE_SWAP_OFF:
+                    error = sd_get_lock(SD_LOCK_N64);
+                    if (error == SD_OK) {
+                        error = sd_set_byte_swap(false);
                     }
                     break;
-                }
 
                 default:
-                    return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, SD_ERROR_INVALID_OPERATION);
+                    error = SD_ERROR_INVALID_OPERATION;
+                    break;
+            }
+            if (error != SD_OK) {
+                return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
             }
             break;
+        }
 
-        case CMD_ID_SD_SECTOR_SET:
+        case CMD_ID_SD_SECTOR_SET: {
+            sd_error_t error = sd_get_lock(SD_LOCK_N64);
+            if (error != SD_OK) {
+                return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
+            }
             p.sd_card_sector = p.data[0];
             break;
+        }
 
         case CMD_ID_SD_READ: {
             if (p.data[1] >= 0x800000) {
@@ -696,9 +712,12 @@ void cfg_process (void) {
             if (cfg_translate_address(&p.data[0], (p.data[1] * SD_SECTOR_SIZE), (SDRAM | FLASH | BRAM))) {
                 return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, SD_ERROR_INVALID_ADDRESS);
             }
-            led_activity_on();
-            sd_error_t error = sd_read_sectors(p.data[0], p.sd_card_sector, p.data[1]);
-            led_activity_off();
+            sd_error_t error = sd_get_lock(SD_LOCK_N64);
+            if (error == SD_OK) {
+                led_activity_on();
+                error = sd_read_sectors(p.data[0], p.sd_card_sector, p.data[1]);
+                led_activity_off();
+            }
             if (error != SD_OK) {
                 return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
             }
@@ -713,9 +732,12 @@ void cfg_process (void) {
             if (cfg_translate_address(&p.data[0], (p.data[1] * SD_SECTOR_SIZE), (SDRAM | FLASH | BRAM))) {
                 return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, SD_ERROR_INVALID_ADDRESS);
             }
-            led_activity_on();
-            sd_error_t error = sd_write_sectors(p.data[0], p.sd_card_sector, p.data[1]);
-            led_activity_off();
+            sd_error_t error = sd_get_lock(SD_LOCK_N64);
+            if (error == SD_OK) {
+                led_activity_on();
+                error = sd_write_sectors(p.data[0], p.sd_card_sector, p.data[1]);
+                led_activity_off();
+            }
             if (error != SD_OK) {
                 return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, error);
             }

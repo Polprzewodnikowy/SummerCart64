@@ -1,5 +1,6 @@
 mod cic;
 mod error;
+pub mod ff;
 pub mod firmware;
 mod ftdi;
 mod link;
@@ -13,10 +14,11 @@ pub use self::{
     link::list_local_devices,
     server::ServerEvent,
     types::{
-        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState,
+        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, CicStep, DataPacket, DdDiskState,
         DdDriveType, DdMode, DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind,
         FpgaDebugData, ISViewer, MemoryTestPattern, MemoryTestPatternResult, SaveType,
-        SaveWriteback, SpeedTestDirection, Switch, TvType,
+        SaveWriteback, SdCardInfo, SdCardOpPacket, SdCardResult, SdCardStatus, SpeedTestDirection,
+        Switch, TvType,
     },
 };
 
@@ -25,7 +27,8 @@ use self::{
     link::Link,
     time::{convert_from_datetime, convert_to_datetime},
     types::{
-        get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
+        get_config, get_setting, Config, ConfigId, FirmwareStatus, SdCardOp, Setting, SettingId,
+        UpdateStatus,
     },
 };
 use chrono::NaiveDateTime;
@@ -58,6 +61,7 @@ pub struct DeviceState {
     pub button_mode: ButtonMode,
     pub rom_extended_enable: Switch,
     pub led_enable: Switch,
+    pub sd_card_status: SdCardStatus,
     pub datetime: NaiveDateTime,
     pub fpga_debug_data: FpgaDebugData,
     pub diagnostic_data: DiagnosticData,
@@ -94,13 +98,18 @@ const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
+const SD_CARD_BUFFER_ADDRESS: u32 = 0x03FE_0000; // Arbitrary offset in SDRAM memory
+const SD_CARD_BUFFER_LENGTH: usize = 128 * 1024; // Arbitrary length in SDRAM memory
+
+pub const SD_CARD_SECTOR_SIZE: usize = 512;
+
 const FIRMWARE_ADDRESS_SDRAM: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
 const FIRMWARE_ADDRESS_FLASH: u32 = 0x0410_0000; // Arbitrary offset in Flash memory
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
-pub const MEMORY_LENGTH: usize = 0x0500_2980;
+pub const MEMORY_LENGTH: usize = 0x0500_2C80;
 
 const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
@@ -233,6 +242,53 @@ impl SC64 {
     fn command_aux_write(&mut self, data: u32) -> Result<(), Error> {
         self.link.execute_command(b'X', [data, 0], &[])?;
         Ok(())
+    }
+
+    fn command_sd_card_operation(&mut self, op: SdCardOp) -> Result<SdCardOpPacket, Error> {
+        let data = self
+            .link
+            .execute_command_raw(b'i', op.into(), &[], false, true)?;
+        if data.len() != 8 {
+            return Err(Error::new(
+                "Invalid data length received for SD card operation command",
+            ));
+        }
+        Ok(SdCardOpPacket {
+            result: data.clone().try_into()?,
+            status: data.clone().try_into()?,
+        })
+    }
+
+    fn command_sd_card_read(
+        &mut self,
+        address: u32,
+        sector: u32,
+        count: u32,
+    ) -> Result<SdCardResult, Error> {
+        let data = self.link.execute_command_raw(
+            b's',
+            [address, count],
+            &sector.to_be_bytes(),
+            false,
+            true,
+        )?;
+        Ok(data.try_into()?)
+    }
+
+    fn command_sd_card_write(
+        &mut self,
+        address: u32,
+        sector: u32,
+        count: u32,
+    ) -> Result<SdCardResult, Error> {
+        let data = self.link.execute_command_raw(
+            b'S',
+            [address, count],
+            &sector.to_be_bytes(),
+            false,
+            true,
+        )?;
+        Ok(data.try_into()?)
     }
 
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
@@ -489,6 +545,7 @@ impl SC64 {
             button_mode: get_config!(self, ButtonMode)?,
             rom_extended_enable: get_config!(self, RomExtendedEnable)?,
             led_enable: get_setting!(self, LedEnable)?,
+            sd_card_status: self.get_sd_card_status()?,
             datetime: self.get_datetime()?,
             fpga_debug_data: self.command_fpga_debug_data_get()?,
             diagnostic_data: self.command_diagnostic_data_get()?,
@@ -606,6 +663,83 @@ impl SC64 {
         Ok(false)
     }
 
+    pub fn init_sd_card(&mut self) -> Result<SdCardResult, Error> {
+        self.command_sd_card_operation(SdCardOp::Init)
+            .map(|packet| packet.result)
+    }
+
+    pub fn deinit_sd_card(&mut self) -> Result<SdCardResult, Error> {
+        self.command_sd_card_operation(SdCardOp::Deinit)
+            .map(|packet| packet.result)
+    }
+
+    pub fn get_sd_card_status(&mut self) -> Result<SdCardStatus, Error> {
+        self.command_sd_card_operation(SdCardOp::GetStatus)
+            .map(|reply| reply.status)
+    }
+
+    pub fn get_sd_card_info(&mut self) -> Result<SdCardInfo, Error> {
+        const SD_CARD_INFO_BUFFER_ADDRESS: u32 = 0x0500_2BE0;
+        let info =
+            match self.command_sd_card_operation(SdCardOp::GetInfo(SD_CARD_INFO_BUFFER_ADDRESS))? {
+                SdCardOpPacket {
+                    result: SdCardResult::OK,
+                    status: _,
+                } => self.command_memory_read(SD_CARD_INFO_BUFFER_ADDRESS, 32)?,
+                packet => {
+                    return Err(Error::new(
+                        format!("Couldn't get SD card info registers: {}", packet.result).as_str(),
+                    ))
+                }
+            };
+        Ok(info.try_into()?)
+    }
+
+    pub fn read_sd_card(&mut self, data: &mut [u8], sector: u32) -> Result<SdCardResult, Error> {
+        if data.len() % SD_CARD_SECTOR_SIZE != 0 {
+            return Err(Error::new(
+                "SD card read length not aligned to the sector size",
+            ));
+        }
+
+        let mut current_sector = sector;
+
+        for mut chunk in data.chunks_mut(SD_CARD_BUFFER_LENGTH) {
+            let sectors = (chunk.len() / SD_CARD_SECTOR_SIZE) as u32;
+            match self.command_sd_card_read(SD_CARD_BUFFER_ADDRESS, current_sector, sectors)? {
+                SdCardResult::OK => {}
+                result => return Ok(result),
+            }
+            let data = self.command_memory_read(SD_CARD_BUFFER_ADDRESS, chunk.len())?;
+            chunk.write_all(&data)?;
+            current_sector += sectors;
+        }
+
+        Ok(SdCardResult::OK)
+    }
+
+    pub fn write_sd_card(&mut self, data: &[u8], sector: u32) -> Result<SdCardResult, Error> {
+        if data.len() % SD_CARD_SECTOR_SIZE != 0 {
+            return Err(Error::new(
+                "SD card write length not aligned to the sector size",
+            ));
+        }
+
+        let mut current_sector = sector;
+
+        for chunk in data.chunks(SD_CARD_BUFFER_LENGTH) {
+            let sectors = (chunk.len() / SD_CARD_SECTOR_SIZE) as u32;
+            self.command_memory_write(SD_CARD_BUFFER_ADDRESS, chunk)?;
+            match self.command_sd_card_write(SD_CARD_BUFFER_ADDRESS, current_sector, sectors)? {
+                SdCardResult::OK => {}
+                result => return Ok(result),
+            }
+            current_sector += sectors;
+        }
+
+        Ok(SdCardResult::OK)
+    }
+
     pub fn check_device(&mut self) -> Result<(), Error> {
         let identifier = self.command_identifier_get().map_err(|e| {
             Error::new(format!("Couldn't get SC64 device identifier: {e}").as_str())
@@ -632,6 +766,14 @@ impl SC64 {
 
     pub fn reset_state(&mut self) -> Result<(), Error> {
         self.command_state_reset()
+    }
+
+    pub fn is_console_powered_on(&mut self) -> Result<bool, Error> {
+        let debug_data = self.command_fpga_debug_data_get()?;
+        Ok(match debug_data.cic_step {
+            CicStep::Unavailable | CicStep::PowerOff => false,
+            _ => true,
+        })
     }
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
@@ -734,6 +876,46 @@ impl SC64 {
         }
 
         let elapsed = time.elapsed();
+
+        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / elapsed.as_secs_f64())
+    }
+
+    pub fn test_sd_card(&mut self) -> Result<f64, Error> {
+        const TEST_LENGTH: usize = 4 * 1024 * 1024;
+        const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
+
+        let mut data = vec![0x00; TEST_LENGTH];
+
+        match self.init_sd_card()? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Init SD card failed: {result}").as_str(),
+                ))
+            }
+        }
+
+        let time = std::time::Instant::now();
+
+        match self.read_sd_card(&mut data, 0)? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Read SD card failed: {result}").as_str(),
+                ))
+            }
+        }
+
+        let elapsed = time.elapsed();
+
+        match self.deinit_sd_card()? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Deinit SD card failed: {result}").as_str(),
+                ))
+            }
+        }
 
         Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / elapsed.as_secs_f64())
     }

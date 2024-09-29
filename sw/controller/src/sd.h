@@ -41,9 +41,16 @@ typedef enum {
     SD_ERROR_ACMD41_IO = 27,
     SD_ERROR_ACMD41_OCR = 28,
     SD_ERROR_ACMD41_TIMEOUT = 29,
+    SD_ERROR_LOCKED = 30,
 } sd_error_t;
 
 typedef sd_error_t sd_process_sectors_t (uint32_t address, uint32_t sector, uint32_t count);
+
+typedef enum {
+    SD_LOCK_NONE,
+    SD_LOCK_N64,
+    SD_LOCK_USB,
+} sd_lock_t;
 
 
 sd_error_t sd_card_init (void);
@@ -57,6 +64,10 @@ sd_error_t sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count);
 sd_error_t sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count);
 
 sd_error_t sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32_t count, sd_process_sectors_t sd_process_sectors);
+
+sd_error_t sd_get_lock (sd_lock_t lock);
+sd_error_t sd_try_lock (sd_lock_t lock);
+void sd_release_lock (sd_lock_t lock);
 
 void sd_init (void);
 
