@@ -874,126 +874,123 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
 
     sc64.reset_state()?;
 
-    sc64::ff::run(sc64, |ff| {
-        match command {
-            SDCommands::List { path } => {
-                for item in ff.list(path.clone().unwrap_or(PathBuf::from("/")))? {
-                    let sc64::ff::Entry {
-                        info,
-                        datetime,
-                        name,
-                    } = item;
-                    let name = match info {
-                        sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
-                        sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
-                    };
-                    println!("{info} {datetime} | {}", name.bold());
-                }
-            }
-            SDCommands::Stat { path } => {
+    let mut ff = sc64::ff::FatFs::new(sc64)?;
+
+    match command {
+        SDCommands::List { path } => {
+            for item in ff.list(path.clone().unwrap_or(PathBuf::from("/")))? {
                 let sc64::ff::Entry {
                     info,
                     datetime,
                     name,
-                } = ff.stat(path)?;
+                } = item;
                 let name = match info {
                     sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
                     sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
                 };
                 println!("{info} {datetime} | {}", name.bold());
             }
-            SDCommands::Move { src, dst } => {
-                ff.rename(src, dst)?;
-                println!(
-                    "Successfully moved {} to {}",
+        }
+        SDCommands::Stat { path } => {
+            let sc64::ff::Entry {
+                info,
+                datetime,
+                name,
+            } = ff.stat(path)?;
+            let name = match info {
+                sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
+                sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
+            };
+            println!("{info} {datetime} | {}", name.bold());
+        }
+        SDCommands::Move { src, dst } => {
+            ff.rename(src, dst)?;
+            println!(
+                "Successfully moved {} to {}",
+                src.to_str().unwrap_or_default().bright_green(),
+                dst.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::Delete { path } => {
+            ff.delete(path)?;
+            println!(
+                "Successfully deleted {}",
+                path.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::CreateDirectory { path } => {
+            ff.mkdir(path)?;
+            println!(
+                "Successfully created {}",
+                path.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::Download { src, dst } => {
+            let dst = &dst.clone().unwrap_or(
+                src.file_name()
+                    .map(PathBuf::from)
+                    .ok_or(sc64::ff::Error::InvalidParameter)?,
+            );
+            let mut src_file = ff.open(src)?;
+            let mut dst_file = std::fs::File::create(dst)?;
+            let mut buffer = vec![0; 128 * 1024];
+            log_wait(
+                format!(
+                    "Downloading {} to {}",
                     src.to_str().unwrap_or_default().bright_green(),
                     dst.to_str().unwrap_or_default().bright_green()
-                );
-            }
-            SDCommands::Delete { path } => {
-                ff.delete(path)?;
-                println!(
-                    "Successfully deleted {}",
-                    path.to_str().unwrap_or_default().bright_green()
-                );
-            }
-            SDCommands::CreateDirectory { path } => {
-                ff.mkdir(path)?;
-                println!(
-                    "Successfully created {}",
-                    path.to_str().unwrap_or_default().bright_green()
-                );
-            }
-            SDCommands::Download { src, dst } => {
-                let dst = &dst.clone().unwrap_or(
-                    src.file_name()
-                        .map(PathBuf::from)
-                        .ok_or(sc64::ff::Error::InvalidParameter)?,
-                );
-                let mut src_file = ff.open(src)?;
-                let mut dst_file = std::fs::File::create(dst)?;
-                let mut buffer = vec![0; 128 * 1024];
-                print!(
-                    "{}",
-                    format!(
-                        "Downloading {} to {}... ",
-                        src.to_str().unwrap_or_default().bright_green(),
-                        dst.to_str().unwrap_or_default().bright_green()
-                    )
-                );
-                stdout().flush().unwrap();
-                loop {
+                ),
+                || loop {
                     match src_file.read(&mut buffer)? {
-                        0 => break,
-                        bytes => dst_file.write_all(&buffer[0..bytes])?,
+                        0 => return Ok(()),
+                        bytes => {
+                            if let Err(e) = dst_file.write_all(&buffer[0..bytes]) {
+                                return Err(e);
+                            }
+                        }
                     }
-                }
-                println!("{}", "done!".bright_green());
-            }
-            SDCommands::Upload { src, dst } => {
-                let dst = &dst.clone().unwrap_or(
-                    src.file_name()
-                        .map(PathBuf::from)
-                        .ok_or(sc64::ff::Error::InvalidParameter)?,
-                );
-                let mut src_file = std::fs::File::open(src)?;
-                let mut dst_file = ff.create(dst)?;
-                let mut buffer = vec![0; 128 * 1024];
-                print!(
-                    "{}",
-                    format!(
-                        "Uploading {} to {}... ",
-                        src.to_str().unwrap_or_default().bright_green(),
-                        dst.to_str().unwrap_or_default().bright_green()
-                    )
-                );
-                stdout().flush().unwrap();
-                loop {
-                    match src_file.read(&mut buffer)? {
-                        0 => break,
-                        bytes => dst_file.write_all(&buffer[0..bytes])?,
-                    }
-                }
-                println!("{}", "done!".bright_green());
-            }
-            SDCommands::Format => {
-                let answer = prompt(format!(
-                    "{}",
-                    "Do you really want to format the SD card? [y/N] ".bold()
-                ));
-                if answer.to_ascii_lowercase() != "y" {
-                    println!("{}", "Format operation aborted".red());
-                    return Ok(());
-                }
-                print!("Formatting the SD card... ",);
-                stdout().flush().unwrap();
-                ff.mkfs()?;
-                println!("{}", "done!".bright_green());
-            }
+                },
+            )?;
         }
-
-        Ok(())
-    })?;
+        SDCommands::Upload { src, dst } => {
+            let dst = &dst.clone().unwrap_or(
+                src.file_name()
+                    .map(PathBuf::from)
+                    .ok_or(sc64::ff::Error::InvalidParameter)?,
+            );
+            let mut src_file = std::fs::File::open(src)?;
+            let mut dst_file = ff.create(dst)?;
+            let mut buffer = vec![0; 128 * 1024];
+            log_wait(
+                format!(
+                    "Uploading {} to {}",
+                    src.to_str().unwrap_or_default().bright_green(),
+                    dst.to_str().unwrap_or_default().bright_green()
+                ),
+                || loop {
+                    match src_file.read(&mut buffer)? {
+                        0 => return Ok(()),
+                        bytes => {
+                            if let Err(e) = dst_file.write_all(&buffer[0..bytes]) {
+                                return Err(e);
+                            }
+                        }
+                    }
+                },
+            )?;
+        }
+        SDCommands::Format => {
+            let answer = prompt(format!(
+                "{}",
+                "Do you really want to format the SD card? [y/N] ".bold()
+            ));
+            if answer.to_ascii_lowercase() != "y" {
+                println!("{}", "Format operation aborted".red());
+                return Ok(());
+            }
+            log_wait(format!("Formatting the SD card"), || ff.mkfs())?;
+        }
+    }
 
     Ok(())
 }

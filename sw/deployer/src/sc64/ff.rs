@@ -120,121 +120,6 @@ pub type Error = fatfs::Error;
 
 static mut DRIVER: std::sync::Mutex<Option<Box<dyn FFDriver>>> = std::sync::Mutex::new(None);
 
-pub struct FF {
-    fs: Box<fatfs::FATFS>,
-}
-
-impl FF {
-    fn new() -> Self {
-        Self {
-            fs: Box::new(unsafe { std::mem::zeroed() }),
-        }
-    }
-
-    fn mount(&mut self) -> Result<(), Error> {
-        match unsafe { fatfs::f_mount(&mut *self.fs, fatfs::path("")?.as_ptr(), 0) } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-
-    fn unmount(&self) -> Result<(), Error> {
-        match unsafe { fatfs::f_mount(std::ptr::null_mut(), fatfs::path("")?.as_ptr(), 0) } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-
-    pub fn open<P: AsRef<std::path::Path>>(&self, path: P) -> Result<File, Error> {
-        File::open(
-            path,
-            fatfs::FA_OPEN_EXISTING | fatfs::FA_READ | fatfs::FA_WRITE,
-        )
-    }
-
-    pub fn create<P: AsRef<std::path::Path>>(&self, path: P) -> Result<File, Error> {
-        File::open(
-            path,
-            fatfs::FA_CREATE_ALWAYS | fatfs::FA_READ | fatfs::FA_WRITE,
-        )
-    }
-
-    pub fn stat<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Entry, Error> {
-        let mut fno = unsafe { std::mem::zeroed() };
-        match unsafe { fatfs::f_stat(fatfs::path(path)?.as_ptr(), &mut fno) } {
-            fatfs::FRESULT_FR_OK => Ok(fno.into()),
-            error => Err(error.into()),
-        }
-    }
-
-    pub fn opendir<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Directory, Error> {
-        Directory::open(path)
-    }
-
-    pub fn list<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Vec<Entry>, Error> {
-        let mut dir = self.opendir(path)?;
-
-        let mut list = vec![];
-
-        while let Some(entry) = dir.read()? {
-            list.push(entry);
-        }
-
-        list.sort_by_key(|k| (k.info, k.name.to_lowercase()));
-
-        Ok(list)
-    }
-
-    pub fn mkdir<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Error> {
-        match unsafe { fatfs::f_mkdir(fatfs::path(path)?.as_ptr()) } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-
-    pub fn delete<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Error> {
-        match unsafe { fatfs::f_unlink(fatfs::path(path)?.as_ptr()) } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-
-    pub fn rename<P: AsRef<std::path::Path>>(&self, old: P, new: P) -> Result<(), Error> {
-        match unsafe { fatfs::f_rename(fatfs::path(old)?.as_ptr(), fatfs::path(new)?.as_ptr()) } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-
-    pub fn mkfs(&self) -> Result<(), Error> {
-        let mut work = [0u8; 16 * 1024];
-        match unsafe {
-            fatfs::f_mkfs(
-                fatfs::path("")?.as_ptr(),
-                std::ptr::null(),
-                work.as_mut_ptr().cast(),
-                size_of_val(&work) as u32,
-            )
-        } {
-            fatfs::FRESULT_FR_OK => Ok(()),
-            error => Err(error.into()),
-        }
-    }
-}
-
-pub fn run<F: FnOnce(&mut FF) -> Result<(), super::Error>>(
-    driver: impl FFDriver + 'static,
-    runner: F,
-) -> Result<(), super::Error> {
-    install_driver(driver)?;
-    let mut ff = FF::new();
-    ff.mount()?;
-    let result = runner(&mut ff);
-    ff.unmount().ok();
-    uninstall_driver().ok();
-    result
-}
-
 fn install_driver(driver: impl FFDriver + 'static) -> Result<(), Error> {
     let mut d = unsafe { DRIVER.lock().unwrap() };
     if d.is_some() {
@@ -251,6 +136,119 @@ fn uninstall_driver() -> Result<(), Error> {
     }
     d.take().unwrap().deinit();
     Ok(())
+}
+
+pub struct FatFs {
+    fs: Box<fatfs::FATFS>,
+}
+
+impl FatFs {
+    pub fn new(driver: impl FFDriver + 'static) -> Result<Self, Error> {
+        install_driver(driver)?;
+        let mut ff = Self {
+            fs: Box::new(unsafe { std::mem::zeroed() }),
+        };
+        ff.mount(false)?;
+        Ok(ff)
+    }
+
+    fn mount(&mut self, force: bool) -> Result<(), Error> {
+        let opt = if force { 1 } else { 0 };
+        match unsafe { fatfs::f_mount(&mut *self.fs, fatfs::path("")?.as_ptr(), opt) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    fn unmount(&mut self) -> Result<(), Error> {
+        match unsafe { fatfs::f_mount(std::ptr::null_mut(), fatfs::path("")?.as_ptr(), 0) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    pub fn open<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<File, Error> {
+        File::open(
+            path,
+            fatfs::FA_OPEN_EXISTING | fatfs::FA_READ | fatfs::FA_WRITE,
+        )
+    }
+
+    pub fn create<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<File, Error> {
+        File::open(
+            path,
+            fatfs::FA_CREATE_ALWAYS | fatfs::FA_READ | fatfs::FA_WRITE,
+        )
+    }
+
+    pub fn stat<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<Entry, Error> {
+        let mut fno = unsafe { std::mem::zeroed() };
+        match unsafe { fatfs::f_stat(fatfs::path(path)?.as_ptr(), &mut fno) } {
+            fatfs::FRESULT_FR_OK => Ok(fno.into()),
+            error => Err(error.into()),
+        }
+    }
+
+    pub fn opendir<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<Directory, Error> {
+        Directory::open(path)
+    }
+
+    pub fn list<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<Vec<Entry>, Error> {
+        let mut dir = self.opendir(path)?;
+
+        let mut list = vec![];
+
+        while let Some(entry) = dir.read()? {
+            list.push(entry);
+        }
+
+        list.sort_by_key(|k| (k.info, k.name.to_lowercase()));
+
+        Ok(list)
+    }
+
+    pub fn mkdir<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), Error> {
+        match unsafe { fatfs::f_mkdir(fatfs::path(path)?.as_ptr()) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    pub fn delete<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), Error> {
+        match unsafe { fatfs::f_unlink(fatfs::path(path)?.as_ptr()) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    pub fn rename<P: AsRef<std::path::Path>>(&mut self, old: P, new: P) -> Result<(), Error> {
+        match unsafe { fatfs::f_rename(fatfs::path(old)?.as_ptr(), fatfs::path(new)?.as_ptr()) } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+
+    pub fn mkfs(&mut self) -> Result<(), Error> {
+        let mut work = [0u8; 16 * 1024];
+        match unsafe {
+            fatfs::f_mkfs(
+                fatfs::path("")?.as_ptr(),
+                std::ptr::null(),
+                work.as_mut_ptr().cast(),
+                size_of_val(&work) as u32,
+            )
+        } {
+            fatfs::FRESULT_FR_OK => Ok(()),
+            error => Err(error.into()),
+        }
+    }
+}
+
+impl Drop for FatFs {
+    fn drop(&mut self) {
+        self.unmount().ok();
+        uninstall_driver().ok();
+    }
 }
 
 pub enum IOCtl {
