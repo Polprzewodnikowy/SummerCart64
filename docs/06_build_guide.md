@@ -1,3 +1,4 @@
+- [Video guide](#video-guide)
 - [Step by step guide how to make SC64](#step-by-step-guide-how-to-make-sc64)
   - [**PCB manufacturing data**](#pcb-manufacturing-data)
   - [**PCB requirements**](#pcb-requirements)
@@ -11,6 +12,10 @@
     - [*`primer.py` threw other error message*](#primerpy-threw-other-error-message)
 
 ---
+
+## Video guide
+
+[![Video guide](https://img.youtube.com/vi/t6hyCFpwqz8/0.jpg)](https://www.youtube.com/watch?v=t6hyCFpwqz8 "How to build and program the SummerCart64")
 
 ## Step by step guide how to make SC64
 
