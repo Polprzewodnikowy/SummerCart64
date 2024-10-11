@@ -1,0 +1,55 @@
+name: Bug Report
+description: File a bug report.
+title: "[SC64][BUG] "
+labels: ["bug"]
+assignees:
+  - Polprzewodnikowy
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: checkboxes
+    id: sanity-check
+    attributes:
+      label: Is your issue really a bug?
+      description: |
+        Issue tracker in this repository is for **BUG REPORTS ONLY**.
+
+        Make sure your problem is caused by the firmware and **not** by the software you're running on the flashcart.
+
+        Errors in the documentation are also considered a bug.
+
+        If your issue is related to the menu then report it in the [N64FlashcartMenu] repository.
+
+        [N64FlashcartMenu]: https://github.com/Polprzewodnikowy/N64FlashcartMenu
+      options:
+        - label: My issue is indeed a bug in the flashcart firmware and/or documentation and I can prove it.
+          required: true
+        - label: I understand the difference in responsibilities between flashcart firmware and menu software.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version
+      placeholder: v2.20.0
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Describe the bug
+      description: |
+        Tell us what you noticed as a bug, and what is your expected outcome.
+        The more detailed the description is the better.
+        If applicable please attach screenshots and/or video showing the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: deployer-info
+    attributes:
+      label: Output logs from `sc64deployer info`
+      description: Please copy and paste the output from the command specified above.
+      render: shell
+    validations:
+      required: true
