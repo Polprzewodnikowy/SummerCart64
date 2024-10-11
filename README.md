@@ -38,17 +38,6 @@
 
 ---
 
-## Help / Q&A
-
-For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab in GitHub repository.
-Using discussions tab is highly encouraged as it allows to have centralized knowledge database accessible for everyone interested in this project.
-
-I'm also active at [N64brew](https://discord.gg/8VNMKhxqQn) Discord server as `korgeaux` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab is a preferred option.
-
-Note that my time is limited so I can't answer all questions.
-
----
-
 ## How do I get one?
 
 Most up to date information about purchasing/manufacturing options is available on https://summercart64.dev website!
@@ -64,7 +53,7 @@ If you have even slightest doubt about the ordering or programming process, it i
 
 **Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/member/shareproject/?bmbno=1046ED64-8AEE-44) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
 
-If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
+If you don't need a physical product but still want to support me then check the sponsor links on the [official website](https://summercart64.dev).
 
 ---
 
