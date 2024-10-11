@@ -4,15 +4,17 @@
 **For non-technical description of the SummerCart64, please head to the https://summercart64.dev website!**
 
 ## Features
- - **Hardware-Dependent Game Features**
-   - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
-   - 64DD add-on emulation
-   - Battery backed real time clock (RTC)
+
+ - **ROM and Save Memory On-board**
+   - 64 MiB SDRAM memory for game and save data (enough memory to support every retail game without compromise)
+   - 16 MiB FLASH memory for bootloader and extended game data (with extended memory flashcart supports game ROMs up to 78 MiB)
 
  - **Game Saves**
-   - 64 MiB SDRAM memory for game and save data
-   - 16 MiB FLASH memory for bootloader and extended game data
-   - EEPROM, SRAM and FlashRAM save types with automatic writeback to SD card (no reset required)
+   - EEPROM 4k/16k, SRAM and FlashRAM save types with an automatic writeback to the SD card (no reset button press required)
+
+ - **Hardware-Dependent Game Features**
+   - 64DD add-on emulation
+   - Battery backed real time clock (RTC)
 
  - **Menu**
    - Dedicated open source menu written specifically for this flashcart - [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu)
@@ -20,20 +22,22 @@
  - **Game Development**
    - ~23.8 MiB/s peak transfer rate SD card interface
    - ~23.8 MiB/s peak transfer rate USB interface for data upload/download and debug functionality
-   - PC app for communicating with flashcart
-     - Game/save data upload/download (feature enable control and debug terminal)
-
-   - IS-Viewer 64 debug interface
+   - PC app to access the flashcart features:
+     - Game/save data upload/download
+     - Feature enable control
+     - Debug terminal
+     - Access to the SD card
+     - Firmware update
    - [UNFLoader](https://github.com/buu342/N64-UNFLoader) support
+   - IS-Viewer 64 debug interface (fixed 64 kiB buffer with a movable base address)
    - 8 kiB on-chip buffer for general use
    - Status LED and button for general use
+   - [UltraCIC_C](https://github.com/jago85/UltraCIC_C) emulation with automatic region switching and programmable seed/checksum values
    - N64 bootloader with support for IPL3 registers spoofing and loading menu from SD card
 
  - **Cartridge Production**
-   - Initial programming via UART header or dedicated JTAG/SWD interfaces
-   - Software and firmware updatable via USB interface
-   - 3D printable plastic shell
-
+   - Initial programming via UART header or via dedicated JTAG/SWD interfaces
+   - 3D printable shell
 
 ---
 
@@ -49,17 +53,6 @@
 
 ---
 
-## Help / Q&A
-
-For any questions related to this project, please use [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab in GitHub repository.
-Using discussions tab is highly encouraged as it allows to have centralized knowledge database accessible for everyone interested in this project.
-
-I'm also active at [N64brew](https://discord.gg/WqFgNWf) Discord server as `korgeaux` but keep in mind that [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab is a preferred option.
-
-Note that my time is limited so I can't answer all questions.
-
----
-
 ## How do I get one?
 
 Most up to date information about purchasing/manufacturing options is available on https://summercart64.dev website!
@@ -71,11 +64,11 @@ Selecting wrong options or giving PCB manufacturer wrong information might resul
 Boards also come unprogrammed from the manufacturer - you need to do **initial programming step** yourself after receiving the board.
 **Price of the components is not included in the initial quote at the checkout** - manufacturer will contact you later with updated price.
 To avoid problems _**please**_ read **both** [build guide](./docs/06_build_guide.md) and description on the shared project page **in full**.
-If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the [n64brew Discord server](https://discord.gg/WqFgNWf) if that's the case.
+If you have even slightest doubt about the ordering or programming process, it is better to leave it to someone experienced - ask in the [N64brew Discord server](https://discord.gg/8VNMKhxqQn) if that's the case.
 
 **Full disclosure**: for every order made through [this link](https://www.pcbway.com/project/member/shareproject/?bmbno=1046ED64-8AEE-44) I will receive 10% of PCB manufacturing and PCB assembly service cost (price of the components is not included in the split). This is a great way of supporting further project development.
 
-If you don't need a physical product but still want to support me then check my [GitHub sponsors](https://github.com/sponsors/Polprzewodnikowy) page.
+If you don't need a physical product but still want to support me then check the sponsor links on the [official website](https://summercart64.dev).
 
 ---
 

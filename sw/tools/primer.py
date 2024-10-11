@@ -781,7 +781,7 @@ if __name__ == '__main__':
     Utils.log()
 
     try:
-        if (input('Type YES to continue: ') != 'YES'):
+        if (input('Type YES to continue: ').upper() != 'YES'):
             Utils.die('No confirmation received. Exiting')
         Utils.log()
     except KeyboardInterrupt:

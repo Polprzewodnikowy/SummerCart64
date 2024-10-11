@@ -7,13 +7,17 @@
 #include <stdint.h>
 
 
+#define SC64_OK (0)
+
+
 typedef enum {
-    ERROR_TYPE_CFG = 0,
-    ERROR_TYPE_SD_CARD = 1,
+    ERROR_TYPE_OBSOLETE = 0,
+    ERROR_TYPE_CFG = 1,
+    ERROR_TYPE_SD_CARD = 2,
 } sc64_error_type_t;
 
 typedef enum {
-    SC64_OK = 0,
+    CFG_OK = 0,
     CFG_ERROR_UNKNOWN_COMMAND = 1,
     CFG_ERROR_INVALID_ARGUMENT = 2,
     CFG_ERROR_INVALID_ADDRESS = 3,
@@ -51,6 +55,7 @@ typedef enum {
     SD_ERROR_ACMD41_IO = 27,
     SD_ERROR_ACMD41_OCR = 28,
     SD_ERROR_ACMD41_TIMEOUT = 29,
+    SD_ERROR_LOCKED = 30,
 } sc64_sd_error_t;
 
 typedef uint32_t sc64_error_t;
@@ -160,6 +165,14 @@ typedef enum {
     SD_CARD_STATUS_BYTE_SWAP = (1 << 4),
 } sc64_sd_card_status_t;
 
+typedef enum {
+    SC64_IRQ_NONE = 0,
+    SC64_IRQ_BTN = (1 << 0),
+    SC64_IRQ_CMD = (1 << 1),
+    SC64_IRQ_USB = (1 << 2),
+    SC64_IRQ_AUX = (1 << 3),
+} sc64_irq_t;
+
 
 typedef struct {
     volatile uint8_t BUFFER[8192];
@@ -178,8 +191,11 @@ void sc64_unlock (void);
 void sc64_lock (void);
 bool sc64_check_presence (void);
 
-bool sc64_irq_pending (void);
-void sc64_irq_clear (void);
+void sc64_cmd_irq_enable (bool enable);
+void sc64_usb_irq_enable (bool enable);
+void sc64_aux_irq_enable (bool enable);
+sc64_irq_t sc64_irq_pending (void);
+void sc64_irq_callback (sc64_irq_t irq);
 
 sc64_error_t sc64_get_identifier (uint32_t *identifier);
 sc64_error_t sc64_get_version (uint16_t *major, uint16_t *minor, uint32_t *revision);

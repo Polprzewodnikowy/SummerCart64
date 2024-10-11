@@ -27,8 +27,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<serialport::Error> for Error {
-    fn from(value: serialport::Error) -> Self {
-        Error::new(format!("SerialPort error: {}", value.description).as_str())
+impl From<super::ff::Error> for Error {
+    fn from(value: super::ff::Error) -> Self {
+        Error::new(format!("FatFs error: {}", value).as_str())
     }
 }

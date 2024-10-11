@@ -11,16 +11,12 @@ module fifo_junction (
         dev_bus.tx_wdata = cfg_bus.tx_write ? cfg_bus.tx_wdata : dma_bus.tx_wdata;
 
         cfg_bus.rx_empty = dev_bus.rx_empty;
-        cfg_bus.rx_almost_empty = dev_bus.rx_almost_empty;
         cfg_bus.rx_rdata = dev_bus.rx_rdata;
         cfg_bus.tx_full = dev_bus.tx_full;
-        cfg_bus.tx_almost_full = dev_bus.tx_almost_full;
 
         dma_bus.rx_empty = dev_bus.rx_empty;
-        dma_bus.rx_almost_empty = dev_bus.rx_almost_empty;
         dma_bus.rx_rdata = dev_bus.rx_rdata;
         dma_bus.tx_full = dev_bus.tx_full;
-        dma_bus.tx_almost_full = dev_bus.tx_almost_full;
     end
 
 endmodule

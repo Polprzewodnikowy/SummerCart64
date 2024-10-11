@@ -1,7 +1,10 @@
 mod cic;
 mod error;
+pub mod ff;
 pub mod firmware;
+mod ftdi;
 mod link;
+mod serial;
 pub mod server;
 mod time;
 mod types;
@@ -11,18 +14,21 @@ pub use self::{
     link::list_local_devices,
     server::ServerEvent,
     types::{
-        BootMode, ButtonMode, ButtonState, CicSeed, DataPacket, DdDiskState, DdDriveType, DdMode,
-        DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind, FpgaDebugData, MemoryTestPattern,
-        MemoryTestPatternResult, SaveType, SaveWriteback, Switch, TvType,
+        AuxMessage, BootMode, ButtonMode, ButtonState, CicSeed, CicStep, DataPacket, DdDiskState,
+        DdDriveType, DdMode, DebugPacket, DiagnosticData, DiskPacket, DiskPacketKind,
+        FpgaDebugData, ISViewer, MemoryTestPattern, MemoryTestPatternResult, SaveType,
+        SaveWriteback, SdCardInfo, SdCardOpPacket, SdCardResult, SdCardStatus, SpeedTestDirection,
+        Switch, TvType,
     },
 };
 
 use self::{
     cic::{sign_ipl3, IPL3_LENGTH, IPL3_OFFSET},
-    link::{Command, Link},
+    link::Link,
     time::{convert_from_datetime, convert_to_datetime},
     types::{
-        get_config, get_setting, Config, ConfigId, FirmwareStatus, Setting, SettingId, UpdateStatus,
+        get_config, get_setting, Config, ConfigId, FirmwareStatus, SdCardOp, Setting, SettingId,
+        UpdateStatus,
     },
 };
 use chrono::NaiveDateTime;
@@ -43,7 +49,7 @@ pub struct DeviceState {
     pub rom_write_enable: Switch,
     pub rom_shadow_enable: Switch,
     pub dd_mode: DdMode,
-    pub isv_address: u32,
+    pub isviewer: ISViewer,
     pub boot_mode: BootMode,
     pub save_type: SaveType,
     pub cic_seed: CicSeed,
@@ -55,6 +61,7 @@ pub struct DeviceState {
     pub button_mode: ButtonMode,
     pub rom_extended_enable: Switch,
     pub led_enable: Switch,
+    pub sd_card_status: SdCardStatus,
     pub datetime: NaiveDateTime,
     pub fpga_debug_data: FpgaDebugData,
     pub diagnostic_data: DiagnosticData,
@@ -63,7 +70,7 @@ pub struct DeviceState {
 const SC64_V2_IDENTIFIER: &[u8; 4] = b"SCv2";
 
 const SUPPORTED_MAJOR_VERSION: u16 = 2;
-const SUPPORTED_MINOR_VERSION: u16 = 18;
+const SUPPORTED_MINOR_VERSION: u16 = 20;
 
 const SDRAM_ADDRESS: u32 = 0x0000_0000;
 const SDRAM_LENGTH: usize = 64 * 1024 * 1024;
@@ -91,23 +98,24 @@ const SRAM_1M_LENGTH: usize = 128 * 1024;
 
 const BOOTLOADER_ADDRESS: u32 = 0x04E0_0000;
 
+const SD_CARD_BUFFER_ADDRESS: u32 = 0x03FE_0000; // Arbitrary offset in SDRAM memory
+const SD_CARD_BUFFER_LENGTH: usize = 128 * 1024; // Arbitrary length in SDRAM memory
+
+pub const SD_CARD_SECTOR_SIZE: usize = 512;
+
 const FIRMWARE_ADDRESS_SDRAM: u32 = 0x0010_0000; // Arbitrary offset in SDRAM memory
 const FIRMWARE_ADDRESS_FLASH: u32 = 0x0410_0000; // Arbitrary offset in Flash memory
 const FIRMWARE_UPDATE_TIMEOUT: Duration = Duration::from_secs(90);
 
 const ISV_BUFFER_LENGTH: usize = 64 * 1024;
 
-pub const MEMORY_LENGTH: usize = 0x0500_2980;
+pub const MEMORY_LENGTH: usize = 0x0500_2C80;
 
 const MEMORY_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
 
 impl SC64 {
     fn command_identifier_get(&mut self) -> Result<[u8; 4], Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'v',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'v', [0, 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for identifier get command",
@@ -117,11 +125,7 @@ impl SC64 {
     }
 
     fn command_version_get(&mut self) -> Result<(u16, u16, u32), Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'V',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'V', [0, 0], &[])?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for version get command",
@@ -134,11 +138,7 @@ impl SC64 {
     }
 
     fn command_state_reset(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'R',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'R', [0, 0], &[])?;
         Ok(())
     }
 
@@ -154,20 +154,14 @@ impl SC64 {
             ((if disable { 1 } else { 0 }) << 24) | ((seed as u32) << 16) | checksum_high,
             checksum_low,
         ];
-        self.link.execute_command(&Command {
-            id: b'B',
-            args,
-            data: vec![],
-        })?;
+        self.link.execute_command(b'B', args, &[])?;
         Ok(())
     }
 
     fn command_config_get(&mut self, config_id: ConfigId) -> Result<Config, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'c',
-            args: [config_id.into(), 0],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'c', [config_id.into(), 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for config get command",
@@ -178,20 +172,14 @@ impl SC64 {
     }
 
     fn command_config_set(&mut self, config: Config) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'C',
-            args: config.into(),
-            data: vec![],
-        })?;
+        self.link.execute_command(b'C', config.into(), &[])?;
         Ok(())
     }
 
     fn command_setting_get(&mut self, setting_id: SettingId) -> Result<Setting, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'a',
-            args: [setting_id.into(), 0],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'a', [setting_id.into(), 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for setting get command",
@@ -202,20 +190,12 @@ impl SC64 {
     }
 
     fn command_setting_set(&mut self, setting: Setting) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'A',
-            args: setting.into(),
-            data: vec![],
-        })?;
+        self.link.execute_command(b'A', setting.into(), &[])?;
         Ok(())
     }
 
     fn command_time_get(&mut self) -> Result<NaiveDateTime, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b't',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b't', [0, 0], &[])?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for time get command",
@@ -225,20 +205,15 @@ impl SC64 {
     }
 
     fn command_time_set(&mut self, datetime: NaiveDateTime) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'T',
-            args: convert_from_datetime(datetime),
-            data: vec![],
-        })?;
+        self.link
+            .execute_command(b'T', convert_from_datetime(datetime), &[])?;
         Ok(())
     }
 
     fn command_memory_read(&mut self, address: u32, length: usize) -> Result<Vec<u8>, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'm',
-            args: [address, length as u32],
-            data: vec![],
-        })?;
+        let data = self
+            .link
+            .execute_command(b'm', [address, length as u32], &[])?;
         if data.len() != length {
             return Err(Error::new(
                 "Invalid data length received for memory read command",
@@ -248,51 +223,86 @@ impl SC64 {
     }
 
     fn command_memory_write(&mut self, address: u32, data: &[u8]) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'M',
-            args: [address, data.len() as u32],
-            data: data.to_vec(),
-        })?;
+        self.link
+            .execute_command(b'M', [address, data.len() as u32], data)?;
         Ok(())
     }
 
     fn command_usb_write(&mut self, datatype: u8, data: &[u8]) -> Result<(), Error> {
         self.link.execute_command_raw(
-            &Command {
-                id: b'U',
-                args: [datatype as u32, data.len() as u32],
-                data: data.to_vec(),
-            },
+            b'U',
+            [datatype as u32, data.len() as u32],
+            data,
             true,
             false,
         )?;
         Ok(())
     }
 
+    fn command_aux_write(&mut self, data: u32) -> Result<(), Error> {
+        self.link.execute_command(b'X', [data, 0], &[])?;
+        Ok(())
+    }
+
+    fn command_sd_card_operation(&mut self, op: SdCardOp) -> Result<SdCardOpPacket, Error> {
+        let data = self
+            .link
+            .execute_command_raw(b'i', op.into(), &[], false, true)?;
+        if data.len() != 8 {
+            return Err(Error::new(
+                "Invalid data length received for SD card operation command",
+            ));
+        }
+        Ok(SdCardOpPacket {
+            result: data.clone().try_into()?,
+            status: data.clone().try_into()?,
+        })
+    }
+
+    fn command_sd_card_read(
+        &mut self,
+        address: u32,
+        sector: u32,
+        count: u32,
+    ) -> Result<SdCardResult, Error> {
+        let data = self.link.execute_command_raw(
+            b's',
+            [address, count],
+            &sector.to_be_bytes(),
+            false,
+            true,
+        )?;
+        Ok(data.try_into()?)
+    }
+
+    fn command_sd_card_write(
+        &mut self,
+        address: u32,
+        sector: u32,
+        count: u32,
+    ) -> Result<SdCardResult, Error> {
+        let data = self.link.execute_command_raw(
+            b'S',
+            [address, count],
+            &sector.to_be_bytes(),
+            false,
+            true,
+        )?;
+        Ok(data.try_into()?)
+    }
+
     fn command_dd_set_block_ready(&mut self, error: bool) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'D',
-            args: [error as u32, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'D', [error as u32, 0], &[])?;
         Ok(())
     }
 
     fn command_writeback_enable(&mut self) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'W',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'W', [0, 0], &[])?;
         Ok(())
     }
 
     fn command_flash_wait_busy(&mut self, wait: bool) -> Result<u32, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'p',
-            args: [wait as u32, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'p', [wait as u32, 0], &[])?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for flash wait busy command",
@@ -303,24 +313,14 @@ impl SC64 {
     }
 
     fn command_flash_erase_block(&mut self, address: u32) -> Result<(), Error> {
-        self.link.execute_command(&Command {
-            id: b'P',
-            args: [address, 0],
-            data: vec![],
-        })?;
+        self.link.execute_command(b'P', [address, 0], &[])?;
         Ok(())
     }
 
     fn command_firmware_backup(&mut self, address: u32) -> Result<(FirmwareStatus, u32), Error> {
-        let data = self.link.execute_command_raw(
-            &Command {
-                id: b'f',
-                args: [address, 0],
-                data: vec![],
-            },
-            false,
-            true,
-        )?;
+        let data = self
+            .link
+            .execute_command_raw(b'f', [address, 0], &[], false, true)?;
         if data.len() != 8 {
             return Err(Error::new(
                 "Invalid data length received for firmware backup command",
@@ -336,15 +336,9 @@ impl SC64 {
         address: u32,
         length: usize,
     ) -> Result<FirmwareStatus, Error> {
-        let data = self.link.execute_command_raw(
-            &Command {
-                id: b'F',
-                args: [address, length as u32],
-                data: vec![],
-            },
-            false,
-            true,
-        )?;
+        let data =
+            self.link
+                .execute_command_raw(b'F', [address, length as u32], &[], false, true)?;
         if data.len() != 4 {
             return Err(Error::new(
                 "Invalid data length received for firmware update command",
@@ -354,20 +348,12 @@ impl SC64 {
     }
 
     fn command_fpga_debug_data_get(&mut self) -> Result<FpgaDebugData, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'?',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'?', [0, 0], &[])?;
         Ok(data.try_into()?)
     }
 
     fn command_diagnostic_data_get(&mut self) -> Result<DiagnosticData, Error> {
-        let data = self.link.execute_command(&Command {
-            id: b'%',
-            args: [0, 0],
-            data: vec![],
-        })?;
+        let data = self.link.execute_command(b'%', [0, 0], &[])?;
         Ok(data.try_into()?)
     }
 }
@@ -547,7 +533,7 @@ impl SC64 {
             rom_write_enable: get_config!(self, RomWriteEnable)?,
             rom_shadow_enable: get_config!(self, RomShadowEnable)?,
             dd_mode: get_config!(self, DdMode)?,
-            isv_address: get_config!(self, IsvAddress)?,
+            isviewer: get_config!(self, ISViewer)?,
             boot_mode: get_config!(self, BootMode)?,
             save_type: get_config!(self, SaveType)?,
             cic_seed: get_config!(self, CicSeed)?,
@@ -559,6 +545,7 @@ impl SC64 {
             button_mode: get_config!(self, ButtonMode)?,
             rom_extended_enable: get_config!(self, RomExtendedEnable)?,
             led_enable: get_setting!(self, LedEnable)?,
+            sd_card_status: self.get_sd_card_status()?,
             datetime: self.get_datetime()?,
             fpga_debug_data: self.command_fpga_debug_data_get()?,
             diagnostic_data: self.command_diagnostic_data_get()?,
@@ -597,10 +584,10 @@ impl SC64 {
                 }
             }
             self.command_config_set(Config::RomWriteEnable(Switch::On))?;
-            self.command_config_set(Config::IsvAddress(offset))?;
+            self.command_config_set(Config::ISViewer(ISViewer::Enabled(offset)))?;
         } else {
             self.command_config_set(Config::RomWriteEnable(Switch::Off))?;
-            self.command_config_set(Config::IsvAddress(0))?;
+            self.command_config_set(Config::ISViewer(ISViewer::Disabled))?;
         }
         Ok(())
     }
@@ -641,6 +628,118 @@ impl SC64 {
         self.command_usb_write(debug_packet.datatype, &debug_packet.data)
     }
 
+    pub fn send_aux_packet(&mut self, data: AuxMessage) -> Result<(), Error> {
+        self.command_aux_write(data.into())
+    }
+
+    pub fn send_and_receive_aux_packet(
+        &mut self,
+        data: AuxMessage,
+        timeout: std::time::Duration,
+    ) -> Result<Option<AuxMessage>, Error> {
+        self.send_aux_packet(data)?;
+        let reply_timeout = std::time::Instant::now();
+        loop {
+            match self.receive_data_packet()? {
+                Some(packet) => match packet {
+                    DataPacket::AuxData(data) => {
+                        return Ok(Some(data));
+                    }
+                    _ => {}
+                },
+                None => {}
+            }
+            if reply_timeout.elapsed() > timeout {
+                return Ok(None);
+            }
+        }
+    }
+
+    pub fn try_notify_via_aux(&mut self, message: AuxMessage) -> Result<bool, Error> {
+        let timeout = std::time::Duration::from_millis(500);
+        if let Some(response) = self.send_and_receive_aux_packet(message, timeout)? {
+            return Ok(message == response);
+        }
+        Ok(false)
+    }
+
+    pub fn init_sd_card(&mut self) -> Result<SdCardResult, Error> {
+        self.command_sd_card_operation(SdCardOp::Init)
+            .map(|packet| packet.result)
+    }
+
+    pub fn deinit_sd_card(&mut self) -> Result<SdCardResult, Error> {
+        self.command_sd_card_operation(SdCardOp::Deinit)
+            .map(|packet| packet.result)
+    }
+
+    pub fn get_sd_card_status(&mut self) -> Result<SdCardStatus, Error> {
+        self.command_sd_card_operation(SdCardOp::GetStatus)
+            .map(|reply| reply.status)
+    }
+
+    pub fn get_sd_card_info(&mut self) -> Result<SdCardInfo, Error> {
+        const SD_CARD_INFO_BUFFER_ADDRESS: u32 = 0x0500_2BE0;
+        let info =
+            match self.command_sd_card_operation(SdCardOp::GetInfo(SD_CARD_INFO_BUFFER_ADDRESS))? {
+                SdCardOpPacket {
+                    result: SdCardResult::OK,
+                    status: _,
+                } => self.command_memory_read(SD_CARD_INFO_BUFFER_ADDRESS, 32)?,
+                packet => {
+                    return Err(Error::new(
+                        format!("Couldn't get SD card info registers: {}", packet.result).as_str(),
+                    ))
+                }
+            };
+        Ok(info.try_into()?)
+    }
+
+    pub fn read_sd_card(&mut self, data: &mut [u8], sector: u32) -> Result<SdCardResult, Error> {
+        if data.len() % SD_CARD_SECTOR_SIZE != 0 {
+            return Err(Error::new(
+                "SD card read length not aligned to the sector size",
+            ));
+        }
+
+        let mut current_sector = sector;
+
+        for mut chunk in data.chunks_mut(SD_CARD_BUFFER_LENGTH) {
+            let sectors = (chunk.len() / SD_CARD_SECTOR_SIZE) as u32;
+            match self.command_sd_card_read(SD_CARD_BUFFER_ADDRESS, current_sector, sectors)? {
+                SdCardResult::OK => {}
+                result => return Ok(result),
+            }
+            let data = self.command_memory_read(SD_CARD_BUFFER_ADDRESS, chunk.len())?;
+            chunk.write_all(&data)?;
+            current_sector += sectors;
+        }
+
+        Ok(SdCardResult::OK)
+    }
+
+    pub fn write_sd_card(&mut self, data: &[u8], sector: u32) -> Result<SdCardResult, Error> {
+        if data.len() % SD_CARD_SECTOR_SIZE != 0 {
+            return Err(Error::new(
+                "SD card write length not aligned to the sector size",
+            ));
+        }
+
+        let mut current_sector = sector;
+
+        for chunk in data.chunks(SD_CARD_BUFFER_LENGTH) {
+            let sectors = (chunk.len() / SD_CARD_SECTOR_SIZE) as u32;
+            self.command_memory_write(SD_CARD_BUFFER_ADDRESS, chunk)?;
+            match self.command_sd_card_write(SD_CARD_BUFFER_ADDRESS, current_sector, sectors)? {
+                SdCardResult::OK => {}
+                result => return Ok(result),
+            }
+            current_sector += sectors;
+        }
+
+        Ok(SdCardResult::OK)
+    }
+
     pub fn check_device(&mut self) -> Result<(), Error> {
         let identifier = self.command_identifier_get().map_err(|e| {
             Error::new(format!("Couldn't get SC64 device identifier: {e}").as_str())
@@ -667,6 +766,14 @@ impl SC64 {
 
     pub fn reset_state(&mut self) -> Result<(), Error> {
         self.command_state_reset()
+    }
+
+    pub fn is_console_powered_on(&mut self) -> Result<bool, Error> {
+        let debug_data = self.command_fpga_debug_data_get()?;
+        Ok(match debug_data.cic_step {
+            CicStep::Unavailable | CicStep::PowerOff => false,
+            _ => true,
+        })
     }
 
     pub fn backup_firmware(&mut self) -> Result<Vec<u8>, Error> {
@@ -748,6 +855,69 @@ impl SC64 {
             }
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    pub fn test_usb_speed(&mut self, direction: SpeedTestDirection) -> Result<f64, Error> {
+        const TEST_ADDRESS: u32 = SDRAM_ADDRESS;
+        const TEST_LENGTH: usize = 8 * 1024 * 1024;
+        const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
+
+        let data = vec![0x00; TEST_LENGTH];
+
+        let time = std::time::Instant::now();
+
+        match direction {
+            SpeedTestDirection::Read => {
+                self.command_memory_read(TEST_ADDRESS, TEST_LENGTH)?;
+            }
+            SpeedTestDirection::Write => {
+                self.command_memory_write(TEST_ADDRESS, &data)?;
+            }
+        }
+
+        let elapsed = time.elapsed();
+
+        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / elapsed.as_secs_f64())
+    }
+
+    pub fn test_sd_card(&mut self) -> Result<f64, Error> {
+        const TEST_LENGTH: usize = 4 * 1024 * 1024;
+        const MIB_DIVIDER: f64 = 1024.0 * 1024.0;
+
+        let mut data = vec![0x00; TEST_LENGTH];
+
+        match self.init_sd_card()? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Init SD card failed: {result}").as_str(),
+                ))
+            }
+        }
+
+        let time = std::time::Instant::now();
+
+        match self.read_sd_card(&mut data, 0)? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Read SD card failed: {result}").as_str(),
+                ))
+            }
+        }
+
+        let elapsed = time.elapsed();
+
+        match self.deinit_sd_card()? {
+            SdCardResult::OK => {}
+            result => {
+                return Err(Error::new(
+                    format!("Deinit SD card failed: {result}").as_str(),
+                ))
+            }
+        }
+
+        Ok((TEST_LENGTH as f64 / MIB_DIVIDER) / elapsed.as_secs_f64())
     }
 
     pub fn test_sdram_pattern(
@@ -875,13 +1045,8 @@ impl SC64 {
 
 impl SC64 {
     pub fn open_local(port: Option<String>) -> Result<Self, Error> {
-        let port = if let Some(port) = port {
-            port
-        } else {
-            list_local_devices()?[0].port.clone()
-        };
         let mut sc64 = SC64 {
-            link: link::new_local(&port)?,
+            link: link::new_local(&port.unwrap_or(list_local_devices()?[0].port.clone()))?,
         };
         sc64.check_device()?;
         Ok(sc64)

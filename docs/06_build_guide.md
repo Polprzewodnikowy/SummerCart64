@@ -1,3 +1,4 @@
+- [Video guide](#video-guide)
 - [Step by step guide how to make SC64](#step-by-step-guide-how-to-make-sc64)
   - [**PCB manufacturing data**](#pcb-manufacturing-data)
   - [**PCB requirements**](#pcb-requirements)
@@ -11,6 +12,10 @@
     - [*`primer.py` threw other error message*](#primerpy-threw-other-error-message)
 
 ---
+
+## Video guide
+
+[![Video guide](https://img.youtube.com/vi/t6hyCFpwqz8/0.jpg)](https://www.youtube.com/watch?v=t6hyCFpwqz8 "How to build and program the SummerCart64")
 
 ## Step by step guide how to make SC64
 
@@ -42,7 +47,7 @@ Please download latest release before proceeding with the instructions.
 
 ### **Components**
 
-  1. Locate interactive BOM file inside `hw/pcb` folder (alternatively, check out this [BOM discussion](https://github.com/Polprzewodnikowy/SummerCart64/discussions/27))
+  1. Locate the interactive BOM file inside `hw/pcb` folder
   2. Order all parts listed in the BOM file or use PCB assembly service together with your PCB order
 
 ---
@@ -137,5 +142,3 @@ Please use command `python3 primer.py COMx sc64-firmware-{version}.bin --bootloa
 Due to multiple possible causes of the problem it's best to start visually inspecting SC64's board for any defects, like bad solder work or chips soldered backwards.
 If visual inspection didn't yield any obvious culprits then next step would be to check if everything is connected correctly.
 Check if TX/RX signals aren't swapped and if SC64 is getting power from the USB cable. Best place to check supply voltage are the exposed test pads on the left of U8 chip.
-If everything at this point was checked and looked fine, then feel free to open new thread in the [*Discussions*](https://github.com/Polprzewodnikowy/SummerCart64/discussions) tab.
-Make sure to describe your problem extensively, attach SC64 board photos **from the both sides**, and paste all logs/screenshots from the `primer.py` output.

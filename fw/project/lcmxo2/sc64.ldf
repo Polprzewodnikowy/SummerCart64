@@ -3,6 +3,9 @@
     <Options/>
     <Implementation title="impl1" dir="impl1" description="impl1" synthesis="synplify" default_strategy="release">
         <Options VerilogStandard="System Verilog" def_top="top" top="top"/>
+        <Source name="../../rtl/memory/dma_scb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
         <Source name="../../rtl/memory/mem_bus.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
@@ -10,6 +13,9 @@
             <Options VerilogStandard="System Verilog"/>
         </Source>
         <Source name="../../rtl/sd/sd_scb.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
+        <Source name="../../rtl/usb/usb_scb.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
         <Source name="../../rtl/fifo/fifo_bus.sv" type="Verilog" type_short="Verilog">

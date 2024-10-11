@@ -47,11 +47,18 @@ interface n64_scb ();
     logic cfg_pending;
     logic cfg_done;
     logic cfg_error;
-    logic cfg_irq;
     logic [7:0] cfg_cmd;
     logic [31:0] cfg_rdata [0:1];
     logic [31:0] cfg_wdata [0:1];
     logic [31:0] cfg_identifier;
+
+    logic btn_irq;
+    logic usb_irq;
+    logic aux_irq;
+
+    logic aux_pending;
+    logic [31:0] aux_rdata;
+    logic [31:0] aux_wdata;
 
     logic [15:0] save_count;
 
@@ -61,11 +68,14 @@ interface n64_scb ();
     logic cic_region;
     logic [7:0] cic_seed;
     logic [47:0] cic_checksum;
-    logic [3:0] cic_debug;
+    logic [3:0] cic_debug_step;
 
     logic pi_sdram_active;
     logic pi_flash_active;
-    logic [35:0] pi_debug;
+    logic [31:0] pi_debug_address;
+    logic [16:0] pi_debug_rw_count;
+    logic pi_debug_direction;
+    logic [3:0] pi_debug_fifo_flags;
 
     modport controller (
         input n64_reset,
@@ -98,11 +108,18 @@ interface n64_scb ();
         input cfg_pending,
         output cfg_done,
         output cfg_error,
-        output cfg_irq,
         input cfg_cmd,
         input cfg_rdata,
         output cfg_wdata,
         output cfg_identifier,
+
+        output btn_irq,
+        output usb_irq,
+        output aux_irq,
+
+        input aux_pending,
+        input aux_rdata,
+        output aux_wdata,
 
         input save_count,
 
@@ -112,9 +129,12 @@ interface n64_scb ();
         output cic_region,
         output cic_seed,
         output cic_checksum,
-        input cic_debug,
+        input cic_debug_step,
 
-        input pi_debug
+        input pi_debug_address,
+        input pi_debug_rw_count,
+        input pi_debug_direction,
+        input pi_debug_fifo_flags
     );
 
     modport pi (
@@ -139,7 +159,11 @@ interface n64_scb ();
 
         output pi_sdram_active,
         output pi_flash_active,
-        output pi_debug
+
+        output pi_debug_address,
+        output pi_debug_rw_count,
+        output pi_debug_direction,
+        output pi_debug_fifo_flags
     );
 
     modport flashram (
@@ -206,11 +230,18 @@ interface n64_scb ();
         output cfg_pending,
         input cfg_done,
         input cfg_error,
-        input cfg_irq,
         output cfg_cmd,
         output cfg_rdata,
         input cfg_wdata,
-        input cfg_identifier
+        input cfg_identifier,
+
+        input btn_irq,
+        input usb_irq,
+        input aux_irq,
+
+        output aux_pending,
+        output aux_rdata,
+        input aux_wdata
     );
 
     modport save_counter (
@@ -228,7 +259,7 @@ interface n64_scb ();
         input cic_region,
         input cic_seed,
         input cic_checksum,
-        output cic_debug
+        output cic_debug_step
     );
 
     modport arbiter (

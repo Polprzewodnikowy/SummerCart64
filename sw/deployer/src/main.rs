@@ -11,12 +11,13 @@ use panic_message::panic_message;
 use std::{
     fs::File,
     io::{stdin, stdout, Read, Write},
+    panic,
     path::PathBuf,
+    process,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    {panic, process},
 };
 
 #[derive(Parser)]
@@ -25,7 +26,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Connect to SC64 device on provided serial port
+    /// Connect to SC64 device on provided local port
     #[arg(short, long)]
     port: Option<String>,
 
@@ -57,6 +58,12 @@ enum Commands {
     /// Dump data from arbitrary location in SC64 memory space
     Dump(DumpArgs),
 
+    /// Perform operations on the SD card
+    SD {
+        #[command(subcommand)]
+        command: SDCommands,
+    },
+
     /// Print information about connected SC64 device
     Info,
 
@@ -86,6 +93,10 @@ enum Commands {
 struct UploadArgs {
     /// Path to the ROM file
     rom: PathBuf,
+
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short = 'a', long)]
+    reboot: bool,
 
     /// Path to the save file
     #[arg(short, long)]
@@ -135,6 +146,10 @@ struct _64DDArgs {
     /// Path to the ROM file
     #[arg(short, long)]
     rom: Option<PathBuf>,
+
+    /// Attempt to reboot the console (requires specific support in the running game)
+    #[arg(short = 'a', long)]
+    reboot: bool,
 
     /// Path to the save file (also used by save writeback mechanism)
     #[arg(short, long, requires = "rom")]
@@ -192,6 +207,71 @@ struct DumpArgs {
 
     /// Path to the dump file
     path: PathBuf,
+}
+
+#[derive(Subcommand)]
+enum SDCommands {
+    /// List a directory on the SD card
+    #[command(name = "ls")]
+    List {
+        /// Path to the directory
+        path: Option<PathBuf>,
+    },
+
+    /// Display a file or directory status
+    #[command(name = "stat")]
+    Stat {
+        /// Path to the file or directory
+        path: PathBuf,
+    },
+
+    /// Move or rename a file or directory
+    #[command(name = "mv")]
+    Move {
+        /// Path to the current file or directory
+        src: PathBuf,
+
+        /// Path to the new file or directory
+        dst: PathBuf,
+    },
+
+    /// Remove a file or empty directory
+    #[command(name = "rm")]
+    Delete {
+        /// Path to the file or directory
+        path: PathBuf,
+    },
+
+    /// Create a new directory
+    #[command(name = "mkdir")]
+    CreateDirectory {
+        /// Path to the directory
+        path: PathBuf,
+    },
+
+    /// Download a file to the PC
+    #[command(name = "download")]
+    Download {
+        /// Path to the file on the SD card
+        src: PathBuf,
+
+        /// Path to the file on the PC
+        dst: Option<PathBuf>,
+    },
+
+    /// Upload a file to the SD card
+    #[command(name = "upload")]
+    Upload {
+        /// Path to the file on the PC
+        src: PathBuf,
+
+        /// Path to the file on the SD card
+        dst: Option<PathBuf>,
+    },
+
+    /// Format the SD card
+    #[command(name = "mkfs")]
+    Format,
 }
 
 #[derive(Subcommand)]
@@ -310,6 +390,9 @@ fn main() {
         panic::set_hook(Box::new(|_| {}));
     }
 
+    #[cfg(windows)]
+    colored::control::set_virtual_terminal(true).ok();
+
     match panic::catch_unwind(|| handle_command(&cli.command, cli.port, cli.remote)) {
         Ok(_) => {}
         Err(payload) => {
@@ -332,6 +415,7 @@ fn handle_command(command: &Commands, port: Option<String>, remote: Option<Strin
         Commands::_64DD(args) => handle_64dd_command(connection, args),
         Commands::Debug(args) => handle_debug_command(connection, args),
         Commands::Dump(args) => handle_dump_command(connection, args),
+        Commands::SD { command } => handle_sd_command(connection, command),
         Commands::Info => handle_info_command(connection),
         Commands::Reset => handle_reset_command(connection),
         Commands::Set { command } => handle_set_command(connection, command),
@@ -350,7 +434,13 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 
     println!("{}", "Found devices:".bold());
     for (i, d) in devices.iter().enumerate() {
-        println!(" {i}: [{}] at port [{}]", d.serial_number, d.port);
+        let index = i + 1;
+        println!(
+            " {index}: [{}] at port [{}] (using \"{}\" backend)",
+            d.serial.bold(),
+            d.port.bold(),
+            d.backend.to_string().bold()
+        );
     }
 
     Ok(())
@@ -358,6 +448,13 @@ fn handle_list_command() -> Result<(), sc64::Error> {
 
 fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
+
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
+        println!(
+            "{}",
+            "Warning: no response for [Halt] AUX message".bright_yellow()
+        );
+    }
 
     sc64.reset_state()?;
 
@@ -404,6 +501,13 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
 
     sc64.calculate_cic_parameters(args.cic_seed)?;
 
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
+    }
+
     Ok(())
 }
 
@@ -441,6 +545,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         "\"Only 64DD IPL\" mode should be safe on development units without IPL builtin"
             .bright_green()
     );
+
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Halt)? {
+        println!(
+            "{}",
+            "Warning: no response for [Halt] AUX message".bright_yellow()
+        );
+    }
 
     sc64.reset_state()?;
 
@@ -551,6 +662,13 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
     sc64.set_64dd_disk_state(sc64::DdDiskState::Inserted)?;
 
     sc64.set_save_writeback(true)?;
+
+    if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
+        println!(
+            "{}",
+            "Warning: no response for [Reboot] AUX message".bright_yellow()
+        );
+    }
 
     let exit = setup_exit_flag();
     while !exit.load(Ordering::Relaxed) {
@@ -725,43 +843,192 @@ fn handle_dump_command(connection: Connection, args: &DumpArgs) -> Result<(), sc
     Ok(())
 }
 
+fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(), sc64::Error> {
+    let mut sc64 = init_sc64(connection, true)?;
+
+    match sc64.init_sd_card()? {
+        sc64::SdCardResult::OK => {}
+        error => {
+            return Err(sc64::Error::new(
+                format!("Couldn't init the SD card: {error}").as_str(),
+            ))
+        }
+    }
+
+    if sc64.is_console_powered_on()? {
+        println!(
+            "{}\n{}\n{}",
+            "========== [WARNING] ==========".bold().bright_yellow(),
+            "The console is powered on. To avoid potential data corruption it's strongly"
+                .bright_yellow(),
+            "recommended to access the SD card only when the console is powered off."
+                .bright_yellow()
+        );
+        let answer = prompt(format!("{}", "Continue anyways? [y/N] ".bold()));
+        if answer.to_ascii_lowercase() != "y" {
+            sc64.deinit_sd_card()?;
+            println!("{}", "SD card access aborted".red());
+            return Ok(());
+        }
+    }
+
+    sc64.reset_state()?;
+
+    let mut ff = sc64::ff::FatFs::new(sc64)?;
+
+    match command {
+        SDCommands::List { path } => {
+            for item in ff.list(path.clone().unwrap_or(PathBuf::from("/")))? {
+                let sc64::ff::Entry {
+                    info,
+                    datetime,
+                    name,
+                } = item;
+                let name = match info {
+                    sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
+                    sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
+                };
+                println!("{info} {datetime} | {}", name.bold());
+            }
+        }
+        SDCommands::Stat { path } => {
+            let sc64::ff::Entry {
+                info,
+                datetime,
+                name,
+            } = ff.stat(path)?;
+            let name = match info {
+                sc64::ff::EntryInfo::Directory => ("/".to_owned() + &name).bright_blue(),
+                sc64::ff::EntryInfo::File { size: _ } => name.bright_green(),
+            };
+            println!("{info} {datetime} | {}", name.bold());
+        }
+        SDCommands::Move { src, dst } => {
+            ff.rename(src, dst)?;
+            println!(
+                "Successfully moved {} to {}",
+                src.to_str().unwrap_or_default().bright_green(),
+                dst.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::Delete { path } => {
+            ff.delete(path)?;
+            println!(
+                "Successfully deleted {}",
+                path.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::CreateDirectory { path } => {
+            ff.mkdir(path)?;
+            println!(
+                "Successfully created {}",
+                path.to_str().unwrap_or_default().bright_green()
+            );
+        }
+        SDCommands::Download { src, dst } => {
+            let dst = &dst.clone().unwrap_or(
+                src.file_name()
+                    .map(PathBuf::from)
+                    .ok_or(sc64::ff::Error::InvalidParameter)?,
+            );
+            let mut src_file = ff.open(src)?;
+            let mut dst_file = std::fs::File::create(dst)?;
+            let mut buffer = vec![0; 128 * 1024];
+            log_wait(
+                format!(
+                    "Downloading {} to {}",
+                    src.to_str().unwrap_or_default().bright_green(),
+                    dst.to_str().unwrap_or_default().bright_green()
+                ),
+                || loop {
+                    match src_file.read(&mut buffer)? {
+                        0 => return Ok(()),
+                        bytes => {
+                            if let Err(e) = dst_file.write_all(&buffer[0..bytes]) {
+                                return Err(e);
+                            }
+                        }
+                    }
+                },
+            )?;
+        }
+        SDCommands::Upload { src, dst } => {
+            let dst = &dst.clone().unwrap_or(
+                src.file_name()
+                    .map(PathBuf::from)
+                    .ok_or(sc64::ff::Error::InvalidParameter)?,
+            );
+            let mut src_file = std::fs::File::open(src)?;
+            let mut dst_file = ff.create(dst)?;
+            let mut buffer = vec![0; 128 * 1024];
+            log_wait(
+                format!(
+                    "Uploading {} to {}",
+                    src.to_str().unwrap_or_default().bright_green(),
+                    dst.to_str().unwrap_or_default().bright_green()
+                ),
+                || loop {
+                    match src_file.read(&mut buffer)? {
+                        0 => return Ok(()),
+                        bytes => {
+                            if let Err(e) = dst_file.write_all(&buffer[0..bytes]) {
+                                return Err(e);
+                            }
+                        }
+                    }
+                },
+            )?;
+        }
+        SDCommands::Format => {
+            let answer = prompt(format!(
+                "{}",
+                "Do you really want to format the SD card? [y/N] ".bold()
+            ));
+            if answer.to_ascii_lowercase() != "y" {
+                println!("{}", "Format operation aborted".red());
+                return Ok(());
+            }
+            log_wait(format!("Formatting the SD card"), || ff.mkfs())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
     let mut sc64 = init_sc64(connection, true)?;
 
     let (major, minor, revision) = sc64.check_firmware_version()?;
     let state = sc64.get_device_state()?;
-    let datetime = state.datetime.format("%Y-%m-%d %H:%M:%S");
 
     println!("{}", "SummerCart64 state information:".bold());
-    println!(" Firmware version:    v{}.{}.{}", major, minor, revision);
-    println!(" RTC datetime:        {}", datetime);
-    println!(" Boot mode:           {}", state.boot_mode);
-    println!(" Save type:           {}", state.save_type);
-    println!(" CIC seed:            {}", state.cic_seed);
-    println!(" TV type:             {}", state.tv_type);
-    println!(" Bootloader switch:   {}", state.bootloader_switch);
-    println!(" ROM write:           {}", state.rom_write_enable);
-    println!(" ROM shadow:          {}", state.rom_shadow_enable);
-    println!(" ROM extended:        {}", state.rom_extended_enable);
-    println!(" 64DD mode:           {}", state.dd_mode);
-    println!(" 64DD SD card mode:   {}", state.dd_sd_enable);
-    println!(" 64DD drive type:     {}", state.dd_drive_type);
-    println!(" 64DD disk state:     {}", state.dd_disk_state);
-    println!(" Button mode:         {}", state.button_mode);
-    println!(" Button state:        {}", state.button_state);
-    println!(" LED blink:           {}", state.led_enable);
-    println!(" IS-Viewer 64 offset: 0x{:08X}", state.isv_address);
+    println!(" Firmware version:  v{}.{}.{}", major, minor, revision);
+    println!(" RTC datetime:      {}", state.datetime);
+    println!(" Boot mode:         {}", state.boot_mode);
+    println!(" Save type:         {}", state.save_type);
+    println!(" CIC seed:          {}", state.cic_seed);
+    println!(" TV type:           {}", state.tv_type);
+    println!(" Bootloader switch: {}", state.bootloader_switch);
+    println!(" ROM write:         {}", state.rom_write_enable);
+    println!(" ROM shadow:        {}", state.rom_shadow_enable);
+    println!(" ROM extended:      {}", state.rom_extended_enable);
+    println!(" 64DD mode:         {}", state.dd_mode);
+    println!(" 64DD SD card mode: {}", state.dd_sd_enable);
+    println!(" 64DD drive type:   {}", state.dd_drive_type);
+    println!(" 64DD disk state:   {}", state.dd_disk_state);
+    println!(" Button mode:       {}", state.button_mode);
+    println!(" Button state:      {}", state.button_state);
+    println!(" LED blink:         {}", state.led_enable);
+    println!(" IS-Viewer 64:      {}", state.isviewer);
+    println!(" SD card status:    {}", state.sd_card_status);
     println!("{}", "SummerCart64 diagnostic information:".bold());
+    println!(" PI I/O access:     {}", state.fpga_debug_data.pi_io_access);
     println!(
-        " Last PI address:     0x{:08X}",
-        state.fpga_debug_data.last_pi_address
-    );
-    println!(
-        " PI FIFO flags:       {}",
+        " PI FIFO flags:     {}",
         state.fpga_debug_data.pi_fifo_flags
     );
-    println!(" Current CIC step:    {}", state.fpga_debug_data.cic_step);
-    println!(" Diagnostic data:     {}", state.diagnostic_data);
+    println!(" Current CIC step:  {}", state.fpga_debug_data.cic_step);
+    println!(" Diagnostic data:   {}", state.diagnostic_data);
 
     Ok(())
 }
@@ -882,7 +1149,30 @@ fn handle_firmware_command(
 }
 
 fn handle_test_command(connection: Connection) -> Result<(), sc64::Error> {
-    let mut sc64 = init_sc64(connection, false)?;
+    let mut sc64 = init_sc64(connection, true)?;
+
+    sc64.reset_state()?;
+
+    println!("{}: USB", "[SC64 Tests]".bold());
+
+    print!(" Performing USB read speed test... ");
+    stdout().flush().unwrap();
+    let usb_read_speed = sc64.test_usb_speed(sc64::SpeedTestDirection::Read)?;
+    println!("{}", format!("{usb_read_speed:.2} MiB/s",).bright_green());
+
+    print!(" Performing USB write speed test... ");
+    stdout().flush().unwrap();
+    let usb_write_speed = sc64.test_usb_speed(sc64::SpeedTestDirection::Write)?;
+    println!("{}", format!("{usb_write_speed:.2} MiB/s",).bright_green());
+
+    println!("{}: SD card", "[SC64 Tests]".bold());
+
+    print!(" Performing SD card read speed test... ");
+    stdout().flush().unwrap();
+    match sc64.test_sd_card() {
+        Ok(sd_read_speed) => println!("{}", format!("{sd_read_speed:.2} MiB/s",).bright_green()),
+        Err(result) => println!("{}", format!("error! {result}").bright_red()),
+    }
 
     println!("{}: SDRAM (pattern)", "[SC64 Tests]".bold());
 

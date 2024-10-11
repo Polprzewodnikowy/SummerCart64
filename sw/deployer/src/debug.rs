@@ -291,17 +291,7 @@ impl Handler {
         let filename = &if let Some(path) = path {
             path.to_string_lossy().to_string()
         } else {
-            generate_filename(
-                "save",
-                match save_writeback.save {
-                    sc64::SaveType::Eeprom4k | sc64::SaveType::Eeprom16k => "eep",
-                    sc64::SaveType::Sram | sc64::SaveType::SramBanked | sc64::SaveType::Sram1m => {
-                        "srm"
-                    }
-                    sc64::SaveType::Flashram => "fla",
-                    _ => "sav",
-                },
-            )
+            generate_filename("save", "sav")
         };
         match File::create(filename) {
             Ok(mut file) => {

@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: GitHub Discussions
-    url:  https://github.com/Polprzewodnikowy/SummerCart64/discussions
-    about: Please use for QUESTIONS, conversations or discussions.
   - name: N64brew Discord
-    url: https://discord.gg/8xvRPqCAFC
-    about: Alternative channel for asking QUESTIONS.
+    url: https://discord.gg/8VNMKhxqQn
+    about: The go-to community to ask about SummerCart64

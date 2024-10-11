@@ -2,8 +2,8 @@
 
 
 #define VERSION_MAJOR       (2)
-#define VERSION_MINOR       (18)
-#define VERSION_REVISION    (1)
+#define VERSION_MINOR       (20)
+#define VERSION_REVISION    (0)
 
 
 void version_firmware (uint32_t *version, uint32_t *revision) {

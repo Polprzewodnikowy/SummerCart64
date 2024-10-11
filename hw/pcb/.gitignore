@@ -1,5 +1,7 @@
+*.lck
 **/*-backups
 **/*-bak
+**/*.3dshapes
 **/*.csv
 **/*.gerbers
 **/*.kicad_prl

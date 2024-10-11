@@ -4,7 +4,9 @@
 #include "flash.h"
 #include "fpga.h"
 #include "hw.h"
+#include "led.h"
 #include "rtc.h"
+#include "sd.h"
 #include "timer.h"
 #include "update.h"
 #include "usb.h"
@@ -15,7 +17,7 @@
 #define BOOTLOADER_ADDRESS      (0x04E00000UL)
 #define BOOTLOADER_LENGTH       (1920 * 1024)
 
-#define MEMORY_LENGTH           (0x05002980UL)
+#define MEMORY_LENGTH           (0x05002C80UL)
 
 #define RX_FLUSH_ADDRESS        (0x07F00000UL)
 #define RX_FLUSH_LENGTH         (1 * 1024 * 1024)
@@ -43,6 +45,8 @@ enum tx_state {
 
 
 struct process {
+    bool last_reset_state;
+
     enum rx_state rx_state;
     uint8_t rx_counter;
     uint8_t rx_cmd;
@@ -79,10 +83,6 @@ static const uint32_t CMP_TOKEN = (0x434D5000UL);
 static const uint32_t ERR_TOKEN = (0x45525200UL);
 static const uint32_t PKT_TOKEN = (0x504B5400UL);
 
-
-static bool usb_dma_ready (void) {
-    return !((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY));
-}
 
 static bool usb_rx_byte (uint8_t *data) {
     if (fpga_usb_status_get() & USB_STATUS_RXNE) {
@@ -149,7 +149,63 @@ static bool usb_rx_cmd (uint8_t *cmd) {
     return false;
 }
 
+static void usb_reset (void) {
+    fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
+    while (fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY);
+    fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
+    while (fpga_reg_get(REG_USB_SCR) & USB_SCR_FIFO_FLUSH_BUSY);
+
+    p.rx_state = RX_STATE_IDLE;
+    p.tx_state = TX_STATE_IDLE;
+
+    p.response_pending = false;
+    p.packet_pending = false;
+
+    p.read_ready = true;
+    p.read_length = 0;
+    p.read_address = 0;
+
+    usb_rx_word_counter = 0;
+    usb_rx_word_buffer = 0;
+    usb_tx_word_counter = 0;
+    usb_rx_cmd_counter = 0;
+}
+
+static void usb_flush_packet (void) {
+    if (p.packet_pending && p.packet_info.done_callback) {
+        p.packet_pending = false;
+        p.packet_info.done_callback();
+    }
+    if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
+        p.tx_info.done_callback();
+        p.tx_info.done_callback = NULL;
+    }
+}
+
+static bool usb_is_active (void) {
+    uint32_t scr = fpga_reg_get(REG_USB_SCR);
+    bool reset_state = (scr & USB_SCR_RESET_STATE);
+    if (p.last_reset_state != reset_state) {
+        p.last_reset_state = reset_state;
+        if (reset_state) {
+            usb_flush_packet();
+            usb_reset();
+            fpga_reg_set(REG_USB_SCR, USB_SCR_WRITE_FLUSH);
+        }
+        fpga_reg_set(REG_USB_SCR, reset_state ? USB_SCR_RESET_ON_ACK : USB_SCR_RESET_OFF_ACK);
+        return false;
+    }
+    return !(reset_state || (scr & USB_SCR_PWRSAV));
+}
+
+static bool usb_dma_ready (void) {
+    return !((fpga_reg_get(REG_USB_DMA_SCR) & DMA_SCR_BUSY));
+}
+
 static bool usb_validate_address_length (uint32_t address, uint32_t length, bool exclude_bootloader) {
+    if (length == 0) {
+        return true;
+    }
     if ((address >= MEMORY_LENGTH) || (length > MEMORY_LENGTH)) {
         return true;
     }
@@ -177,9 +233,6 @@ static void usb_rx_process (void) {
             p.response_info.data_length = 0;
             p.response_info.dma_length = 0;
             p.response_info.done_callback = NULL;
-            if (p.rx_cmd == 'U') {
-                timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
-            }
         }
     }
 
@@ -189,6 +242,10 @@ static void usb_rx_process (void) {
             if (p.rx_counter == 2) {
                 p.rx_counter = 0;
                 p.rx_state = RX_STATE_DATA;
+                if ((p.rx_cmd == 'U') && (p.rx_args[0] > 0)) {
+                    fpga_reg_set(REG_USB_SCR, USB_SCR_IRQ);
+                    timer_countdown_start(TIMER_ID_USB, DEBUG_WRITE_TIMEOUT_MS);
+                }
                 break;
             }
         }
@@ -213,6 +270,7 @@ static void usb_rx_process (void) {
             case 'R':
                 cfg_reset_state();
                 cic_reset_parameters();
+                sd_release_lock(SD_LOCK_USB);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
                 break;
@@ -323,6 +381,128 @@ static void usb_rx_process (void) {
                 }
                 break;
 
+            case 'X':
+                fpga_reg_set(REG_AUX, p.rx_args[0]);
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                break;
+
+            case 'i': {
+                sd_error_t error = SD_OK;
+                switch (p.rx_args[1]) {
+                    case 0:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            sd_card_deinit();
+                            sd_release_lock(SD_LOCK_USB);
+                        }
+                        break;
+
+                    case 1:
+                        error = sd_try_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            led_activity_on();
+                            error = sd_card_init();
+                            led_activity_off();
+                            if (error != SD_OK) {
+                                sd_release_lock(SD_LOCK_USB);
+                            }
+                        }
+                        break;
+
+                    case 2:
+                        break;
+
+                    case 3:
+                        if (usb_validate_address_length(p.rx_args[0], SD_CARD_INFO_SIZE, true)) {
+                            error = SD_ERROR_INVALID_ADDRESS;
+                        } else {
+                            error = sd_get_lock(SD_LOCK_USB);
+                            if (error == SD_OK) {
+                                error = sd_card_get_info(p.rx_args[0]);
+                            }
+                        }
+                        break;
+
+                    case 4:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            error = sd_set_byte_swap(true);
+                        }
+                        break;
+
+                    case 5:
+                        error = sd_get_lock(SD_LOCK_USB);
+                        if (error == SD_OK) {
+                            error = sd_set_byte_swap(false);
+                        }
+                        break;
+
+                    default:
+                        error = SD_ERROR_INVALID_OPERATION;
+                        break;
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 8;
+                p.response_info.data[0] = error;
+                p.response_info.data[1] = sd_card_get_status();
+                break;
+            }
+
+            case 's': {
+                uint32_t sector = 0;
+                if (!usb_rx_word(&sector)) {
+                    break;
+                }
+                sd_error_t error = SD_OK;
+                if (p.rx_args[1] >= 0x800000) {
+                    error = SD_ERROR_INVALID_ARGUMENT;
+                } else if (usb_validate_address_length(p.rx_args[0], (p.rx_args[1] * SD_SECTOR_SIZE), true)) {
+                    error = SD_ERROR_INVALID_ADDRESS;
+                } else {
+                    error = sd_get_lock(SD_LOCK_USB);
+                    if (error == SD_OK) {
+                        led_activity_on();
+                        error = sd_read_sectors(p.rx_args[0], sector, p.rx_args[1]);
+                        led_activity_off();
+                    }
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = error;
+                break;
+            }
+
+            case 'S': {
+                uint32_t sector = 0;
+                if (!usb_rx_word(&sector)) {
+                    break;
+                }
+                sd_error_t error = SD_OK;
+                if (p.rx_args[1] >= 0x800000) {
+                    error = SD_ERROR_INVALID_ARGUMENT;
+                } else if (usb_validate_address_length(p.rx_args[0], (p.rx_args[1] * SD_SECTOR_SIZE), true)) {
+                    error = SD_ERROR_INVALID_ADDRESS;
+                } else {
+                    error = sd_get_lock(SD_LOCK_USB);
+                    if (error == SD_OK) {
+                        led_activity_on();
+                        error = sd_write_sectors(p.rx_args[0], sector, p.rx_args[1]);
+                        led_activity_off();
+                    }
+                }
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = (error != SD_OK);
+                p.response_info.data_length = 4;
+                p.response_info.data[0] = error;
+                break;
+            }
+
             case 'D':
                 dd_set_block_ready(p.rx_args[0] == 0);
                 p.rx_state = RX_STATE_IDLE;
@@ -410,27 +590,34 @@ static void usb_rx_process (void) {
     }
 
     if (p.rx_state == RX_STATE_FLUSH) {
-        if (usb_dma_ready()) {
-            if (p.rx_args[1] != 0) {
+        if (p.rx_args[1] > 0) {
+            if (usb_dma_ready()) {
                 uint32_t length = (p.rx_args[1] > RX_FLUSH_LENGTH) ? RX_FLUSH_LENGTH : p.rx_args[1];
-                fpga_reg_set(REG_USB_DMA_ADDRESS, RX_FLUSH_ADDRESS);
-                fpga_reg_set(REG_USB_DMA_LENGTH, length);
-                fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
-                p.rx_args[1] -= length;
-            } else {
-                if (p.flush_response) {
-                    p.rx_state = RX_STATE_IDLE;
-                    p.response_pending = true;
-                    p.response_error = true;
-                } else if (p.flush_packet) {
-                    usb_tx_info_t packet_info;
-                    usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
-                    if (usb_enqueue_packet(&packet_info)) {
-                        p.rx_state = RX_STATE_IDLE;
-                    }
+                if (!p.rx_dma_running) {
+                    fpga_reg_set(REG_USB_DMA_ADDRESS, RX_FLUSH_ADDRESS);
+                    fpga_reg_set(REG_USB_DMA_LENGTH, length);
+                    fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_DIRECTION | DMA_SCR_START);
+                    p.rx_dma_running = true;
                 } else {
+                    p.rx_args[1] -= length;
+                    p.rx_dma_running = false;
+                }
+            }
+        }
+
+        if (p.rx_args[1] == 0) {
+            if (p.flush_response) {
+                p.rx_state = RX_STATE_IDLE;
+                p.response_pending = true;
+                p.response_error = true;
+            } else if (p.flush_packet) {
+                usb_tx_info_t packet_info;
+                usb_create_packet(&packet_info, PACKET_CMD_DATA_FLUSHED);
+                if (usb_enqueue_packet(&packet_info)) {
                     p.rx_state = RX_STATE_IDLE;
                 }
+            } else {
+                p.rx_state = RX_STATE_IDLE;
             }
         }
     }
@@ -556,42 +743,17 @@ void usb_get_read_info (uint32_t *args) {
 
 
 void usb_init (void) {
-    fpga_reg_set(REG_USB_DMA_SCR, DMA_SCR_STOP);
-    fpga_reg_set(REG_USB_SCR, USB_SCR_FIFO_FLUSH);
-
-    p.rx_state = RX_STATE_IDLE;
-    p.tx_state = TX_STATE_IDLE;
-
-    p.response_pending = false;
-    p.packet_pending = false;
-
-    p.read_ready = true;
-    p.read_length = 0;
-    p.read_address = 0;
-
-    usb_rx_word_counter = 0;
-    usb_rx_word_buffer = 0;
-    usb_tx_word_counter = 0;
-    usb_rx_cmd_counter = 0;
+    p.last_reset_state = false;
+    usb_reset();
 }
 
 
 void usb_process (void) {
-    uint32_t scr = fpga_reg_get(REG_USB_SCR);
-    if (scr & (USB_SCR_PWRSAV | USB_SCR_RESET_STATE | USB_SCR_RESET_PENDING)) {
-        if (p.packet_pending && p.packet_info.done_callback) {
-            p.packet_pending = false;
-            p.packet_info.done_callback();
-        }
-        if (scr & USB_SCR_RESET_PENDING) {
-            if (p.tx_state != TX_STATE_IDLE && p.tx_info.done_callback) {
-                p.tx_info.done_callback();
-            }
-            usb_init();
-            fpga_reg_set(REG_USB_SCR, USB_SCR_RESET_ACK);
-        }
-    } else {
+    if (usb_is_active()) {
         usb_rx_process();
         usb_tx_process();
+    } else {
+        usb_flush_packet();
+        sd_release_lock(SD_LOCK_USB);
     }
 }

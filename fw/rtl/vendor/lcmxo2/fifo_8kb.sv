@@ -3,17 +3,18 @@ module fifo_8kb (
     input reset,
 
     output empty,
-    output almost_empty,
     input read,
     output [7:0] rdata,
 
     output full,
-    output almost_full,
     input write,
     input [7:0] wdata,
-    
+
     output logic [10:0] count
 );
+
+    logic almost_empty;
+    logic almost_full;
 
     fifo_8kb_lattice_generated fifo_8kb_lattice_generated_inst (
         .Data(wdata),
@@ -25,7 +26,7 @@ module fifo_8kb (
         .RPReset(reset),
         .Q(rdata),
         .Empty(empty),
-        .Full(full), 
+        .Full(full),
         .AlmostEmpty(almost_empty),
         .AlmostFull(almost_full)
     );

@@ -134,11 +134,14 @@ static bool dd_block_read_request (void) {
     uint16_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
-        uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
-        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, false);
-        led_activity_on();
-        sd_error_t error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_read_sectors);
-        led_activity_off();
+        sd_error_t error = sd_get_lock(SD_LOCK_N64);
+        if (error == SD_OK) {
+            uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
+            uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, false);
+            led_activity_on();
+            error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_read_sectors);
+            led_activity_off();
+        }
         dd_set_block_ready(error == SD_OK);
     } else {
         usb_tx_info_t packet_info;
@@ -158,11 +161,14 @@ static bool dd_block_write_request (void) {
     uint32_t index = dd_track_head_block();
     uint32_t buffer_address = DD_BLOCK_BUFFER_ADDRESS;
     if (p.sd_mode) {
-        uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
-        uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, true);
-        led_activity_on();
-        sd_error_t error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_write_sectors);
-        led_activity_off();
+        sd_error_t error = sd_get_lock(SD_LOCK_N64);
+        if (error == SD_OK) {
+            uint32_t sector_table[DD_SD_SECTOR_TABLE_SIZE];
+            uint32_t sectors = dd_fill_sd_sector_table(index, sector_table, true);
+            led_activity_on();
+            error = sd_optimize_sectors(buffer_address, sector_table, sectors, sd_write_sectors);
+            led_activity_off();
+        }
         dd_set_block_ready(error == SD_OK);
     } else {
         usb_tx_info_t packet_info;

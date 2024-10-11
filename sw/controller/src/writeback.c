@@ -72,19 +72,20 @@ static save_type_t writeback_get_address_length (uint32_t *address, uint32_t *le
 }
 
 static void writeback_save_to_sd (void) {
-    save_type_t save;
     uint32_t address;
     uint32_t length;
 
-    save = writeback_get_address_length(&address, &length);
-    if (save == SAVE_TYPE_NONE) {
+    if (writeback_get_address_length(&address, &length) == SAVE_TYPE_NONE) {
         writeback_disable();
         return;
     }
 
-    sd_error_t error = sd_optimize_sectors(address, p.sectors, (length / SD_SECTOR_SIZE), sd_write_sectors);
+    if (sd_get_lock(SD_LOCK_N64) != SD_OK) {
+        writeback_disable();
+        return;
+    }
 
-    if (error != SD_OK) {
+    if (sd_optimize_sectors(address, p.sectors, (length / SD_SECTOR_SIZE), sd_write_sectors) != SD_OK) {
         writeback_disable();
         return;
     }
