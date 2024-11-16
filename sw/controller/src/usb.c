@@ -390,15 +390,15 @@ static void usb_rx_process (void) {
             case 'i': {
                 sd_error_t error = SD_OK;
                 switch (p.rx_args[1]) {
-                    case 0:
-                        error = sd_get_lock(SD_LOCK_USB);
+                    case SD_OP_DEINIT:
+                        error = sd_try_lock(SD_LOCK_USB);
                         if (error == SD_OK) {
                             sd_card_deinit();
                             sd_release_lock(SD_LOCK_USB);
                         }
                         break;
 
-                    case 1:
+                    case SD_OP_INIT:
                         error = sd_try_lock(SD_LOCK_USB);
                         if (error == SD_OK) {
                             led_activity_on();
@@ -410,10 +410,10 @@ static void usb_rx_process (void) {
                         }
                         break;
 
-                    case 2:
+                    case SD_OP_GET_STATUS:
                         break;
 
-                    case 3:
+                    case SD_OP_GET_INFO:
                         if (usb_validate_address_length(p.rx_args[0], SD_CARD_INFO_SIZE, true)) {
                             error = SD_ERROR_INVALID_ADDRESS;
                         } else {
@@ -424,14 +424,14 @@ static void usb_rx_process (void) {
                         }
                         break;
 
-                    case 4:
+                    case SD_OP_BYTE_SWAP_ON:
                         error = sd_get_lock(SD_LOCK_USB);
                         if (error == SD_OK) {
                             error = sd_set_byte_swap(true);
                         }
                         break;
 
-                    case 5:
+                    case SD_OP_BYTE_SWAP_OFF:
                         error = sd_get_lock(SD_LOCK_USB);
                         if (error == SD_OK) {
                             error = sd_set_byte_swap(false);

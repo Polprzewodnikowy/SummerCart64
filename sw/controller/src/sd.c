@@ -4,7 +4,7 @@
 #include "timer.h"
 
 
-#define SD_INIT_BUFFER_ADDRESS          (0x05002BB8UL)
+#define SD_INIT_BUFFER_ADDRESS          (0x05002A00UL)
 #define BYTE_SWAP_ADDRESS_END           (0x05000000UL)
 
 #define CMD6_ARG_CHECK_HS               (0x00FFFFF1UL)
@@ -35,11 +35,10 @@
 #define R7_CHECK_PATTERN                (0xAA << 0)
 
 #define TIMEOUT_INIT_MS                 (1000)
+#define TIMEOUT_DATA_MS                 (5000)
 
 #define DAT_CRC16_LENGTH                (8)
 #define DAT_BLOCK_MAX_COUNT             (256)
-#define DAT_TIMEOUT_INIT_MS             (2000)
-#define DAT_TIMEOUT_DATA_MS             (5000)
 
 
 typedef enum {
@@ -60,15 +59,11 @@ typedef enum {
 } rsp_type_t;
 
 typedef enum {
-    DAT_READ,
-    DAT_WRITE,
-} dat_mode_t;
-
-typedef enum {
     DAT_OK,
+    DAT_BUSY,
     DAT_ERROR_IO,
     DAT_ERROR_TIMEOUT,
-} dat_error_t;
+} dat_status_t;
 
 typedef enum {
     CMD6_OK,
@@ -176,50 +171,97 @@ static bool sd_acmd (uint8_t acmd, uint32_t arg, rsp_type_t rsp_type, void *rsp)
     return false;
 }
 
-static void sd_dat_prepare (uint32_t address, uint32_t count, dat_mode_t mode) {
-    uint32_t length = (count * SD_SECTOR_SIZE);
-    uint32_t sd_dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_FIFO_FLUSH);
-    uint32_t sd_dma_scr = DMA_SCR_START;
+static void sd_dat_start_write (uint32_t count) {
+    uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_WRITE | SD_DAT_FIFO_FLUSH);
+    fpga_reg_set(REG_SD_DAT, dat);
 
-    if (mode == DAT_READ) {
-        sd_dat |= SD_DAT_START_READ;
-        sd_dma_scr |= DMA_SCR_DIRECTION;
-        if (p.byte_swap && (address < BYTE_SWAP_ADDRESS_END)) {
-            sd_dma_scr |= DMA_SCR_BYTE_SWAP;
-        }
-    } else {
-        sd_dat |= SD_DAT_START_WRITE;
+}
+
+static void sd_dat_start_read (uint32_t count) {
+    uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_READ | SD_DAT_FIFO_FLUSH);
+    fpga_reg_set(REG_SD_DAT, dat);
+    
+}
+
+static dat_status_t sd_dat_status (void) {
+    uint32_t dat = fpga_reg_get(REG_SD_DAT);
+    if (dat & SD_DAT_BUSY) {
+        return DAT_BUSY;
     }
-
-    fpga_reg_set(REG_SD_DAT, sd_dat);
-    fpga_reg_set(REG_SD_DMA_ADDRESS, address);
-    fpga_reg_set(REG_SD_DMA_LENGTH, length);
-    fpga_reg_set(REG_SD_DMA_SCR, sd_dma_scr);
+    if (dat & SD_DAT_ERROR) {
+        return DAT_ERROR_IO;
+    }
+    return DAT_OK;
 }
 
 static void sd_dat_abort (void) {
-    fpga_reg_set(REG_SD_DMA_SCR, DMA_SCR_STOP);
     fpga_reg_set(REG_SD_DAT, SD_DAT_STOP | SD_DAT_FIFO_FLUSH);
 }
 
-static dat_error_t sd_dat_wait (uint16_t timeout_ms) {
+static void sd_dma_start_write (uint32_t address, uint32_t count) {
+    uint32_t length = (count * SD_SECTOR_SIZE);
+    uint32_t scr = DMA_SCR_START;
+
+    fpga_reg_set(REG_SD_DMA_ADDRESS, address);
+    fpga_reg_set(REG_SD_DMA_LENGTH, length);
+    fpga_reg_set(REG_SD_DMA_SCR, scr);
+}
+
+static void sd_dma_start_read (uint32_t address, uint32_t count) {
+    uint32_t length = (count * SD_SECTOR_SIZE);
+    uint32_t scr = (DMA_SCR_DIRECTION | DMA_SCR_START);
+
+    if (p.byte_swap && (address < BYTE_SWAP_ADDRESS_END)) {
+        scr |= DMA_SCR_BYTE_SWAP;
+    }
+
+    fpga_reg_set(REG_SD_DMA_ADDRESS, address);
+    fpga_reg_set(REG_SD_DMA_LENGTH, length);
+    fpga_reg_set(REG_SD_DMA_SCR, scr);
+}
+
+static void sd_dma_wait_busy (void) {
+    while (fpga_reg_get(REG_SD_DMA_SCR) & DMA_SCR_BUSY);
+}
+
+static void sd_dma_abort (void) {
+    fpga_reg_set(REG_SD_DMA_SCR, DMA_SCR_STOP);
+    sd_dma_wait_busy();
+}
+
+static void sd_start_write (uint32_t address, uint32_t count) {
+    sd_dat_start_write(count);
+    sd_dma_start_write(address, count);
+}
+
+static void sd_start_read (uint32_t address, uint32_t count) {
+    sd_dat_start_read(count);
+    sd_dma_start_read(address, count);
+}
+
+static void sd_abort (void) {
+    sd_dma_abort();
+    sd_dat_abort();
+}
+
+static dat_status_t sd_sync (uint16_t timeout_ms) {
     timer_countdown_start(TIMER_ID_SD, timeout_ms);
 
-    do {
-        uint32_t sd_dat = fpga_reg_get(REG_SD_DAT);
-        uint32_t sd_dma_scr = fpga_reg_get(REG_SD_DMA_SCR);
-        if ((!(sd_dat & SD_DAT_BUSY)) && (!(sd_dma_scr & DMA_SCR_BUSY))) {
-            if (sd_dat & SD_DAT_ERROR) {
-                sd_dat_abort();
-                return DAT_ERROR_IO;
+    while (true) {
+        dat_status_t status = sd_dat_status();
+
+        if (status != DAT_BUSY) {
+            if (status != DAT_OK) {
+                sd_abort();
             }
-            return DAT_OK;
+            return status;
         }
-    } while (!timer_countdown_elapsed(TIMER_ID_SD));
 
-    sd_dat_abort();
-
-    return DAT_ERROR_TIMEOUT;
+        if (timer_countdown_elapsed(TIMER_ID_SD)) {
+            sd_abort();
+            return DAT_ERROR_TIMEOUT;
+        }
+    }
 }
 
 static bool sd_dat_check_crc16 (uint8_t *data, uint32_t length) {
@@ -266,15 +308,15 @@ static bool sd_dat_check_crc16 (uint8_t *data, uint32_t length) {
 
 static cmd6_error_t sd_cmd6 (uint32_t arg, uint8_t *buffer) {
     uint32_t rsp;
-    sd_dat_prepare(SD_INIT_BUFFER_ADDRESS, 1, DAT_READ);
+    sd_start_read(SD_INIT_BUFFER_ADDRESS, 1);
     if (sd_cmd(6, arg, RSP_R1, NULL)) {
-        sd_dat_abort();
+        sd_abort();
         if ((!sd_cmd(13, p.rca, RSP_R1, &rsp)) && (rsp & R1_ILLEGAL_COMMAND)) {
             return CMD6_ERROR_ILLEGAL_CMD;
         }
         return CMD6_ERROR_IO;
     }
-    if (sd_dat_wait(DAT_TIMEOUT_INIT_MS) == DAT_ERROR_TIMEOUT) {
+    if (sd_sync(TIMEOUT_DATA_MS) == DAT_ERROR_TIMEOUT) {
         return CMD6_ERROR_TIMEOUT;
     }
     fpga_mem_read(SD_INIT_BUFFER_ADDRESS, CMD6_DATA_LENGTH + DAT_CRC16_LENGTH, buffer);
@@ -495,13 +537,12 @@ sd_error_t sd_write_sectors (uint32_t address, uint32_t sector, uint32_t count) 
         if (sd_cmd(25, sector, RSP_R1, NULL)) {
             return SD_ERROR_CMD25_IO;
         }
-        sd_dat_prepare(address, blocks, DAT_WRITE);
-        dat_error_t error = sd_dat_wait(DAT_TIMEOUT_DATA_MS);
-        if (error != DAT_OK) {
-            sd_cmd(12, 0, RSP_R1b, NULL);
-            return (error == DAT_ERROR_IO) ? SD_ERROR_CMD25_CRC : SD_ERROR_CMD25_TIMEOUT;
-        }
+        sd_start_write(address, blocks);
+        dat_status_t status = sd_sync(TIMEOUT_DATA_MS);
         sd_cmd(12, 0, RSP_R1b, NULL);
+        if (status != DAT_OK) {
+            return (status == DAT_ERROR_IO) ? SD_ERROR_CMD25_CRC : SD_ERROR_CMD25_TIMEOUT;
+        }
         address += (blocks * SD_SECTOR_SIZE);
         sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;
@@ -529,17 +570,16 @@ sd_error_t sd_read_sectors (uint32_t address, uint32_t sector, uint32_t count) {
 
     while (count > 0) {
         uint32_t blocks = ((count > DAT_BLOCK_MAX_COUNT) ? DAT_BLOCK_MAX_COUNT : count);
-        sd_dat_prepare(address, blocks, DAT_READ);
+        sd_start_read(address, blocks);
         if (sd_cmd(18, sector, RSP_R1, NULL)) {
-            sd_dat_abort();
+            sd_abort();
             return SD_ERROR_CMD18_IO;
         }
-        dat_error_t error = sd_dat_wait(DAT_TIMEOUT_DATA_MS);
-        if (error != DAT_OK) {
-            sd_cmd(12, 0, RSP_R1b, NULL);
-            return (error == DAT_ERROR_IO) ? SD_ERROR_CMD18_CRC : SD_ERROR_CMD18_TIMEOUT;
-        }
+        dat_status_t status = sd_sync(TIMEOUT_DATA_MS);
         sd_cmd(12, 0, RSP_R1b, NULL);
+        if (status != DAT_OK) {
+            return (status == DAT_ERROR_IO) ? SD_ERROR_CMD18_CRC : SD_ERROR_CMD18_TIMEOUT;
+        }
         address += (blocks * SD_SECTOR_SIZE);
         sector += (blocks * (p.card_type_block ? 1 : SD_SECTOR_SIZE));
         count -= blocks;

@@ -52,6 +52,15 @@ typedef enum {
     SD_LOCK_USB,
 } sd_lock_t;
 
+typedef enum {
+    SD_OP_DEINIT = 0,
+    SD_OP_INIT = 1,
+    SD_OP_GET_STATUS = 2,
+    SD_OP_GET_INFO = 3,
+    SD_OP_BYTE_SWAP_ON = 4,
+    SD_OP_BYTE_SWAP_OFF = 5,
+} sd_op_t;
+
 
 sd_error_t sd_card_init (void);
 void sd_card_deinit (void);

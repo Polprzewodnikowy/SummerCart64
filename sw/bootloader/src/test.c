@@ -178,7 +178,7 @@ static void test_sd_card_io (void) {
     uint8_t sector[512] __attribute__((aligned(8)));
 
     if ((error = sc64_sd_card_get_status(&card_status)) != SC64_OK) {
-        error_display("Could not get SD card info\n (%08X) - %s", error, sc64_error_description(error));
+        error_display("Could not get SD card status\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if (card_status & SD_CARD_STATUS_INSERTED) {
@@ -188,11 +188,11 @@ static void test_sd_card_io (void) {
     }
 
     if ((error = sc64_sd_card_deinit()) != SC64_OK) {
-        error_display("SD card deinit error\n (%08X) - %s", error, sc64_error_description(error));
+        return display_printf("SD card deinit error, skipping test\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((error = sc64_sd_card_init()) != SC64_OK) {
-        return display_printf("SD card init error\n (%08X) - %s\n", error, sc64_error_description(error));
+        return display_printf("SD card init error, skipping test\n (%08X) - %s\n", error, sc64_error_description(error));
     }
 
     if ((error = sc64_sd_card_get_status(&card_status)) != SC64_OK) {
@@ -261,7 +261,7 @@ static void test_sd_card_fatfs (void) {
     UINT bytes;
 
     if ((error = sc64_sd_card_deinit()) != SC64_OK) {
-        error_display("SD card deinit error\n (%08X) - %s", error, sc64_error_description(error));
+        return display_printf("SD card deinit error, skipping test\n (%08X) - %s", error, sc64_error_description(error));
     }
 
     if ((fresult = f_mount(&fs, "", 1)) != FR_OK) {

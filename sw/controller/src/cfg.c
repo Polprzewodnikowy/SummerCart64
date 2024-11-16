@@ -93,15 +93,6 @@ typedef enum {
 } tv_type_t;
 
 typedef enum {
-    SD_CARD_OP_DEINIT = 0,
-    SD_CARD_OP_INIT = 1,
-    SD_CARD_OP_GET_STATUS = 2,
-    SD_CARD_OP_GET_INFO = 3,
-    SD_CARD_OP_BYTE_SWAP_ON = 4,
-    SD_CARD_OP_BYTE_SWAP_OFF = 5,
-} sd_card_op_t;
-
-typedef enum {
     DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE = 0,
 } diagnostic_id_t;
 
@@ -641,15 +632,15 @@ void cfg_process (void) {
         case CMD_ID_SD_CARD_OP: {
             sd_error_t error = SD_OK;
             switch (p.data[1]) {
-                case SD_CARD_OP_DEINIT:
-                    error = sd_get_lock(SD_LOCK_N64);
+                case SD_OP_DEINIT:
+                    error = sd_try_lock(SD_LOCK_N64);
                     if (error == SD_OK) {
                         sd_card_deinit();
                         sd_release_lock(SD_LOCK_N64);
                     }
                     break;
 
-                case SD_CARD_OP_INIT:
+                case SD_OP_INIT:
                     error = sd_try_lock(SD_LOCK_N64);
                     if (error == SD_OK) {
                         led_activity_on();
@@ -661,11 +652,11 @@ void cfg_process (void) {
                     }
                     break;
 
-                case SD_CARD_OP_GET_STATUS:
+                case SD_OP_GET_STATUS:
                     p.data[1] = sd_card_get_status();
                     break;
 
-                case SD_CARD_OP_GET_INFO:
+                case SD_OP_GET_INFO:
                     if (cfg_translate_address(&p.data[0], SD_CARD_INFO_SIZE, (SDRAM | BRAM))) {
                         return cfg_cmd_reply_error(ERROR_TYPE_SD_CARD, SD_ERROR_INVALID_ADDRESS);
                     }
@@ -675,14 +666,14 @@ void cfg_process (void) {
                     }
                     break;
 
-                case SD_CARD_OP_BYTE_SWAP_ON:
+                case SD_OP_BYTE_SWAP_ON:
                     error = sd_get_lock(SD_LOCK_N64);
                     if (error == SD_OK) {
                         error = sd_set_byte_swap(true);
                     }
                     break;
 
-                case SD_CARD_OP_BYTE_SWAP_OFF:
+                case SD_OP_BYTE_SWAP_OFF:
                     error = sd_get_lock(SD_LOCK_N64);
                     if (error == SD_OK) {
                         error = sd_set_byte_swap(false);
