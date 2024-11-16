@@ -1,5 +1,5 @@
 name: Bug Report
-description: File a bug report.
+description: File a bug report
 title: "[SC64][BUG] "
 labels: ["bug"]
 assignees:
@@ -16,7 +16,7 @@ body:
       description: |
         Issue tracker in this repository is for **BUG REPORTS ONLY**.
 
-        Make sure your problem is caused by the firmware and **not** by the software you're running on the flashcart.
+        Make sure your problem is caused by the firmware/PC app and **not** by the software you're running on the flashcart.
 
         Errors in the documentation are also considered a bug.
 
@@ -24,10 +24,15 @@ body:
 
         [N64FlashcartMenu]: https://github.com/Polprzewodnikowy/N64FlashcartMenu
       options:
-        - label: My issue is indeed a bug in the flashcart firmware and/or documentation and I can prove it.
+        - label: I understand the difference between flashcart firmware, N64FlashcartMenu and `sc64deployer` PC app.
           required: true
-        - label: I understand the difference in responsibilities between flashcart firmware and menu software.
-          required: true
+        - label: I found a bug in FPGA HDL (`/fw/rtl`)
+        - label: I found a bug in MCU app (`/sw/controller`)
+        - label: I found a bug in N64 bootloader (`/sw/bootloader`)
+        - label: I found a bug in PC app (`/sw/deployer`)
+        - label: I found a bug in initial programming script (`/sw/tools/primer.py`)
+        - label: I found an error in documentation (`/docs`)
+        - label: I found an issue elsewhere
   - type: input
     id: version
     attributes:
@@ -49,7 +54,5 @@ body:
     id: deployer-info
     attributes:
       label: Output logs from `sc64deployer info`
-      description: Please copy and paste the output from the command specified above.
+      description: If possible, please copy and paste the output from the command specified above.
       render: shell
-    validations:
-      required: true
