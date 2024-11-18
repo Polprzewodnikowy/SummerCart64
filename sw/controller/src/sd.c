@@ -106,6 +106,7 @@ static void sd_set_clock (sd_clock_t mode) {
     }
 }
 
+
 static bool sd_cmd (uint8_t cmd, uint32_t arg, rsp_type_t rsp_type, void *rsp) {
     uint32_t scr;
     uint32_t cmd_data;
@@ -171,6 +172,7 @@ static bool sd_acmd (uint8_t acmd, uint32_t arg, rsp_type_t rsp_type, void *rsp)
     return false;
 }
 
+
 static void sd_dat_start_write (uint32_t count) {
     uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_WRITE | SD_DAT_FIFO_FLUSH);
     fpga_reg_set(REG_SD_DAT, dat);
@@ -180,7 +182,7 @@ static void sd_dat_start_write (uint32_t count) {
 static void sd_dat_start_read (uint32_t count) {
     uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_READ | SD_DAT_FIFO_FLUSH);
     fpga_reg_set(REG_SD_DAT, dat);
-    
+
 }
 
 static dat_status_t sd_dat_status (void) {
@@ -197,6 +199,7 @@ static dat_status_t sd_dat_status (void) {
 static void sd_dat_abort (void) {
     fpga_reg_set(REG_SD_DAT, SD_DAT_STOP | SD_DAT_FIFO_FLUSH);
 }
+
 
 static void sd_dma_start_write (uint32_t address, uint32_t count) {
     uint32_t length = (count * SD_SECTOR_SIZE);
@@ -220,14 +223,15 @@ static void sd_dma_start_read (uint32_t address, uint32_t count) {
     fpga_reg_set(REG_SD_DMA_SCR, scr);
 }
 
-static void sd_dma_wait_busy (void) {
-    while (fpga_reg_get(REG_SD_DMA_SCR) & DMA_SCR_BUSY);
+static bool sd_dma_is_busy (void) {
+    return (fpga_reg_get(REG_SD_DMA_SCR) & DMA_SCR_BUSY);
 }
 
 static void sd_dma_abort (void) {
     fpga_reg_set(REG_SD_DMA_SCR, DMA_SCR_STOP);
-    sd_dma_wait_busy();
+    while (sd_dma_is_busy());
 }
+
 
 static void sd_start_write (uint32_t address, uint32_t count) {
     sd_dat_start_write(count);
@@ -250,11 +254,19 @@ static dat_status_t sd_sync (uint16_t timeout_ms) {
     while (true) {
         dat_status_t status = sd_dat_status();
 
-        if (status != DAT_BUSY) {
-            if (status != DAT_OK) {
+        switch (status) {
+            case DAT_BUSY:
+                break;
+
+            case DAT_OK:
+                if (!sd_dma_is_busy()) {
+                    return DAT_OK;
+                }
+                break;
+
+            default:
                 sd_abort();
-            }
-            return status;
+                return status;
         }
 
         if (timer_countdown_elapsed(TIMER_ID_SD)) {
@@ -263,6 +275,7 @@ static dat_status_t sd_sync (uint16_t timeout_ms) {
         }
     }
 }
+
 
 static bool sd_dat_check_crc16 (uint8_t *data, uint32_t length) {
     uint16_t device_crc[4];
@@ -616,6 +629,7 @@ sd_error_t sd_optimize_sectors (uint32_t address, uint32_t *sector_table, uint32
 
     return SD_OK;
 }
+
 
 sd_error_t sd_get_lock (sd_lock_t lock) {
     if (p.lock == lock) {
