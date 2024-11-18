@@ -272,6 +272,14 @@ enum SDCommands {
     /// Format the SD card
     #[command(name = "mkfs")]
     Format,
+
+    /// Mount the SD card
+    #[command(name = "fuse")]
+    #[cfg(unix)]
+    Fuse {
+        /// Path to the directory
+        mount_path: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -989,6 +997,12 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                 return Ok(());
             }
             log_wait(format!("Formatting the SD card"), || ff.mkfs())?;
+        }
+        #[cfg(unix)]
+        SDCommands::Fuse { mount_path } => {
+            let fuse_args = [std::ffi::OsStr::new("-o"), std::ffi::OsStr::new("fsname=passthrufs,allow_other,auto_unmount")];
+
+            fuse_mt::mount(fuse_mt::FuseMT::new(ff, 1), mount_path, &fuse_args[..])?;
         }
     }
 
