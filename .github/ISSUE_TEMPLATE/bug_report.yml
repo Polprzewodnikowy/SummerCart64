@@ -37,7 +37,7 @@ body:
     id: version
     attributes:
       label: Firmware version
-      placeholder: v2.20.1
+      placeholder: v2.20.2
     validations:
       required: true
   - type: textarea
