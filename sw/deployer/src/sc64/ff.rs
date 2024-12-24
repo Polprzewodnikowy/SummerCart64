@@ -1,5 +1,24 @@
 use super::{SdCardResult, SC64, SD_CARD_SECTOR_SIZE};
 use chrono::{Datelike, Timelike};
+#[cfg(unix)]
+use fuse_mt::{
+    CallbackResult, DirectoryEntry, FileAttr, FileType, FilesystemMT, RequestInfo,
+    ResultEmpty, ResultEntry, ResultOpen, ResultReaddir, ResultSlice, ResultStatfs, Statfs
+};
+
+#[cfg(unix)]
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    io::{Read, Seek, SeekFrom},
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime}
+};
+#[cfg(unix)]
+use log::{debug, error};
+#[cfg(unix)]
+use chrono::{Utc};
+
 mod fatfs {
     #![allow(non_camel_case_types)]
     #![allow(non_snake_case)]
@@ -138,8 +157,104 @@ fn uninstall_driver() -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(unix)]
+struct HandleMap<T> {
+    mutex: Mutex<u32>,
+    counter: RefCell<u64>,
+    map: RefCell<HashMap<u64, Arc<Mutex<T>>>>,
+}
+
+#[cfg(unix)]
+impl<T> HandleMap<T> {
+    pub fn new(start_counter: u64) -> Self {
+        HandleMap {
+            mutex: Mutex::new(0),
+            counter: RefCell::new(start_counter),
+            map: RefCell::new(HashMap::new()),
+        }
+    }
+
+    pub fn insert(&self, item: T) -> u64 {
+        let _lock = self.mutex.lock();
+        let mut counter = self.counter.borrow_mut();
+        *counter += 1;
+        self.map.borrow_mut().insert(*counter, Arc::new(Mutex::new(item)));
+        *counter
+    }
+
+    pub fn get(&self, handle: u64) -> Result<Arc<Mutex<T>>, libc::c_int> {
+        let _lock = self.mutex.lock();
+        let map = self.map.borrow();
+        map.get(&handle)
+            .map(|item| Arc::clone(item))
+            .ok_or(libc::EEXIST)
+    }
+
+    pub fn release(&self, handle: u64) {
+        let _lock = self.mutex.lock();
+        self.map.borrow_mut().retain(|&k, _| k != handle);
+    }
+}
+
+#[cfg(unix)]
+pub struct FatFsHelper {
+    dirs: HandleMap<Directory>,
+    files: HandleMap<File>,
+    stat_cache: StatCache<Entry>,
+}
+
+#[cfg(unix)]
+pub struct StatCache<T> {
+    mutex: Mutex<u64>,
+    cache: RefCell<HashMap<std::path::PathBuf, T>>,
+}
+
+#[cfg(unix)]
+impl<T: Clone> StatCache<T> {
+    pub fn new() -> Self {
+        StatCache {
+            mutex: Mutex::new(0),
+            cache: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// Inserts an entry into the cache, returning the previous entry if it existed.
+    pub fn insert(&self, path: &std::path::Path, entry: T) -> Option<T> {
+        let _lock = self.mutex.lock();
+        let mut cache = self.cache.borrow_mut();
+        cache.insert(path.to_path_buf(), entry)
+    }
+
+    /// Removes an entry from the cache, if it exists.
+    pub fn remove(&self, path: &std::path::PathBuf) {
+        let _lock = self.mutex.lock();
+        let mut cache = self.cache.borrow_mut();
+        cache.remove(path);
+    }
+
+    /// Retrieves an entry from the cache, returning None if it doesn't exist.
+    pub fn get(&self, path: &std::path::Path) -> Option<T> {
+        let _lock = self.mutex.lock();
+        let cache = self.cache.borrow();
+        cache.get(path).cloned() // Clone the entry if it exists
+    }
+}
+
+#[cfg(unix)]
+impl FatFsHelper {
+    pub fn new() -> Self {
+        FatFsHelper {
+            dirs: HandleMap::new(0),
+            files: HandleMap::new(u64::MAX / 2),
+            stat_cache: StatCache::new(),
+        }
+    }
+}
+
 pub struct FatFs {
     fs: Box<fatfs::FATFS>,
+    #[cfg(unix)]
+    helper: FatFsHelper,
 }
 
 impl FatFs {
@@ -147,6 +262,8 @@ impl FatFs {
         install_driver(driver)?;
         let mut ff = Self {
             fs: Box::new(unsafe { std::mem::zeroed() }),
+            #[cfg(unix)]
+            helper: FatFsHelper::new(),
         };
         ff.mount(false)?;
         Ok(ff)
@@ -167,7 +284,7 @@ impl FatFs {
         }
     }
 
-    pub fn open<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<File, Error> {
+    pub fn open<P: AsRef<std::path::Path>>(&self, path: P) -> Result<File, Error> {
         File::open(
             path,
             fatfs::FA_OPEN_EXISTING | fatfs::FA_READ | fatfs::FA_WRITE,
@@ -181,7 +298,7 @@ impl FatFs {
         )
     }
 
-    pub fn stat<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<Entry, Error> {
+    pub fn stat<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Entry, Error> {
         let mut fno = unsafe { std::mem::zeroed() };
         match unsafe { fatfs::f_stat(fatfs::path(path)?.as_ptr(), &mut fno) } {
             fatfs::FRESULT_FR_OK => Ok(fno.into()),
@@ -189,7 +306,7 @@ impl FatFs {
         }
     }
 
-    pub fn opendir<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<Directory, Error> {
+    pub fn opendir<P: AsRef<std::path::Path>>(&self, path: P) -> Result<Directory, Error> {
         Directory::open(path)
     }
 
@@ -243,6 +360,260 @@ impl FatFs {
         }
     }
 }
+
+
+// TODO, see https://github.com/wfraser/fuse-mt/issues/29
+#[cfg(unix)]
+unsafe impl Send for FatFs {}
+#[cfg(unix)]
+unsafe impl Sync for FatFs {}
+#[cfg(unix)]
+const TTL: Duration = Duration::from_secs(u64::MAX); // TTL can be high because currently it's RO anyway
+
+#[cfg(unix)]
+fn stat_to_fuse(stat: &Entry) -> FileAttr {
+    let time = |secs: i64, nanos: i64|
+        SystemTime::UNIX_EPOCH + Duration::new(secs as u64, nanos as u32);
+
+    FileAttr {
+        size: match stat.info {
+            EntryInfo::Directory => { 0 }
+            EntryInfo::File { size } => { size }
+        },
+        blocks: match stat.info {
+            EntryInfo::Directory => { 0 }
+            EntryInfo::File { size } => { (size / 4096) + 1 } // https://github.com/wfraser/fuse-mt/blob/ee9d91d9003e5aa72877ca39b614ff7d84149f02/src/fusemt.rs#L49
+        },
+        atime: time(stat.datetime.and_utc().timestamp(), 0),
+        mtime: time(stat.datetime.and_utc().timestamp(), 0),
+        ctime: time(stat.datetime.and_utc().timestamp(), 0),
+        crtime: SystemTime::UNIX_EPOCH,
+        kind: match stat.info {
+            EntryInfo::Directory => { FileType::Directory }
+            EntryInfo::File { .. } => { FileType::RegularFile }
+        },
+        perm: 0o755, // TODO?
+        nlink: match stat.info {
+            EntryInfo::Directory => { 2 }
+            EntryInfo::File { .. } => { 1 }
+        },
+        // TODO ?!?!
+        uid: 501,
+        gid: 20,
+        rdev: 0,
+        flags: 0,
+    }
+}
+
+
+#[cfg(unix)]
+impl FilesystemMT for FatFs {
+    fn init(&self, _req: RequestInfo) -> ResultEmpty {
+        debug!("init");
+        Ok(())
+    }
+
+    fn destroy(&self) {
+        debug!("destroy");
+    }
+
+    fn getattr(&self, _req: RequestInfo, path: &std::path::Path, _fh: Option<u64>) -> ResultEntry {
+        debug!("getattr: {:?}", path);
+
+        if let Some(entry) = self.helper.stat_cache.get(path) {
+            return Ok((TTL, stat_to_fuse(&entry)));
+        }
+
+        debug!("getattr: {:?}, no cache", path);
+
+
+        if path.as_os_str() == "/" {
+            let entry = Entry {
+                name: "name".to_string(),
+                datetime: Utc::now().naive_utc(),
+                info: EntryInfo::Directory,
+            };
+
+            self.helper.stat_cache.insert(path, entry.clone());
+            return Ok((TTL, stat_to_fuse(&entry)));
+        }
+
+        match self.stat(path) {
+            Ok(entry) => {
+                self.helper.stat_cache.insert(path, entry.clone());
+                Ok((TTL, stat_to_fuse(&entry)))
+            }
+            Err(e) => Err(e.into())
+        }
+    }
+
+
+    fn open(&self, _req: RequestInfo, path: &std::path::Path, flags: u32) -> ResultOpen {
+        debug!("open: {:?} flags={:#x}", path, flags);
+
+        match FatFs::open(self, path) {
+            Ok(fh) => {
+                Ok((self.helper.files.insert(fh), 0))
+            }
+            Err(e) => {
+                error!("open({:?}) failed: {}", path, libc::EEXIST);
+                Err(e.into())
+            }
+        }
+    }
+
+    fn read(&self, _req: RequestInfo, path: &std::path::Path, fh: u64, offset: u64, size: u32, callback: impl FnOnce(ResultSlice<'_>) -> CallbackResult) -> CallbackResult {
+        debug!("read attempt: {:?} {:#x} @ {:#x}", path, size, offset);
+
+        let file_arc = match self.helper.files.get(fh) {
+            Ok(dir) => { dir }
+            Err(_) => { return callback(Err(libc::EEXIST)); }
+        };
+
+        let mut file = file_arc.lock().unwrap();
+
+        if let Err(e) = file.seek(SeekFrom::Start(offset)) {
+            error!("seek({:?}, {}) failed: {}", path, offset, e);
+            return callback(Err(e.raw_os_error().unwrap()));
+        }
+
+        let mut data = vec![0u8; size as usize];
+        match file.read(&mut data) {
+            Ok(read_size) => {
+                data.resize(read_size, 0);
+                callback(Ok(&data))
+            }
+            Err(_) => {
+                error!("read: {:?} {:#x} @ {:#x} failed.", path, size, offset);
+                callback(Err(libc::EFAULT))
+            }
+        }
+    }
+
+    fn release(&self, _req: RequestInfo, path: &std::path::Path, fh: u64, _flags: u32, _lock_owner: u64, _flush: bool) -> ResultEmpty {
+        debug!("release: {:?}", path);
+        self.helper.files.release(fh);
+        Ok(())
+    }
+
+    fn opendir(&self, _req: RequestInfo, path: &std::path::Path, _flags: u32) -> ResultOpen {
+        debug!("opendir: {:?} (flags = {:#o})", path, _flags);
+
+        match FatFs::opendir(self, path) {
+            Ok(fh) => {
+                Ok((self.helper.dirs.insert(fh), 0))
+            }
+            Err(e) => {
+                let new_e = e.into();
+                error!("opendir({:?}): failed {}", path, new_e);
+                Err(new_e)
+            }
+        }
+    }
+
+    fn readdir(&self, _req: RequestInfo, path: &std::path::Path, fh: u64) -> ResultReaddir {
+        debug!("readdir: {:?}", path);
+        let mut entries: Vec<DirectoryEntry> = vec![];
+
+        if fh == 0 {
+            error!("readdir: missing fh");
+            return Err(libc::EINVAL);
+        }
+
+        let dir_arc = match self.helper.dirs.get(fh) {
+            Ok(dir) => { dir }
+            Err(_) => { return Err(libc::EEXIST); }
+        };
+
+        let mut dir = dir_arc.lock().unwrap();
+
+        loop {
+            match dir.read() {
+                Ok(Some(entry)) => {
+                    let mut full_path = path.to_path_buf();
+                    full_path.push(&entry.name);
+
+                    if self.helper.stat_cache.get(full_path.as_path()).is_none() {
+                        self.helper.stat_cache.insert(full_path.as_path(), entry.clone());
+                    }
+
+                    let name = entry.name;
+
+                    let filetype = match entry.info {
+                        EntryInfo::Directory => { FileType::Directory }
+                        EntryInfo::File { .. } => { FileType::RegularFile }
+                    };
+
+                    entries.push(DirectoryEntry {
+                        name: std::ffi::OsString::from(name),
+                        kind: filetype,
+                    })
+                }
+                Ok(None) => { break; }
+                Err(e) => {
+                    let new_val = e.into();
+                    error!("readdir failed: {:?}: {}", path, new_val);
+                    return Err(new_val);
+                }
+            }
+        }
+
+        Ok(entries)
+    }
+
+    fn releasedir(&self, _req: RequestInfo, path: &std::path::Path, fh: u64, _flags: u32) -> ResultEmpty {
+        debug!("releasedir: {:?}", path);
+        self.helper.dirs.release(fh);
+        Ok(())
+    }
+
+    fn statfs(&self, _req: RequestInfo, path: &std::path::Path) -> ResultStatfs {
+        debug!("statfs: {:?}", path);
+        // TODO which values to actually put here?
+        Ok(Statfs {
+            blocks: 10000,
+            bfree: 1000,
+            bavail: 1000,
+            files: 5000,
+            ffree: 5000,
+            bsize: 4096,
+            namelen: 255,
+            frsize: 4096,
+        })
+    }
+}
+
+#[cfg(unix)]
+impl From<fatfs::Error> for libc::c_int {
+    fn from(value: fatfs::Error) -> Self {
+        // TODO almost all of these values are arbitrary set to EINVAL, correct mapping is needed
+        match value {
+            Error::DiskErr => { libc::EINVAL }
+            Error::IntErr => { libc::EINVAL }
+            Error::NotReady => { libc::EINVAL }
+            Error::NoFile => { libc::ENOENT }
+            Error::NoPath => { libc::ENOENT }
+            Error::InvalidName => { libc::ENOENT }
+            Error::Denied => { libc::EINVAL }
+            Error::Exist => { libc::EEXIST }
+            Error::InvalidObject => { libc::EFAULT }
+            Error::WriteProtected => { libc::EACCES }
+            Error::InvalidDrive => { libc::EINVAL }
+            Error::NotEnabled => { libc::EINVAL }
+            Error::NoFilesystem => { libc::EINVAL }
+            Error::MkfsAborted => { libc::EINVAL }
+            Error::Timeout => { libc::EINVAL }
+            Error::Locked => { libc::EINVAL }
+            Error::NotEnoughCore => { libc::EINVAL }
+            Error::TooManyOpenFiles => { libc::EINVAL }
+            Error::InvalidParameter => { libc::EINVAL }
+            Error::DriverInstalled => { libc::EINVAL }
+            Error::DriverNotInstalled => { libc::EINVAL }
+            Error::Unknown => { libc::EINVAL }
+        }
+    }
+}
+
 
 impl Drop for FatFs {
     fn drop(&mut self) {
@@ -439,7 +810,7 @@ unsafe extern "C" fn get_fattime() -> fatfs::DWORD {
         | (second << 1)
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Entry {
     pub info: EntryInfo,
     pub name: String,
@@ -521,6 +892,7 @@ impl From<fatfs::FILINFO> for Entry {
     }
 }
 
+#[derive(Clone)]
 pub struct Directory {
     dir: fatfs::DIR,
 }
