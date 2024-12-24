@@ -3,7 +3,7 @@
   - [PC -\> SC64 packets](#pc---sc64-packets)
     - [**`CMD`** packet](#cmd-packet)
   - [SC64 -\> PC packets](#sc64---pc-packets)
-    - [**`RSP`/`ERR`** packets](#rsperr-packets)
+    - [**`CMP`/`ERR`** packets](#cmperr-packets)
     - [**`PKT`** packet](#pkt-packet)
 - [Supported commands](#supported-commands)
   - [`v`: **IDENTIFIER\_GET**](#v-identifier_get)
@@ -128,29 +128,29 @@ Packet data length is derived from the argument if specific command supports it.
 
 | identifier | description                              |
 | ---------- | ---------------------------------------- |
-| `RSP`      | Success response to the received command |
+| `CMP`      | Success response to the received command |
 | `ERR`      | Error response to the received command   |
 | `PKT`      | Asynchronous data packet                 |
 
-SC64 sends response packet `RSP`/`ERR` to almost every command received from the PC.
+SC64 sends response packet `CMP`/`ERR` to almost every command received from the PC.
 Fourth byte is the same as in the command that triggered the response.
-If command execution was not successful, then `RSP` identifier is replaced by the `ERR` identifier.
+If command execution was not successful, then `CMP` identifier is replaced by the `ERR` identifier.
 
 SC64 can also send `PKT` packet at any time as a response to action triggered by the N64 or the flashcart itself.
 Fourth byte denotes packet ID listed in the [asynchronous packets](#asynchronous-packets) section.
 
-#### **`RSP`/`ERR`** packets
+#### **`CMP`/`ERR`** packets
 
 General structure of packet:
 | offset | type                 | description            |
 | ------ | -------------------- | ---------------------- |
-| `0`    | char[3]              | `RSP`/`ERR` identifier |
+| `0`    | char[3]              | `CMP`/`ERR` identifier |
 | `3`    | char[1]              | Command ID             |
 | `4`    | uint32_t             | Response data length   |
 | `8`    | uint8_t[data_length] | Response data (if any) |
 
-`RSP`/`ERR` packet is sent as a response to the command sent by the PC.
-`ERR` response might contain no (or undefined) data in the arbitrary data field compared to regular `RSP` packet.
+`CMP`/`ERR` packet is sent as a response to the command sent by the PC.
+`ERR` response might contain no (or undefined) data in the arbitrary data field compared to regular `CMP` packet.
 
 #### **`PKT`** packet
 
@@ -463,7 +463,7 @@ Writes bytes to the specified memory address. Please refer to the [internal memo
 
 _This command does not send response data._
 
-_This command does not send `RSP`/`ERR` packet response!_
+_This command does not send `CMP`/`ERR` packet response!_
 
 This command notifies N64 that data is waiting to be acknowledged.
 If N64 side doesn't acknowledge data via [`m` **USB_READ**](./02_n64_commands.md#m-usb_read) N64 command within 1 second then data is flushed and [`G` **DATA_FLUSHED**](#asynchronous-packets) asynchronous packet is sent to the PC.
