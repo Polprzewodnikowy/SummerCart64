@@ -287,7 +287,8 @@ pub enum SaveType {
     Sram,
     Flashram,
     SramBanked,
-    Sram1m,
+    Sram1mNonCompliant,
+    FlashramNonCompliant,
 }
 
 impl Display for SaveType {
@@ -299,7 +300,8 @@ impl Display for SaveType {
             Self::Sram => "SRAM 256k",
             Self::SramBanked => "SRAM 768k",
             Self::Flashram => "FlashRAM 1M",
-            Self::Sram1m => "SRAM 1M",
+            Self::Sram1mNonCompliant => "SRAM 1M (non-compliant)",
+            Self::FlashramNonCompliant => "FlashRAM 1M (non-compliant)",
         })
     }
 }
@@ -314,7 +316,8 @@ impl TryFrom<u32> for SaveType {
             3 => Self::Sram,
             4 => Self::Flashram,
             5 => Self::SramBanked,
-            6 => Self::Sram1m,
+            6 => Self::Sram1mNonCompliant,
+            7 => Self::FlashramNonCompliant,
             _ => return Err(Error::new("Unknown save type code")),
         })
     }
@@ -329,7 +332,8 @@ impl From<SaveType> for u32 {
             SaveType::Sram => 3,
             SaveType::Flashram => 4,
             SaveType::SramBanked => 5,
-            SaveType::Sram1m => 6,
+            SaveType::Sram1mNonCompliant => 6,
+            SaveType::FlashramNonCompliant => 7,
         }
     }
 }

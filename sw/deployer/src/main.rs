@@ -328,8 +328,9 @@ enum SaveType {
     Eeprom16k,
     Sram,
     SramBanked,
-    Sram1m,
+    Sram1mNonCompliant,
     Flashram,
+    FlashramNonCompliant,
 }
 
 impl From<n64::SaveType> for SaveType {
@@ -340,8 +341,9 @@ impl From<n64::SaveType> for SaveType {
             n64::SaveType::Eeprom16k => Self::Eeprom16k,
             n64::SaveType::Sram => Self::Sram,
             n64::SaveType::SramBanked => Self::SramBanked,
-            n64::SaveType::Sram1m => Self::Sram1m,
+            n64::SaveType::Sram1mNonCompliant => Self::Sram1mNonCompliant,
             n64::SaveType::Flashram => Self::Flashram,
+            n64::SaveType::FlashramNonCompliant => Self::FlashramNonCompliant,
         }
     }
 }
@@ -354,8 +356,9 @@ impl From<SaveType> for sc64::SaveType {
             SaveType::Eeprom16k => Self::Eeprom16k,
             SaveType::Sram => Self::Sram,
             SaveType::SramBanked => Self::SramBanked,
-            SaveType::Sram1m => Self::Sram1m,
+            SaveType::Sram1mNonCompliant => Self::Sram1mNonCompliant,
             SaveType::Flashram => Self::Flashram,
+            SaveType::FlashramNonCompliant => Self::FlashramNonCompliant,
         }
     }
 }

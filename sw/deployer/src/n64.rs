@@ -10,7 +10,8 @@ pub enum SaveType {
     Sram,
     SramBanked,
     Flashram,
-    Sram1m,
+    Sram1mNonCompliant,
+    FlashramNonCompliant,
 }
 
 const HASH_CHUNK_LENGTH: usize = 1 * 1024 * 1024;
@@ -31,7 +32,8 @@ pub fn guess_save_type<T: Read + Seek>(
                 3 => SaveType::Sram,
                 4 => SaveType::SramBanked,
                 5 => SaveType::Flashram,
-                6 => SaveType::Sram1m,
+                6 => SaveType::Sram1mNonCompliant,
+                7 => SaveType::FlashramNonCompliant,
                 _ => SaveType::None,
             },
             None,
