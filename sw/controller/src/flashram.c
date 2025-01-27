@@ -8,6 +8,8 @@
 #define FLASHRAM_ADDRESS        (0x03FE0000UL)
 #define FLASHRAM_BUFFER_ADDRESS (0x05002C00UL)
 
+//#define FLASHRAM_NONCOMPLIANT // (uncomment this line to enable non-compliant behavior)
+
 
 typedef enum {
     OP_NONE,
@@ -40,7 +42,52 @@ void flashram_init (void) {
     }
 }
 
+#ifdef FLASHRAM_NONCOMPLIANT
+void flashram_process (void) {
+    uint32_t scr = fpga_reg_get(REG_FLASHRAM_SCR);
 
+    enum operation op = flashram_operation_type(scr);
+    uint8_t buffer[FLASHRAM_PAGE_SIZE];
+    uint8_t read_buffer[FLASHRAM_PAGE_SIZE];
+    uint8_t write_buffer[FLASHRAM_PAGE_SIZE];
+    uint32_t address = FLASHRAM_ADDRESS;
+    uint32_t erase_size = (op == OP_ERASE_SECTOR) ? FLASHRAM_SECTOR_SIZE : FLASHRAM_SIZE;
+    uint32_t page = (op != OP_ERASE_ALL) ? ((scr & FLASHRAM_SCR_PAGE_MASK) >> FLASHRAM_SCR_PAGE_BIT) : 0;
+    address += page * FLASHRAM_PAGE_SIZE;
+
+    switch (op) {
+        case OP_ERASE_ALL:
+        case OP_ERASE_SECTOR:
+            for (int i = 0; i < FLASHRAM_PAGE_SIZE; i++) {
+                buffer[i] = 0xFF;
+                write_buffer[i] = 0xFF;
+            }
+            for (int i = 0; i < erase_size; i += FLASHRAM_PAGE_SIZE) {
+                fpga_mem_write(address + i, FLASHRAM_PAGE_SIZE, buffer);
+                fpga_mem_write(address + i, FLASHRAM_PAGE_SIZE, write_buffer);
+            }
+            fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
+            break;
+
+        case OP_WRITE_PAGE:
+            fpga_mem_copy(FLASHRAM_BUFFER_ADDRESS, address, FLASHRAM_PAGE_SIZE);
+            fpga_mem_read(FLASHRAM_BUFFER_ADDRESS, FLASHRAM_PAGE_SIZE, read_buffer);
+            fpga_mem_read(address, FLASHRAM_PAGE_SIZE, write_buffer);
+            for (int i = 0; i < FLASHRAM_PAGE_SIZE; i++) {
+                write_buffer[i] &= read_buffer[i];
+            }
+            fpga_mem_write(address, FLASHRAM_PAGE_SIZE, write_buffer);
+            fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
+            break;
+
+        case OP_NONE:
+        default:
+            break;
+    }
+}
+
+
+#else
 void flashram_process (void) {
     uint32_t scr = fpga_reg_get(REG_FLASHRAM_SCR);
 
@@ -84,3 +131,4 @@ void flashram_process (void) {
 
     fpga_reg_set(REG_FLASHRAM_SCR, FLASHRAM_SCR_DONE);
 }
+#endif
