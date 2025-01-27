@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>SummerCart64 - Features</title>
+    <meta property="og:title" content="SummerCart64 - FAQ" />
+    <meta property="og:description" content="SummerCart64 - a fully open source N64 flashcart" />
+    <meta property="og:url" content="https://summercart64.dev/faq.html" />
+    <meta property="og:image" content="https://summercart64.dev/sc64-embed.png" />
+    <meta property="og:type" content="website" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.svg" sizes="any" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./script.js"></script>
+</head>
+
+<body>
+    <div class="menu-container">
+        <div class="menu-bar">
+            <div class="menu-buttons">
+                <a href="/"><img src="sc64.svg"></a>
+                <div class="menu-button" onclick="showMenu(event)">
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                    <div class="menu-button-line"></div>
+                </div>
+            </div>
+            <menu class="mobile-hidden">
+                <li><a href="/">Home</a></li>
+                <li><a href="/features.html">Features</a></li>
+                <li class="active"><a href="/faq.html">FAQ</a></li>
+                <li><a href="https://menu.summercart64.dev">Menu</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64/releases/latest">Downloads</a></li>
+                <li><a href="/bom.html">Bill of materials</a></li>
+                <li><a href="https://github.com/Polprzewodnikowy/SummerCart64">GitHub</a></li>
+            </menu>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <main>
+            <h1>Frequently Asked Questions</h1>
+            <section>
+                <details>
+                    <summary>What is the SummerCart64?</summary>
+                    <div>
+                        <p>SummerCart64 is a device that lets you develop and test games on the N64 console. It is a
+                            similar device to the <a href="https://64drive.retroactive.be/">64drive</a>, or <a
+                                href="https://krikzz.com/our-products/cartridges/ed64x7.html">EverDrive-64 X7</a>. Its
+                            main strenghts are fast I/O, developer oriented features, full 64DD emulation and being
+                            fully open source.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Is this flashcart for game developers only, or for anyone?</summary>
+                    <div>
+                        <p>SummerCart64 started its life as a device to aid game development and testing on a real N64
+                            console. Over time scope of the project has expanded and currently it's a great choice for
+                            casual gamers and people interested in tinkering with the N64.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Where can I get SummerCart64?</summary>
+                    <div>
+                        <p>For latest information check the <strong>Where to buy</strong> section on the <a
+                                href="/">home page</a>.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Which SD cards are supported? Should I format the card in a specific way?</summary>
+                    <div>
+                        <p>SummerCart64 currently supports cards up to 2 TB in size. Supported filesystems are FAT32 and
+                            exFAT. Card can be formatted with any tool but it's recommended to use builtin tools
+                            available in your system - for Windows OS just right click on the SD card drive and select
+                            <strong>Format</strong> option. For other OS refer to the system's included help.
+                        </p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>I don't care about developer features and just want to play games. How do I setup the SD
+                        card?</summary>
+                    <div>
+                        <p>All necessary information about installing menu and preparing SD card is available on the <a
+                                href="https://menu.summercart64.dev">N64FlashcartMenu official website</a>.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>SummerCart64 won't boot and it blinks once every second. What's happening?</summary>
+                    <div>
+                        <p>Due to technical reasons N64 region lockout can be bypassed only after detecting if the
+                            current boot failed. To fix this just power off the console, and then power it on again. If
+                            the issue persist then check the next question.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Why is there a battery on the board? Do I need it?</summary>
+                    <div>
+                        <p>Yes, battery is required for full operation. Battery keeps the time and persistent settings.
+                            This includes last detected console region. If your console region is PAL and SummerCart64
+                            doesn't boot while LED is blinking once every second then try inserting a battery into the
+                            holder.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Which battery model do I need?</summary>
+                    <div>
+                        <p>Just a standard CR2032 button cell battery.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Do I need an Expansion Pak?</summary>
+                    <div>
+                        <p>It depends. Common misconception is that flashcart is able to expand N64 memory. This is
+                            technically not possible. SummerCart64 on its own do not require an Expansion Pak to work.
+                            However, for couple of retail games the Expansion Pak is mandatory to even run the game.
+                            This is also true for most of the ROM hacks.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>I've tried to play a ROM hack / homebrew and it doesn't work. Why?</summary>
+                    <div>
+                        <p>Most of the ROM hacks available for the N64 absolutely <strong>require</strong> an Expansion
+                            Pak to be installed in the console. If the screen stays black after loading the game then
+                            either you don't have an Expansion Pak, or the ROM hack is not console compatible. Always
+                            verify if the game you're trying to run is designed to run on real hardware, and not just in
+                            an emulator.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Can SummerCart64 replace a Controller Pak / Transfer Pak / Rumble Pak?</summary>
+                    <div>
+                        <p>No. SummerCart64 (and any other thing that is plugged in the cartridge slot) can't replace a
+                            device that plugs in the bottom slot of the controller.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Do I need to press the reset button to save the game progress?</summary>
+                    <div>
+                        <p>No. SummerCart64 watches the console activity and automatically writes save data to the SD
+                            card <strong>while you play the game</strong>. Automatic writeback happens about 1 second
+                            after game finishes saving the progress.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Where do I get games to play?</summary>
+                    <div>
+                        <p>You can check entries from the <a href="https://n64brew.dev/wiki/Category:Game_Jams">N64brew
+                                game jams</a>. There are plenty of gems to try out!</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>How can I update firmware?</summary>
+                    <div>
+                        <p>Instructions are available in the <a
+                                href="https://github.com/Polprzewodnikowy/SummerCart64/blob/main/docs/00_quick_startup_guide.md#firmware-backupupdate">official
+                                documentation</a>.
+                        </p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary><code>sc64deployer</code> can't find my cart, why?</summary>
+                    <div>
+                        <p>On Windows OS please check if you have latest FTDI drivers installed, either through Windows
+                            Update or directly from <a href="https://ftdichip.com/drivers/vcp-drivers">chip
+                                manufacturer's website</a>. On Linux OS check if you have proper permissions to the USB
+                            device.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Can I use software other than <code>sc64deployer</code>?</summary>
+                    <div>
+                        <p>Yes. <a href="https://github.com/buu342/N64-UNFLoader">UNFLoader</a> is also supported.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Real time clock is not keeping the time, what's wrong?</summary>
+                    <div>
+                        <p>Make sure that the battery is installed in the correct orientation. Don't forget to peel all
+                            protective plastic stickers from the battery before installation.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>What is the purpose for button on the back?</summary>
+                    <div>
+                        <p>It has several uses:</p>
+                        <ol>
+                            <li>To eject/swap 64DD disks - when there are multiple virtual 64DD disks "inserted".</li>
+                            <li>To run builtin test ROM - hold the button while switching the power on.</li>
+                            <li>For game developers as additional input.</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Can I access files on the microSD card via USB port on the PC?</summary>
+                    <div>
+                        <p>Yes. <code>sc64deployer</code> has a <code>sd</code> command to access files on the SD card.
+                        </p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Does SummerCart64 come with a warranty?</summary>
+                    <div>
+                        <p>As a DIY product and an open-source project, SummerCart64 itself comes with no warranty and
+                            liability whatsoever. The project depends on group buys, which means an individual has to
+                            buy a number of assembled PCBs (and optionally shells) from a manufacturer and then check if
+                            everything is working correctly. Any SummerCart64 that is available from actual stores might
+                            have warranty from the store, not from the developers of SummerCart64.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>I bought SummerCart64 from XXX store. It doesn't work or there are weird problems. What
+                        should I do?</summary>
+                    <div>
+                        <p>Always contact the seller you've bought the device to resolve the issues. Developers and
+                            community are not responsible for low quality hardware and lack of quality control.</p>
+                    </div>
+                </details>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <span>© 2020 - 2025 <a href="https://mateuszfaderewski.pl">Mateusz Faderewski</a></span>
+    </footer>
+</body>
+
+</html>

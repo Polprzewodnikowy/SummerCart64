@@ -23,6 +23,8 @@
 
     --sponsor-buttons-height: 32px;
 
+    --details-bg-color: rgb(56, 56, 128);
+
     --footer-padding: 16px 32px 16px 32px;
     --footer-font-size: 14px;
 }
@@ -57,6 +59,7 @@ a:visited {
 a:active,
 a:hover {
     color: var(--text-color);
+    text-decoration: underline;
 }
 
 .menu-container {
@@ -257,6 +260,22 @@ main .separator {
     height: var(--main-separator-height);
     background-color: var(--text-color);
     margin: var(--main-separator-margin) 0;
+}
+
+details {
+    margin: var(--main-paragraph-margin) 0;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+details > div {
+    overflow: auto;
+    margin-top: var(--main-paragraph-margin);
+    padding: 0 var(--main-paragraph-margin);
+    background-color: var(--details-bg-color);
 }
 
 iframe.bom {
