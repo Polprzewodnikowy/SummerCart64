@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BUILDER_IMAGE="ghcr.io/polprzewodnikowy/sc64env:v1.10"
+BUILDER_PLATFORM="linux/x86_64"
 
 pushd $(dirname $0) > /dev/null
 
@@ -28,6 +29,7 @@ docker run \
     -e GIT_SHA="$GIT_SHA" \
     -e GIT_MESSAGE="$GIT_MESSAGE" \
     -e SC64_VERSION=${SC64_VERSION:-""} \
+    --platform $BUILDER_PLATFORM \
     $BUILDER_IMAGE \
     ./build.sh $@
 
