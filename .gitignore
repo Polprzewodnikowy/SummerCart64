@@ -5,3 +5,5 @@
 **/*.zip
 
 !**/.vscode/tasks.json
+sw/deployer/.idea/
+.idea/
