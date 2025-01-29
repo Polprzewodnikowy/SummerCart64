@@ -444,7 +444,8 @@ impl SC64 {
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
             SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
-            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
+            SaveType::Sram1mNonCompliant => (SAVE_ADDRESS, SRAM_1M_LENGTH),
+            SaveType::FlashramNonCompliant => (SAVE_ADDRESS, FLASHRAM_LENGTH),
         };
 
         if length != save_length {
@@ -468,7 +469,8 @@ impl SC64 {
             SaveType::Sram => (SAVE_ADDRESS, SRAM_LENGTH),
             SaveType::Flashram => (SAVE_ADDRESS, FLASHRAM_LENGTH),
             SaveType::SramBanked => (SAVE_ADDRESS, SRAM_BANKED_LENGTH),
-            SaveType::Sram1m => (SAVE_ADDRESS, SRAM_1M_LENGTH),
+            SaveType::Sram1mNonCompliant => (SAVE_ADDRESS, SRAM_1M_LENGTH),
+            SaveType::FlashramNonCompliant => (SAVE_ADDRESS, FLASHRAM_LENGTH),
         };
 
         self.memory_read_chunked(writer, address, save_length)

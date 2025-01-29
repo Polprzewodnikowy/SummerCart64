@@ -275,8 +275,11 @@ static bool cfg_set_save_type (save_type_t save_type) {
         case SAVE_TYPE_SRAM_BANKED:
             cfg_change_scr_bits(CFG_SCR_SRAM_BANKED | CFG_SCR_SRAM_ENABLED, true);
             break;
-        case SAVE_TYPE_SRAM_1M:
+        case SAVE_TYPE_SRAM_1M_NONCOMPLIANT:
             cfg_change_scr_bits(CFG_SCR_SRAM_ENABLED, true);
+            break;
+        case SAVE_TYPE_FLASHRAM_NONCOMPLIANT:
+            cfg_change_scr_bits(CFG_SCR_FLASHRAM_ENABLED, true);
             break;
         default:
             save_type = SAVE_TYPE_NONE;
