@@ -57,21 +57,21 @@ mod fatfs {
             f.write_str(match self {
                 Self::DiskErr => "A hard error occurred in the low level disk I/O layer",
                 Self::IntErr => "Assertion failed",
-                Self::NotReady => "The physical drive cannot work",
+                Self::NotReady => "The physical drive does not work",
                 Self::NoFile => "Could not find the file",
                 Self::NoPath => "Could not find the path",
                 Self::InvalidName => "The path name format is invalid",
-                Self::Denied => "Access denied due to prohibited access or directory full",
-                Self::Exist => "Access denied due to prohibited access",
+                Self::Denied => "Access denied due to a prohibited access or directory full",
+                Self::Exist => "Access denied due to a prohibited access",
                 Self::InvalidObject => "The file/directory object is invalid",
                 Self::WriteProtected => "The physical drive is write protected",
                 Self::InvalidDrive => "The logical drive number is invalid",
                 Self::NotEnabled => "The volume has no work area",
-                Self::NoFilesystem => "There is no valid FAT volume",
-                Self::MkfsAborted => "The f_mkfs() aborted due to any problem",
-                Self::Timeout => "Could not get a grant to access the volume within defined period",
+                Self::NoFilesystem => "Could not find a valid FAT volume",
+                Self::MkfsAborted => "The f_mkfs function aborted due to some problem",
+                Self::Timeout => "Could not take control of the volume within defined period",
                 Self::Locked => "The operation is rejected according to the file sharing policy",
-                Self::NotEnoughCore => "LFN working buffer could not be allocated",
+                Self::NotEnoughCore => "LFN working buffer could not be allocated or given buffer is insufficient in size",
                 Self::TooManyOpenFiles => "Number of open files > FF_FS_LOCK",
                 Self::InvalidParameter => "Given parameter is invalid",
                 Self::DriverInstalled => "FatFs driver is already installed",
@@ -290,14 +290,20 @@ impl FFDriver for SC64 {
     }
 
     fn read(&mut self, buffer: &mut [u8], sector: fatfs::LBA_t) -> fatfs::DRESULT {
-        if let Ok(SdCardResult::OK) = self.read_sd_card(buffer, sector) {
+        if (sector + ((buffer.len() / SD_CARD_SECTOR_SIZE) as fatfs::LBA_t)) > 0x1_0000_0000 {
+            return fatfs::DRESULT_RES_PARERR;
+        }
+        if let Ok(SdCardResult::OK) = self.read_sd_card(buffer, sector as u32) {
             return fatfs::DRESULT_RES_OK;
         }
         fatfs::DRESULT_RES_ERROR
     }
 
     fn write(&mut self, buffer: &[u8], sector: fatfs::LBA_t) -> fatfs::DRESULT {
-        if let Ok(SdCardResult::OK) = self.write_sd_card(buffer, sector) {
+        if (sector + ((buffer.len() / SD_CARD_SECTOR_SIZE) as fatfs::LBA_t)) > 0x1_0000_0000 {
+            return fatfs::DRESULT_RES_PARERR;
+        }
+        if let Ok(SdCardResult::OK) = self.write_sd_card(buffer, sector as u32) {
             return fatfs::DRESULT_RES_OK;
         }
         fatfs::DRESULT_RES_ERROR
