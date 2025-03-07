@@ -133,9 +133,10 @@ type: *enum* | default: `0`
 - `4` - FlashRAM 1 Mib save is enabled
 - `5` - SRAM 768 kib save is enabled
 - `6` - SRAM 1 Mib save is enabled
+- `7` - FakeFlashRAM 1 Mib save is enabled (write/erase timings are not emulated and erase before write is not required)
 
 Use this setting for selecting save type that will be emulated. Only one save type can be enabled.
-Any successful write to this config will disable automatic save writeback to USB or SD card when previously enabled.
+Any successful write to this config will disable automatic save writeback to the USB or SD card if previously enabled.
 
 ---
 

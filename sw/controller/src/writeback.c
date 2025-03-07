@@ -62,6 +62,10 @@ static save_type_t writeback_get_address_length (uint32_t *address, uint32_t *le
             *address = SRAM_FLASHRAM_ADDRESS;
             *length = SRAM_1M_LENGTH;
             break;
+        case SAVE_TYPE_FLASHRAM_FAKE:
+            *address = SRAM_FLASHRAM_ADDRESS;
+            *length = FLASHRAM_LENGTH;
+            break;
         default:
             *address = 0;
             *length = 0;
