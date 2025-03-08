@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  pull_request_target:
     branches:
       - main
   release:
@@ -28,9 +28,15 @@ jobs:
           string: '${{ github.ref_name }}'
           replace-with: '-'
 
+      - name: Retrieve the Lattice Diamond license from secrets and decode it
+        run: echo $LICENSE | base64 --decode > fw/project/lcmxo2/license.dat
+        env:
+          LICENSE: ${{ secrets.LATTICE_DIAMOND_LICENSE_BASE64 }}
+
       - name: Build firmware
         run: ./docker_build.sh release --force-clean
         env:
+          MAC_ADDRESS: ${{ secrets.LATTICE_DIAMOND_MAC_ADDRESS }}
           SC64_VERSION: ${{ steps.version.outputs.replaced }}
 
       - name: Upload artifact
