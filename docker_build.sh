@@ -14,8 +14,6 @@ if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
 
-SECONDS=0
-
 docker run \
     $DOCKER_OPTIONS \
     --rm \
@@ -33,12 +31,8 @@ docker run \
     $BUILDER_IMAGE \
     ./build.sh $@
 
-BUILD_ERROR=$?
-
-echo "Build took $SECONDS seconds"
+BUILD_RESULT=$?
 
 popd > /dev/null
 
-if [ $BUILD_ERROR -ne 0 ]; then
-    exit -1
-fi
+exit $BUILD_RESULT

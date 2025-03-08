@@ -163,6 +163,14 @@ if test $# -eq 0; then
     exit 1
 fi
 
+print_time () {
+    echo "Build took $SECONDS seconds"
+}
+
+trap "echo \"Build failed\"; print_time" ERR
+
+SECONDS=0
+
 TRIGGER_BOOTLOADER=false
 TRIGGER_CONTROLLER=false
 TRIGGER_CIC=false
@@ -213,3 +221,5 @@ if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi
+
+print_time
