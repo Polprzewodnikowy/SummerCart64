@@ -5,11 +5,6 @@ BUILDER_PLATFORM="linux/x86_64"
 
 pushd $(dirname $0) > /dev/null
 
-GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-GIT_TAG=$(git describe --tags 2> /dev/null)
-GIT_SHA=$(git rev-parse HEAD)
-GIT_MESSAGE=$(git log --oneline --format=%B -n 1 HEAD | head -n 1)
-
 if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
@@ -22,10 +17,6 @@ docker run \
     -v "$(pwd)"/fw/project/lcmxo2/license.dat:/flexlm/license.dat \
     -v "$(pwd)":/workdir \
     -h=`hostname` \
-    -e GIT_BRANCH="$GIT_BRANCH" \
-    -e GIT_TAG="$GIT_TAG" \
-    -e GIT_SHA="$GIT_SHA" \
-    -e GIT_MESSAGE="$GIT_MESSAGE" \
     -e SC64_VERSION=${SC64_VERSION:-""} \
     --platform $BUILDER_PLATFORM \
     $BUILDER_IMAGE \
