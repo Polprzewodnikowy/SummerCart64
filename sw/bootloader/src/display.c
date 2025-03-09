@@ -116,8 +116,8 @@ static void display_draw_character (char c) {
     }
 
     if ((char_x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
-        char_x = BORDER_WIDTH;
-        char_y += FONT_HEIGHT + LINE_SPACING;
+        char_x -= FONT_WIDTH;
+        c = '\x7F';
     }
 
     if ((c < ' ') || (c > '~')) {
