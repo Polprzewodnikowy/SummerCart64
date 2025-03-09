@@ -3,7 +3,7 @@
 #include "vr4300.h"
 
 
-static void cache_operation (uint8_t operation, uint8_t line_size, void *address, size_t length) {
+static inline void cache_operation (const uint8_t operation, uint8_t line_size, void *address, size_t length) {
     uint32_t cache_address = (((uint32_t) (address)) & (~(line_size - 1)));
     while (cache_address < ((uint32_t) (address) + length)) {
         asm volatile (
@@ -108,4 +108,28 @@ void pi_dma_write (io32_t *address, void *buffer, size_t length) {
         cpu_io_write(&PI->RDMA, length - 1);
     });
     while (pi_busy());
+}
+
+uint32_t si_busy (void) {
+    return (cpu_io_read(&SI->SR) & (SI_SR_IO_BUSY | SI_SR_DMA_BUSY));
+}
+
+void si_dma_read (void *buffer) {
+    cache_data_hit_writeback_invalidate(buffer, PIF_RAM_LENGTH);
+    WITH_INTERRUPTS_DISABLED({
+        while (si_busy());
+        cpu_io_write(&SI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&SI->RDMA, (uint32_t) (PIF_RAM));
+    });
+    while (si_busy());
+}
+
+void si_dma_write (void *buffer) {
+    cache_data_hit_writeback(buffer, PIF_RAM_LENGTH);
+    WITH_INTERRUPTS_DISABLED({
+        while (si_busy());
+        cpu_io_write(&SI->MADDR, (uint32_t) (PHYSICAL(buffer)));
+        cpu_io_write(&SI->WDMA, (uint32_t) (PIF_RAM));
+    });
+    while (si_busy());
 }

@@ -202,6 +202,24 @@ typedef struct {
 #define PI_SR_CLR_INTR              (1 << 1)
 
 
+typedef struct {
+    io32_t MADDR;
+    io32_t RDMA;
+    io32_t __reserved_0[2];
+    io32_t WDMA;
+    io32_t __reserved_1[1];
+    io32_t SR;
+} si_regs_t;
+
+#define SI_BASE                     (0x04800000UL)
+#define SI                          ((si_regs_t *) SI_BASE)
+
+#define SI_SR_DMA_BUSY              (1 << 0)
+#define SI_SR_IO_BUSY               (1 << 1)
+#define SI_SR_DMA_ERROR             (1 << 3)
+#define SI_SR_INTERRUPT             (1 << 12)
+
+
 #define ROM_DDIPL_BASE              (0x06000000UL)
 #define ROM_DDIPL                   ((io32_t *) ROM_DDIPL_BASE)
 
@@ -210,6 +228,14 @@ typedef struct {
 #define ROM_CART                    ((io32_t *) ROM_CART_BASE)
 
 
+#define PIF_RAM_BASE                (0x1FC007C0)
+#define PIF_RAM_LENGTH              (64)
+#define PIF_RAM                     ((io32_t *) PIF_RAM_BASE)
+
+
+void cache_data_hit_writeback_invalidate (void *address, size_t length);
+void cache_data_hit_writeback (void *address, size_t length);
+void cache_inst_hit_invalidate (void *address, size_t length);
 uint32_t c0_count (void);
 void delay_ms (int ms);
 uint32_t cpu_io_read (io32_t *address);
@@ -220,9 +246,9 @@ uint32_t pi_io_read (io32_t *address);
 void pi_io_write (io32_t *address, uint32_t value);
 void pi_dma_read (io32_t *address, void *buffer, size_t length);
 void pi_dma_write (io32_t *address, void *buffer, size_t length);
-void cache_data_hit_writeback_invalidate (void *address, size_t length);
-void cache_data_hit_writeback (void *address, size_t length);
-void cache_inst_hit_invalidate (void *address, size_t length);
+uint32_t si_busy (void);
+void si_dma_read (void *buffer);
+void si_dma_write (void *buffer);
 
 
 #endif

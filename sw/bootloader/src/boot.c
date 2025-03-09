@@ -79,6 +79,7 @@ void boot (boot_params_t *params) {
     while (cpu_io_read(&SP->DMA_BUSY));
 
     cpu_io_write(&PI->SR, PI_SR_CLR_INTR | PI_SR_RESET);
+    cpu_io_write(&SI->SR, 0);
     while ((cpu_io_read(&VI->CURR_LINE) & ~(VI_CURR_LINE_FIELD)) != 0);
     cpu_io_write(&VI->V_INTR, 0x3FF);
     cpu_io_write(&VI->H_LIMITS, 0);

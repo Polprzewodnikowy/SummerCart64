@@ -34,6 +34,7 @@ SRC_FILES = \
 	interrupts.c \
 	interrupts.S \
 	io.c \
+	joybus.c \
 	main.c \
 	menu.c \
 	reboot.S \
