@@ -3,6 +3,7 @@
 #include "error.h"
 #include "init.h"
 #include "io.h"
+#include "joybus.h"
 #include "menu.h"
 #include "sc64.h"
 
@@ -21,6 +22,20 @@ void main (void) {
     boot_params.tv_type = sc64_boot_params.tv_type;
     boot_params.cic_seed = (sc64_boot_params.cic_seed & 0xFF);
     boot_params.detect_cic_seed = (sc64_boot_params.cic_seed == CIC_SEED_AUTO);
+
+    switch (sc64_boot_params.boot_mode) {
+        case BOOT_MODE_ROM:
+        case BOOT_MODE_DDIPL: {
+            joybus_controller_state_t controller_state;
+            if (joybus_get_controller_state(0, &controller_state) && controller_state.r) {
+                sc64_boot_params.boot_mode = BOOT_MODE_MENU;
+            }
+            break;
+        }
+
+        default:
+            break;
+    }
 
     switch (sc64_boot_params.boot_mode) {
         case BOOT_MODE_MENU:
