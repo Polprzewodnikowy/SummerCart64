@@ -40,15 +40,19 @@ echo " > 8"
 FORCE_CLEAN=false
 echo " > 9"
 get_last_commit_info () {
+    echo " >>> 1"
     if [ "$HAVE_COMMIT_INFO" = true ]; then return; fi
-
+    echo " >>> 2"
     SAFE_DIRECTORY="-c safe.directory=$(pwd)"
-
+    echo " >>> 3"
     GIT_BRANCH=$(git $SAFE_DIRECTORY rev-parse --abbrev-ref HEAD)
+    echo " >>> 4"
     GIT_TAG=$(git $SAFE_DIRECTORY describe --tags 2> /dev/null)
+    echo " >>> 5"
     GIT_SHA=$(git $SAFE_DIRECTORY rev-parse HEAD)
+    echo " >>> 6"
     GIT_MESSAGE=$(git $SAFE_DIRECTORY log --oneline --format=%B -n 1 HEAD | head -n 1)
-
+    echo " >>> 7"
     HAVE_COMMIT_INFO=true
 }
 echo " > 10"
@@ -147,16 +151,23 @@ build_update () {
 }
 echo " > 15"
 build_release () {
+    echo " >> 1"
     if [ "$BUILT_RELEASE" = true ]; then return; fi
-
+    echo " >> 2"
     build_update
-
+    echo " >> 3"
     if [ -e "./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip" ]; then
+        echo " >> 4"
         rm -f ./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip
+        echo " >> 5"
     fi
+    echo " >> 6"
     PACKAGE="./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip"
+    echo " >> 7"
     zip -j -r $PACKAGE ${TOP_FILES[@]}
+    echo " >> 8"
     zip -r $PACKAGE ${FILES[@]}
+    echo " >> 9"
 
     BUILT_RELEASE=true
 }
