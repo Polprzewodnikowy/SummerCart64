@@ -1,11 +1,11 @@
 #!/bin/bash
-
+echo " > 1"
 set -e
-
+echo " > 2"
 SC64_VERSION=${SC64_VERSION:-"none"}
-
+echo " > 3"
 PACKAGE_FILE_NAME="sc64-extra"
-
+echo " > 4"
 TOP_FILES=(
     "./fw/ftdi/ft232h_config.xml"
     "./fw/project/lcmxo2/impl1/fpga_max_frequency.txt"
@@ -13,7 +13,7 @@ TOP_FILES=(
     "./sw/tools/requirements.txt"
     "./sc64-firmware-${SC64_VERSION}.bin"
 )
-
+echo " > 5"
 FILES=(
     "./assets/*"
     "./docs/*"
@@ -27,18 +27,18 @@ FILES=(
     "./LICENSE"
     "./README.md"
 )
-
+echo " > 6"
 HAVE_COMMIT_INFO=false
-
+echo " > 7"
 BUILT_BOOTLOADER=false
 BUILT_CONTROLLER=false
 BUILT_CIC=false
 BUILT_FPGA=false
 BUILT_UPDATE=false
 BUILT_RELEASE=false
-
+echo " > 8"
 FORCE_CLEAN=false
-
+echo " > 9"
 get_last_commit_info () {
     if [ "$HAVE_COMMIT_INFO" = true ]; then return; fi
 
@@ -51,7 +51,7 @@ get_last_commit_info () {
 
     HAVE_COMMIT_INFO=true
 }
-
+echo " > 10"
 build_bootloader () {
     if [ "$BUILT_BOOTLOADER" = true ]; then return; fi
 
@@ -71,7 +71,7 @@ build_bootloader () {
 
     BUILT_BOOTLOADER=true
 }
-
+echo " > 11"
 build_controller () {
     if [ "$BUILT_CONTROLLER" = true ]; then return; fi
 
@@ -84,7 +84,7 @@ build_controller () {
 
     BUILT_CONTROLLER=true
 }
-
+echo " > 12"
 build_cic () {
     if [ "$BUILT_CIC" = true ]; then return; fi
 
@@ -97,7 +97,7 @@ build_cic () {
 
     BUILT_CIC=true
 }
-
+echo " > 13"
 build_fpga () {
     if [ "$BUILT_FPGA" = true ]; then return; fi
 
@@ -112,7 +112,7 @@ build_fpga () {
 
     BUILT_FPGA=true
 }
-
+echo " > 14"
 build_update () {
     if [ "$BUILT_UPDATE" = true ]; then return; fi
 
@@ -145,7 +145,7 @@ build_update () {
 
     BUILT_UPDATE=true
 }
-
+echo " > 15"
 build_release () {
     if [ "$BUILT_RELEASE" = true ]; then return; fi
 
@@ -160,7 +160,7 @@ build_release () {
 
     BUILT_RELEASE=true
 }
-
+echo " > 16"
 print_usage () {
     echo "builder script for SC64"
     echo "usage: ./build.sh [bootloader] [controller] [cic] [fpga] [update] [release] [-c] [--help]"
@@ -175,29 +175,29 @@ print_usage () {
     echo "              - clean compilation result directories before build"
     echo "  --help      - print this guide"
 }
-
+echo " > 17"
 if test $# -eq 0; then
     echo "error: no parameters provided"
     echo " "
     print_usage
     exit 1
 fi
-
+echo " > 18"
 print_time () {
     echo "Build took $SECONDS seconds"
 }
-
+echo " > 19"
 trap "echo \"Build failed\"; print_time" ERR
-
+echo " > 20"
 SECONDS=0
-
+echo " > 21"
 TRIGGER_BOOTLOADER=false
 TRIGGER_CONTROLLER=false
 TRIGGER_CIC=false
 TRIGGER_FPGA=false
 TRIGGER_UPDATE=false
 TRIGGER_RELEASE=false
-
+echo " > 22"
 while test $# -gt 0; do
     case "$1" in
         bootloader)
@@ -234,12 +234,12 @@ while test $# -gt 0; do
     esac
     shift
 done
-
+echo " > 23"
 if [ "$TRIGGER_BOOTLOADER" = true ]; then build_bootloader; fi
 if [ "$TRIGGER_CONTROLLER" = true ]; then build_controller; fi
 if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi
-
+echo " > 24"
 print_time
