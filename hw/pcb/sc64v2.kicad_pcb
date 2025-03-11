@@ -9,8 +9,8 @@
 	(paper "A4")
 	(title_block
 		(title "SummerCart64")
-		(date "2024-08-11")
-		(rev "2.1")
+		(date "2025-03-10")
+		(rev "2.1a")
 		(company "Mateusz Faderewski")
 	)
 	(layers
@@ -26785,6 +26785,18 @@
 		(layer "User.1")
 		(uuid "e23fcef0-be99-4588-9e98-11fe6a1e9f26")
 	)
+	(gr_text "Designed by Mateusz Faderewski\nLicensed under CERN-OHL-S-2.0\nhttps://summercart64.dev"
+		(at 198 122.2 0)
+		(layer "B.SilkS")
+		(uuid "9c42ed30-fd86-4d8a-bb4f-89dcb0e60e6e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+			(justify left bottom mirror)
+		)
+	)
 	(gr_text "RX"
 		(at 123 84.75 90)
 		(layer "F.SilkS")
@@ -26807,7 +26819,7 @@
 			)
 		)
 	)
-	(gr_text "HW ver: 2.1"
+	(gr_text "HW ver: 2.1a"
 		(at 100.25 83.5 0)
 		(layer "F.SilkS")
 		(uuid "4ab65223-ff63-4a7c-853c-e7b8d8e12e76")
@@ -26819,7 +26831,7 @@
 			(justify left)
 		)
 	)
-	(gr_text "11.08.2024"
+	(gr_text "10.03.2025"
 		(at 100.25 85.25 0)
 		(layer "F.SilkS")
 		(uuid "4ebec920-49dd-4966-8b6b-a500a99cc601")
@@ -26838,17 +26850,6 @@
 		(effects
 			(font
 				(size 1 1)
-				(thickness 0.15)
-			)
-		)
-	)
-	(gr_text "Licensed under GNU GPLv3\nhttps://summercart64.dev"
-		(at 137 120 0)
-		(layer "F.SilkS")
-		(uuid "77e7f556-c63c-46bb-bff0-b858da0827cb")
-		(effects
-			(font
-				(size 0.95 0.95)
 				(thickness 0.15)
 			)
 		)
@@ -26885,19 +26886,6 @@
 				(thickness 0.5)
 			)
 			(justify left)
-		)
-	)
-	(gr_text "© 2020 - 2024\nMateusz Faderewski"
-		(at 200.1 78.8 0)
-		(layer "F.Mask")
-		(uuid "9c42ed30-fd86-4d8a-bb4f-89dcb0e60e6e")
-		(effects
-			(font
-				(size 1 1)
-				(thickness 0.25)
-				(bold yes)
-			)
-			(justify right top)
 		)
 	)
 	(segment
