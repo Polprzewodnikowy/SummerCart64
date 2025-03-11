@@ -5,6 +5,7 @@
 #include "fatfs/ff.h"
 #include "init.h"
 #include "io.h"
+#include "joybus.h"
 #include "sc64.h"
 #include "test.h"
 
@@ -55,6 +56,7 @@ static void fill_random (uint32_t *buffer, int size, uint32_t pattern, uint32_t 
 static void test_sc64_cfg (void) {
     sc64_error_t error;
     uint32_t button_state;
+    joybus_controller_info_t controller_info;
     uint32_t identifier;
     uint16_t major;
     uint16_t minor;
@@ -70,6 +72,10 @@ static void test_sc64_cfg (void) {
     } while (button_state != 0);
 
     display_printf("done\n\n");
+
+    if (joybus_get_controller_info(0, &controller_info, false)) {
+        display_printf("Found controller on port 0: 0x%04X | 0x%02X\n\n", controller_info.id, controller_info.flags);
+    }
 
     if ((error = sc64_get_identifier(&identifier)) != SC64_OK) {
         error_display("Command IDENTIFIER_GET failed\n (%08X) - %s", error, sc64_error_description(error));
