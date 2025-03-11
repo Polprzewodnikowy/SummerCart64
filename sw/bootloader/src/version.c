@@ -35,9 +35,10 @@ const struct {
 
 
 void version_print (void) {
-    display_printf("[ SC64 bootloader metadata ]\n");
-    display_printf("branch: %s | tag: %s\n", version.git_branch, version.git_tag);
+    display_printf("[ SC64 btldr ] %s | %s\n", version.git_branch, version.git_tag);
     display_printf("sha: %s\n", version.git_sha);
     display_printf("msg: %s\n", version.git_message);
-    display_printf("\n");
+    display_printf("Copyright 2020 - 2025 Mateusz Faderewski\n");
+    display_printf("Licensed under | FW/SW: GPL-3.0 | HW: CERN-OHL-S-2.0\n");
+    display_printf("Official website: https://summercart64.dev\n\n");
 }
