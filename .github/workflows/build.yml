@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set package version
         uses: frabert/replace-string-action@v2
