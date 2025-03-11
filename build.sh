@@ -154,7 +154,6 @@ build_release () {
     if [ -e "./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip" ]; then
         rm -f ./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip
     fi
-
     PACKAGE="./${PACKAGE_FILE_NAME}-${SC64_VERSION}.zip"
     zip -j -r $PACKAGE ${TOP_FILES[@]}
     zip -r $PACKAGE ${FILES[@]}
