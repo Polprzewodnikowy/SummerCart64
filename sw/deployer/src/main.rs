@@ -330,6 +330,7 @@ enum SaveType {
     SramBanked,
     Sram1m,
     Flashram,
+    FlashramFake,
 }
 
 impl From<n64::SaveType> for SaveType {
@@ -356,6 +357,7 @@ impl From<SaveType> for sc64::SaveType {
             SaveType::SramBanked => Self::SramBanked,
             SaveType::Sram1m => Self::Sram1m,
             SaveType::Flashram => Self::Flashram,
+            SaveType::FlashramFake => Self::FlashramFake,
         }
     }
 }

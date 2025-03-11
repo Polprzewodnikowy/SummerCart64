@@ -13,6 +13,7 @@ typedef enum {
     TIMER_ID_SD,
     TIMER_ID_USB,
     TIMER_ID_WRITEBACK,
+    TIMER_ID_FLASHRAM,
     __TIMER_ID_COUNT
 } timer_id_t;
 

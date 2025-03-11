@@ -6,8 +6,8 @@
 	(paper "A2")
 	(title_block
 		(title "SummerCart64")
-		(date "2024-08-11")
-		(rev "2.1")
+		(date "2025-03-10")
+		(rev "2.1a")
 		(company "Mateusz Faderewski")
 	)
 	(lib_symbols
@@ -19434,7 +19434,6 @@
 	)
 	(label "USB_D+"
 		(at 97.79 124.46 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -19445,7 +19444,6 @@
 	)
 	(label "USB_D-"
 		(at 97.79 121.92 0)
-		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)

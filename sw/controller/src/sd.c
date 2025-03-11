@@ -176,13 +176,11 @@ static bool sd_acmd (uint8_t acmd, uint32_t arg, rsp_type_t rsp_type, void *rsp)
 static void sd_dat_start_write (uint32_t count) {
     uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_WRITE | SD_DAT_FIFO_FLUSH);
     fpga_reg_set(REG_SD_DAT, dat);
-
 }
 
 static void sd_dat_start_read (uint32_t count) {
     uint32_t dat = (((count - 1) << SD_DAT_BLOCKS_BIT) | SD_DAT_START_READ | SD_DAT_FIFO_FLUSH);
     fpga_reg_set(REG_SD_DAT, dat);
-
 }
 
 static dat_status_t sd_dat_status (void) {

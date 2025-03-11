@@ -50,6 +50,9 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     if (pdrv > 0) {
         return RES_PARERR;
     }
+    if ((sector + count) > 0x100000000ULL) {
+        return RES_PARERR;
+    }
     uint32_t *physical_address = (uint32_t *) (PHYSICAL(buff));
     if (physical_address < (uint32_t *) (N64_RAM_SIZE)) {
         uint8_t aligned_buffer[BUFFER_BLOCKS_MAX * SD_SECTOR_SIZE] __attribute__((aligned(8)));
@@ -80,6 +83,9 @@ DRESULT disk_read (BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
 #if !FF_FS_READONLY
 DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv > 0) {
+        return RES_PARERR;
+    }
+    if ((sector + count) > 0x100000000ULL) {
         return RES_PARERR;
     }
     uint32_t *physical_address = (uint32_t *) (PHYSICAL(buff));

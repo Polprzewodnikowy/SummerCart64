@@ -116,8 +116,8 @@ static void display_draw_character (char c) {
     }
 
     if ((char_x + FONT_WIDTH) > (SCREEN_WIDTH - BORDER_WIDTH)) {
-        char_x = BORDER_WIDTH;
-        char_y += FONT_HEIGHT + LINE_SPACING;
+        char_x -= FONT_WIDTH;
+        c = '\x7F';
     }
 
     if ((c < ' ') || (c > '~')) {
@@ -185,7 +185,7 @@ bool display_ready (void) {
 }
 
 void display_vprintf (const char *fmt, va_list args) {
-    char line[256];
+    char line[1024];
 
     vsniprintf(line, sizeof(line), fmt, args);
     display_draw_string(line);

@@ -17,6 +17,7 @@ TOP_FILES=(
 FILES=(
     "./assets/*"
     "./docs/*"
+    "./hw/pcb/LICENSE"
     "./hw/pcb/sc64v2_bom.html"
     "./hw/pcb/sc64v2.kicad_pcb"
     "./hw/pcb/sc64v2.kicad_pro"
@@ -27,6 +28,8 @@ FILES=(
     "./README.md"
 )
 
+HAVE_COMMIT_INFO=false
+
 BUILT_BOOTLOADER=false
 BUILT_CONTROLLER=false
 BUILT_CIC=false
@@ -36,8 +39,23 @@ BUILT_RELEASE=false
 
 FORCE_CLEAN=false
 
+get_last_commit_info () {
+    if [ "$HAVE_COMMIT_INFO" = true ]; then return; fi
+
+    SAFE_DIRECTORY="-c safe.directory=$(pwd)"
+
+    GIT_BRANCH=$(git $SAFE_DIRECTORY rev-parse --abbrev-ref HEAD)
+    GIT_TAG=$(git $SAFE_DIRECTORY describe --tags 2> /dev/null)
+    GIT_SHA=$(git $SAFE_DIRECTORY rev-parse HEAD)
+    GIT_MESSAGE=$(git $SAFE_DIRECTORY log --oneline --format=%B -n 1 HEAD | head -n 1)
+
+    HAVE_COMMIT_INFO=true
+}
+
 build_bootloader () {
     if [ "$BUILT_BOOTLOADER" = true ]; then return; fi
+
+    get_last_commit_info
 
     pushd sw/bootloader > /dev/null
     if [ "$FORCE_CLEAN" = true ]; then
@@ -97,6 +115,8 @@ build_fpga () {
 
 build_update () {
     if [ "$BUILT_UPDATE" = true ]; then return; fi
+
+    get_last_commit_info
 
     build_bootloader
     build_controller
@@ -163,6 +183,14 @@ if test $# -eq 0; then
     exit 1
 fi
 
+print_time () {
+    echo "Build took $SECONDS seconds"
+}
+
+trap "echo \"Build failed\"; print_time" ERR
+
+SECONDS=0
+
 TRIGGER_BOOTLOADER=false
 TRIGGER_CONTROLLER=false
 TRIGGER_CIC=false
@@ -213,3 +241,5 @@ if [ "$TRIGGER_CIC" = true ]; then build_cic; fi
 if [ "$TRIGGER_FPGA" = true ]; then build_fpga; fi
 if [ "$TRIGGER_UPDATE" = true ]; then build_update; fi
 if [ "$TRIGGER_RELEASE" = true ]; then build_release; fi
+
+print_time
