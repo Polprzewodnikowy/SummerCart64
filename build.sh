@@ -47,6 +47,7 @@ get_last_commit_info () {
     echo " >>> 3"
     GIT_BRANCH=$(git $SAFE_DIRECTORY rev-parse --abbrev-ref HEAD)
     echo " >>> 4"
+    git $SAFE_DIRECTORY describe --tags
     GIT_TAG=$(git $SAFE_DIRECTORY describe --tags 2> /dev/null)
     echo " >>> 5"
     GIT_SHA=$(git $SAFE_DIRECTORY rev-parse HEAD)
