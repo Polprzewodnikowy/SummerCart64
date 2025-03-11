@@ -1,5 +1,3 @@
-use std::ffi::c_char;
-
 pub struct DeviceInfo {
     pub description: String,
     pub serial: String,
@@ -75,8 +73,8 @@ impl Wrapper {
         let result = if devices > 0 {
             let mut list: Vec<DeviceInfo> = vec![];
 
-            let mut description = [c_char::from(0); 128];
-            let mut serial = [c_char::from(0); 128];
+            let mut description = [std::ffi::c_char::from(0); 128];
+            let mut serial = [std::ffi::c_char::from(0); 128];
 
             let mut device = device_list;
             let mut index = 0;
