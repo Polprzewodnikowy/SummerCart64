@@ -8,7 +8,7 @@ pushd $(dirname $0) > /dev/null
 if [ -t 1 ]; then
     DOCKER_OPTIONS="-it"
 fi
-echo " < 1"
+
 docker run \
     $DOCKER_OPTIONS \
     --rm \
@@ -21,9 +21,9 @@ docker run \
     --platform $BUILDER_PLATFORM \
     $BUILDER_IMAGE \
     ./build.sh $@
+
 BUILD_RESULT=$?
-echo " < 2"
-echo " error: $BUILD_RESULT"
+
 popd > /dev/null
-echo " < 3"
+
 exit $BUILD_RESULT
