@@ -1,4 +1,6 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("cargo::rerun-if-changed=../bootloader/src/");
+
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
     cc::Build::new()
