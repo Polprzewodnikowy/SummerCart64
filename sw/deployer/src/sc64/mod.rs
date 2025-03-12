@@ -488,7 +488,10 @@ impl SC64 {
         self.memory_read_chunked(writer, address, length)
     }
 
-    pub fn calculate_cic_parameters(&mut self, custom_seed: Option<u8>) -> Result<(), Error> {
+    pub fn calculate_cic_parameters(
+        &mut self,
+        custom_seed: Option<u8>,
+    ) -> Result<(u8, u64, bool), Error> {
         let (address, cic_seed, boot_seed) = match get_config!(self, BootMode)? {
             BootMode::Menu => (BOOTLOADER_ADDRESS, None, None),
             BootMode::Rom => (BOOTLOADER_ADDRESS, None, custom_seed),
@@ -497,12 +500,12 @@ impl SC64 {
             BootMode::DirectDdIpl => (DDIPL_ADDRESS, custom_seed, None),
         };
         let ipl3 = self.command_memory_read(address + IPL3_OFFSET, IPL3_LENGTH)?;
-        let (seed, checksum) = sign_ipl3(&ipl3, cic_seed)?;
+        let (seed, checksum, matched) = sign_ipl3(&ipl3, cic_seed)?;
         self.command_cic_params_set(false, seed, checksum)?;
         if let Some(seed) = boot_seed {
             self.command_config_set(Config::CicSeed(CicSeed::Seed(seed)))?;
         }
-        Ok(())
+        Ok((seed, checksum, matched))
     }
 
     pub fn set_boot_mode(&mut self, boot_mode: BootMode) -> Result<(), Error> {

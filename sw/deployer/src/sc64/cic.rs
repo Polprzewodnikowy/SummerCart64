@@ -110,35 +110,35 @@ fn calculate_ipl3_checksum(ipl3: &[u8], seed: u8) -> Result<u64, Error> {
     Ok(checksum)
 }
 
-pub fn sign_ipl3(ipl3: &[u8], custom_seed: Option<u8>) -> Result<(u8, u64), Error> {
+pub fn sign_ipl3(ipl3: &[u8], custom_seed: Option<u8>) -> Result<(u8, u64, bool), Error> {
     if let Some(seed) = custom_seed {
-        Ok((seed, calculate_ipl3_checksum(ipl3, seed)?))
-    } else {
-        let known_seed_checksum_pairs = [
-            (0xDD, 0x083C6C77E0B1u64), // 5167
-            (0x3F, 0x45CC73EE317Au64), // 6101
-            (0x3F, 0x44160EC5D9AFu64), // 7102
-            (0x3F, 0xA536C0F1D859u64), // 6102/7102
-            (0x78, 0x586FD4709867u64), // 6103/7103
-            (0x91, 0x8618A45BC2D3u64), // 6105/7105
-            (0x85, 0x2BBAD4E6EB74u64), // 6106/7106
-            (0xDD, 0x6EE8D9E84970u64), // NDXJ0
-            (0xDD, 0x6C216495C8B9u64), // NDDJ0
-            (0xDD, 0xE27F43BA93ACu64), // NDDJ1
-            (0xDD, 0x32B294E2AB90u64), // NDDJ2
-            (0xDE, 0x05BA2EF0A5F1u64), // NDDE0
-        ];
-
-        for (seed, checksum) in known_seed_checksum_pairs {
-            if calculate_ipl3_checksum(ipl3, seed)? == checksum {
-                return Ok((seed, checksum));
-            }
-        }
-
-        // Unknown IPL3 detected, sign it with arbitrary seed (CIC6102/7101 value is used here)
-        const DEFAULT_SEED: u8 = 0x3F;
-        let checksum = calculate_ipl3_checksum(ipl3, DEFAULT_SEED)?;
-
-        Ok((DEFAULT_SEED, checksum))
+        return Ok((seed, calculate_ipl3_checksum(ipl3, seed)?, true));
     }
+
+    let known_seed_checksum_pairs = [
+        (0xDD, 0x083C6C77E0B1u64), // 5167
+        (0x3F, 0x45CC73EE317Au64), // 6101
+        (0x3F, 0x44160EC5D9AFu64), // 7102
+        (0x3F, 0xA536C0F1D859u64), // 6102/7102
+        (0x78, 0x586FD4709867u64), // 6103/7103
+        (0x91, 0x8618A45BC2D3u64), // 6105/7105
+        (0x85, 0x2BBAD4E6EB74u64), // 6106/7106
+        (0xDD, 0x6EE8D9E84970u64), // NDXJ0
+        (0xDD, 0x6C216495C8B9u64), // NDDJ0
+        (0xDD, 0xE27F43BA93ACu64), // NDDJ1
+        (0xDD, 0x32B294E2AB90u64), // NDDJ2
+        (0xDE, 0x05BA2EF0A5F1u64), // NDDE0
+    ];
+
+    for (seed, checksum) in known_seed_checksum_pairs {
+        if calculate_ipl3_checksum(ipl3, seed)? == checksum {
+            return Ok((seed, checksum, true));
+        }
+    }
+
+    // Unknown IPL3 detected, sign it with arbitrary seed (CIC6102/7101 value is used here)
+    const DEFAULT_SEED: u8 = 0x3F;
+    let checksum = calculate_ipl3_checksum(ipl3, DEFAULT_SEED)?;
+
+    Ok((DEFAULT_SEED, checksum, false))
 }

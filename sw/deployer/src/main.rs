@@ -501,7 +501,16 @@ fn handle_upload_command(connection: Connection, args: &UploadArgs) -> Result<()
         sc64.set_tv_type(tv_type)?;
     }
 
-    sc64.calculate_cic_parameters(args.cic_seed)?;
+    let (seed, checksum, matched) = sc64.calculate_cic_parameters(args.cic_seed)?;
+    if !matched {
+        println!(
+            "{}",
+            "Warning: IPL3 in the ROM does not match any known variant. It may fail to boot."
+                .bright_yellow(),
+        );
+        println!("IPL3 has been automatically signed with the parameters listed below:");
+        println!("[seed = 0x{seed:02X} | checksum = 0x{checksum:012X}]");
+    }
 
     if args.reboot && !sc64.try_notify_via_aux(sc64::AuxMessage::Reboot)? {
         println!(
@@ -616,7 +625,16 @@ fn handle_64dd_command(connection: Connection, args: &_64DDArgs) -> Result<(), s
         sc64.set_tv_type(tv_type)?;
     }
 
-    sc64.calculate_cic_parameters(args.cic_seed)?;
+    let (seed, checksum, matched) = sc64.calculate_cic_parameters(args.cic_seed)?;
+    if !matched {
+        println!(
+            "{}",
+            "Warning: IPL3 in the ROM does not match any known variant. It may fail to boot."
+                .bright_yellow(),
+        );
+        println!("IPL3 has been automatically signed with the parameters listed below:");
+        println!("[seed = 0x{seed:02X} | checksum = 0x{checksum:012X}]");
+    }
 
     if args.disk.len() == 0 {
         let dd_mode = sc64::DdMode::DdIpl;
