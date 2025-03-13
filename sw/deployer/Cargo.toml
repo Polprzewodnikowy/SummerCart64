@@ -30,6 +30,11 @@ rust-ini = "0.18.0"
 serial2 = "0.2.26"
 serialport = "4.4.0"
 
+[target.'cfg(unix)'.dependencies]
+fuse_mt = "0.6.1"
+libc = "0.2.161"
+log = "0.4.22"
+
 [profile.release]
 lto = true
 strip = true
