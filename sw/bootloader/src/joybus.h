@@ -34,6 +34,7 @@ typedef struct {
 
 bool joybus_get_controller_info (int port, joybus_controller_info_t *info, bool reset);
 bool joybus_get_controller_state (int port, joybus_controller_state_t *state);
+bool joybus_set_controller_player (int port);
 
 
 #endif

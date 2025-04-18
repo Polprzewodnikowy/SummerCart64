@@ -10,6 +10,7 @@
 
 #define JOYBUS_CMD_INFO             (0x00)
 #define JOYBUS_CMD_STATE            (0x01)
+#define JOYBUS_CMD_PLAYER           (0xF0)
 #define JOYBUS_CMD_RESET            (0xFF)
 
 
@@ -58,6 +59,16 @@ typedef struct __attribute__((packed)) {
         int8_t y;
     } rx;
 } joybus_cmd_state_t;
+
+typedef struct __attribute__((packed)) {
+    joybus_trx_info_t info;
+    struct __attribute__((packed)) {
+        uint8_t bitmask;
+    } tx;
+    struct __attribute__((packed)) {
+        uint8_t previous;
+    } rx;
+} joybus_cmd_player_t;
 
 
 static void joybus_clear_buffer (uint8_t *buffer) {
@@ -162,6 +173,20 @@ bool joybus_get_controller_state (int port, joybus_controller_state_t *state) {
 
     if (joybus_execute_command(port, &cmd, sizeof(cmd))) {
         joybus_copy_controller_state(&cmd, state);
+        return true;
+    }
+
+    return false;
+}
+
+bool joybus_set_controller_player (int port) {
+    joybus_cmd_player_t cmd = { .info = {
+        .cmd = JOYBUS_CMD_PLAYER,
+        .tx = { .length = sizeof(cmd.tx) },
+        .rx = { .length = sizeof(cmd.rx) }
+    }, .tx = { 1 << port } };
+
+    if (joybus_execute_command(port, &cmd, sizeof(cmd))) {
         return true;
     }
 

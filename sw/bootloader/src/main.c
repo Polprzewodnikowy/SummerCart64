@@ -59,6 +59,10 @@ void main (void) {
             break;
     }
 
+    for (int i = 0; i < 4; i++) {
+        joybus_set_controller_player(i);
+    }
+
     deinit();
 
     boot(&boot_params);
