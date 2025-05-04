@@ -117,9 +117,6 @@
         <Source name="../../rtl/vendor/lcmxo2/generated/pll_lattice_generated.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
-        <Source name="../../rtl/serv/serv_aligner.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
         <Source name="../../rtl/serv/serv_alu.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
@@ -127,12 +124,6 @@
             <Options/>
         </Source>
         <Source name="../../rtl/serv/serv_bufreg2.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../rtl/serv/serv_compdec.v" type="Verilog" type_short="Verilog">
-            <Options/>
-        </Source>
-        <Source name="../../rtl/serv/serv_csr.v" type="Verilog" type_short="Verilog">
             <Options/>
         </Source>
         <Source name="../../rtl/serv/serv_ctrl.v" type="Verilog" type_short="Verilog">
