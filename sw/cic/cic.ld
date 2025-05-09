@@ -1,5 +1,6 @@
 MEMORY {
-    ram (rwx) : org = 0x80000000, len = 2k
+    rom (rx) : org = 0x80000000, len = 0x740
+    ram (rw) : org = 0x80000740, len = 0xC0
 }
 
 ENTRY(entry_handler)
@@ -10,12 +11,12 @@ SECTIONS {
         . = ALIGN(4);
         *(.text .text.* .gnu.linkonce.t.*)
         . = ALIGN(4);
-    } > ram
+    } > rom
 
     .rodata : {
         *(.rdata .rodata .rodata.* .gnu.linkonce.r.*)
         . = ALIGN(4);
-    } > ram
+    } > rom
 
     .data : {
         *(.data .data.* .gnu.linkonce.d.*)

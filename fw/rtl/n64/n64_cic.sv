@@ -219,14 +219,21 @@ module n64_cic (
             2'b11: begin
                 case (dbus_addr[3:2])
                     2'b00: dbus_rdata = {
+                        n64_scb.cic_checksum[39:32],
+                        n64_scb.cic_checksum[47:40],
+                        n64_scb.cic_seed,
+                        5'd0,
                         n64_scb.cic_disabled,
                         n64_scb.cic_64dd_mode,
-                        n64_scb.cic_region,
-                        n64_scb.cic_seed,
-                        n64_scb.cic_checksum[47:32]
+                        n64_scb.cic_region
                     };
 
-                    2'b01: dbus_rdata = n64_scb.cic_checksum[31:0];
+                    2'b01: dbus_rdata = {
+                        n64_scb.cic_checksum[7:0],
+                        n64_scb.cic_checksum[15:8],
+                        n64_scb.cic_checksum[23:16],
+                        n64_scb.cic_checksum[31:24]
+                    };
 
                     2'b10: dbus_rdata = {
                         28'd0,

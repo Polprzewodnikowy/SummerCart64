@@ -1175,7 +1175,7 @@ impl From<&[u8; 8]> for PiFifoFlags {
 pub enum CicStep {
     Unavailable,
     PowerOff,
-    ConfigLoad,
+    LoadConfig,
     Id,
     Seed,
     Checksum,
@@ -1196,7 +1196,7 @@ impl Display for CicStep {
         f.write_str(match self {
             Self::Unavailable => "Unavailable",
             Self::PowerOff => "Power off",
-            Self::ConfigLoad => "Load config",
+            Self::LoadConfig => "Load config",
             Self::Id => "ID",
             Self::Seed => "Seed",
             Self::Checksum => "Checksum",
@@ -1206,7 +1206,7 @@ impl Display for CicStep {
             Self::X105 => "X105 algorithm",
             Self::ResetButton => "Reset button pressed",
             Self::DieDisabled => "Die (disabled)",
-            Self::Die64DD => "Die (found another CIC in 64DD mode)",
+            Self::Die64DD => "Die (found cartridge in 64DD mode)",
             Self::DieInvalidRegion => "Die (invalid region)",
             Self::DieCommand => "Die (triggered by command)",
             Self::Unknown => "Unknown",
@@ -1220,7 +1220,7 @@ impl From<&[u8; 8]> for CicStep {
         match cic_step {
             0 => Self::Unavailable,
             1 => Self::PowerOff,
-            2 => Self::ConfigLoad,
+            2 => Self::LoadConfig,
             3 => Self::Id,
             4 => Self::Seed,
             5 => Self::Checksum,

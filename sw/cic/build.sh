@@ -3,20 +3,7 @@
 set -e
 
 TOOLCHAIN="riscv32-unknown-elf-"
-CFLAGS=" \
-    -march=rv32i \
-    -mabi=ilp32 \
-    -Os \
-    -Wl,--gc-sections \
-    -ffunction-sections \
-    -fdata-sections \
-    -ffreestanding \
-    -nostartfiles \
-    -nostdlib \
-    -nodefaultlibs \
-    -fno-builtin \
-    -mcmodel=medany \
-"
+CFLAGS="-ffreestanding -nostartfiles -Os"
 
 case "$1" in
     all)

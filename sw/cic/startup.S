@@ -1,4 +1,3 @@
-.option norvc
 .section .text.entry_handler
 entry_handler:
     .global entry_handler
