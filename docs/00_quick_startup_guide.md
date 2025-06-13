@@ -15,10 +15,15 @@
 
 ## Standalone mode (Running menu and games on the N64)
 
-Menu, as known from 64drive or EverDrive-64, is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
-Download latest version from [here](https://github.com/Polprzewodnikowy/N64FlashcartMenu/releases) and put `sc64menu.n64` file in the root directory of the SD card.
-Additionally, follow the instructions in the N64FlashcartMenu repository for more information about thr SD card setup and extra functionality.
-When N64 is powered on menu is automatically loaded from the SD card. Supported file system formats are FAT32 and exFAT.
+When the N64 is powered on, it attempts to automatically load a menu contained on the Micro SD card, as similar to that used on an 64drive or EverDrive-64. 
+The supported Micro SD card filesystem formats are FAT32 and exFAT.
+The graphical menu is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
+
+> [!TIP]
+> Download latest menu version from [here](https://github.com/Polprzewodnikowy/N64FlashcartMenu/releases) and put `sc64menu.n64` file in the root directory of the SD card.
+
+Make sure you read the [documentation]([https://github.com/Polprzeleaseswodnikowy/N64FlashcartMenu/re](https://menu.summercart64.dev/md_docs_200__index.html)) 
+for more information about the SD card setup and extra functionality it gives.
 
 ---
 
