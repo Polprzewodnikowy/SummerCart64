@@ -15,7 +15,7 @@
 
 ## Standalone mode (Running menu and games on the N64)
 
-When the N64 is powered on, it attempts to automatically loaded a menu from the Micro SD card as similar to that used on an 64drive or EverDrive-64. 
+When the N64 is powered on, it attempts to automatically load a menu contained on the Micro SD card, as similar to that used on an 64drive or EverDrive-64. 
 The supported Micro SD card filesystem formats are FAT32 and exFAT.
 The graphical menu is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
 
