@@ -17,7 +17,7 @@
 
 When the N64 is powered on, it attempts to automatically loaded a menu from the Micro SD card as similar to that used on an 64drive or EverDrive-64. 
 The supported Micro SD card filesystem formats are FAT32 and exFAT.
-The graphical menu,is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
+The graphical menu is developed in another repository: [N64FlashcartMenu](https://github.com/Polprzewodnikowy/N64FlashcartMenu).
 
 > [!TIP]
 > Download latest menu version from [here](https://github.com/Polprzewodnikowy/N64FlashcartMenu/releases) and put `sc64menu.n64` file in the root directory of the SD card.
