@@ -60,7 +60,7 @@ jobs:
   build-deployer:
     strategy:
       matrix:
-        version: [windows, windows-32bit, linux, macos]
+        version: [windows, windows-32bit, linux-x86_64, linux-arm64, macos]
         include:
           - version: windows
             os: windows-latest
@@ -77,11 +77,19 @@ jobs:
             package-params: -c -a -f
             package-extension: zip
 
-          - version: linux
+          - version: linux-x86_64
             os: ubuntu-latest
             apt-packages: libudev-dev
             executable: target/release/sc64deployer
-            package-name: sc64-deployer-linux
+            package-name: sc64-deployer-linux-x86_64
+            package-params: -czf
+            package-extension: tar.gz
+
+          - version: linux-arm64
+            os: ubuntu-22.04-arm
+            apt-packages: libudev-dev
+            executable: target/release/sc64deployer
+            package-name: sc64-deployer-linux-arm64
             package-params: -czf
             package-extension: tar.gz
 
