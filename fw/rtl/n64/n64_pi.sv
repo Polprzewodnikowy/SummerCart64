@@ -262,6 +262,13 @@ module n64_pi (
                     mem_offset <= (-32'h1400_0000) + FLASH_OFFSET;
                     n64_scb.pi_flash_active <= 1'b1;
                 end
+            end else begin //N64 Modem
+                if (n64_pi_dq_in >= 16'h1800 && n64_pi_dq_in < 16'h18E0) begin
+                    read_port <= PORT_MEM;
+                    write_port <= PORT_NONE;
+                    mem_offset <= (-32'h1800_0000) + FLASH_OFFSET;
+                    n64_scb.pi_flash_active <= 1'b1;
+                end
             end
 
             if (n64_scb.cfg_unlock) begin

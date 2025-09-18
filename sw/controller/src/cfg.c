@@ -216,6 +216,12 @@ static bool cfg_translate_address (uint32_t *address, uint32_t length, translate
                 return false;
             }
         }
+        if (*address >= 0x18000000 && *address < 0x18E00000) {
+            if ((*address + length) <= 0x18E00000) {
+                *address = *address - 0x18000000 + 0x04000000;
+                return false;
+            }
+        }
         if (*address >= 0x1FFC0000 && *address < 0x1FFE0000) {
             if ((*address + length) <= 0x1FFE0000) {
                 *address = *address - 0x1FFC0000 + 0x04FE0000;
