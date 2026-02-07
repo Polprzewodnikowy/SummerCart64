@@ -16,6 +16,8 @@ jobs:
   build-firmware:
     runs-on: ubuntu-latest
 
+    if: ${{ ! contains(github.event.pull_request.title, '[skip fw]') && (github.event.repository.fork == false) }}
+
     steps:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v4
@@ -94,6 +96,11 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    if: ${{ ! contains(github.event.pull_request.title, '[skip deployer]') }}
+
+    env:
+      MACOS_UNIVERSAL_BINARY: 1
+
     steps:
       - name: Download SummerCart64 repository
         uses: actions/checkout@v4
@@ -115,6 +122,25 @@ jobs:
       - name: Build deployer
         run: cargo b -r ${{ matrix.build-params }}
         working-directory: sw/deployer
+
+      - name: Build Universal macOS deployer
+        if: ${{ runner.os == 'macOS' && env.MACOS_UNIVERSAL_BINARY == 1 }}
+        working-directory: sw/deployer
+        run: |
+          # 'Build deployer' step has built the aarch64-apple-darwin binary.
+          # We will only build the x86_64 version of deployer and lipo it together.
+          # If Apple introduces new architectures or moves away from arm64, 
+          # this will need to be updated.
+          # 
+          # Add x86_64 architecture to Rust toolchain
+          rustup target add x86_64-apple-darwin
+          # Move the prior created arm64 binary for now
+          mkdir -p target/aarch64-apple-darwin/release
+          mv ${{ matrix.executable }} target/aarch64-apple-darwin/release
+          # Build the x86-64 binary
+          cargo b -r --target x86_64-apple-darwin ${{ matrix.build-params }}
+          # lipo the builds together
+          lipo -create -output ${{ matrix.executable }} -arch arm64 target/aarch64-apple-darwin/release/sc64deployer -arch x86_64 target/x86_64-apple-darwin/release/sc64deployer
 
       - name: Package executable
         run: |
@@ -138,7 +164,7 @@ jobs:
             sw/deployer/package/${{ matrix.package-name }}-${{ steps.version.outputs.replaced }}.${{ matrix.package-extension }}
 
   publish-website:
-    if: github.ref == 'refs/heads/main'
+    if: "github.ref == 'refs/heads/main' && (! contains(github.event.pull_request.title, '[skip web]') && (github.event.repository.fork == false))"
 
     permissions:
       contents: read
