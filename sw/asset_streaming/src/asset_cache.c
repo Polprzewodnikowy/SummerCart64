@@ -84,6 +84,7 @@ int cache_allocate(asset_cache_t *cache, uint32_t asset_id, bool *evicted) {
                        cache->config.slot_size,
                        cache->slots[victim].asset_id);
 
+    cache->slots[victim].generation++;
     cache->slots[victim].asset_id = asset_id;
     cache->slots[victim].state = SLOT_LOADING;
     cache->slots[victim].lru_counter = ++cache->lru_clock;

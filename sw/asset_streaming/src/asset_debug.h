@@ -105,6 +105,13 @@ int asset_debug_check_leaks(void *mgr);
  */
 void asset_debug_print_stats(void);
 
+/**
+ * Print currently pinned assets. Call once per frame in your game loop
+ * to catch pin count creep in long play sessions.
+ * Only logs if any assets are pinned.
+ */
+void asset_debug_frame_report(void *mgr);
+
 /* Internal macros used by cache/manager code */
 #define ASSET_DBG_ON_EVICT(data, size, id)  asset_debug_on_evict(data, size, id)
 #define ASSET_DBG_ON_PIN(id, cnt)           asset_debug_on_pin(id, cnt)
@@ -128,6 +135,7 @@ static inline int asset_debug_is_poisoned(const void *data, uint32_t n) {
     (void)data; (void)n; return 0;
 }
 static inline void asset_debug_print_stats(void) {}
+static inline void asset_debug_frame_report(void *mgr) { (void)mgr; }
 
 #endif /* ASSET_DEBUG */
 

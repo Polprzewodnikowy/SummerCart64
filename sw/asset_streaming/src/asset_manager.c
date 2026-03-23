@@ -384,6 +384,62 @@ void asset_shutdown(asset_manager_t *mgr) {
     }
 }
 
+/* -------------------------------------------------------------------
+ * Handle API
+ * ------------------------------------------------------------------- */
+
+asset_handle_t asset_acquire(asset_manager_t *mgr, uint32_t asset_id) {
+    void *data = asset_load_pinned(mgr, asset_id);
+    if (!data) return ASSET_HANDLE_INVALID;
+
+    /* Find the slot to capture generation */
+    for (uint32_t i = 0; i < mgr->cache.config.slot_count; i++) {
+        if (mgr->cache.slots[i].asset_id == asset_id &&
+            mgr->cache.slots[i].state == SLOT_READY) {
+            return (asset_handle_t){
+                .slot = (int16_t)i,
+                .generation = (uint16_t)mgr->cache.slots[i].generation,
+                .asset_id = asset_id,
+            };
+        }
+    }
+
+    return ASSET_HANDLE_INVALID;
+}
+
+void *asset_resolve(asset_manager_t *mgr, asset_handle_t handle) {
+    if (handle.slot < 0 || (uint32_t)handle.slot >= mgr->cache.config.slot_count)
+        return NULL;
+
+    cache_slot_t *slot = &mgr->cache.slots[handle.slot];
+    if (slot->state != SLOT_READY ||
+        slot->asset_id != handle.asset_id ||
+        (uint16_t)slot->generation != handle.generation) {
+        ASSET_DBG_LOG("[ASSET_DBG] STALE HANDLE: asset %u slot %d "
+                      "(gen %u != %u)\n",
+                      handle.asset_id, handle.slot,
+                      handle.generation, (uint16_t)slot->generation);
+        return NULL;
+    }
+
+    slot->lru_counter = ++mgr->cache.lru_clock;
+    return slot->data;
+}
+
+void *asset_resolve_with_size(asset_manager_t *mgr, asset_handle_t handle,
+                               uint32_t *out_size) {
+    void *data = asset_resolve(mgr, handle);
+    if (data && out_size) {
+        *out_size = mgr->cache.slots[handle.slot].data_size;
+    }
+    return data;
+}
+
+void asset_release(asset_manager_t *mgr, asset_handle_t handle) {
+    if (handle.slot < 0) return;
+    asset_unpin(mgr, handle.asset_id);
+}
+
 const char *asset_error_string(asset_error_t error) {
     switch (error) {
         case ASSET_OK:                  return "OK";

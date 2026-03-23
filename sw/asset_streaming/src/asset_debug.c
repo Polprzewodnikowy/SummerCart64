@@ -123,6 +123,28 @@ int asset_debug_check_leaks(void *mgr_ptr) {
     return leaked;
 }
 
+void asset_debug_frame_report(void *mgr_ptr) {
+    asset_manager_t *mgr = (asset_manager_t *)mgr_ptr;
+    int pinned = 0;
+
+    for (uint32_t i = 0; i < mgr->cache.config.slot_count; i++) {
+        cache_slot_t *slot = &mgr->cache.slots[i];
+        if (slot->pin_count > 0 && slot->state == SLOT_READY) {
+            if (pinned == 0) {
+                ASSET_DBG_LOG("[ASSET_DBG] --- Frame Pin Report ---\n");
+            }
+            ASSET_DBG_LOG("[ASSET_DBG]   asset %u  pin_count=%u\n",
+                          slot->asset_id, slot->pin_count);
+            pinned++;
+        }
+    }
+
+    if (pinned > 0) {
+        ASSET_DBG_LOG("[ASSET_DBG]   total: %d pinned slot(s), %u/%u slots used\n",
+                      pinned, mgr->cache.pin_count, mgr->cache.config.slot_count);
+    }
+}
+
 void asset_debug_print_stats(void) {
     ASSET_DBG_LOG("[ASSET_DBG] --- Statistics ---\n");
     ASSET_DBG_LOG("[ASSET_DBG] Evictions:       %u\n", asset_debug.eviction_count);

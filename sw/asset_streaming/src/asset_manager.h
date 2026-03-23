@@ -234,4 +234,60 @@ void asset_shutdown(asset_manager_t *mgr);
  */
 const char *asset_error_string(asset_error_t error);
 
+/* =====================================================================
+ * HANDLE API (safer alternative to raw pointers)
+ *
+ * Handles are {slot_index, generation} pairs. When you resolve a handle,
+ * the generation is checked against the slot's current generation.
+ * If it doesn't match, the slot was evicted and reused — your handle
+ * is stale. This catches use-after-evict at the point of dereference
+ * rather than as a silent data corruption.
+ *
+ * Usage:
+ *   asset_handle_t h = asset_acquire(&mgr, ASSET_PLAYER);  // load + pin
+ *   void *data = asset_resolve(&mgr, h);                   // get pointer (validated)
+ *   asset_release(&mgr, h);                                // unpin
+ *
+ * Handles are pinned on acquire and unpinned on release.
+ * ===================================================================== */
+
+/* Invalid handle constant */
+#define ASSET_HANDLE_INVALID ((asset_handle_t){-1, 0, 0})
+
+typedef struct {
+    int16_t     slot;           /* Cache slot index (-1 = invalid) */
+    uint16_t    generation;     /* Generation at time of acquisition */
+    uint32_t    asset_id;       /* For debug/logging */
+} asset_handle_t;
+
+/**
+ * Load, pin, and return a handle. The safest way to hold a long-lived
+ * reference to an asset.
+ */
+asset_handle_t asset_acquire(asset_manager_t *mgr, uint32_t asset_id);
+
+/**
+ * Resolve a handle to a data pointer. Returns NULL if the handle is
+ * stale (slot was evicted and reused — should never happen if pinned,
+ * but catches bugs where you forgot to pin or released too early).
+ */
+void *asset_resolve(asset_manager_t *mgr, asset_handle_t handle);
+
+/**
+ * Resolve a handle and also return the data size.
+ */
+void *asset_resolve_with_size(asset_manager_t *mgr, asset_handle_t handle, uint32_t *out_size);
+
+/**
+ * Release a handle (unpins the asset).
+ */
+void asset_release(asset_manager_t *mgr, asset_handle_t handle);
+
+/**
+ * Check if a handle is valid (not stale).
+ */
+static inline bool asset_handle_valid(asset_handle_t h) {
+    return h.slot >= 0;
+}
+
 #endif

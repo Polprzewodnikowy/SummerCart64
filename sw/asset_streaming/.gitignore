@@ -1,4 +1,6 @@
 __pycache__/
 *.pyc
 *.so
+build/
 test_cache
+test_archive.bin

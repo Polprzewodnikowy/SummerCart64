@@ -35,6 +35,7 @@ typedef struct {
     uint8_t    *data;           /* Pointer to slot memory (PI-mapped SDRAM) */
     uint32_t    data_size;      /* Decompressed size of current asset */
     uint32_t    pin_count;      /* >0 means slot is pinned and cannot be evicted */
+    uint32_t    generation;     /* Bumped on eviction, used for stale handle detection */
 } cache_slot_t;
 
 /* Cache configuration */
