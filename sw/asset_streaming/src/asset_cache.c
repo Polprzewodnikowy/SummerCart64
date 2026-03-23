@@ -15,6 +15,7 @@ void cache_init(asset_cache_t *cache, cache_slot_t *slots,
     cache->lru_clock = 0;
     cache->hit_count = 0;
     cache->miss_count = 0;
+    cache->pin_count = 0;
 
     for (uint32_t i = 0; i < cache->config.slot_count; i++) {
         slots[i].asset_id = 0;
@@ -22,6 +23,7 @@ void cache_init(asset_cache_t *cache, cache_slot_t *slots,
         slots[i].lru_counter = 0;
         slots[i].data = base_address + (i * slot_size);
         slots[i].data_size = 0;
+        slots[i].pin_count = 0;
     }
 }
 
@@ -61,12 +63,13 @@ int cache_allocate(asset_cache_t *cache, uint32_t asset_id, bool *evicted) {
         }
     }
 
-    /* Third: evict LRU slot (skip LOADING slots) */
+    /* Third: evict LRU slot (skip LOADING and PINNED slots) */
     uint32_t min_lru = 0xFFFFFFFF;
     int victim = -1;
 
     for (uint32_t i = 0; i < cache->config.slot_count; i++) {
         if (cache->slots[i].state == SLOT_LOADING) continue;
+        if (cache->slots[i].pin_count > 0) continue;
         if (cache->slots[i].lru_counter < min_lru) {
             min_lru = cache->slots[i].lru_counter;
             victim = (int)i;
@@ -95,14 +98,66 @@ void *cache_slot_data(asset_cache_t *cache, int slot_idx) {
     return cache->slots[slot_idx].data;
 }
 
+bool cache_pin(asset_cache_t *cache, uint32_t asset_id) {
+    for (uint32_t i = 0; i < cache->config.slot_count; i++) {
+        if (cache->slots[i].asset_id == asset_id &&
+            cache->slots[i].state == SLOT_READY) {
+            if (cache->slots[i].pin_count == 0) {
+                cache->pin_count++;
+            }
+            cache->slots[i].pin_count++;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool cache_unpin(asset_cache_t *cache, uint32_t asset_id) {
+    for (uint32_t i = 0; i < cache->config.slot_count; i++) {
+        if (cache->slots[i].asset_id == asset_id &&
+            cache->slots[i].state == SLOT_READY) {
+            if (cache->slots[i].pin_count > 0) {
+                cache->slots[i].pin_count--;
+                if (cache->slots[i].pin_count == 0) {
+                    cache->pin_count--;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool cache_is_pinned(asset_cache_t *cache, uint32_t asset_id) {
+    for (uint32_t i = 0; i < cache->config.slot_count; i++) {
+        if (cache->slots[i].asset_id == asset_id) {
+            return cache->slots[i].pin_count > 0;
+        }
+    }
+    return false;
+}
+
 void cache_flush(asset_cache_t *cache) {
     for (uint32_t i = 0; i < cache->config.slot_count; i++) {
+        if (cache->slots[i].pin_count > 0) continue;  /* Skip pinned slots */
         cache->slots[i].asset_id = 0;
         cache->slots[i].state = SLOT_EMPTY;
         cache->slots[i].lru_counter = 0;
         cache->slots[i].data_size = 0;
     }
+    /* Don't reset lru_clock - pinned slots still have valid counters */
+}
+
+void cache_flush_all(asset_cache_t *cache) {
+    for (uint32_t i = 0; i < cache->config.slot_count; i++) {
+        cache->slots[i].asset_id = 0;
+        cache->slots[i].state = SLOT_EMPTY;
+        cache->slots[i].lru_counter = 0;
+        cache->slots[i].data_size = 0;
+        cache->slots[i].pin_count = 0;
+    }
     cache->lru_clock = 0;
+    cache->pin_count = 0;
 }
 
 int cache_hit_rate(asset_cache_t *cache) {

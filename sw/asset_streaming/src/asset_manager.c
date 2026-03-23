@@ -119,11 +119,11 @@ static void *load_asset_into_slot(asset_manager_t *mgr, const asset_entry_t *ent
                                    int slot_idx) {
     uint8_t *slot_data = (uint8_t *)cache_slot_data(&mgr->cache, slot_idx);
     uint32_t sd_sector = mgr->archive_base_sector + entry->sector_offset;
-    uint32_t compressed_bytes = (uint32_t)entry->sector_count * ASSET_SECTOR_SIZE;
+    uint32_t sector_bytes = (uint32_t)entry->sector_count * ASSET_SECTOR_SIZE;
 
     if (entry->flags & ASSET_FLAG_COMPRESSED) {
         /* Read compressed data into staging buffer */
-        if (compressed_bytes > mgr->staging_size) {
+        if (sector_bytes > mgr->staging_size) {
             mgr->last_error = ASSET_ERR_TOO_LARGE;
             return NULL;
         }
@@ -134,10 +134,12 @@ static void *load_asset_into_slot(asset_manager_t *mgr, const asset_entry_t *ent
             return NULL;
         }
 
-        /* Decompress into cache slot */
+        /* Decompress into cache slot.
+         * Use exact compressed_size (not sector-padded size) so the
+         * decoder doesn't try to parse padding bytes as LZ4 tokens. */
         int decoded = lz4_decode_block(
             mgr->staging_buffer, slot_data,
-            (int)compressed_bytes, (int)mgr->cache.config.slot_size
+            (int)entry->compressed_size, (int)mgr->cache.config.slot_size
         );
         if (decoded < 0 || (uint32_t)decoded != entry->decompressed_size) {
             mgr->last_error = ASSET_ERR_DECOMPRESS;
@@ -295,6 +297,29 @@ asset_error_t asset_prefetch(asset_manager_t *mgr, uint32_t asset_id) {
     /* Currently just a blocking load. Future: async DMA. */
     void *result = asset_load(mgr, asset_id);
     return result ? ASSET_OK : mgr->last_error;
+}
+
+bool asset_pin(asset_manager_t *mgr, uint32_t asset_id) {
+    if (!mgr->initialized) return false;
+    return cache_pin(&mgr->cache, asset_id);
+}
+
+bool asset_unpin(asset_manager_t *mgr, uint32_t asset_id) {
+    if (!mgr->initialized) return false;
+    return cache_unpin(&mgr->cache, asset_id);
+}
+
+void *asset_load_pinned(asset_manager_t *mgr, uint32_t asset_id) {
+    void *data = asset_load(mgr, asset_id);
+    if (data) {
+        cache_pin(&mgr->cache, asset_id);
+    }
+    return data;
+}
+
+bool asset_is_pinned(asset_manager_t *mgr, uint32_t asset_id) {
+    if (!mgr->initialized) return false;
+    return cache_is_pinned(&mgr->cache, asset_id);
 }
 
 bool asset_is_cached(asset_manager_t *mgr, uint32_t asset_id) {

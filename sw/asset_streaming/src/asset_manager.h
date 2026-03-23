@@ -4,28 +4,65 @@
  * Top-level API for demand-paged asset streaming from SD card.
  * Combines SC64 SD access, LZ4 decompression, and LRU caching.
  *
+ * POINTER LIFETIME AND OWNERSHIP
+ * ==============================
+ *
+ * asset_load() returns a raw pointer into SDRAM. This pointer is ONLY
+ * guaranteed valid until the next call to asset_load/asset_prefetch/asset_flush.
+ * A subsequent load may evict the slot your pointer points to.
+ *
+ * Two usage patterns are safe:
+ *
+ * 1. TRANSIENT USE (load, consume, forget):
+ *
+ *      void *tex = asset_load(&mgr, ASSET_TREE_TEXTURE);
+ *      upload_to_tmem(tex, size);   // Use immediately
+ *      // tex is now "stale" - don't store it
+ *
+ * 2. PINNED USE (load, pin, keep pointer, unpin when done):
+ *
+ *      void *mdl = asset_load(&mgr, ASSET_PLAYER_MODEL);
+ *      asset_pin(&mgr, ASSET_PLAYER_MODEL);
+ *      // mdl is now safe to store and use across frames.
+ *      // It will NEVER be evicted while pinned.
+ *      player->model = mdl;
+ *      ...
+ *      // When truly done (e.g. level unload):
+ *      asset_unpin(&mgr, ASSET_PLAYER_MODEL);
+ *      player->model = NULL;
+ *
+ * Pin counts are reference-counted. Two pins require two unpins.
+ * Pinned assets survive cache_flush() but not cache_flush_all().
+ *
+ * RULES:
+ * - Never store a pointer from asset_load() without pinning it first.
+ * - Always unpin when done. Leaked pins eat cache slots forever.
+ * - asset_is_cached() does NOT prevent eviction. Only pin does.
+ * - Prefetch + pin is the ideal pattern for "I'll need this soon."
+ *
  * Usage:
  *
  *   // At boot:
  *   asset_manager_t mgr;
  *   asset_init(&mgr, &(asset_init_config_t){
- *       .archive_base_sector = 0x10000,    // Where your archive starts on SD
- *       .cache_base = (uint8_t *)0xB1000000,  // SDRAM after 16 MB resident
- *       .cache_size = 48 * 1024 * 1024,       // 48 MB cache
- *       .slot_size  = 2 * 1024 * 1024,        // 2 MB per slot
- *       .staging_buffer = staging_buf,         // Temp buffer for compressed data
- *       .staging_size = 2 * 1024 * 1024,       // Must be >= slot_size
+ *       .archive_base_sector = 0x10000,
+ *       .cache_base = (uint8_t *)0xB1000000,
+ *       .cache_size = 48 * 1024 * 1024,
+ *       .slot_size  = 2 * 1024 * 1024,
+ *       .staging_buffer = staging_buf,
+ *       .staging_size = 2 * 1024 * 1024,
  *   });
  *
- *   // During gameplay:
- *   void *tex = asset_load(&mgr, ASSET_LEVEL1_TEXTURES);  // Returns pointer or NULL
- *   uint32_t size;
- *   void *mdl = asset_load_with_size(&mgr, ASSET_PLAYER_MODEL, &size);
+ *   // Pin long-lived assets:
+ *   void *player = asset_load(&mgr, ASSET_PLAYER_MODEL);
+ *   asset_pin(&mgr, ASSET_PLAYER_MODEL);  // Safe to keep pointer
  *
- *   // Prefetch hint (non-blocking if possible, blocking fallback):
- *   asset_prefetch(&mgr, ASSET_LEVEL2_TEXTURES);
+ *   // Transient use (load, consume, discard):
+ *   void *tex = asset_load(&mgr, ASSET_LEVEL1_TEXTURES);
+ *   upload_to_tmem(tex, size);  // Don't store tex
  *
  *   // Cleanup:
+ *   asset_unpin(&mgr, ASSET_PLAYER_MODEL);
  *   asset_shutdown(&mgr);
  */
 
@@ -122,7 +159,44 @@ void *asset_load_with_size(asset_manager_t *mgr, uint32_t asset_id, uint32_t *ou
 asset_error_t asset_prefetch(asset_manager_t *mgr, uint32_t asset_id);
 
 /**
+ * Pin an asset in cache. The asset must already be loaded (call asset_load first).
+ * Pinned assets cannot be evicted by subsequent loads. Pin calls are
+ * reference-counted: each pin must be balanced by an unpin.
+ *
+ * @param mgr       Manager instance
+ * @param asset_id  Asset to pin (must be loaded)
+ * @return          true if pinned successfully, false if not in cache
+ */
+bool asset_pin(asset_manager_t *mgr, uint32_t asset_id);
+
+/**
+ * Unpin an asset. Once pin_count reaches 0, the asset becomes evictable again.
+ *
+ * @param mgr       Manager instance
+ * @param asset_id  Asset to unpin
+ * @return          true if unpinned successfully
+ */
+bool asset_unpin(asset_manager_t *mgr, uint32_t asset_id);
+
+/**
+ * Load and pin in one call. Convenience for the common pattern:
+ *   void *p = asset_load(mgr, id);
+ *   asset_pin(mgr, id);
+ *
+ * @param mgr       Manager instance
+ * @param asset_id  Asset to load and pin
+ * @return          Pointer to pinned asset data, or NULL on error
+ */
+void *asset_load_pinned(asset_manager_t *mgr, uint32_t asset_id);
+
+/**
+ * Check if an asset is currently pinned.
+ */
+bool asset_is_pinned(asset_manager_t *mgr, uint32_t asset_id);
+
+/**
  * Check if an asset is currently in cache (without loading it).
+ * WARNING: This does NOT prevent eviction. Use asset_pin for that.
  *
  * @param mgr       Manager instance
  * @param asset_id  Asset to check
@@ -131,7 +205,7 @@ asset_error_t asset_prefetch(asset_manager_t *mgr, uint32_t asset_id);
 bool asset_is_cached(asset_manager_t *mgr, uint32_t asset_id);
 
 /**
- * Evict all cached assets.
+ * Evict all non-pinned cached assets. Pinned assets are preserved.
  */
 void asset_flush(asset_manager_t *mgr);
 

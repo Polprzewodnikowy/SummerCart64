@@ -34,6 +34,7 @@ typedef struct {
     uint32_t    lru_counter;    /* For LRU eviction (higher = more recently used) */
     uint8_t    *data;           /* Pointer to slot memory (PI-mapped SDRAM) */
     uint32_t    data_size;      /* Decompressed size of current asset */
+    uint32_t    pin_count;      /* >0 means slot is pinned and cannot be evicted */
 } cache_slot_t;
 
 /* Cache configuration */
@@ -51,6 +52,7 @@ typedef struct {
     uint32_t        lru_clock;      /* Monotonic counter for LRU tracking */
     uint32_t        hit_count;      /* Stats: cache hits */
     uint32_t        miss_count;     /* Stats: cache misses */
+    uint32_t        pin_count;      /* Stats: total pinned slots */
 } asset_cache_t;
 
 /**
@@ -104,9 +106,40 @@ void cache_slot_ready(asset_cache_t *cache, int slot_idx, uint32_t data_size);
 void *cache_slot_data(asset_cache_t *cache, int slot_idx);
 
 /**
- * Invalidate all cache slots.
+ * Pin an asset in cache, preventing eviction. Pin calls are reference-counted:
+ * each pin must be balanced by an unpin. Returns true if asset was found and pinned.
+ *
+ * @param cache     Cache instance
+ * @param asset_id  Asset to pin
+ * @return          true if asset was found and pinned, false if not in cache
+ */
+bool cache_pin(asset_cache_t *cache, uint32_t asset_id);
+
+/**
+ * Unpin an asset, allowing it to be evicted again once pin_count reaches 0.
+ * Returns true if the asset was found and unpinned.
+ *
+ * @param cache     Cache instance
+ * @param asset_id  Asset to unpin
+ * @return          true if asset was found and unpinned, false if not in cache
+ */
+bool cache_unpin(asset_cache_t *cache, uint32_t asset_id);
+
+/**
+ * Check if an asset is currently pinned.
+ */
+bool cache_is_pinned(asset_cache_t *cache, uint32_t asset_id);
+
+/**
+ * Invalidate all cache slots. Pinned slots are NOT flushed.
+ * Use cache_flush_all() to force-flush everything including pinned slots.
  */
 void cache_flush(asset_cache_t *cache);
+
+/**
+ * Force-flush ALL cache slots including pinned ones. Resets all pin counts.
+ */
+void cache_flush_all(asset_cache_t *cache);
 
 /**
  * Get cache hit rate as a percentage (0-100).

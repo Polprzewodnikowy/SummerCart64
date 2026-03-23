@@ -7,7 +7,7 @@
  * Archive layout on SD card (all sector-aligned):
  *
  *   [Header]              1 sector (512 bytes)
- *   [Index Table]         N sectors (ceil(asset_count * 16 / 512))
+ *   [Index Table]         N sectors (ceil(asset_count * 20 / 512))
  *   [Asset Data 0]        sector-aligned, compressed
  *   [Asset Data 1]        sector-aligned, compressed
  *   ...
@@ -44,17 +44,18 @@ typedef struct __attribute__((packed, aligned(4))) {
 _Static_assert(sizeof(asset_archive_header_t) == ASSET_SECTOR_SIZE,
     "Archive header must be exactly 1 sector");
 
-/* Index entry - 16 bytes per asset, tightly packed */
+/* Index entry - 20 bytes per asset, tightly packed */
 typedef struct __attribute__((packed, aligned(4))) {
     uint32_t asset_id;              /* Unique asset identifier */
     uint32_t sector_offset;         /* Sector offset of data (relative to archive base) */
     uint16_t sector_count;          /* Number of sectors occupied (compressed + padding) */
     uint16_t flags;                 /* ASSET_FLAG_* */
+    uint32_t compressed_size;       /* Exact compressed size in bytes (for LZ4 decoder) */
     uint32_t decompressed_size;     /* Size after decompression (or raw size if uncompressed) */
 } asset_entry_t;
 
-_Static_assert(sizeof(asset_entry_t) == 16,
-    "Index entry must be exactly 16 bytes");
+_Static_assert(sizeof(asset_entry_t) == 20,
+    "Index entry must be exactly 20 bytes");
 
 /* Maximum assets per archive (practical limit for N64 RAM index table) */
 #define ASSET_MAX_ENTRIES           (8192)

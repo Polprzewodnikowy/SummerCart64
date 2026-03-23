@@ -50,7 +50,7 @@ except ImportError:
 SECTOR_SIZE = 512
 MAGIC = 0x53433634  # "SC64"
 VERSION = 1
-ENTRY_SIZE = 16
+ENTRY_SIZE = 20
 
 FLAG_COMPRESSED = (1 << 0)
 FLAG_RESIDENT   = (1 << 1)
@@ -118,6 +118,9 @@ def pack_archive(manifest, base_dir=""):
         else:
             blob = raw_data
 
+        # Track exact compressed size before padding
+        compressed_size = len(blob)
+
         # Pad blob to sector boundary
         padded_size = align_up(len(blob), SECTOR_SIZE)
         blob = blob + b'\x00' * (padded_size - len(blob))
@@ -125,6 +128,7 @@ def pack_archive(manifest, base_dir=""):
         entries.append({
             "asset_id": asset_id,
             "flags": flags,
+            "compressed_size": compressed_size,
             "decompressed_size": decompressed_size,
             "sector_count": padded_size // SECTOR_SIZE,
         })
@@ -166,11 +170,12 @@ def pack_archive(manifest, base_dir=""):
     # Phase 4: Build index table
     index_data = b''
     for entry in entries:
-        index_data += struct.pack("<IIHHI",
+        index_data += struct.pack("<IIHHII",
                                   entry["asset_id"],
                                   entry["sector_offset"],
                                   entry["sector_count"],
                                   entry["flags"],
+                                  entry["compressed_size"],
                                   entry["decompressed_size"])
 
     # Pad index to sector boundary

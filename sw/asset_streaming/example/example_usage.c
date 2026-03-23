@@ -96,29 +96,32 @@ static void game_load_level(int level_id) {
             return;
     }
 
-    /* Load level assets. On first call these will be SD reads.
-     * On revisit they may be instant cache hits. */
+    /* TRANSIENT pattern: load, consume immediately, don't store pointer.
+     * These pointers are valid RIGHT NOW but could be evicted by
+     * the next asset_load() call. That's fine - we copy what we need. */
     uint32_t geo_size, tex_size, mus_size;
 
     void *geometry = asset_load_with_size(&asset_mgr, geo_id, &geo_size);
-    void *textures = asset_load_with_size(&asset_mgr, tex_id, &tex_size);
-    void *music    = asset_load_with_size(&asset_mgr, mus_id, &mus_size);
+    if (!geometry) return;
+    /* setup_level_geometry(geometry, geo_size);  <-- copies into engine structs */
 
-    if (!geometry || !textures || !music) {
-        /* Handle load failure */
-        return;
-    }
+    void *textures = asset_load_with_size(&asset_mgr, tex_id, &tex_size);
+    if (!textures) return;
+    /* upload_textures_to_tmem(textures, tex_size);  <-- uploads to RDP TMEM */
+
+    void *music = asset_load_with_size(&asset_mgr, mus_id, &mus_size);
+    if (!music) return;
+    /* start_music_playback(music, mus_size);  <-- copies to audio buffer */
+
+    /* NOTE: geometry, textures, music pointers are now STALE after
+     * subsequent loads above. Don't use them again. This is safe because
+     * we already consumed the data above. */
 
     /* Prefetch the NEXT level while playing this one */
     if (level_id == 1) {
         asset_prefetch(&asset_mgr, ASSET_LEVEL2_GEOMETRY);
         asset_prefetch(&asset_mgr, ASSET_LEVEL2_TEXTURES);
     }
-
-    /* Use the data - it's just pointers into SDRAM */
-    /* setup_level_geometry(geometry, geo_size); */
-    /* upload_textures(textures, tex_size); */
-    /* start_music(music, mus_size); */
 }
 
 /**
@@ -131,10 +134,11 @@ void game_main(void) {
     /* Initialize the asset streaming system */
     game_init_assets();
 
-    /* Player model stays cached because it's accessed every frame.
-     * The LRU policy ensures it's never evicted. */
-    void *player_mdl = asset_load(&asset_mgr, ASSET_PLAYER_MODEL);
-    void *player_tex = asset_load(&asset_mgr, ASSET_PLAYER_TEXTURE);
+    /* PIN long-lived assets. These pointers are safe to store because
+     * pinned assets can NEVER be evicted. Without pinning, any subsequent
+     * asset_load() call could evict the slot and invalidate your pointer. */
+    void *player_mdl = asset_load_pinned(&asset_mgr, ASSET_PLAYER_MODEL);
+    void *player_tex = asset_load_pinned(&asset_mgr, ASSET_PLAYER_TEXTURE);
 
     /* Load first level */
     game_load_level(1);
@@ -144,8 +148,8 @@ void game_main(void) {
     while (1) {
         /* ... game logic ... */
 
-        /* Player assets are always available - accessed every frame
-         * keeps them hot in the LRU cache */
+        /* Player assets are PINNED - safe to use every frame.
+         * Without pin, these pointers could go stale after any load. */
         /* render_player(player_mdl, player_tex); */
 
         /* When transitioning levels: */
@@ -158,6 +162,10 @@ void game_main(void) {
         /* int hit_rate = cache_hit_rate(&asset_mgr.cache); */
         /* debug_print("Cache hit rate: %d%%\n", hit_rate); */
     }
+
+    /* Unpin before shutdown (good hygiene, prevents leak warnings) */
+    asset_unpin(&asset_mgr, ASSET_PLAYER_MODEL);
+    asset_unpin(&asset_mgr, ASSET_PLAYER_TEXTURE);
 
     /* Cleanup */
     asset_shutdown(&asset_mgr);
