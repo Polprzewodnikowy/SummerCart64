@@ -6,6 +6,7 @@
  */
 
 #include "asset_manager.h"
+#include "asset_debug.h"
 #include "lz4_decode.h"
 #include <string.h>
 
@@ -246,7 +247,10 @@ void *asset_load(asset_manager_t *mgr, uint32_t asset_id) {
 
     /* Try cache first */
     void *cached = cache_lookup(&mgr->cache, asset_id);
-    if (cached) return cached;
+    if (cached) {
+        ASSET_DBG_ON_LOAD(asset_id, 1, -1);
+        return cached;
+    }
 
     /* Cache miss - find in index */
     const asset_entry_t *entry = index_find(mgr, asset_id);
@@ -275,6 +279,7 @@ void *asset_load(asset_manager_t *mgr, uint32_t asset_id) {
     }
 
     /* Load from SD into slot */
+    ASSET_DBG_ON_LOAD(asset_id, 0, slot);
     return load_asset_into_slot(mgr, entry, slot);
 }
 
@@ -335,6 +340,8 @@ void asset_flush(asset_manager_t *mgr) {
 
 void asset_shutdown(asset_manager_t *mgr) {
     if (mgr->initialized) {
+        /* In debug mode, check for leaked pins before shutting down */
+        asset_debug_check_leaks(mgr);
         sd_deinit();
         mgr->initialized = false;
     }

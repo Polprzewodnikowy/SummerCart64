@@ -3,6 +3,7 @@
  */
 
 #include "asset_cache.h"
+#include "asset_debug.h"
 #include <string.h>
 
 void cache_init(asset_cache_t *cache, cache_slot_t *slots,
@@ -78,6 +79,11 @@ int cache_allocate(asset_cache_t *cache, uint32_t asset_id, bool *evicted) {
 
     if (victim < 0) return -1;  /* All slots busy loading */
 
+    /* Poison evicted slot memory for use-after-evict detection */
+    ASSET_DBG_ON_EVICT(cache->slots[victim].data,
+                       cache->config.slot_size,
+                       cache->slots[victim].asset_id);
+
     cache->slots[victim].asset_id = asset_id;
     cache->slots[victim].state = SLOT_LOADING;
     cache->slots[victim].lru_counter = ++cache->lru_clock;
@@ -106,9 +112,12 @@ bool cache_pin(asset_cache_t *cache, uint32_t asset_id) {
                 cache->pin_count++;
             }
             cache->slots[i].pin_count++;
+            ASSET_DBG_ON_PIN(asset_id, cache->slots[i].pin_count);
             return true;
         }
     }
+    ASSET_DBG_LOG("[ASSET_DBG] WARNING: PIN of asset %u failed (not in cache)\n",
+                  asset_id);
     return false;
 }
 
@@ -116,6 +125,7 @@ bool cache_unpin(asset_cache_t *cache, uint32_t asset_id) {
     for (uint32_t i = 0; i < cache->config.slot_count; i++) {
         if (cache->slots[i].asset_id == asset_id &&
             cache->slots[i].state == SLOT_READY) {
+            ASSET_DBG_ON_UNPIN(asset_id, cache->slots[i].pin_count);
             if (cache->slots[i].pin_count > 0) {
                 cache->slots[i].pin_count--;
                 if (cache->slots[i].pin_count == 0) {
@@ -125,6 +135,8 @@ bool cache_unpin(asset_cache_t *cache, uint32_t asset_id) {
             return true;
         }
     }
+    ASSET_DBG_LOG("[ASSET_DBG] WARNING: UNPIN of asset %u failed (not in cache)\n",
+                  asset_id);
     return false;
 }
 
