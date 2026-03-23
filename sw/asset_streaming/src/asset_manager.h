@@ -93,6 +93,19 @@ typedef enum {
     ASSET_ERR_NOT_INITIALIZED,  /* Manager not initialized */
 } asset_error_t;
 
+/**
+ * SD backend interface. Allows swapping the real SC64 hardware
+ * for a host-side file backend during testing.
+ *
+ * Set to NULL in asset_init_config_t to use real SC64 hardware.
+ */
+typedef struct {
+    uint32_t (*init)(void *ctx);
+    uint32_t (*deinit)(void *ctx);
+    uint32_t (*read_sectors)(void *ctx, void *dest, uint32_t sector, uint32_t count);
+    void *ctx;  /* Opaque context (e.g. FILE*, fd, etc.) */
+} asset_sd_backend_t;
+
 /* Initialization config */
 typedef struct {
     uint32_t    archive_base_sector;    /* SD sector where archive starts */
@@ -101,10 +114,11 @@ typedef struct {
     uint32_t    slot_size;              /* Size per cache slot */
     uint8_t    *staging_buffer;         /* Temp buffer for compressed reads */
     uint32_t    staging_size;           /* Size of staging buffer */
+    const asset_sd_backend_t *backend;  /* NULL = real SC64 hardware */
 } asset_init_config_t;
 
 /* Manager instance */
-typedef struct {
+typedef struct asset_manager_t {
     bool                initialized;
     uint32_t            archive_base_sector;    /* SD card base sector */
     asset_archive_header_t  header;             /* Cached archive header */
@@ -115,6 +129,7 @@ typedef struct {
     uint8_t            *staging_buffer;         /* Compressed data staging area */
     uint32_t            staging_size;
     asset_error_t       last_error;             /* Last error for debugging */
+    const asset_sd_backend_t *backend;          /* SD backend (NULL = SC64 hw) */
 } asset_manager_t;
 
 /**

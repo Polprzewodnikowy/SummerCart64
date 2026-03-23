@@ -11,7 +11,21 @@
 #include <string.h>
 
 /* -------------------------------------------------------------------
- * SC64 hardware interface (minimal standalone, no bootloader dependency)
+ * SD backend dispatch
+ *
+ * When a backend is provided, all SD operations go through it.
+ * When backend is NULL (production on real N64), use SC64 hardware.
+ * ------------------------------------------------------------------- */
+
+/* Forward declarations for backend dispatch */
+static uint32_t sd_init_dispatch(asset_manager_t *mgr);
+static uint32_t sd_deinit_dispatch(asset_manager_t *mgr);
+static uint32_t sd_read_dispatch(asset_manager_t *mgr, void *dest,
+                                  uint32_t sector, uint32_t count);
+
+#ifndef ASSET_HOST_BUILD
+/* -------------------------------------------------------------------
+ * SC64 hardware interface (only compiled for N64 target)
  * ------------------------------------------------------------------- */
 
 typedef volatile uint32_t io32_t;
@@ -30,12 +44,10 @@ typedef volatile uint32_t io32_t;
 #define PI_SR_DMA_BUSY      (1 << 0)
 #define PI_SR_IO_BUSY       (1 << 1)
 
-/* Wait for PI bus to be idle */
 static inline void pi_wait(void) {
     while (PI_REG_SR & (PI_SR_DMA_BUSY | PI_SR_IO_BUSY));
 }
 
-/* PI I/O read (32-bit, uncached) */
 static inline uint32_t pi_read(io32_t *addr) {
     pi_wait();
     uint32_t val = *addr;
@@ -43,14 +55,12 @@ static inline uint32_t pi_read(io32_t *addr) {
     return val;
 }
 
-/* PI I/O write (32-bit, uncached) */
 static inline void pi_write(io32_t *addr, uint32_t val) {
     pi_wait();
     *addr = val;
     pi_wait();
 }
 
-/* Execute an SC64 command and wait for completion */
 static uint32_t sc64_cmd(uint8_t cmd_id, uint32_t arg0, uint32_t arg1,
                          uint32_t *rsp0, uint32_t *rsp1) {
     pi_write(&SC64_REG_DATA0, arg0);
@@ -71,31 +81,57 @@ static uint32_t sc64_cmd(uint8_t cmd_id, uint32_t arg0, uint32_t arg1,
     return 0;
 }
 
-/* SC64 command IDs */
 #define CMD_SD_CARD_OP      ('i')
 #define CMD_SD_SECTOR_SET   ('I')
 #define CMD_SD_READ         ('s')
-
 #define SD_OP_INIT          (1)
 #define SD_OP_DEINIT        (0)
 
-/* Initialize SD card */
-static uint32_t sd_init(void) {
+static uint32_t sc64_sd_init(void) {
     return sc64_cmd(CMD_SD_CARD_OP, 0, SD_OP_INIT, NULL, NULL);
 }
 
-/* Deinitialize SD card */
-static uint32_t sd_deinit(void) {
+static uint32_t sc64_sd_deinit(void) {
     return sc64_cmd(CMD_SD_CARD_OP, 0, SD_OP_DEINIT, NULL, NULL);
 }
 
-/* Read sectors from SD directly to a PI-mapped address */
-static uint32_t sd_read_sectors(void *pi_address, uint32_t sector, uint32_t count) {
+static uint32_t sc64_sd_read_sectors(void *dest, uint32_t sector, uint32_t count) {
     uint32_t err;
     err = sc64_cmd(CMD_SD_SECTOR_SET, sector, 0, NULL, NULL);
     if (err) return err;
-    err = sc64_cmd(CMD_SD_READ, (uint32_t)pi_address, count, NULL, NULL);
+    err = sc64_cmd(CMD_SD_READ, (uint32_t)dest, count, NULL, NULL);
     return err;
+}
+
+#endif /* !ASSET_HOST_BUILD */
+
+/* Backend dispatch: routes to backend or SC64 hardware */
+static uint32_t sd_init_dispatch(asset_manager_t *mgr) {
+    if (mgr->backend) return mgr->backend->init(mgr->backend->ctx);
+#ifndef ASSET_HOST_BUILD
+    return sc64_sd_init();
+#else
+    return 1; /* No backend and no hardware */
+#endif
+}
+
+static uint32_t sd_deinit_dispatch(asset_manager_t *mgr) {
+    if (mgr->backend) return mgr->backend->deinit(mgr->backend->ctx);
+#ifndef ASSET_HOST_BUILD
+    return sc64_sd_deinit();
+#else
+    return 0;
+#endif
+}
+
+static uint32_t sd_read_dispatch(asset_manager_t *mgr, void *dest,
+                                  uint32_t sector, uint32_t count) {
+    if (mgr->backend) return mgr->backend->read_sectors(mgr->backend->ctx, dest, sector, count);
+#ifndef ASSET_HOST_BUILD
+    return sc64_sd_read_sectors(dest, sector, count);
+#else
+    return 1; /* No backend and no hardware */
+#endif
 }
 
 /* -------------------------------------------------------------------
@@ -129,7 +165,7 @@ static void *load_asset_into_slot(asset_manager_t *mgr, const asset_entry_t *ent
             return NULL;
         }
 
-        uint32_t err = sd_read_sectors(mgr->staging_buffer, sd_sector, entry->sector_count);
+        uint32_t err = sd_read_dispatch(mgr, mgr->staging_buffer, sd_sector, entry->sector_count);
         if (err) {
             mgr->last_error = ASSET_ERR_SD_READ;
             return NULL;
@@ -155,7 +191,7 @@ static void *load_asset_into_slot(asset_manager_t *mgr, const asset_entry_t *ent
             return NULL;
         }
 
-        uint32_t err = sd_read_sectors(slot_data, sd_sector, entry->sector_count);
+        uint32_t err = sd_read_dispatch(mgr, slot_data, sd_sector, entry->sector_count);
         if (err) {
             mgr->last_error = ASSET_ERR_SD_READ;
             return NULL;
@@ -176,15 +212,16 @@ asset_error_t asset_init(asset_manager_t *mgr, const asset_init_config_t *config
     mgr->archive_base_sector = config->archive_base_sector;
     mgr->staging_buffer = config->staging_buffer;
     mgr->staging_size = config->staging_size;
+    mgr->backend = config->backend;
 
     /* Initialize SD card */
-    if (sd_init()) {
+    if (sd_init_dispatch(mgr)) {
         mgr->last_error = ASSET_ERR_SD_INIT;
         return ASSET_ERR_SD_INIT;
     }
 
     /* Read archive header (1 sector) into staging buffer */
-    if (sd_read_sectors(config->staging_buffer, config->archive_base_sector, 1)) {
+    if (sd_read_dispatch(mgr, config->staging_buffer, config->archive_base_sector, 1)) {
         mgr->last_error = ASSET_ERR_SD_READ;
         return ASSET_ERR_SD_READ;
     }
@@ -209,7 +246,7 @@ asset_error_t asset_init(asset_manager_t *mgr, const asset_init_config_t *config
     uint32_t index_bytes = mgr->header.asset_count * sizeof(asset_entry_t);
     uint32_t index_sd_sector = config->archive_base_sector + mgr->header.index_sector;
 
-    if (sd_read_sectors(config->staging_buffer, index_sd_sector,
+    if (sd_read_dispatch(mgr, config->staging_buffer, index_sd_sector,
                         mgr->header.index_sector_count)) {
         mgr->last_error = ASSET_ERR_SD_READ;
         return ASSET_ERR_SD_READ;
@@ -342,7 +379,7 @@ void asset_shutdown(asset_manager_t *mgr) {
     if (mgr->initialized) {
         /* In debug mode, check for leaked pins before shutting down */
         asset_debug_check_leaks(mgr);
-        sd_deinit();
+        sd_deinit_dispatch(mgr);
         mgr->initialized = false;
     }
 }
