@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 *.so
 build/
+debugrom/build/
 test_cache
 test_archive.bin
