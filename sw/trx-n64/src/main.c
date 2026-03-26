@@ -50,6 +50,7 @@
 #include "render/n64_render.h"
 #include "render/n64_transform.h"
 #include "render/n64_room_draw.h"
+#include "render/n64_textures.h"
 #include "level/n64_level_loader.h"
 #include "level/tr_level_parse.h"
 #include "level/tr_types.h"
@@ -77,6 +78,9 @@ n64_level_state_t g_level_state;
 tr_level_t g_level;
 transform_state_t g_transform;
 room_draw_state_t g_room_draw;
+
+/* Texture pages (converted to N64 CI8 format) */
+static n64_texture_page_t g_tex_pages[N64_MAX_TEX_PAGES];
 
 /* Free-fly camera for milestone 2 (replaced by TRX camera in M5) */
 static tr_camera_t g_camera;
@@ -224,18 +228,20 @@ static bool load_level(uint32_t level_num) {
                    (N64_GAME_HEAP_SIZE - n64_mem_available()) / 1024,
                    N64_GAME_HEAP_SIZE / 1024);
 
-    /* Convert texture pages to N64 format */
+    /* Convert texture pages to N64 CI8 format — pixel-perfect, byte-for-byte
+     * preservation of original palette indices. Only the palette colors are
+     * converted from TR1's 6-bit RGB to RGBA5551. */
     if (g_level.tex_pages && g_level.tex_page_count > 0) {
-        display_printf("  Converting %d texture pages...\n",
+        display_printf("  Converting %d texture pages (CI8, faithful)...\n",
                        (int)g_level.tex_page_count);
-        n64_render_load_tex_pages(&g_renderer,
-                                   g_level.tex_pages,
-                                   g_level.palette,
-                                   g_level.tex_page_count);
+        n64_tex_init(g_tex_pages,
+                     g_level.tex_pages,
+                     g_level.palette,
+                     g_level.tex_page_count);
     }
 
-    /* Initialize room renderer */
-    room_draw_init(&g_room_draw, &g_level, &g_transform, &g_renderer);
+    /* Initialize room renderer with texture pages */
+    room_draw_init(&g_room_draw, &g_level, &g_transform, &g_renderer, g_tex_pages);
 
     /* Find Lara's starting position (object_id 0 is always Lara) */
     g_camera_room = 0;

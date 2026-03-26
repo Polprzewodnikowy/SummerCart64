@@ -68,6 +68,7 @@ PORT_SRCS = \
 	src/render/n64_render.c \
 	src/render/n64_transform.c \
 	src/render/n64_room_draw.c \
+	src/render/n64_textures.c \
 	src/level/n64_level_loader.c \
 	src/level/tr_level_parse.c
 
@@ -129,6 +130,8 @@ $(BUILD)/port_n64_transform.c.o: src/render/n64_transform.c
 $(BUILD)/port_n64_room_draw.c.o: src/render/n64_room_draw.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_level_parse.c.o: src/level/tr_level_parse.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_n64_textures.c.o: src/render/n64_textures.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # TRX game logic

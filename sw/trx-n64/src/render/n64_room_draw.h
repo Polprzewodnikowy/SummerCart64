@@ -13,6 +13,7 @@
 
 #include "n64_render.h"
 #include "n64_transform.h"
+#include "n64_textures.h"
 #include "../level/tr_types.h"
 
 /* Max rooms visible in one frame (portal recursion depth + breadth) */
@@ -55,6 +56,10 @@ typedef struct {
     /* Scratch buffer for transformed vertices */
     transformed_vertex_t vertex_buf[MAX_ROOM_VERTICES];
 
+    /* Texture state */
+    tmem_state_t tmem;
+    const n64_texture_page_t *tex_pages;
+
     /* Per-frame stats */
     uint32_t rooms_drawn;
     uint32_t faces_drawn;
@@ -72,7 +77,8 @@ typedef struct {
 void room_draw_init(room_draw_state_t *rds,
                     const tr_level_t *level,
                     transform_state_t *transform,
-                    n64_renderer_t *renderer);
+                    n64_renderer_t *renderer,
+                    const n64_texture_page_t *tex_pages);
 
 /*
  * Draw all visible rooms from the given camera room.
