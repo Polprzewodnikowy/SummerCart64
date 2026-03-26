@@ -36,6 +36,9 @@ PORT_SRCS = \
 	src/render/mw_terrain.c \
 	src/game/mw_save.c \
 	src/game/mw_script.c \
+	src/game/mw_character.c \
+	src/game/mw_dialogue.c \
+	src/world/mw_weather.c \
 	src/stubs.c
 
 # Object files
@@ -69,6 +72,12 @@ $(BUILD)/port_mw_save.c.o: src/game/mw_save.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_mw_script.c.o: src/game/mw_script.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_character.c.o: src/game/mw_character.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_dialogue.c.o: src/game/mw_dialogue.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_weather.c.o: src/world/mw_weather.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_stubs.c.o: src/stubs.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -82,6 +91,7 @@ $(BUILD)/mw-n64.bin: $(BUILD)/mw-n64.elf
 
 $(BUILD)/mw-n64.z64: $(BUILD)/mw-n64.bin
 	@$(PYTHON) ../trx-n64/tools/make_z64.py $< $@
+	@echo "Z64: $@ ($$(stat -c%s $@) bytes)"
 
 pack: tools/mw_pack.py
 	$(PYTHON) tools/mw_pack.py data/ $(BUILD)/
