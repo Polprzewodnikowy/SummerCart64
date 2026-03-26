@@ -381,6 +381,56 @@ void n64_render_frame_begin(n64_renderer_t *r) {
     /* Switch to 1-cycle textured mode */
     rdp_set_other_modes_1cycle(buf, true, true);
 
+    /*
+     * SET_COMBINE_MODE: shade × texture
+     *
+     * Combiner formula for 1-cycle mode:
+     *   Color = (TEXEL0 - 0) * SHADE + 0  → TEXEL0 * SHADE
+     *   Alpha = (0 - 0) * 0 + SHADE       → SHADE alpha
+     *
+     * This multiplies the texture color by the per-vertex shade,
+     * which is how TR1 lighting works (vertex light × texture).
+     *
+     * For flat-shaded (untextured) triangles:
+     *   Color = (SHADE - 0) * SHADE + 0   → SHADE only
+     *
+     * RDP SET_COMBINE_MODE (opcode 0x3C):
+     *   Word format encodes the A,B,C,D selectors for color and alpha
+     *   for both cycles. In 1-cycle mode, cycle 2 is pass-through.
+     *
+     * TEXEL0 * SHADE combiner:
+     *   sub_a_rgb_0 = COMBINED/TEXEL0 (1)
+     *   sub_b_rgb_0 = 0 (zero)
+     *   mul_rgb_0   = SHADE (4)
+     *   add_rgb_0   = 0 (zero)
+     */
+    {
+        /* Encode: (TEXEL0 - 0) * SHADE + 0 for color, SHADE for alpha */
+        uint64_t combine =
+            ((uint64_t)RDP_SET_COMBINE << 56)
+            /* Cycle 0 color: sub_a=TEXEL0(1), sub_b=0(31), mul=SHADE(4), add=0(7) */
+            | ((uint64_t)1  << 52)   /* sub_a_rgb_0 = TEXEL0 */
+            | ((uint64_t)31 << 28)   /* sub_b_rgb_0 = 0 */
+            | ((uint64_t)4  << 47)   /* mul_rgb_0 = SHADE */
+            | ((uint64_t)7  << 15)   /* add_rgb_0 = 0 */
+            /* Cycle 0 alpha: sub_a=0(7), sub_b=0(7), mul=0(7), add=SHADE(4) */
+            | ((uint64_t)7  << 44)   /* sub_a_a_0 = 0 */
+            | ((uint64_t)7  << 12)   /* sub_b_a_0 = 0 */
+            | ((uint64_t)7  << 41)   /* mul_a_0 = 0 */
+            | ((uint64_t)4  << 9)    /* add_a_0 = SHADE */
+            /* Cycle 1: pass-through (same as cycle 0 for 1-cycle) */
+            | ((uint64_t)0  << 37)   /* sub_a_rgb_1 = COMBINED */
+            | ((uint64_t)0  << 24)   /* sub_b_rgb_1 = COMBINED */
+            | ((uint64_t)0  << 32)   /* mul_rgb_1 = COMBINED */
+            | ((uint64_t)0  << 6)    /* add_rgb_1 = COMBINED */
+            | ((uint64_t)0  << 21)   /* sub_a_a_1 */
+            | ((uint64_t)0  << 3)    /* sub_b_a_1 */
+            | ((uint64_t)0  << 18)   /* mul_a_1 */
+            | ((uint64_t)0  << 0)    /* add_a_1 */
+            ;
+        rdp_emit(buf, combine);
+    }
+
     rdp_sync_pipe(buf);
 }
 

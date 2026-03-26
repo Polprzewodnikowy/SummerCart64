@@ -112,7 +112,7 @@ LDSCRIPT = N64-trx.ld
 
 # ---- Build rules ----
 
-all: $(BUILD)/trx-n64.bin
+all: $(BUILD)/trx-n64.z64
 
 # Bootloader infrastructure
 $(BUILD)/boot_%.S.o: $(BOOTLOADER_SRC)/%.S

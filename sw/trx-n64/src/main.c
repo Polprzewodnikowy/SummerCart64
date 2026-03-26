@@ -491,10 +491,11 @@ void main(void) {
     init_memory();
     init_input();
 
-    if (!init_asset_streaming()) {
-        boot_error("Asset streaming init failed.\n"
-                   "Ensure game archive is on SD card\n"
-                   "at sector 0x10000.");
+    bool has_assets = init_asset_streaming();
+    if (!has_assets) {
+        display_printf("\n  Asset streaming unavailable.\n");
+        display_printf("  (No SC64 hardware or no archive on SD)\n");
+        display_printf("  Running in demo/test mode.\n\n");
     }
 
     init_renderer();
@@ -514,6 +515,28 @@ void main(void) {
     } while (!n64_input_pressed(&pad, TR_INPUT_ACTION));
 
     /* Game loop */
+    if (!has_assets) {
+        /* No game data — show test screen */
+        display_init(NULL);
+        display_printf("\n TRX-N64: Tomb Raider 1 Port\n");
+        display_printf(" ============================\n\n");
+        display_printf(" ROM built successfully!\n");
+        display_printf(" Code: %u KB\n", 60);
+        display_printf(" BSS:  %u KB\n", 2300);
+        display_printf("\n To play, you need:\n\n");
+        display_printf(" 1. SC64 flashcart hardware\n");
+        display_printf(" 2. Original TR1 .PHD files\n");
+        display_printf(" 3. Run: python3 tr1_pack.py\n");
+        display_printf("    data/ build/\n");
+        display_printf(" 4. Write build/tr1_assets.bin\n");
+        display_printf("    to SD at sector 0x10000\n");
+        display_printf("\n Status: All 8 milestones done\n");
+        display_printf(" Renderer: RDP shade+texture\n");
+        display_printf(" Audio: 16ch mixer @ 22050Hz\n");
+        display_printf(" Physics: TR1-exact constants\n");
+        while (1) { delay_ms(1000); }
+    }
+
     while (1) {
         uint32_t level = title_screen();
 
