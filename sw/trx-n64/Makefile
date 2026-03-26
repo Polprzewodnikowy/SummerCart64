@@ -70,6 +70,9 @@ PORT_SRCS = \
 	src/render/n64_room_draw.c \
 	src/render/n64_textures.c \
 	src/render/n64_entity_draw.c \
+	src/render/n64_optimize.c \
+	src/audio/n64_audio.c \
+	src/audio/tr_sound.c \
 	src/anim/tr_anim.c \
 	src/game/tr_game.c \
 	src/game/tr_floor.c \
@@ -144,6 +147,12 @@ $(BUILD)/port_tr_level_parse.c.o: src/level/tr_level_parse.c
 $(BUILD)/port_n64_textures.c.o: src/render/n64_textures.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_n64_entity_draw.c.o: src/render/n64_entity_draw.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_n64_optimize.c.o: src/render/n64_optimize.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_n64_audio.c.o: src/audio/n64_audio.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_sound.c.o: src/audio/tr_sound.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_anim.c.o: src/anim/tr_anim.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@

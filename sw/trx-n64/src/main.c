@@ -40,8 +40,8 @@
  *   M4: Lara model + animation playback
  *   M5: Collision + movement (TRX game logic integration)
  *   M6: Full game logic (enemies, pickups, triggers, saves)
- *   M7: Audio (RSP mixer — original samples, faithful mixing)
- *   M8: Polish + optimization
+ *   M7: Audio (software mixer + N64 AI DMA, 3D positioning) ✓ (current)
+ *   M8: Optimization (Z-off, face sort, bbox cull, state batch) ✓ (current)
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -54,6 +54,7 @@
 #include "render/n64_entity_draw.h"
 #include "anim/tr_anim.h"
 #include "game/tr_game_shim.h"
+#include "audio/n64_audio.h"
 #include "level/n64_level_loader.h"
 #include "level/tr_level_parse.h"
 #include "level/tr_types.h"
@@ -76,6 +77,7 @@
 
 asset_manager_t g_asset_mgr;
 n64_renderer_t g_renderer;
+audio_state_t g_audio;
 n64_input_state_t g_input;
 n64_level_state_t g_level_state;
 tr_level_t g_level;
@@ -401,6 +403,9 @@ static void game_frame(void) {
     /* Debug overlay showing stats */
     n64_render_debug_overlay(&g_renderer);
 
+    /* Mix and submit one frame of audio to AI */
+    audio_mix_frame(&g_audio);
+
     /* End frame: flush RDP, swap buffers */
     n64_render_frame_end(&g_renderer);
 
@@ -485,6 +490,10 @@ void main(void) {
     }
 
     init_renderer();
+
+    boot_msg("Initializing audio...");
+    audio_init(&g_audio);
+    display_printf("  22050 Hz 16-bit stereo, %d channels\n", AUDIO_MAX_CHANNELS);
 
     boot_msg("\nAll systems initialized.");
     boot_msg("Press A to continue.");
