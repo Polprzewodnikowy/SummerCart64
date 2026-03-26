@@ -16,9 +16,16 @@
  */
 
 #include "tr_game_shim.h"
+#include <stddef.h>
 
 extern fix16_t tr_sin(int32_t angle);
 extern fix16_t tr_cos(int32_t angle);
+
+/* Object IDs needed by creature init */
+#define O_WOLF      7
+#define O_BAT       9
+#define O_T_REX     18
+#define O_RAPTOR    19
 
 /* -------------------------------------------------------------------
  * Creature moods (exact TR1 values)
@@ -281,8 +288,4 @@ int game_creature_init(int16_t object_id) {
     return creature_count++;
 }
 
-/* Object IDs referenced from tr_objects.c */
-#define O_WOLF      7
-#define O_BAT       9
-#define O_T_REX     18
-#define O_RAPTOR    19
+/* (Object IDs defined at top of file) */

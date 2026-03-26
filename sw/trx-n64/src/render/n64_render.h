@@ -34,6 +34,7 @@
  * N64 Video Interface / RDP register addresses
  * ------------------------------------------------------------------- */
 
+#ifndef VI_BASE
 #define VI_BASE             0xA4400000
 #define VI_STATUS           (*(volatile uint32_t *)(VI_BASE + 0x00))
 #define VI_ORIGIN           (*(volatile uint32_t *)(VI_BASE + 0x04))
@@ -50,10 +51,14 @@
 #define VI_X_SCALE           (*(volatile uint32_t *)(VI_BASE + 0x30))
 #define VI_Y_SCALE           (*(volatile uint32_t *)(VI_BASE + 0x34))
 
+#endif /* VI_BASE */
+
+#ifndef DPC_BASE
 #define DPC_BASE            0xA4100000
 #define DPC_START           (*(volatile uint32_t *)(DPC_BASE + 0x00))
 #define DPC_END             (*(volatile uint32_t *)(DPC_BASE + 0x04))
 #define DPC_STATUS          (*(volatile uint32_t *)(DPC_BASE + 0x0C))
+#endif /* DPC_BASE */
 
 /* -------------------------------------------------------------------
  * Display configuration

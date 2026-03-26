@@ -15,6 +15,7 @@
  */
 
 #include "tr_game_shim.h"
+#include <stddef.h>
 
 extern fix16_t tr_sin(int32_t angle);
 extern fix16_t tr_cos(int32_t angle);

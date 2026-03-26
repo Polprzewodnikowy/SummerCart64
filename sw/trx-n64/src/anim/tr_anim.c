@@ -369,7 +369,7 @@ void tr_anim_draw_entity(const tr_item_t *item,
                           const tr_level_t *level,
                           tr_matrix_stack_t *ms,
                           const transform_state_t *ts,
-                          struct rdp_cmd_buffer *buf) {
+                          void *rdp_buf) {
     if (obj->mesh_count <= 0 || obj->mesh_count > TR_MAX_MESHES_PER_OBJECT)
         return;
 
@@ -439,7 +439,7 @@ void tr_anim_draw_entity(const tr_item_t *item,
              * Stubbed for now — next sub-milestone. */
             (void)mesh;
             (void)ts;
-            (void)buf;
+            (void)rdp_buf;
         }
     }
 

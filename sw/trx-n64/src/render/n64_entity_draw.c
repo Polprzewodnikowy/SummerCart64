@@ -217,6 +217,6 @@ void n64_draw_room_entities(const tr_level_t *level,
 
         /* Draw with animation */
         tr_anim_draw_entity(item, obj, &entity_anims[i], level,
-                             ms, ts, (struct rdp_cmd_buffer *)buf);
+                             ms, ts, (void *)buf);
     }
 }

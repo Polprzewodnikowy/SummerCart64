@@ -19,6 +19,7 @@
  */
 
 #include "tr_game_shim.h"
+#include <stddef.h>
 
 /* -------------------------------------------------------------------
  * TR1 object IDs (exact values from the original engine)

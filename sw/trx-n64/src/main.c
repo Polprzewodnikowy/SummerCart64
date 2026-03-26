@@ -60,8 +60,8 @@
 #include "level/tr_types.h"
 
 /* Asset streaming system */
-#include "../asset_streaming/src/asset_manager.h"
-#include "../asset_streaming/src/asset_debug.h"
+#include "asset_manager.h"
+#include "asset_debug.h"
 
 /* Bootloader infrastructure */
 #include "display.h"
@@ -84,8 +84,9 @@ tr_level_t g_level;
 transform_state_t g_transform;
 room_draw_state_t g_room_draw;
 
-/* Texture pages (converted to N64 CI8 format) */
-static n64_texture_page_t g_tex_pages[N64_MAX_TEX_PAGES];
+/* Texture pages — allocated from game heap at level load time.
+ * Each page is ~64KB, so 16 pages = 1MB. Too large for static storage. */
+static n64_texture_page_t *g_tex_pages = NULL;
 
 /* Animation state per entity (used by renderer, synced from game state) */
 #define MAX_ENTITIES    256
@@ -241,12 +242,19 @@ static bool load_level(uint32_t level_num) {
      * preservation of original palette indices. Only the palette colors are
      * converted from TR1's 6-bit RGB to RGBA5551. */
     if (g_level.tex_pages && g_level.tex_page_count > 0) {
-        display_printf("  Converting %d texture pages (CI8, faithful)...\n",
-                       (int)g_level.tex_page_count);
-        n64_tex_init(g_tex_pages,
-                     g_level.tex_pages,
-                     g_level.palette,
-                     g_level.tex_page_count);
+        int page_count = g_level.tex_page_count;
+        if (page_count > N64_MAX_TEX_PAGES) page_count = N64_MAX_TEX_PAGES;
+        display_printf("  Converting %d texture pages (CI8, faithful)...\n", page_count);
+        g_tex_pages = (n64_texture_page_t *)n64_mem_alloc(
+            sizeof(n64_texture_page_t) * page_count);
+        if (!g_tex_pages) {
+            display_printf("  WARNING: not enough heap for texture pages!\n");
+        } else {
+                n64_tex_init(g_tex_pages,
+                         g_level.tex_pages,
+                         g_level.palette,
+                         g_level.tex_page_count);
+        }
     }
 
     /* Initialize room renderer with texture pages */

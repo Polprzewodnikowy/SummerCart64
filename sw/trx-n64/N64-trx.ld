@@ -20,10 +20,10 @@
 
 MEMORY {
     exceptions  (rx)  : org = 0x80000000, len = 0x400
-    ram         (rwx) : org = 0x80000400, len = 1M - 0x400
-    framebuf0   (rw)  : org = 0x80100000, len = 160k
-    framebuf1   (rw)  : org = 0x80128000, len = 160k
-    zbuffer     (rw)  : org = 0x80150000, len = 160k
+    ram         (rwx) : org = 0x80000400, len = 4M - 0x400
+    framebuf0   (rw)  : org = 0x80400000, len = 160k
+    framebuf1   (rw)  : org = 0x80428000, len = 160k
+    zbuffer     (rw)  : org = 0x80450000, len = 160k
 }
 
 ENTRY(entry_handler)

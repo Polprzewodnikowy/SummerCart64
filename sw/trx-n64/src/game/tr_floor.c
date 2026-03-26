@@ -18,6 +18,7 @@
  */
 
 #include "tr_game_shim.h"
+#include <stddef.h>
 
 #include <string.h>
 

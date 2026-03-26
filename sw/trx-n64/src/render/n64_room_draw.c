@@ -24,6 +24,11 @@
 
 #include <string.h>
 
+/* Forward declarations */
+static void transform_vertex_direct(const transform_state_t *ts,
+                                     int32_t wx, int32_t wy, int32_t wz,
+                                     transformed_vertex_t *out);
+
 /* -------------------------------------------------------------------
  * RDP triangle command builder
  *

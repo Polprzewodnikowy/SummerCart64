@@ -83,20 +83,16 @@ PORT_SRCS = \
 	src/game/tr_objects.c \
 	src/game/tr_creature.c \
 	src/level/n64_level_loader.c \
-	src/level/tr_level_parse.c
+	src/level/tr_level_parse.c \
+	src/stubs.c
 
 # TRX game logic (portable C files)
 # These are added incrementally as we integrate each subsystem.
 # Start with core types and math, then rooms, items, etc.
-TRX_GAME_SRCS = \
-	game/random.c \
-	game/matrix.c \
-	game/viewport.c \
-	game/game_buf.c
-
-TRX_CORE_SRCS = \
-	core/memory.c \
-	core/vector.c
+# TRX game logic files — not compiled yet (our port has its own implementations).
+# Will be enabled incrementally as we replace our shim with TRX's original code.
+TRX_GAME_SRCS =
+TRX_CORE_SRCS =
 
 # ---- Object file generation ----
 
@@ -116,7 +112,7 @@ LDSCRIPT = N64-trx.ld
 
 # ---- Build rules ----
 
-all: $(BUILD)/trx-n64.z64
+all: $(BUILD)/trx-n64.bin
 
 # Bootloader infrastructure
 $(BUILD)/boot_%.S.o: $(BOOTLOADER_SRC)/%.S
@@ -154,6 +150,8 @@ $(BUILD)/port_n64_audio.c.o: src/audio/n64_audio.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_sound.c.o: src/audio/tr_sound.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_stubs.c.o: src/stubs.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_anim.c.o: src/anim/tr_anim.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_game.c.o: src/game/tr_game.c
@@ -186,13 +184,16 @@ $(BUILD)/trx-n64.elf: $(ALL_OBJS) $(LDSCRIPT)
 	@echo ""
 	@$(SIZE) -B -d $@
 
-# Convert to N64 ROM
-$(BUILD)/trx-n64.z64: $(BUILD)/trx-n64.elf
-	@cp $< $<.stripped
-	@$(STRIP) -s $<.stripped
-	@$(N64_TOOL) --title "TOMB RAIDER N64" --output $@ --align 256 $<.stripped
+# Convert to N64 ROM (raw binary from ELF, no n64tool dependency)
+$(BUILD)/trx-n64.bin: $(BUILD)/trx-n64.elf
+	@$(OBJCOPY) -O binary $< $@
 	@echo ""
 	@echo "ROM: $@ ($$(stat -c%s $@ 2>/dev/null || stat -f%z $@ 2>/dev/null) bytes)"
+
+# Also produce a .z64 with the N64 header (first 64 bytes = PI settings + entry point)
+$(BUILD)/trx-n64.z64: $(BUILD)/trx-n64.bin
+	@python3 tools/make_z64.py $< $@
+	@echo "Z64: $@ ($$(stat -c%s $@ 2>/dev/null || stat -f%z $@ 2>/dev/null) bytes)"
 
 # ---- Asset packing ----
 

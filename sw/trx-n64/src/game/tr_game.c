@@ -5,6 +5,7 @@
  */
 
 #include "tr_game_shim.h"
+#include <stddef.h>
 #include "../platform/n64_platform.h"
 
 #include <string.h>

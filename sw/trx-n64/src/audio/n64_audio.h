@@ -45,7 +45,9 @@
  * N64 Audio Interface registers
  * ------------------------------------------------------------------- */
 
+#ifndef AI_BASE
 #define AI_BASE             0xA4500000
+#endif
 #define AI_DRAM_ADDR        (*(volatile uint32_t *)(AI_BASE + 0x00))
 #define AI_LEN              (*(volatile uint32_t *)(AI_BASE + 0x04))
 #define AI_CONTROL          (*(volatile uint32_t *)(AI_BASE + 0x08))
