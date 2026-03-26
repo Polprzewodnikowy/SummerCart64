@@ -38,7 +38,12 @@ PORT_SRCS = \
 	src/game/mw_script.c \
 	src/game/mw_character.c \
 	src/game/mw_dialogue.c \
+	src/game/mw_ai.c \
+	src/game/mw_spells.c \
+	src/game/mw_script_exec.c \
+	src/esm/mw_esm_dialogue.c \
 	src/world/mw_weather.c \
+	src/render/mw_ui.c \
 	src/stubs.c
 
 # Object files
@@ -77,6 +82,16 @@ $(BUILD)/port_mw_character.c.o: src/game/mw_character.c
 $(BUILD)/port_mw_dialogue.c.o: src/game/mw_dialogue.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_mw_weather.c.o: src/world/mw_weather.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_ai.c.o: src/game/mw_ai.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_spells.c.o: src/game/mw_spells.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_script_exec.c.o: src/game/mw_script_exec.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_esm_dialogue.c.o: src/esm/mw_esm_dialogue.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_mw_ui.c.o: src/render/mw_ui.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_stubs.c.o: src/stubs.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
