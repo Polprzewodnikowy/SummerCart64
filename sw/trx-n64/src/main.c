@@ -53,6 +53,7 @@
 #include "render/n64_textures.h"
 #include "render/n64_entity_draw.h"
 #include "anim/tr_anim.h"
+#include "game/tr_game_shim.h"
 #include "level/n64_level_loader.h"
 #include "level/tr_level_parse.h"
 #include "level/tr_types.h"
@@ -84,14 +85,13 @@ room_draw_state_t g_room_draw;
 /* Texture pages (converted to N64 CI8 format) */
 static n64_texture_page_t g_tex_pages[N64_MAX_TEX_PAGES];
 
-/* Animation state per entity */
+/* Animation state per entity (used by renderer, synced from game state) */
 #define MAX_ENTITIES    256
 static tr_anim_state_t g_entity_anims[MAX_ENTITIES];
 static tr_matrix_stack_t g_matrix_stack;
 
-/* Free-fly camera for milestone 2 (replaced by TRX camera in M5) */
-static tr_camera_t g_camera;
-static int16_t g_camera_room = 0;
+/* Game mode toggle (free-fly debug vs real game) */
+static bool g_debug_camera = false;
 
 /*
  * TR1 runs at 30 fps (33.33ms per frame).
@@ -250,47 +250,28 @@ static bool load_level(uint32_t level_num) {
     /* Initialize room renderer with texture pages */
     room_draw_init(&g_room_draw, &g_level, &g_transform, &g_renderer, g_tex_pages);
 
-    /* Initialize entity animation states from level item data.
-     * Each entity starts at its object's first animation. */
+    /* Initialize game state — this sets up all entities, finds Lara,
+     * initializes the camera, and prepares the game for play.
+     * All physics constants and state machine values are TR1-exact. */
+    game_init(&g_game, &g_level);
     tr_matrix_init(&g_matrix_stack);
+
+    /* Sync renderer's entity anim array from game state */
     memset(g_entity_anims, 0, sizeof(g_entity_anims));
-    for (int i = 0; i < g_level.item_count && i < MAX_ENTITIES; i++) {
-        const tr_item_t *item = &g_level.items[i];
-        /* Find object definition for this entity type */
-        for (int o = 0; o < g_level.object_count; o++) {
-            if (g_level.objects[o].object_id == item->object_id) {
-                const tr_object_def_t *obj = &g_level.objects[o];
-                g_entity_anims[i].anim_num = obj->anim_idx;
-                if (obj->anim_idx >= 0 && obj->anim_idx < g_level.anim_count) {
-                    g_entity_anims[i].frame_num = g_level.anims[obj->anim_idx].frame_base;
-                    g_entity_anims[i].current_state = g_level.anims[obj->anim_idx].state_id;
-                }
-                g_entity_anims[i].goal_state = g_entity_anims[i].current_state;
-                break;
-            }
-        }
+    for (int i = 0; i < g_game.item_count && i < MAX_ENTITIES; i++) {
+        g_entity_anims[i] = g_game.items[i].anim;
     }
-    display_printf("  Entities initialized: %d\n", g_level.item_count);
-
-    /* Find Lara's starting position (object_id 0 is always Lara) */
-    g_camera_room = 0;
-    for (int i = 0; i < g_level.item_count; i++) {
-        if (g_level.items[i].object_id == 0) {  /* Lara */
-            g_camera.x = g_level.items[i].pos.x;
-            g_camera.y = g_level.items[i].pos.y - 512; /* Above Lara's head */
-            g_camera.z = g_level.items[i].pos.z;
-            g_camera.rot_y = g_level.items[i].rotation;
-            g_camera.rot_x = 0;
-            g_camera.fov = 14563;  /* TR1 default ~80° */
-            g_camera_room = g_level.items[i].room;
-            display_printf("  Lara at room %d: (%d, %d, %d)\n",
-                           g_camera_room,
-                           g_camera.x, g_camera.y, g_camera.z);
-            break;
-        }
+    display_printf("  Entities initialized: %d\n", g_game.item_count);
+    if (g_game.lara_item) {
+        display_printf("  Lara at room %d: (%d, %d, %d)\n",
+                       g_game.lara_item->room_num,
+                       g_game.lara_item->pos.x,
+                       g_game.lara_item->pos.y,
+                       g_game.lara_item->pos.z);
     }
 
-    transform_set_camera(&g_transform, &g_camera);
+    /* Set camera from game state (game_init found Lara and positioned camera) */
+    transform_set_camera(&g_transform, &g_game.camera);
 
     display_printf("\nLevel loaded. Press A to explore.\n");
     display_printf("Analog=move, C=look, Z=down, R=up\n");
@@ -316,21 +297,19 @@ static bool load_level(uint32_t level_num) {
 #define TURN_SPEED  512     /* Angle units per frame */
 
 static void update_free_camera(void) {
+    tr_camera_t *cam = &g_game.camera;
+
     /* Rotation with C-buttons and analog stick */
     if (n64_input_held(&g_input, TR_INPUT_LOOK_UP))
-        g_camera.rot_x -= TURN_SPEED;
+        cam->rot_x -= TURN_SPEED;
     if (n64_input_held(&g_input, TR_INPUT_LOOK_DOWN))
-        g_camera.rot_x += TURN_SPEED;
-
-    /* Horizontal rotation from analog stick X */
+        cam->rot_x += TURN_SPEED;
     if (g_input.analog_x > 12 || g_input.analog_x < -12)
-        g_camera.rot_y += g_input.analog_x * 8;
+        cam->rot_y += g_input.analog_x * 8;
 
-    /* Clamp pitch */
-    if (g_camera.rot_x > 16384) g_camera.rot_x = 16384;
-    if (g_camera.rot_x < -16384) g_camera.rot_x = -16384;
+    if (cam->rot_x > 16384) cam->rot_x = 16384;
+    if (cam->rot_x < -16384) cam->rot_x = -16384;
 
-    /* Forward/back movement */
     int32_t speed = 0;
     if (g_input.analog_y > 12)
         speed = (g_input.analog_y * FLY_SPEED) >> 7;
@@ -339,22 +318,17 @@ static void update_free_camera(void) {
     if (n64_input_held(&g_input, TR_INPUT_UP)) speed = FLY_SPEED;
     if (n64_input_held(&g_input, TR_INPUT_DOWN)) speed = -FLY_SPEED;
 
-    /* Apply movement in camera direction */
-    fix16_t sy = tr_sin(g_camera.rot_y);
-    fix16_t cy = tr_cos(g_camera.rot_y);
-    g_camera.x += (speed * (sy >> 8)) >> 8;
-    g_camera.z += (speed * (cy >> 8)) >> 8;
+    fix16_t sy = tr_sin(cam->rot_y);
+    fix16_t cy = tr_cos(cam->rot_y);
+    cam->x += (speed * (sy >> 8)) >> 8;
+    cam->z += (speed * (cy >> 8)) >> 8;
 
-    /* Vertical movement */
-    if (n64_input_held(&g_input, TR_INPUT_LOOK))     /* R = up */
-        g_camera.y -= FLY_SPEED;
-    if (n64_input_held(&g_input, TR_INPUT_DRAW))      /* Z = down */
-        g_camera.y += FLY_SPEED;
+    if (n64_input_held(&g_input, TR_INPUT_LOOK))
+        cam->y -= FLY_SPEED;
+    if (n64_input_held(&g_input, TR_INPUT_DRAW))
+        cam->y += FLY_SPEED;
 
-    /* Update which room the camera is in */
-    /* TODO: proper room lookup from sector data */
-
-    transform_set_camera(&g_transform, &g_camera);
+    transform_set_camera(&g_transform, cam);
 }
 
 /* -------------------------------------------------------------------
@@ -367,14 +341,50 @@ static void game_frame(void) {
     /* Poll input */
     n64_input_poll(&g_input);
 
-    /* Update camera (free-fly for M2, TRX camera for M5+) */
-    update_free_camera();
+    /* Map N64 controller to game input bits */
+    game_map_input(&g_game, &g_input);
+
+    /* Toggle debug camera with L+R+Start */
+    if (n64_input_held(&g_input, TR_INPUT_LOOK) &&
+        n64_input_pressed(&g_input, TR_INPUT_PAUSE)) {
+        g_debug_camera = !g_debug_camera;
+    }
+
+    if (g_debug_camera) {
+        /* Free-fly debug camera (M2 behavior) */
+        update_free_camera();
+    } else {
+        /*
+         * Game logic tick — exact TR1 update order:
+         *   1. Lara control (movement, physics, state machine)
+         *   2. Other item control (enemies, traps — M6)
+         *   3. Camera update (chase Lara)
+         *
+         * All physics, collision, and state transitions use
+         * exact TR1 constants and algorithms.
+         */
+        game_frame_tick(&g_game);
+
+        /* Sync camera from game state to transform pipeline */
+        transform_set_camera(&g_transform, &g_game.camera);
+    }
+
+    /* Sync entity animation states from game to renderer */
+    for (int i = 0; i < g_game.item_count && i < MAX_ENTITIES; i++) {
+        g_entity_anims[i] = g_game.items[i].anim;
+    }
+
+    /* Determine camera room for rendering */
+    int16_t camera_room = g_debug_camera ?
+        game_get_room_at(&g_game, g_game.camera_room,
+                          g_game.camera.x, g_game.camera.y, g_game.camera.z) :
+        g_game.camera_room;
 
     /* Begin rendering */
     n64_render_frame_begin(&g_renderer);
 
     /* Draw all visible rooms from camera's current room */
-    room_draw_frame(&g_room_draw, g_camera_room);
+    room_draw_frame(&g_room_draw, camera_room);
 
     /* Draw entities in visible rooms */
     for (int i = 0; i < g_room_draw.visible_count; i++) {
@@ -388,25 +398,15 @@ static void game_frame(void) {
                                 MAX_ENTITIES);
     }
 
-    /* Advance entity animations (30fps tick, exact TR1 timing) */
-    for (int i = 0; i < g_level.item_count && i < MAX_ENTITIES; i++) {
-        const tr_item_t *item = &g_level.items[i];
-        for (int o = 0; o < g_level.object_count; o++) {
-            if (g_level.objects[o].object_id == item->object_id) {
-                tr_anim_advance(&g_entity_anims[i], &g_level, &g_level.objects[o]);
-                break;
-            }
-        }
-    }
-
     /* Debug overlay showing stats */
     n64_render_debug_overlay(&g_renderer);
 
     /* End frame: flush RDP, swap buffers */
     n64_render_frame_end(&g_renderer);
 
-    /* Frame pacing: TR1 runs at exactly 30 fps.
-     * This preserves original gameplay timing. */
+    /* Frame pacing: TR1 runs at exactly 30 fps (33ms per frame).
+     * This preserves original gameplay timing — all physics,
+     * animation, and AI are tied to this frame rate. */
     uint32_t elapsed_ms = (n64_timer_ticks() - frame_start) / N64_TICKS_PER_MS;
     if (elapsed_ms < TR1_FRAME_MS) {
         n64_timer_wait_ms(TR1_FRAME_MS - elapsed_ms);

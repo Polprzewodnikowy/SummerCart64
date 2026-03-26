@@ -71,6 +71,11 @@ PORT_SRCS = \
 	src/render/n64_textures.c \
 	src/render/n64_entity_draw.c \
 	src/anim/tr_anim.c \
+	src/game/tr_game.c \
+	src/game/tr_floor.c \
+	src/game/tr_collision.c \
+	src/game/tr_lara.c \
+	src/game/tr_camera.c \
 	src/level/n64_level_loader.c \
 	src/level/tr_level_parse.c
 
@@ -138,6 +143,16 @@ $(BUILD)/port_n64_textures.c.o: src/render/n64_textures.c
 $(BUILD)/port_n64_entity_draw.c.o: src/render/n64_entity_draw.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_anim.c.o: src/anim/tr_anim.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_game.c.o: src/game/tr_game.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_floor.c.o: src/game/tr_floor.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_collision.c.o: src/game/tr_collision.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_lara.c.o: src/game/tr_lara.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_camera.c.o: src/game/tr_camera.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # TRX game logic
