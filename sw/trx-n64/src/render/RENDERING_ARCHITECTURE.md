@@ -128,8 +128,43 @@ The initial implementation uses the **Direct CI8 TMEM Load** path:
 This is correct and faithful for all faces with tiles ≤64×64 pixels.
 The deferred UV pipeline will be added for the remaining large-tile faces.
 
+## James Lambert Techniques (Full Detail)
+
+### Mipmap LOD Selection
+LOD selection: `lod = floor(0.5 * log2(screen_pixel_area))`
+For angled faces: 3 samples (closest/farthest/middle texel to camera),
+compute LOD boundary, draw each LOD with dividing plane for clean seam.
+
+### Tile Streaming Budget
+Per frame N tile loads from SD. Most tiles reused frame-to-frame.
+When budget exceeded: skip, use highest-detail available fallback.
+Lowest 2 LODs always resident, never evicted — guaranteed fallback.
+
+### Frustum Tile Culling
+Per face: test against frustum. If partial intersection, compute
+overlap in texture image space, only load/draw intersecting tiles.
+
+### Z-Buffer Disable
+Saves 48 bits written + 16 read per pixel (80→16 bits per pixel).
+Requires back-to-front sort. Some overdraw but net bandwidth win.
+
+### Two-Pass Far/Near
+Pass 1: far objects scaled ~100×, low detail. Pass 2: near, full.
+Avoids Z-fighting at distance. Layer high over low.
+
+### Terrain Rendering Order
+1. Skybox. 2. Lowest detail tiles (frustum culled). 3. If close,
+replace with higher detail (recursive). Back-to-front, Z off.
+Bake terrain chunks: geometry + texture + vertex lighting in one.
+4 chunks → 1 lower-detail chunk for distance.
+
+### Fog Optimization
+Distant terrain doesn't use vertex colors (baked). Free the combiner:
+- RGB fog interpolation (3-channel fog color over texture)
+- Top-to-bottom fog gradient via freed vertex color channel
+
 ## References
 
 - HailToDodongo's tiny3d: https://github.com/HailToDodongo/tiny3d
-- James Lambert's portal64 megatextures
+- James Lambert's portal64 rendering techniques
 - TR1 texture format: TRX src/trx/game/level/sections/textures.c
