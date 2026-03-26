@@ -37,6 +37,10 @@ static inline uint16_t read_u16(esm_reader_t *r) {
     return v;
 }
 
+static inline int16_t read_s16(esm_reader_t *r) {
+    return (int16_t)read_u16(r);
+}
+
 static inline uint32_t read_u32(esm_reader_t *r) {
     if (!has_bytes(r, 4)) return 0;
     uint32_t v = r->data[r->pos]
