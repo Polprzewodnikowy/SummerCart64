@@ -1,0 +1,51 @@
+# Post-processing HUD
+
+Abovewater: "Над водой"
+ActiveShaders: "Включенные шейдеры"
+Author: "Автор"
+Description: "Описание"
+InactiveShaders: "Выключенные шейдеры"
+InExteriors: "Вне помещений"
+InInteriors: "В помещениях"
+KeyboardControls: |
+    Управление с помощью клавиатуры:
+
+    Shift+Right-Arrow > Включить шейдер
+    Shift+Left-Arrow > Выключить шейдер
+    Shift+Up-Arrow > Передвинуть шейдер выше
+    Shift+Down-Arrow > Передвинуть шейдер ниже
+PostProcessHUD: "Настройки постобработки"
+ResetShader: "Обнулить настройки этого шейдера"
+ShaderLocked: "Заблокирован"
+ShaderLockedDescription: "Не может быть выключен или передвинут, управляется внешним Lua-скриптом"
+ShaderResetUniform: "x"
+Underwater: "Под водой"
+Version: "Версия"
+
+
+# Built-in post-processing shaders
+
+AdjustmentsDescription: "Коррекция цвета."
+DebugDescription: "Отладочный шейдер."
+DebugHeaderDepth: "Буфер глубины"
+DebugHeaderNormals: "Нормали"
+DisplayDepthName: "Визуализация буфера глубины"
+DisplayDepthFactorDescription: "Определяет соотношение между значением глубины пикселя и его цветом. Чем выше значение, тем ярче будет изображение."
+DisplayDepthFactorName: "Соотношение цвета"
+DisplayNormalsName: "Визуализация нормалей"
+NormalsInWorldSpace: "Показывать нормали мирового пространства"
+ContrastLevelDescription: "Контрастность изображения"
+ContrastLevelName: "Контрастность"
+GammaLevelDescription: "Яркость изображения"
+GammaLevelName: "Яркость"
+BloomDescription: "Шейдер блума, совершающий вычисления на основе (приблизительно) линейного освещения."
+StrengthLevelName: "Сила"
+StrengthLevelDescription: "Сила эффекта"
+RadiusLevelName: "Радиус"
+RadiusLevelDescription: "Радиус эффекта"
+SkyFactorLevelName: "Множитель неба"
+SkyFactorLevelDescription: "Множитель для освещения напрямую от неба."
+BloomClampLevelName: "Уровень привязки"
+BloomClampLevelDescription: "Яркость, к которой привязываются более яркие пиксели блума при смешивании со сценой."
+BloomThresholdLevelName: "Порог"
+BloomThresholdLevelDescription: "Пиксели темнее этого значения при вычислении размытия игнорируются. Не влияет на небо."

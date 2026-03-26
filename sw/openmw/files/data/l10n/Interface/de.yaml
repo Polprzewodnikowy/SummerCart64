@@ -1,0 +1,75 @@
+Ask: "Fragen"
+Back: "Zurück"
+Barter: "Handeln"
+Buy: "Kaufen"
+Cancel: "Abbruch"
+Center: "Zentrieren"
+Close: "Schließen"
+Container: "Behälter"
+Copy: "Kopieren"
+Create: "Herstellen"
+Delete: "Entfernen"
+DisposeOfCorpse: "Leiche beseitigen"
+Done: "Fertig"
+Drop: "Ablegen"
+DurationDay: "{days} d "
+DurationHour: "{hours} h "
+DurationMinute: "{minutes} min "
+# There is no abbreviation for "Monat" ("month") in German, so full terms are used instead.
+DurationMonth: |-
+ {months, plural,
+   one{{months} Monat }
+   other{{months} Monate }
+ }
+DurationSecond: "{seconds} s "
+# In German, "J."/"Jr." exist as abbreviations for "Jahr" ("year") but are seldomly used.
+# A plural version of these does not exist (at least, to my knowledge).
+#
+# To avoid confusion, use full terms instead.
+DurationYear: |-
+ {years, plural,
+   one{{years} Jahr }
+   other{{years} Jahre }
+ }
+Equip: "Verwenden"
+Face: "Gesicht"
+Goodbye: "Lebt wohl!"
+Hair: "Haar"
+Info: "Info"
+Inventory: "Inventar"
+Item: "Gegenstand"
+Local: "Lokal"
+MagicEffects: "Magischer Effekt"
+Mouse: "Maus"
+Move: "Bewegen"
+Next: "Weiter"
+No: "Nein"
+# This one is a bit tricky since it can be translated to
+# "keiner"/"keine"/"keines", "nichts", or "leer" ("empty") depending on context.
+#
+# Using the "keine" option for now.
+None: "Keine"
+NotAvailableShort: "N/A"
+Off: "Aus"
+Offer: "Angebot"
+OK: "OK"
+On: "An"
+Prev: "Zurück"
+Repair: "Reparieren"
+Reset: "Zurücksetzen"
+Rest: "Rasten"
+ScrollDown: "Nach unten scrollen"
+ScrollUp: "Nach oben scrollen"
+Select: "Auswählen"
+Sell: "Verkaufen"
+Sex: "Geschlecht"
+Share: "Teilen"
+Soul: "Seele"
+Take: "Nehmen"
+TakeAll: "Alles nehmen"
+Topics: "Themen"
+Travel: "Reisen"
+UntilHealed: "Bis geheilt"
+Wait: "Warten"
+World: "Welt"
+Yes: "Ja"

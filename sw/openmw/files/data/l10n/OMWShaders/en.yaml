@@ -1,0 +1,51 @@
+# Post-processing HUD
+
+Abovewater: "Abovewater"
+ActiveShaders: "Active Shaders"
+Author: "Author"
+Description: "Description"
+InactiveShaders: "Inactive Shaders"
+InExteriors: "Exteriors"
+InInteriors: "Interiors"
+KeyboardControls: |
+    Keyboard controls:
+
+    Shift+Right-Arrow > Activate shader
+    Shift+Left-Arrow > Deactive shader
+    Shift+Up-Arrow > Move shader up
+    Shift+Down-Arrow > Move shader down
+PostProcessHUD: "Post Processor HUD"
+ResetShader: "Reset shader to default state"
+ShaderLocked: "Locked"
+ShaderLockedDescription: "Cannot be toggled or moved, controlled by external Lua script"
+ShaderResetUniform: "r"
+Underwater: "Underwater"
+Version: "Version"
+
+
+# Built-in post-processing shaders
+
+AdjustmentsDescription: "Colour adjustments."
+BloomDescription: "Bloom shader performing its calculations in (approximately) linear light."
+DebugDescription: "Debug shader."
+DebugHeaderDepth: "Depth Buffer"
+DebugHeaderNormals: "Normals"
+DisplayDepthFactorName: "Depth Colour Factor"
+DisplayDepthFactorDescription: "Determines correlation between pixel depth value and its output colour. High values lead to brighter image."
+DisplayDepthName: "Visualize Depth Buffer"
+DisplayNormalsName: "Visualize Pass Normals"
+NormalsInWorldSpace: "Show Normals in World Space"
+ContrastLevelDescription: "Contrast level."
+ContrastLevelName: "Contrast"
+GammaLevelDescription: "Gamma level."
+GammaLevelName: "Gamma"
+StrengthLevelName: "Strength"
+StrengthLevelDescription: "Strength of the effect."
+RadiusLevelName: "Radius"
+RadiusLevelDescription: "Radius of the effect."
+SkyFactorLevelName: "Sky Factor"
+SkyFactorLevelDescription: "Multiplication factor for light coming directly from the sky."
+BloomClampLevelName: "Clamp Level"
+BloomClampLevelDescription: "Clamp bloom pixels brighter than this value when mixing bloom into scene."
+BloomThresholdLevelName: "Threshold"
+BloomThresholdLevelDescription: "Ignore pixels with brightnesses below this value when calculating blur. Doesn't affect the sky."

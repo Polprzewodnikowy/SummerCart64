@@ -1,0 +1,51 @@
+# Post-processing HUD
+
+Abovewater: "Hors de l'eau"
+ActiveShaders: "Shaders actifs"
+Author: "Auteur(e)"
+Description: "Description"
+InactiveShaders: "Shaders inactifs"
+InExteriors: "À l'extérieur"
+InInteriors: "En intérieur"
+KeyboardControls: |
+    Raccourcis clavier:
+
+    Majuscule+Flèche droite > Active le shader
+    Majuscule+Flèche gauche > Désactive le shader
+    Majuscule+Flèche haut > Monte le shader dans la liste
+    Majuscule+Flèche bas > Descend le shader dans la liste
+MainPassDescription: "Transmet les données de la scène aux shaders de post-traitement. Ne peut être déplacé ou supprimé."
+PostProcessHUD: "HUD de post-traitement"
+ResetShader: "Restaure le shader dans sa configuration par défaut"
+ShaderLocked: "Verrouillé"
+ShaderResetUniform: "r"
+Underwater: "Sous l'eau"
+Version: "Version"
+
+
+# Built-in post-processing shaders
+
+AdjustmentsDescription: "Ajustements de l'image (couleurs, luminosité, contrastes...)."
+BloomDescription: "Flou lumineux, calculé (approximativement) de façon linéaire suivant l'intensité de la lumière."
+DebugDescription: "Shader de débogage."
+DebugHeaderDepth: "Z-buffer "
+DebugHeaderNormals: "G-buffer de normales"
+DisplayDepthFactorName: "Rapport couleur/profondeur"
+DisplayDepthFactorDescription: "Détermine la corrélation entre la valeur de profondeur d'un pixel et sa couleur de sortie. Une valeur élevée mène à une image plus lumineuse."
+DisplayDepthName: "Visualise le Z-buffer (tampon de profondeur)."
+DisplayNormalsName: "Visualise le G-buffer de normales (normals pass)"
+NormalsInWorldSpace: "Affiche la normale de la surface de chaque objet"
+ContrastLevelDescription: "Niveau de contraste"
+ContrastLevelName: "Contraste"
+GammaLevelDescription: "Correction Gamma"
+GammaLevelName: "Gamma"
+StrengthLevelName: "Instensité"
+StrengthLevelDescription: "Intensité de l'effet."
+RadiusLevelName: "Étendue radiale"
+RadiusLevelDescription: "Étendue radiale de l'effet."
+SkyFactorLevelName: "Facteur pour le ciel"
+SkyFactorLevelDescription: "Facteur multiplicatif appliqué à la lumière qui provient directement du ciel."
+BloomClampLevelName: "Niveau d'atténuation"
+BloomClampLevelDescription: "Atténue l'intensité du flou lumineux pour les pixels dont la luminosité est supérieure à cette valeur. Appliqué lors de l'intégration du flou au rendu principal."
+BloomThresholdLevelName: "Seuil"
+BloomThresholdLevelDescription: "Ignore les pixels dont la luminosité est inférieure à cette valeur lors du calcul du flou. N'affecte pas le ciel."

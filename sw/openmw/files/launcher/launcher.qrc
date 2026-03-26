@@ -1,0 +1,18 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource prefix="images">
+    <file alias="openmw.png">images/openmw.png</file>
+    <file alias="openmw-header.png">images/openmw-header.png</file>
+    <file alias="openmw-plugin.png">images/openmw-plugin.png</file>
+    <file alias="preferences.png">images/preferences.png</file>
+    <file alias="preferences-advanced.png">images/preferences-advanced.png</file>
+    <file alias="preferences-video.png">images/preferences-video.png</file>
+</qresource>
+<qresource prefix="icons/fallback">
+    <file alias="index.theme">icons/fallback/index.theme</file>
+    <file alias="16x16/document-new.svg">icons/fallback/16x16/document-new.svg</file>
+    <file alias="16x16/edit-clear.svg">icons/fallback/16x16/edit-clear.svg</file>
+    <file alias="16x16/edit-copy.svg">icons/fallback/16x16/edit-copy.svg</file>
+    <file alias="16x16/edit-delete.svg">icons/fallback/16x16/edit-delete.svg</file>
+    <file alias="16x16/view-refresh.svg">icons/fallback/16x16/view-refresh.svg</file>
+</qresource>
+</RCC>

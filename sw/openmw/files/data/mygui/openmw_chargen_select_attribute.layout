@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout">
+    <Widget type="Window" skin="MW_DialogNoTransp" layer="Modal" position="0 0 247 231" align="Center" name="_Main">
+        <Widget type="Widget" skin="" position="14 14 216 204" align="HCenter VStretch">
+
+            <!-- Label -->
+            <Widget type="TextBox" skin="HeaderText" position="0 0 216 18" name="LabelT" align="HCenter Top">
+                <Property key="Caption" value="#{sAttributesMenu1}"/>
+                <Property key="TextAlign" value="HCenter Top"/>
+            </Widget>
+
+            <!-- Attribute list -->
+            <Widget type="ScrollView" skin="MW_ScrollView" position="0 28 216 144" name="Attributes" align="Left Top">
+                <Property key="CanvasAlign" value="Left"/>
+            </Widget>
+
+            <!-- Dialog buttons -->
+            <Widget type="HBox" position="0 175 216 28">
+                <Widget type="Spacer" />
+                <Widget type="AutoSizedButton" skin="MW_Button" align="Right Bottom" name="CancelButton">
+                    <Property key="ExpandDirection" value="Left Up"/>
+                    <Property key="Caption" value="#{Interface:Cancel}"/>
+                </Widget>
+            </Widget>
+
+        </Widget>
+    </Widget>
+</MyGUI>

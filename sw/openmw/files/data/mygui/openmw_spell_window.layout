@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MyGUI type="Layout">
+    <Widget type="Window" skin="MW_Window_Pinnable" layer="Windows" position="0 0 300 600" name="_Main">
+        <Property key="MinSize" value="40 40"/>
+
+        <!-- Effect box-->
+        <Widget type="Widget" skin="MW_Box" position="8 8 268 23" align="Left Top HStretch">
+            <Widget type="Widget" skin="" position="2 1 264 20" align="Left Top Stretch" name="EffectsBox"/>
+        </Widget>
+
+        <!-- Spell list -->
+        <Widget type="SpellView" skin="MW_SpellView" position="8 38 268 490" align="Left Top Stretch" name="SpellView">
+        </Widget>
+
+        <Widget type="HBox" position="8 535 268 23" align="Right Bottom HStretch">
+            <Widget type="Spacer"/>
+            <!-- Spell deletion button -->
+            <Widget type="AutoSizedButton" skin="MW_Button" align="Right Bottom" position="8 535 0 23" name="DeleteSpellButton">
+                <Property key="Caption" value="#{sDelete}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+        </Widget>
+
+        <!-- Search box-->
+        <Widget type="EditBox" skin="MW_TextBoxEditWithBorder" position="8 535 268 23" align="Left Bottom HStretch" name="FilterEdit">
+            <UserString key="AcceptTab" value="true"/>
+        </Widget>
+
+    </Widget>
+</MyGUI>

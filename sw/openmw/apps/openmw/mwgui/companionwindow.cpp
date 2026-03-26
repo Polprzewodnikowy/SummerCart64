@@ -1,0 +1,274 @@
+#include "companionwindow.hpp"
+
+#include <cmath>
+
+#include <MyGUI_Button.h>
+#include <MyGUI_EditBox.h>
+#include <MyGUI_InputManager.h>
+
+#include <components/settings/values.hpp>
+
+#include "../mwbase/environment.hpp"
+#include "../mwbase/windowmanager.hpp"
+
+#include "../mwworld/class.hpp"
+
+#include "companionitemmodel.hpp"
+#include "countdialog.hpp"
+#include "draganddrop.hpp"
+#include "itemtransfer.hpp"
+#include "itemview.hpp"
+#include "messagebox.hpp"
+#include "sortfilteritemmodel.hpp"
+#include "tooltips.hpp"
+#include "widgets.hpp"
+
+namespace
+{
+
+    int getProfit(const MWWorld::Ptr& actor)
+    {
+        const ESM::RefId& script = actor.getClass().getScript(actor);
+        if (!script.empty())
+        {
+            return actor.getRefData().getLocals().getIntVar(script, "minimumprofit");
+        }
+        return 0;
+    }
+
+}
+
+namespace MWGui
+{
+
+    CompanionWindow::CompanionWindow(DragAndDrop& dragAndDrop, ItemTransfer& itemTransfer, MessageBoxManager* manager)
+        : WindowBase("openmw_companion_window.layout")
+        , mSortModel(nullptr)
+        , mModel(nullptr)
+        , mSelectedItem(-1)
+        , mUpdateNextFrame(false)
+        , mDragAndDrop(&dragAndDrop)
+        , mItemTransfer(&itemTransfer)
+        , mMessageBoxManager(manager)
+    {
+        getWidget(mCloseButton, "CloseButton");
+        getWidget(mProfitLabel, "ProfitLabel");
+        getWidget(mEncumbranceBar, "EncumbranceBar");
+        getWidget(mFilterEdit, "FilterEdit");
+        getWidget(mItemView, "ItemView");
+        mItemView->eventBackgroundClicked += MyGUI::newDelegate(this, &CompanionWindow::onBackgroundSelected);
+        mItemView->eventItemClicked += MyGUI::newDelegate(this, &CompanionWindow::onItemSelected);
+        mFilterEdit->eventEditTextChange += MyGUI::newDelegate(this, &CompanionWindow::onNameFilterChanged);
+
+        mCloseButton->eventMouseButtonClick += MyGUI::newDelegate(this, &CompanionWindow::onCloseButtonClicked);
+
+        setCoord(200, 0, 600, 300);
+
+        mControllerButtons.mA = "#{Interface:Take}";
+        mControllerButtons.mB = "#{Interface:Close}";
+        mControllerButtons.mR3 = "#{Interface:Info}";
+        mControllerButtons.mL2 = "#{Interface:Inventory}";
+    }
+
+    void CompanionWindow::onItemSelected(int index)
+    {
+        if (mDragAndDrop->mIsOnDragAndDrop)
+        {
+            mDragAndDrop->drop(mModel, mItemView);
+            updateEncumbranceBar();
+            return;
+        }
+
+        const ItemStack& item = mSortModel->getItem(index);
+
+        // We can't take conjured items from a companion actor
+        if (item.mFlags & ItemStack::Flag_Bound)
+        {
+            MWBase::Environment::get().getWindowManager()->messageBox("#{sBarterDialog12}");
+            return;
+        }
+
+        MWWorld::Ptr object = item.mBase;
+        size_t count = item.mCount;
+        bool shift = MyGUI::InputManager::getInstance().isShiftPressed();
+        if (MyGUI::InputManager::getInstance().isControlPressed())
+            count = 1;
+
+        mSelectedItem = mSortModel->mapToSource(index);
+
+        if (count > 1 && !shift)
+        {
+            CountDialog* dialog = MWBase::Environment::get().getWindowManager()->getCountDialog();
+            std::string name{ object.getClass().getName(object) };
+            name += MWGui::ToolTips::getSoulString(object.getCellRef());
+            dialog->openCountDialog(name, "#{sTake}", static_cast<int>(count));
+            dialog->eventOkClicked.clear();
+            if (Settings::gui().mControllerMenus || MyGUI::InputManager::getInstance().isAltPressed())
+                dialog->eventOkClicked += MyGUI::newDelegate(this, &CompanionWindow::transferItem);
+            else
+                dialog->eventOkClicked += MyGUI::newDelegate(this, &CompanionWindow::dragItem);
+        }
+        else if (Settings::gui().mControllerMenus || MyGUI::InputManager::getInstance().isAltPressed())
+            transferItem(nullptr, count);
+        else
+            dragItem(nullptr, count);
+    }
+
+    void CompanionWindow::onNameFilterChanged(MyGUI::EditBox* sender)
+    {
+        mSortModel->setNameFilter(sender->getCaption());
+        mItemView->update();
+    }
+
+    void CompanionWindow::dragItem(MyGUI::Widget* /*sender*/, std::size_t count)
+    {
+        mDragAndDrop->startDrag(mSelectedItem, mSortModel, mModel, mItemView, count);
+    }
+
+    void CompanionWindow::transferItem(MyGUI::Widget* /*sender*/, std::size_t count)
+    {
+        mItemTransfer->apply(mModel->getItem(mSelectedItem), count, *mItemView);
+    }
+
+    void CompanionWindow::onBackgroundSelected()
+    {
+        if (mDragAndDrop->mIsOnDragAndDrop)
+        {
+            mDragAndDrop->drop(mModel, mItemView);
+            updateEncumbranceBar();
+        }
+    }
+
+    void CompanionWindow::setPtr(const MWWorld::Ptr& actor)
+    {
+        if (actor.isEmpty() || !actor.getClass().isActor())
+            throw std::runtime_error("Invalid argument in CompanionWindow::setPtr");
+        mPtr = actor;
+        updateEncumbranceBar();
+        auto model = std::make_unique<CompanionItemModel>(actor);
+        mModel = model.get();
+        auto sortModel = std::make_unique<SortFilterItemModel>(std::move(model));
+        mSortModel = sortModel.get();
+        mFilterEdit->setCaption({});
+        mItemView->setModel(std::move(sortModel));
+        mItemView->resetScrollBars();
+
+        setTitle(actor.getClass().getName(actor));
+    }
+
+    void CompanionWindow::onFrame(float dt)
+    {
+        checkReferenceAvailable();
+
+        if (mUpdateNextFrame)
+        {
+            updateEncumbranceBar();
+            mItemView->update();
+            mUpdateNextFrame = false;
+        }
+    }
+
+    void CompanionWindow::updateEncumbranceBar()
+    {
+        if (mPtr.isEmpty())
+            return;
+        int capacity = static_cast<int>(mPtr.getClass().getCapacity(mPtr));
+        float encumbrance = std::ceil(mPtr.getClass().getEncumbrance(mPtr));
+        mEncumbranceBar->setValue(static_cast<int>(encumbrance), capacity);
+
+        if (mModel && mModel->hasProfit(mPtr))
+        {
+            mProfitLabel->setCaptionWithReplacing("#{sProfitValue} " + MyGUI::utility::toString(getProfit(mPtr)));
+        }
+        else
+            mProfitLabel->setCaption({});
+    }
+
+    void CompanionWindow::onCloseButtonClicked(MyGUI::Widget* /*sender*/)
+    {
+        if (exit())
+            MWBase::Environment::get().getWindowManager()->removeGuiMode(GM_Companion);
+    }
+
+    bool CompanionWindow::exit()
+    {
+        if (mModel && mModel->hasProfit(mPtr) && getProfit(mPtr) < 0)
+        {
+            std::vector<std::string> buttons;
+            buttons.emplace_back("#{sCompanionWarningButtonOne}");
+            buttons.emplace_back("#{sCompanionWarningButtonTwo}");
+            mMessageBoxManager->createInteractiveMessageBox("#{sCompanionWarningMessage}", buttons);
+            mMessageBoxManager->eventButtonPressed
+                += MyGUI::newDelegate(this, &CompanionWindow::onMessageBoxButtonClicked);
+            return false;
+        }
+        return true;
+    }
+
+    void CompanionWindow::onMessageBoxButtonClicked(int button)
+    {
+        if (button == 0)
+        {
+            MWBase::Environment::get().getWindowManager()->removeGuiMode(GM_Companion);
+            // Important for Calvus' contract script to work properly
+            MWBase::Environment::get().getWindowManager()->exitCurrentGuiMode();
+        }
+    }
+
+    void CompanionWindow::onReferenceUnavailable()
+    {
+        MWBase::Environment::get().getWindowManager()->removeGuiMode(GM_Companion);
+    }
+
+    void CompanionWindow::resetReference()
+    {
+        ReferenceInterface::resetReference();
+        mItemView->setModel(nullptr);
+        mModel = nullptr;
+        mSortModel = nullptr;
+    }
+
+    void CompanionWindow::onInventoryUpdate(const MWWorld::Ptr& ptr)
+    {
+        if (ptr == mPtr)
+            mUpdateNextFrame = true;
+    }
+
+    void CompanionWindow::onOpen()
+    {
+        mItemTransfer->addTarget(*mItemView);
+    }
+
+    void CompanionWindow::onClose()
+    {
+        mItemTransfer->removeTarget(*mItemView);
+    }
+
+    bool CompanionWindow::onControllerButtonEvent(const SDL_ControllerButtonEvent& arg)
+    {
+        if (arg.button == SDL_CONTROLLER_BUTTON_A)
+        {
+            int index = mItemView->getControllerFocus();
+            if (index >= 0 && index < mItemView->getItemCount())
+                onItemSelected(index);
+        }
+        else if (arg.button == SDL_CONTROLLER_BUTTON_B)
+        {
+            onCloseButtonClicked(mCloseButton);
+        }
+        else if (arg.button == SDL_CONTROLLER_BUTTON_RIGHTSTICK || arg.button == SDL_CONTROLLER_BUTTON_DPAD_UP
+            || arg.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN || arg.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT
+            || arg.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
+        {
+            mItemView->onControllerButton(arg.button);
+        }
+
+        return true;
+    }
+
+    void CompanionWindow::setActiveControllerWindow(bool active)
+    {
+        mItemView->setActiveControllerWindow(active);
+        WindowBase::setActiveControllerWindow(active);
+    }
+}

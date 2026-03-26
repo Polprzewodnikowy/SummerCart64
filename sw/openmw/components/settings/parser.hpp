@@ -1,0 +1,32 @@
+#ifndef COMPONENTS_SETTINGS_PARSER_H
+#define COMPONENTS_SETTINGS_PARSER_H
+
+#include "categories.hpp"
+
+#include <filesystem>
+#include <string>
+
+namespace Settings
+{
+    class SettingsFileParser
+    {
+    public:
+        void loadSettingsFile(const std::filesystem::path& file, CategorySettingValueMap& settings,
+            bool base64Encoded = false, bool overrideExisting = false);
+
+        void saveSettingsFile(const std::filesystem::path& file, const CategorySettingValueMap& settings);
+
+    private:
+        /// Increment i until it longer points to a whitespace character
+        /// in the string or has reached the end of the string.
+        /// @return false if we have reached the end of the string
+        bool skipWhiteSpace(size_t& i, std::string& str);
+
+        [[noreturn]] void fail(const std::string& message);
+
+        std::filesystem::path mFile;
+        int mLine = 0;
+    };
+}
+
+#endif // _COMPONENTS_SETTINGS_PARSER_H

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MyGUI type="Resource" version="1.1">
+    <!-- Progress bar track, various colors -->
+    <Resource type="ResourceSkin" name="MW_Track_Red" size="2 14" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="#{fontcolour=health}"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 16" align="Stretch">
+            <State name="normal" offset="0 0 16 16"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="MW_Track_Blue" size="2 14" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="#{fontcolour=magic}"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 16">
+            <State name="normal" offset="0 0 16 16"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="MW_Track_Green" size="2 14" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="#{fontcolour=fatigue}"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 16" align="Stretch">
+            <State name="normal" offset="0 0 16 16"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="MW_Progress_Drowning_Full_Small" size="16 2" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="0.235 0.745 0.745"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 2" align="Stretch">
+            <State name="normal" offset="0 0 16 2"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="MW_Progress_Drowning_Small" size="16 2" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="1 0 0"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 2" align="Stretch">
+            <State name="normal" offset="0 0 16 2"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="MW_Progress_Loading_Small" size="16 2" texture="textures\menu_bar_gray.dds" >
+        <Property key="Colour" value="0 0.815 0.820"/>
+        <BasisSkin type="MainSkin" offset="0 0 16 2" align="Stretch">
+            <State name="normal" offset="0 0 16 2"/>
+        </BasisSkin>
+    </Resource>
+    <Resource type="ResourceSkin" name="ProgressText" size="16 16">
+        <Property key="FontName" value="Default"/>
+        <Property key="TextAlign" value="VCenter HCenter"/>
+        <Property key="TextColour" value="#{fontcolour=normal}"/>
+        <Property key="TextShadow" value="true"/>
+
+        <BasisSkin type="SimpleText" offset="0 0 16 16" align="Stretch"/>
+    </Resource>
+
+    <!-- Main energy bar widget definitions. There's one for each color.-->
+
+    <Resource type="ResourceLayout" name="MW_Progress_Red" size="64 12">
+        <Widget type="Widget" position="0 0 64 12" name="Root">
+            <UserString key="TrackSkin" value="MW_Track_Red"/>
+            <UserString key="TrackFill" value="true"/>
+            <Widget type="Widget" skin="TransparentBG" position="2 2 60 8" align="Stretch" name="Client" />
+            <Widget type="Widget" skin="MW_Box" position="0 0 64 12" align="Stretch" />
+        </Widget>
+    </Resource>
+
+    <Resource type="ResourceLayout" name="MW_Progress_Green" size="64 12">
+        <Widget type="Widget" position="0 0 64 12" name="Root">
+            <UserString key="TrackSkin" value="MW_Track_Green"/>
+            <UserString key="TrackFill" value="true"/>
+            <Widget type="Widget" skin="TransparentBG" position="2 2 60 8" align="Stretch" name="Client" />
+            <Widget type="Widget" skin="MW_Box" position="0 0 64 12" align="Stretch" />
+        </Widget>
+    </Resource>
+
+    <Resource type="ResourceLayout" name="MW_Progress_Blue" size="64 12">
+        <Widget type="Widget" position="0 0 64 12" name="Root">
+            <UserString key="TrackSkin" value="MW_Track_Blue"/>
+            <UserString key="TrackFill" value="true"/>
+            <Widget type="Widget" skin="TransparentBG" position="2 2 60 8" align="Stretch" name="Client" />
+            <Widget type="Widget" skin="MW_Box" position="0 0 64 12" align="Stretch" />
+        </Widget>
+    </Resource>
+
+    <Resource type="ResourceLayout" name="MW_Progress_Drowning_Full" size="64 6">
+        <Widget type="Widget" position="0 0 64 6" name="Root">
+            <UserString key="TrackSkin" value="MW_Progress_Drowning_Full_Small"/>
+            <UserString key="TrackFill" value="true"/>
+            <Widget type="Widget" skin="TransparentBG" position="2 2 60 2" align="Stretch" name="Client" />
+        </Widget>
+    </Resource>
+
+    <Resource type="ResourceLayout" name="MW_ProgressScroll_Loading" size="64 6">
+        <Widget type="Widget" position="0 0 64 6" name="Root">
+            <UserString key="TrackFill" value="true"/>
+            <Property key="VerticalAlignment" value="false"/>
+            <Widget type="Widget" skin="TransparentBG" position="2 2 60 2" align="Stretch" />
+            <Widget type="Button" skin="MW_Progress_Loading_Small" position="0 0 1 6" align="Left VStretch" name="Track" />
+            <Widget type="Widget" skin="MW_Box" position="0 0 64 6" align="Stretch" />
+        </Widget>
+    </Resource>
+</MyGUI>

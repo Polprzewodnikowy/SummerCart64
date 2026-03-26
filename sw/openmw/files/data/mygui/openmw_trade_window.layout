@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MyGUI type="Layout">
+    <Widget type="Window" skin="MW_Window" layer="Windows" position="0 0 600 360" name="_Main">
+        <Property key="Visible" value="false"/>
+        <Property key="MinSize" value="428 245"/>
+
+        <!-- Categories -->
+        <Widget type="HBox" position="8 8 566 24" align="Left Top HStretch" name="Categories">
+            <Widget type="ImageBox" skin="ImageBox" position="0 0 24 24" name="BtnL1Image">
+                <Property key="ImageTexture" value="textures\omw_steam_button_l1.dds"/>
+                <Property key="Colour" value="#ccb589"/>
+                <Property key="Alpha" value="0.7"/>
+                <Property key="Visible" value="false"/>
+                <UserString key="Hidden" value="true"/>
+            </Widget>
+            <Widget type="AutoSizedButton" skin="MW_Button" name="AllButton">
+                <Property key="Caption" value="#{sAllTab}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+            <Widget type="AutoSizedButton" skin="MW_Button" name="WeaponButton">
+                <Property key="Caption" value="#{sWeaponTab}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+            <Widget type="AutoSizedButton" skin="MW_Button" name="ApparelButton">
+                <Property key="Caption" value="#{sApparelTab}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+            <Widget type="AutoSizedButton" skin="MW_Button" name="MagicButton">
+                <Property key="Caption" value="#{sMagicTab}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+            <Widget type="AutoSizedButton" skin="MW_Button" name="MiscButton">
+                <Property key="Caption" value="#{sMiscTab}"/>
+                <Property key="NeedKey" value="false"/>
+            </Widget>
+            <Widget type="ImageBox" skin="ImageBox" position="0 0 24 24" name="BtnR1Image">
+                <Property key="ImageTexture" value="textures\omw_steam_button_r1.dds"/>
+                <Property key="Colour" value="#ccb589"/>
+                <Property key="Alpha" value="0.7"/>
+                <Property key="Visible" value="false"/>
+                <UserString key="Hidden" value="true"/>
+            </Widget>
+            <!-- Search box-->
+            <Widget type="EditBox" skin="MW_TextBoxEditWithBorder" position="0 0 0 23" name="FilterEdit">
+                <UserString key="HStretch" value="true"/>
+                <UserString key="AcceptTab" value="true"/>
+            </Widget>
+        </Widget>
+
+        <!-- Items -->
+        <Widget type="ItemView" skin="MW_ItemView" position="8 38 566 185" name="ItemView" align="Left Top Stretch">
+        </Widget>
+
+        <Widget type="Widget" skin="" position="8 231 566 92" name="BottomPane" align="Left Bottom HStretch">
+            <Widget type="HBox" position="0 0 566 24" align="Left Top HStretch">
+                <Widget type="Button" skin="MW_Button" position="0 0 40 24" name="IncreaseButton" align="Left Top">
+                    <Property key="Caption" value="+"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="AutoSizedTextBox" skin="SandText" position="48 0 140 24" name="TotalBalanceLabel" align="Left Top">
+                    <Property key="TextAlign" value="Left VCenter"/>
+                </Widget>
+                <Widget type="Spacer" />
+                <Widget type="AutoSizedTextBox" skin="SandText" position="0 0 374 24" name="PlayerGold" align="Right Top">
+                    <Property key="TextAlign" value="Right"/>
+                </Widget>
+            </Widget>
+
+            <Widget type="HBox" position="0 28 566 28" align="Left Top HStretch">
+                <Widget type="Button" skin="MW_Button" position="0 0 40 24" name="DecreaseButton" align="Left Top">
+                    <Property key="Caption" value="-"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="NumericEditBox" skin="MW_TextEdit" position="48 0 140 24" name="TotalBalance" align="Left Top">
+                    <Property key="TextAlign" value="Center"/>
+                </Widget>
+                <Widget type="Spacer" />
+                <Widget type="AutoSizedTextBox" skin="SandText" position="0 0 374 24" name="MerchantGold" align="Right Top">
+                    <Property key="TextAlign" value="Right"/>
+                </Widget>
+            </Widget>
+
+            <Widget type="HBox" position="0 60 566 28" align="Left Bottom HStretch">
+                <Widget type="AutoSizedButton" skin="MW_Button" name="MaxSaleButton">
+                    <Property key="Caption" value="#{sMaxSale}"/>
+                </Widget>
+                <Widget type="Spacer" />
+                <Widget type="AutoSizedButton" skin="MW_Button" name="OfferButton">
+                    <Property key="Caption" value="#{sBarterDialog8}"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" name="CancelButton">
+                    <Property key="Caption" value="#{Interface:Cancel}"/>
+                </Widget>
+            </Widget>
+
+        </Widget>
+
+    </Widget>
+
+</MyGUI>

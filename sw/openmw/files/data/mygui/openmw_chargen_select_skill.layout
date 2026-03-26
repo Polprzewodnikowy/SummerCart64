@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyGUI type="Layout">
+    <Widget type="Window" skin="MW_DialogNoTransp" layer="Modal" position="0 0 487 275" align="Center" name="_Main">
+        <Widget type="Widget" skin="" position="17 14 457 246" align="Stretch">
+
+            <!-- Label -->
+            <Widget type="TextBox" skin="HeaderText" position="0 0 457 18" name="LabelT" align="HCenter Top">
+                <Property key="Caption" value="#{sSkillsMenu1}"/>
+                <Property key="TextAlign" value="HCenter Top"/>
+            </Widget>
+
+            <!-- Combat list -->
+            <Widget type="TextBox" skin="HeaderText" position="0 32 154 18" name="CombatLabelT" align="Left Top">
+                <Property key="Caption" value="#{sSpecializationCombat}"/>
+                <Property key="TextAlign" value="Left Top"/>
+            </Widget>
+            <Widget type="ScrollView" skin="MW_ScrollView" position="0 50 154 168" name="CombatSkills" align="Left Top">
+                <Property key="CanvasAlign" value="Left"/>
+            </Widget>
+
+            <!-- Magic list -->
+            <Widget type="TextBox" skin="HeaderText" position="158 32 154 18" name="MagicLabelT" align="Left Top">
+                <Property key="Caption" value="#{sSpecializationMagic}"/>
+                <Property key="TextAlign" value="Left Top"/>
+            </Widget>
+            <Widget type="ScrollView" skin="MW_ScrollView" position="158 50 154 168" name="MagicSkills" align="Left Top">
+                <Property key="CanvasAlign" value="Left"/>
+            </Widget>
+
+            <!-- Stealth list -->
+            <Widget type="TextBox" skin="HeaderText" position="316 32 131 18" name="StealthLabelT" align="Left Top">
+                <Property key="Caption" value="#{sSpecializationStealth}"/>
+                <Property key="TextAlign" value="Left Top"/>
+            </Widget>
+            <Widget type="ScrollView" skin="MW_ScrollView" position="316 50 154 168" name="StealthSkills" align="Left Top">
+                <Property key="CanvasAlign" value="Left"/>
+            </Widget>
+
+            <!-- Dialog buttons -->
+            <Widget type="HBox" position="0 218 457 28">
+                <Widget type="Spacer" />
+                <Widget type="AutoSizedButton" skin="MW_Button" align="Right Bottom" name="CancelButton">
+                    <Property key="ExpandDirection" value="Left Up"/>
+                    <Property key="Caption" value="#{Interface:Cancel}"/>
+                </Widget>
+            </Widget>
+
+        </Widget>
+    </Widget>
+</MyGUI>

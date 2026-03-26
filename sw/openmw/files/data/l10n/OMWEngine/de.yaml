@@ -1,0 +1,238 @@
+# Console
+
+ConsoleWindow: "Kommandokonsole"
+
+# Debug window
+
+DebugWindow: "Debug-Fenster"
+LogViewer: "Log-Ansicht"
+LuaProfiler: "Lua-Profiler"
+PhysicsProfiler: "Physik-Profiler"
+
+
+# Messages
+
+AskLoadLastSave: "Der aktuellste Spielstand ist ''{save}''. Soll er geladen werden?"
+BuildingNavigationMesh: "Erstelle Navigationsgitter..."
+InitializingData: "Initialisiere Daten..."
+LoadingExterior: "Lade Bereich..."
+LoadingFailed: "Laden des Spielstandes fehlgeschlagen!"
+LoadingInterior: "Lade Bereich..."
+LoadingInProgress: "Lade Spielstand..."
+LoadingRequiresNewVersionError: |-
+   Der Spielstand wurde mit einer neueren Version von OpenMW erstellt und wird daher nicht unterstützt.
+   Bitte aktualisieren Sie Ihre OpenMW-Installation, um den Spielstand laden zu können.
+LoadingRequiresOldVersionError: |-
+    Der Spielstand wurde mit einer älteren Version von OpenMW erstellt, deren Speicherformat nicht mehr unterstützt wird.
+    Laden und speichern Sie den Spielstand mit Version {version}, um das Format anzupassen.
+NewGameConfirmation: "Neues Spiel starten und aktuellen Fortschritt verwerfen?"
+QuitGameConfirmation: "Spiel verlassen?"
+SaveGameDenied: "Das Spiel kann gerade nicht gespeichert werden!"
+SavingInProgress: "Speichere Spiel..."
+ScreenshotFailed: "Speichern des Screenshots fehlgeschlagen!"
+ScreenshotMade: "{file} wurde gespeichert."
+
+
+# Save game menu
+
+DeleteGame: "Spielstand löschen"
+DeleteGameConfirmation: "Möchten Sie den Spielstand wirklich löschen?"
+EmptySaveNameError: "Der Spielstand kann ohne Name nicht gespeichert werden!"
+Health: "Lebensenergie"
+Level: "Stufe"
+LoadGameConfirmation: "Spielstand laden und aktuellen Fortschritt verwerfen?"
+MissingContentFilesConfirmation: |-
+   Die aktuell ausgewählten Spieledateien stimmen nicht mit den im Spielstand verwendeten überein,
+   was zu Fehlern beim Laden und während des Spielens führen kann.
+   Möchten Sie wirklich fortfahren?
+MissingContentFilesList: |-
+ {files, plural,
+   one{\n\nEine fehlende Datei gefunden: }
+   few{\n\n{files} fehlende Dateien gefunden:\n}
+   other{\n\n{files} fehlende Dateien gefunden:\n}
+ }
+MissingContentFilesListCopy: |-
+ {files, plural,
+   one{\n\nDrücken Sie „Kopieren“, um den Namen in die Zwischenablage zu kopieren.}
+   few{\n\nDrücken Sie „Kopieren“, um alle Namen in die Zwischenablage zu kopieren.}
+   other{\n\nDrücken Sie „Kopieren“, um alle Namen in die Zwischenablage zu kopieren.}
+ }
+OverwriteGameConfirmation: "Sind Sie sicher, dass Sie den Spielstand überschreiben wollen?"
+SelectCharacter: "Charakter auswählen..."
+TimePlayed: "Spielzeit"
+
+
+# Settings menu
+
+ActorsProcessingRange: "Akteur-Verarbeitungsreichweite"
+ActorsProcessingRangeValue: "Akteur-Verarbeitungsreichweite ({value, number, :: group-off})"
+Anisotropy: "Anisotropie"
+AnisotropyValue: "Anisotropie ({value})"
+Audio: "Audio"
+AudioMaster: "Master-Lautstärke"
+AudioVoice: "Stimmen"
+AudioEffects: "Effekte"
+AudioFootsteps: "Schritte"
+AudioMusic: "Musik"
+AutoSaveOnResting: "Beim Rasten speichern"
+BestAttack: "Immer bester Angriff"
+CameraSensitivity: "Kameraempfindlichkeit"
+CameraZoomIn: "Kamera hineinzoomen"
+CameraZoomOut: "Kamera herauszoomen"
+ChangeRequiresRestart: "Diese Änderung erfordert einen Neustart, um wirksam zu werden."
+ClampLighting: "Beleuchtung begrenzen"
+ClampLightingTooltip: |-
+    Begrenzt die Beleuchtungshelligkeit auf (1, 1, 1), um Morrowinds Darstellung nachzubilden.
+    Verhindert übermäßig helle oder verfälschte Farben, kann die Beleuchtung aber abschwächen.
+ClassicFalloff: "Klassischer Lichtabfall"
+ClassicFalloffTooltip: |-
+    Standard: aus
+    Verwendet die traditionelle Formel für die Abschwächung von Punktlichtquellen, die kein frühzeitiges Ausblenden aufweist.
+
+    Ein Nachteil der traditionellen Formel ist, dass der Lichteinfluss nie ganz Null erreicht.
+    Dies ist physikalisch korrekt, kann aber zu Beleuchtungsnähten führen, da Lichter nicht die gesamte Szene beeinflussen.
+    Frühzeitiges Ausblenden hilft, diese Nähte zu verringern, allerdings auf Kosten einer dunkleren Szene.
+
+    Morrowind verwendet die traditionelle Formel, daher möchten Sie dies möglicherweise aktivieren, wenn Ihnen die Helligkeitsunterschiede nicht gefallen.
+    Alternativ können Sie versuchen, die minimale Innenraumhelligkeit zu ändern.
+ConfirmResetBindings: "Alle Tastenbelegungen zurücksetzen?"
+ConfirmResolution: "Neue Auflösung wird sofort angewendet. Fortsetzen?"
+Controller: "Controller"
+Controls: "Steuerung"
+Crosshair: "Fadenkreuz"
+DelayLow: "Schnell"
+DelayHigh: "Langsam"
+DetailLevel: "Detailgrad"
+Difficulty: "Schwierigkeitsgrad"
+DifficultyValue: "Schwierigkeitsgrad ({value})"
+DifficultyEasy: "Leicht"
+DifficultyHard: "Schwer"
+DistanceHigh: "Weit"
+DistanceLow: "Kurz"
+EnableController: "Controller aktivieren"
+FieldOfView: "Sichtfeld"
+FieldOfViewValue: "Sichtfeld ({value, number, ::.00})"
+FieldOfViewLow: "Niedrig"
+FieldOfViewHigh: "Hoch"
+ForcePerPixelLighting: "Beleuchtung pro Pixel"
+ForcePerPixelLightingTooltip: |-
+    Erzwingt die Verwendung der Beleuchtung pro Pixel. Standardmäßig verwenden nur Bump- und Normal-mapped-Objekte eine Beleuchtung pro Pixel.
+
+    Die Aktivierung der Per-Pixel-Beleuchtung führt zu visuellen Unterschieden zur ursprünglichen Engine, da bestimmte Lichter in Morrowind auf Vertex-Beleuchtung angewiesen sind, um wie beabsichtigt auszusehen.
+
+    Beachten Sie, dass Bodendecker-Shader und Partikeleffekte diese Einstellung ignorieren.
+FrameRateHint: "Hinweis: Drücken Sie F3,\num die aktuelle Bildrate anzuzeigen."
+GammaCorrection: "Gamma-Korrektur"
+GammaCorrectionValue: "Gamma-Korrektur ({value, number, ::.00})"
+GammaDark: "Dunkel"
+GammaLight: "Hell"
+GmstOverridesL10n: "Texte aus ESM-Dateien haben Vorrang"
+InvertXAxis: "X-Achse invertieren"
+InvertYAxis: "Y-Achse invertieren"
+Language: "Sprache"
+LanguageNote: "Hinweis: Diese Einstellungen wirken sich nicht auf Texte aus ESM-Dateien aus."
+LightingMethod: "Beleuchtungsmethode"
+LightingMethodShaders: "Shader"
+LightingMethodShadersCompatibility: "Shader (Kompatibilitätsmodus)"
+LightingResetToDefaults: "Einstellungen wirklich zurücksetzen? Das Ändern der „Beleuchtungsmethode“ erfordert einen Neustart."
+Lights: "Beleuchtung"
+LightsBoundingSphereMultiplier: "Multiplikator für Begrenzungssphäre"
+LightsBoundingSphereMultiplierValue: "Multiplikator für Begrenzungssphäre ({value, number, ::.00})"
+LightsBoundingSphereMultiplierTooltip: "Standard: 1,65\nMultiplikator für Größe der Begrenzungssphäre.\nGrößere Werte ermöglichen einen sanfteren Abfall, erfordern jedoch eine Erhöhung der maximalen Anzahl von Lichtquellen.\n\nBeeinflusst nicht die Beleuchtung oder Lichtintensität."
+LightsFadeStartMultiplier: "Multiplikator für Startwert der Lichtabblendung"
+LightsFadeStartMultiplierValue: "Multiplikator für Startwert der Lichtabblendung ({value, number, ::.00})"
+LightsFadeStartMultiplierTooltip: "Standard: 0,85\nBruchteil der maximalen Lichtreichweite, bei der Lichtquellen langsam zu verblassen beginnen.\n\nKleinere Werte führen zu einem sanfteren Übergang, der allerdings bereits bei geringerer Entfernung startet; größere Werte machen den Übergang abrupter, betreffen aber nur weiter entfernte Lichtquellen."
+LightsLightingMethodTooltip: "Legt die interne Behandlung von Lichtquellen fest.\n\n
+   „Shader (Kompatibilitätsmodus)“ Es wird empfohlen, diese Option für ältere Hardware und Maximalwerte für Lichtquellen nahe 8 zu verwenden.\n\n
+   „Shader“ bietet alle Vorteile von „Shader (Kompatibilitätsmodus)“, nutzt aber einen moderneren Ansatz, der größere Maximalwerte für Lichtquellen bei geringen bis keinen Leistungseinbußen ermöglicht. Funktioniert möglicherweise nicht auf älterer Hardware."
+LightsMaximumDistance: "Maximale Lichtreichweite"
+LightsMaximumDistanceValue: "Maximale Lichtreichweite ({value, number, :: group-off})"
+LightsMaximumDistanceTooltip: "Standard: 8192 (1 Zelle)\nMaximale Entfernung, bis zu der Lichtquellen noch dargestellt werden (gemessen in In-Game-Einheiten).\n\nEin Wert von 0 entspricht einer unbegrenzten Reichweite."
+LightsMinimumInteriorBrightness: "Minimale Helligkeit in Innenräumen"
+LightsMinimumInteriorBrightnessValue: "Minimale Helligkeit in Innenräumen ({value, number, ::.00})"
+LightsMinimumInteriorBrightnessTooltip: "Standard: 0,08\nMinimale Umgebungshelligkeit in Innenräumen.\n\nKann erhöht werden, falls Innenräume zu dunkel dargestellt werden.\n\nDies hat keine Auswirkung, wenn der klassische Lichtabfall verwendet wird."
+MatchSunlightToSun: "Licht an Sonne ausrichten"
+MatchSunlightToSunTooltip: |-
+    In Morrowind stimmt die sichtbare Sonnenposition aus mysteriösen Gründen nicht mit ihrer Lichtrichtung überein.
+    Wir bewahren dieses unrealistische Verhalten, um die Kompatibilität sicherzustellen.
+
+    Diese Option passt die Position der Sonnenlichtquelle an die sichtbare Position der Sonne an.
+MaxLights: "Max. Lichter"
+MaxLightsValue: "Max. Lichter ({value, number, :: group-off})"
+MaxLightsTooltip: "Standard: 8\nMaximale Anzahl von Lichtquellen, die ein Objekt beleuchten können.\n\nKleine Werte können gerade an Orten mit vielen Lichtquellen zum Aufploppen und zum schnellen Wechsel von Lichtern führen, wie es aus der Original-Engine und anderen The-Elder-Scrolls-Titeln bekannt ist."
+MenuHelpDelay: "Verzögerung des Hilfe-Menüs"
+MenuTransparency: "Menü-Transparenz"
+MouseAndKeyboard: "Maus/Tastatur"
+PostProcessing: "Post-Processing"
+PostProcessingIsNotEnabled: "Post-Processing ist nicht aktiviert!"
+PostProcessingTooltip: "Wird über Post-Processing-HUD konfiguriert (siehe Tastenbelegung)."
+Preferences: "Einstellungen"
+PrimaryLanguage: "Hauptsprache"
+PrimaryLanguageTooltip: "Lokalisierungsdateien für diese Sprache haben die höchste Priorität."
+QualityHigh: "Hoch"
+QualityLow: "Niedrig"
+QualityMedium: "Mittel"
+RainRippleDetail: "Detailgrad der Regentropfen-Wellen"
+RainRippleDetailDense: "Dicht (mit Normal-Maps)"
+RainRippleDetailSimple: "Einfach (keine Normal-Maps)"
+RainRippleDetailSparse: "Spärlich (mit Normal-Maps)"
+RebindAction: "Drücken Sie eine Taste oder einen Knopf, um diese Tastenbelegung zu ändern."
+ReflectionShaderDetail: "Detailgrad des Wasserreflexions-Shaders"
+ReflectionShaderDetailActors: "Akteure"
+ReflectionShaderDetailGroundcover: "Bodenvegetation"
+ReflectionShaderDetailObjects: "Objekte"
+ReflectionShaderDetailSky: "Himmel"
+ReflectionShaderDetailTerrain: "Terrain"
+ReflectionShaderDetailWorld: "Welt"
+Refraction: "Lichtbrechung"
+ResetControls: "Tastenbelegungen zurücksetzen"
+Screenshot: "Screenshot"
+Scripts: "Skripte"
+ScriptsDisabled: "Laden Sie einen Spielstand, um auf die Skripteinstellungen zugreifen zu können."
+SecondaryLanguage: "Sekundäre Sprache"
+SecondaryLanguageTooltip: "Lokalisierungsdateien für diese Sprache werden als Rückfalloption verwendet, falls in den Dateien der Primärsprache die erforderlichen Zeilen fehlen."
+SensitivityHigh: "Hoch"
+SensitivityLow: "Niedrig"
+SettingsWindow: "Optionen"
+Subtitles: "Untertitel"
+SunlightScattering: "Sonnenlicht-Streuung"
+TestingExteriorCells: "Außenzellen testen"
+TestingInteriorCells: "Innenzellen testen"
+TextureFiltering: "Texturfilter"
+TextureFilteringBilinear: "Bilinear"
+TextureFilteringNearest: "Nächstgelegen"
+TextureFilteringDisabled: "Keiner"
+TextureFilteringOther: "Sonstiges"
+TextureFilteringTrilinear: "Trilinear"
+ToggleHUD: "HUD umschalten"
+TogglePostProcessorHUD: "Post-Processing-HUD umschalten"
+TransparencyFull: "Vollständig"
+TransparencyNone: "Keine"
+Video: "Video"
+ViewDistance: "Sichtweite"
+ViewDistanceValue: "Sichtweite ({value, number, ::.00})"
+ViewDistanceValueCells: "Sichtweite (×{cells, number, ::.00})"
+VSync: "VSync"
+VSyncAdaptive: "Adaptiv"
+Water: "Wasser"
+WaterShader: "Wasser-Shader"
+WaterShaderTextureQuality: "Texturqualität"
+WindowBorder: "Fensterrahmen darstellen"
+WindowMode: "Fenstermodus"
+WindowModeFullscreen: "Vollbild"
+WindowModeHint: "Hinweis: Die Option „Fenster in Vollbildgröße“\nverwendet automatisch die native Bildschirmauflösung."
+WindowModeWindowed: "Fenster"
+WindowModeWindowedFullscreen: "Fenster in Vollbildgröße"
+# More fitting translations of "wobbly" are welcome
+WobblyShores: "Wabbelige Uferlinien"
+
+
+# Controller button names
+
+EnchantType: "Zaubertyp"
+InventorySelect: "Geben"
+JournalQuests: "Quests"
+JournalShowAll: "Alle Anzeigen"
+LoadingSelectCharacter: "Charakter auswählen"
+RechargeSelect: "Aufladen"
+RepairTool: "Werkzeug"

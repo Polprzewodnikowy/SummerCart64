@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<MyGUI type="Layout">
+    <Widget type="Window" skin="MW_Window_Pinnable" layer="Windows" position="0 0 600 300" name="_Main">
+        <Property key="MinSize" value="40 40"/>
+
+        <Widget type="Widget" skin="" position="0 0 224 223" align="Left Top" name="LeftPane">
+
+            <!-- Player encumbrance -->
+            <Widget type="MWDynamicStat" skin="MW_ChargeBar_Blue" position="8 8 212 24" name="EncumbranceBar" align="Left Top HStretch">
+            </Widget>
+
+            <!-- Avatar -->
+            <Widget type="Widget" skin="MW_Box" position="8 38 212 185" name="Avatar" align="Left Top Stretch">
+                <Widget type="ImageBox" skin="ImageBox" position="3 3 206 158" align="Stretch" name="AvatarImage">
+                    <UserString key="ToolTipType" value="AvatarItemSelection"/>
+                </Widget>
+                <Widget type="TextBox" skin="ProgressText" position="0 161 212 24" align="HStretch Bottom" name="ArmorRating">
+                    <Property key="NeedMouse" value="false"/>
+                </Widget>
+            </Widget>
+
+        </Widget>
+
+        <Widget type="Widget" skin="" position="228 0 350 223" align="Left Top" name="RightPane">
+
+            <!-- Items in inventory -->
+            <Widget type="ItemView" skin="MW_ItemView" position="0 38 350 185" name="ItemView" align="Left Top Stretch">
+            </Widget>
+
+            <!-- Categories -->
+            <Widget type="HBox" position="0 6 350 28" align="Left Top HStretch" name="Categories">
+                <Widget type="ImageBox" skin="ImageBox" position="0 0 24 24" name="BtnL1Image">
+                    <Property key="ImageTexture" value="textures\omw_steam_button_l1.dds"/>
+                    <Property key="Colour" value="#ccb589"/>
+                    <Property key="Alpha" value="0.7"/>
+                    <Property key="Visible" value="false"/>
+                    <UserString key="Hidden" value="true"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" position="0 0 60 24" name="AllButton">
+                    <Property key="Caption" value="#{sAllTab}"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" position="0 0 60 24" name="WeaponButton">
+                    <Property key="Caption" value="#{sWeaponTab}"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" position="0 0 60 24" name="ApparelButton">
+                    <Property key="Caption" value="#{sApparelTab}"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" position="0 0 60 24" name="MagicButton">
+                    <Property key="Caption" value="#{sMagicTab}"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="AutoSizedButton" skin="MW_Button" position="0 0 60 24" name="MiscButton">
+                    <Property key="Caption" value="#{sMiscTab}"/>
+                    <Property key="NeedKey" value="false"/>
+                </Widget>
+                <Widget type="ImageBox" skin="ImageBox" position="0 0 24 24" name="BtnR1Image">
+                    <Property key="ImageTexture" value="textures\omw_steam_button_r1.dds"/>
+                    <Property key="Colour" value="#ccb589"/>
+                    <Property key="Alpha" value="0.7"/>
+                    <Property key="Visible" value="false"/>
+                    <UserString key="Hidden" value="true"/>
+                </Widget>
+                <!-- Search box-->
+                <Widget type="EditBox" skin="MW_TextBoxEditWithBorder" position="0 0 0 23" name="FilterEdit">
+                    <UserString key="HStretch" value="true"/>
+                    <UserString key="AcceptTab" value="true"/>
+                </Widget>
+            </Widget>
+
+        </Widget>
+
+    </Widget>
+</MyGUI>

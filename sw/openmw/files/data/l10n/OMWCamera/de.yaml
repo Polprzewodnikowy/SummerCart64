@@ -1,0 +1,72 @@
+Camera: "OpenMW: Kamera"
+settingsPageDescription: "OpenMW-Kameraeinstellungen"
+
+thirdPersonSettings: "Verfolgerperspektive"
+
+viewOverShoulder: "Über-die-Schulter-Ansicht"
+viewOverShoulderDescription: |
+    Beeinflusst die Verfolgerperspektive.
+      Nein: Die Ansicht ist auf den Kopf des Spielercharakters zentriert; das Fadenkreuz ist ausgeblendet.
+      Ja: Die Kamera ist bei weggesteckter Waffe hinter der Schulter des Spielercharakters positioniert; das Fadenkreuz ist immer sichtbar.
+
+shoulderOffsetX: "Schulteransicht: horizontaler Offset"
+shoulderOffsetXDescription: >
+    Horizontaler Offset der "Über-die-Schulter-Ansicht".
+    Größere Werte verschieben die Ansicht nach rechts; negative Werte verschieben die Ansicht über die linke Schulter.
+
+shoulderOffsetY: "Schulteransicht: vertikaler Offset"
+shoulderOffsetYDescription: >
+    Vertikaler Offset der "Über-die-Schulter-Ansicht".
+
+autoSwitchShoulder: "Schulter automatisch wechseln"
+autoSwitchShoulderDescription: >
+    Falls aktiviert, wechselt die Ansicht temporär auf die andere Schulter, solange ein Hindernis die Kamera zu nah an den Spielercharakter bewegen würde.
+
+zoomOutWhenMoveCoef: "Kamera-Zoomfaktor bei Bewegung"
+zoomOutWhenMoveCoefDescription: >
+    Bewegt die Kamera vom Spielercharakter weg (positiver Wert) oder auf ihn zu (negativer Wert), solange sich dieser bewegt. Der Wert 0 deaktiviert den Zoom (Standard: 20,0).
+    Funktioniert nur, wenn "Über-die-Schulter-Ansicht" aktiviert ist.
+
+previewIfStandStill: "Vorschau bei Stillstand"
+previewIfStandStillDescription: >
+    Falls aktiviert, dreht sich der Spielercharakter nicht in Blickrichtung der Kamera, solange er untätig ist und seine Waffe weggesteckt ist.
+
+deferredPreviewRotation: "Sanfter Übergang aus der Vorschau"
+deferredPreviewRotationDescription: |
+    Falls aktiviert, dreht sich der Spielercharakter nach dem Verlassen des Vorschau- oder Vanity-Modus sanft in die Blickrichtung der Kamera.
+    Falls deaktiviert, dreht sich die Kamera ruckartig in Richtung des Spielercharakters.
+
+ignoreNC: |
+    Ignoriere "No Collision"-Flag
+ignoreNCDescription: >
+    Falls aktiviert, bewegt sich die Kamera nicht durch Objekte, deren NC-Flag ("No Collision"-Flag) im NIF-Modell aktiviert ist.
+
+move360: "360°-Bewegung"
+move360Description: >
+    Falls aktiviert, ist die Bewegungsrichtung des Spielercharakters bei weggesteckter Waffe unabhängig von der Kamerarichtung.
+    Beispiel: Läuft der Spielercharakter in diesem Modus rückwärts, dreht er sich stattdessen mit dem Gesicht zur Kamera.
+
+move360TurnSpeed: "Multiplikator für 360°-Bewegung-Drehgeschwindigkeit"
+move360TurnSpeedDescription: |
+    Multiplikator für die Drehgeschwindigkeit bei aktivierter "360°-Bewegung" (Standard: 5,0).
+
+slowViewChange: "Sanfter Ansichtswechsel"
+slowViewChangeDescription: "Falls aktiviert, wechselt die Kamera nicht mehr ruckartig von der Ego- in die Verfolgerperspektive."
+
+povAutoSwitch: "Automatischer Wechsel zur Egoperspektive"
+povAutoSwitchDescription: "Falls aktiviert, wechselt die Kamera automatisch in die Egoperspektive, sobald sich sich ein Hindernis direkt hinter dem Spielercharakter befindet."
+
+
+headBobbingSettings: "Kopfwippen in der Egoperspektive"
+
+headBobbing_enabled: "Eingeschaltet"
+headBobbing_enabledDescription: "Falls aktiviert, wippt die Kamera beim Laufen in der Egoperspektive auf und ab."
+
+headBobbing_step: "Schrittlänge"
+headBobbing_stepDescription: "Definiert die Länge eines Schritts, also die Frequenz des Kopfwippens (Standard: 90,0)."
+
+headBobbing_height: "Schritthöhe"
+headBobbing_heightDescription: "Definiert die Höhe eines Schritts, also die Amplitude des Kopfwippens (Standard: 3,0)."
+
+headBobbing_roll: "Maximaler Rollwinkel"
+headBobbing_rollDescription: "Der maximale Rollwinkel der Kamera beim Kopfwippen in Grad (Standard: 0,2)."

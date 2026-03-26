@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2015 Alexandre Moine <nobrakal@gmail.com>
+Copyright 2020 Bret Curtis <psi29a@gmail.com>
+-->
+<component type="desktop">
+ <id>org.openmw.launcher.desktop</id>
+ <metadata_license>CC0-1.0</metadata_license>
+ <project_license>GPL-3.0-or-later</project_license>
+ <name>OpenMW</name>
+ <summary>Reimplementation of The Elder Scrolls III: Morrowind</summary>
+ <description>
+  <p>
+  OpenMW is a new engine for 2002's Game of the Year, The Elder Scrolls 3: Morrowind.
+  </p>
+  <p>
+  It aims to be a fully playable (and improved!), open source implementation of the game's engine and functionality (including mods). 
+  </p>
+  <p>
+  You will still need the original game data to play OpenMW.
+  </p>
+ </description>
+ <launchable type="desktop-id">org.openmw.launcher.desktop</launchable>
+ <developer id="org.openmw">
+   <name>OpenMW Contributors</name>
+ </developer>
+
+ <branding>
+  <color type="primary" scheme_preference="light">#dcccb8</color>
+  <color type="primary" scheme_preference="dark">#574526</color>
+ </branding>
+
+ <screenshots>
+  <screenshot type="default">
+   <image>https://wiki.openmw.org/images/Openmw_0.11.1_launcher_1.png</image>
+   <caption>The OpenMW launcher</caption>
+  </screenshot>
+  <screenshot>
+   <image>https://wiki.openmw.org/images/0.40_Screenshot-Balmora_3.png</image>
+   <caption>Balmora at morning on OpenMW</caption>
+  </screenshot>
+  <screenshot>
+   <image>https://wiki.openmw.org/images/Screenshot_mournhold_plaza_0.35.png</image>
+   <caption>The Mournhold's plaza on OpenMW</caption>
+  </screenshot>
+  <screenshot>
+   <image>https://wiki.openmw.org/images/Screenshot_Vivec_seen_from_Ebonheart_0.35.png</image>
+   <caption>Vivec seen from Ebonheart on OpenMW</caption>
+  </screenshot>
+ </screenshots>
+ <categories>
+  <category>Game</category>
+  <category>RolePlaying</category>
+ </categories>
+ <releases>
+  <release version="@OPENMW_VERSION@" date="@OPENMW_VERSION_COMMITDATE@"/>
+ </releases>
+ <url type="homepage">https://openmw.org</url>
+ <url type="bugtracker">https://gitlab.com/OpenMW/openmw/issues</url>
+ <url type="faq">https://openmw.org/faq/</url>
+ <content_rating type="oars-1.1" />
+</component>

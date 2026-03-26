@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="">
+    <file alias="preferences-desktop-locale">icons/preferences-desktop-locale.svg</file>
+    <file alias="folder">icons/folder.svg</file>
+    <file alias="system-installer">icons/system-installer.svg</file>
+    <file alias="dollar">icons/dollar.svg</file>
+  </qresource>
+  <qresource prefix="images">
+    <file alias="intropage-background.png">images/intropage-background.png</file>    
+    <file alias="openmw-wizard.png">images/openmw-wizard.png</file>
+  </qresource>
+</RCC>

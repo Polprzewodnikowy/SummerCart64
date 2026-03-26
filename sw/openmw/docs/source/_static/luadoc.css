@@ -1,0 +1,91 @@
+#luadoc code, #luadoc tt, #luadoc p em {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#luadoc pre.example code {
+    white-space: pre;
+}
+
+#luadoc code:not([class*="language-"]) {
+  background-color: unset;
+}
+
+#luadoc pre:not([class*="language-"]) {
+    background-color: inherit;
+    color: inherit;
+    border: none;
+}
+
+#luadoc pre code {
+    white-space: normal;
+}
+
+html:has(#luadoc) {
+    scroll-padding-top: 4.0rem;
+}
+
+#content #luadoc code a:not(.toc-backref) {
+  font-weight: 600;
+}
+
+#luadoc > p:nth-child(1) {
+  margin: 12px 0 12px 0;
+}
+
+#luadoc a:not([href]) {
+    text-decoration: none;
+    cursor: inherit;
+    color: inherit;
+}
+
+#luadoc a:not([href]):hover {
+    color: inherit;
+}
+
+#luadoc code a em {
+  color: inherit;
+  font-weight: inherit;
+}
+
+#luadoc em {
+  font-size: 13px;
+  font-style: normal;
+}
+
+.context-wrapper {
+    display: flex;
+    margin-top: 14px;
+    gap: 4px;
+}
+
+#luadoc ul { list-style-type: disc; }
+#luadoc li {list-style: bullet;}
+
+#luadoc .function a:not(.toc-backref) {
+  font-weight: 500;
+}
+
+#content #luadoc dl.function dt:not(.sig):first-child {
+  border-bottom: 2px solid hsl(var(--muted)  / 50%);
+  background-color: hsl(var(--muted));
+  padding: 6px;
+}
+
+#content #luadoc dl.function dt:not(.sig):first-child a {
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  #content #luadoc dl.function dt:not(.sig):first-child {
+      border-bottom: 2px solid hsl(var(--accent)  / 50%);
+      background-color: hsl(var(--accent));
+  }
+}
+
+#luadoc .table-wrapper.container {
+  padding: 0;
+}
+
+table.docutils {
+    width: 100%;
+}
