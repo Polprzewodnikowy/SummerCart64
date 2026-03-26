@@ -51,6 +51,8 @@
 #include "render/n64_transform.h"
 #include "render/n64_room_draw.h"
 #include "render/n64_textures.h"
+#include "render/n64_entity_draw.h"
+#include "anim/tr_anim.h"
 #include "level/n64_level_loader.h"
 #include "level/tr_level_parse.h"
 #include "level/tr_types.h"
@@ -81,6 +83,11 @@ room_draw_state_t g_room_draw;
 
 /* Texture pages (converted to N64 CI8 format) */
 static n64_texture_page_t g_tex_pages[N64_MAX_TEX_PAGES];
+
+/* Animation state per entity */
+#define MAX_ENTITIES    256
+static tr_anim_state_t g_entity_anims[MAX_ENTITIES];
+static tr_matrix_stack_t g_matrix_stack;
 
 /* Free-fly camera for milestone 2 (replaced by TRX camera in M5) */
 static tr_camera_t g_camera;
@@ -243,6 +250,28 @@ static bool load_level(uint32_t level_num) {
     /* Initialize room renderer with texture pages */
     room_draw_init(&g_room_draw, &g_level, &g_transform, &g_renderer, g_tex_pages);
 
+    /* Initialize entity animation states from level item data.
+     * Each entity starts at its object's first animation. */
+    tr_matrix_init(&g_matrix_stack);
+    memset(g_entity_anims, 0, sizeof(g_entity_anims));
+    for (int i = 0; i < g_level.item_count && i < MAX_ENTITIES; i++) {
+        const tr_item_t *item = &g_level.items[i];
+        /* Find object definition for this entity type */
+        for (int o = 0; o < g_level.object_count; o++) {
+            if (g_level.objects[o].object_id == item->object_id) {
+                const tr_object_def_t *obj = &g_level.objects[o];
+                g_entity_anims[i].anim_num = obj->anim_idx;
+                if (obj->anim_idx >= 0 && obj->anim_idx < g_level.anim_count) {
+                    g_entity_anims[i].frame_num = g_level.anims[obj->anim_idx].frame_base;
+                    g_entity_anims[i].current_state = g_level.anims[obj->anim_idx].state_id;
+                }
+                g_entity_anims[i].goal_state = g_entity_anims[i].current_state;
+                break;
+            }
+        }
+    }
+    display_printf("  Entities initialized: %d\n", g_level.item_count);
+
     /* Find Lara's starting position (object_id 0 is always Lara) */
     g_camera_room = 0;
     for (int i = 0; i < g_level.item_count; i++) {
@@ -346,6 +375,29 @@ static void game_frame(void) {
 
     /* Draw all visible rooms from camera's current room */
     room_draw_frame(&g_room_draw, g_camera_room);
+
+    /* Draw entities in visible rooms */
+    for (int i = 0; i < g_room_draw.visible_count; i++) {
+        int16_t room_idx = g_room_draw.visible[i].room_idx;
+        n64_draw_room_entities(&g_level, room_idx,
+                                &g_matrix_stack, &g_transform,
+                                &g_renderer.cmd_buf,
+                                &g_room_draw.tmem,
+                                g_tex_pages,
+                                g_entity_anims,
+                                MAX_ENTITIES);
+    }
+
+    /* Advance entity animations (30fps tick, exact TR1 timing) */
+    for (int i = 0; i < g_level.item_count && i < MAX_ENTITIES; i++) {
+        const tr_item_t *item = &g_level.items[i];
+        for (int o = 0; o < g_level.object_count; o++) {
+            if (g_level.objects[o].object_id == item->object_id) {
+                tr_anim_advance(&g_entity_anims[i], &g_level, &g_level.objects[o]);
+                break;
+            }
+        }
+    }
 
     /* Debug overlay showing stats */
     n64_render_debug_overlay(&g_renderer);

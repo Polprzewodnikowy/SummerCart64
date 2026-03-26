@@ -158,7 +158,7 @@ static void emit_rdp_triangle(rdp_cmd_buffer_t *buf,
  * The shade values modulate the texture (TR1 lighting).
  * UV gradients are computed from the screen-space triangle.
  */
-static void emit_rdp_textured_triangle(rdp_cmd_buffer_t *buf,
+void emit_rdp_textured_triangle(rdp_cmd_buffer_t *buf,
                                         const transformed_vertex_t *v0,
                                         const transformed_vertex_t *v1,
                                         const transformed_vertex_t *v2,
