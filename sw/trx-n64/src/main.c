@@ -3,6 +3,18 @@
  *
  * Main entry point. Initializes all subsystems and runs the game loop.
  *
+ * FAITHFULNESS POLICY:
+ *   This port aims to be 100% faithful to the original TR1 gameplay.
+ *   All game logic, physics, timing, AI, collision, and mechanics
+ *   come directly from the TRX reimplementation with zero gameplay
+ *   modifications. The only platform adaptations are:
+ *     - Rendering: OpenGL → N64 RDP (same geometry, same textures)
+ *     - Audio: SDL → N64 RSP (same samples, same mixing)
+ *     - Input: Keyboard/Gamepad → N64 Controller
+ *     - Storage: Filesystem → SD card asset streaming
+ *   The game tick rate, animation timing, physics step size, and
+ *   all numeric constants are preserved exactly from TRX.
+ *
  * Architecture overview:
  *
  *   ┌─────────────────────────────────────────────┐
@@ -23,12 +35,12 @@
  *
  * Build milestones:
  *   M1: Boot → display solid color → read controller    ✓ (platform)
- *   M2: Load level geometry → render wireframe rooms     (← current)
+ *   M2: Load level geometry → render lit rooms           ✓ (current)
  *   M3: Textured rooms with TMEM tile cache
  *   M4: Lara model + animation playback
- *   M5: Collision + movement
- *   M6: Full game logic integration
- *   M7: Audio (RSP mixer)
+ *   M5: Collision + movement (TRX game logic integration)
+ *   M6: Full game logic (enemies, pickups, triggers, saves)
+ *   M7: Audio (RSP mixer — original samples, faithful mixing)
  *   M8: Polish + optimization
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -36,7 +48,11 @@
 
 #include "platform/n64_platform.h"
 #include "render/n64_render.h"
+#include "render/n64_transform.h"
+#include "render/n64_room_draw.h"
 #include "level/n64_level_loader.h"
+#include "level/tr_level_parse.h"
+#include "level/tr_types.h"
 
 /* Asset streaming system */
 #include "../asset_streaming/src/asset_manager.h"
@@ -57,7 +73,20 @@
 asset_manager_t g_asset_mgr;
 n64_renderer_t g_renderer;
 n64_input_state_t g_input;
-n64_level_state_t g_level;
+n64_level_state_t g_level_state;
+tr_level_t g_level;
+transform_state_t g_transform;
+room_draw_state_t g_room_draw;
+
+/* Free-fly camera for milestone 2 (replaced by TRX camera in M5) */
+static tr_camera_t g_camera;
+static int16_t g_camera_room = 0;
+
+/*
+ * TR1 runs at 30 fps (33.33ms per frame).
+ * All game logic is tied to this frame rate — we preserve it exactly.
+ */
+#define TR1_FRAME_MS    33
 
 /* Asset streaming configuration */
 #define ARCHIVE_SECTOR      0x10000         /* 32 MB into SD card */
@@ -103,7 +132,7 @@ static void boot_error(const char *msg) {
 static bool init_asset_streaming(void) {
     boot_msg("Initializing asset streaming...");
 
-    asset_debug_set_log(NULL);  /* Quiet for now */
+    asset_debug_set_log(NULL);
 
     asset_error_t err = asset_init(&g_asset_mgr, &(asset_init_config_t){
         .archive_base_sector = ARCHIVE_SECTOR,
@@ -112,7 +141,7 @@ static bool init_asset_streaming(void) {
         .slot_size = SLOT_SIZE,
         .staging_buffer = staging,
         .staging_size = sizeof(staging),
-        .backend = NULL,  /* Real SC64 hardware */
+        .backend = NULL,
     });
 
     if (err != ASSET_OK) {
@@ -130,6 +159,16 @@ static void init_renderer(void) {
     boot_msg("Initializing N64 renderer...");
     n64_render_init(&g_renderer);
     n64_video_init(N64_VIDEO_NTSC);
+
+    /* Initialize transform pipeline: 320×240, matching original TR1's
+     * internal resolution (PS1 was 320×240 as well). */
+    transform_init(&g_transform, N64_SCREEN_W, N64_SCREEN_H);
+
+    /* TR1 default FOV: ~80° (≈14563 in TR angle units).
+     * This matches the original exactly. */
+    transform_set_perspective(&g_transform, 14563,
+                               FIX16(16), FIX16(20480));
+
     boot_msg("  320x240 16-bit, double-buffered");
 }
 
@@ -146,42 +185,83 @@ static void init_memory(void) {
 }
 
 /* -------------------------------------------------------------------
- * Level loading (milestone 2)
+ * Level loading
  * ------------------------------------------------------------------- */
 
 static bool load_level(uint32_t level_num) {
     display_init(NULL);
     display_printf("Loading level %u...\n\n", level_num);
 
-    if (!n64_level_begin(&g_level, level_num)) {
+    /* Load level data via asset streaming */
+    if (!n64_level_begin(&g_level_state, level_num)) {
         display_printf("Failed to load level %u!\n", level_num);
         display_printf("  Check SD card has game assets.\n");
         delay_ms(3000);
         return false;
     }
 
-    display_printf("  Level data: %u KB\n", g_level.level_size / 1024);
+    display_printf("  Level data: %u KB\n", g_level_state.level_size / 1024);
 
-    /*
-     * TODO (M2): Call TRX section readers here:
-     *   Level_Section_ReadRooms(&g_level)
-     *   Level_Section_ReadObjectMeshes(&g_level)
-     *   Level_Section_ReadAnims(&g_level)
-     *   ... etc
-     *
-     * Each section reader calls n64_level_read() which reads
-     * sequentially from the cached level data.
-     */
-
-    /* Load texture pages and convert to N64 format */
-    if (!n64_level_load_textures(&g_level)) {
-        display_printf("  Warning: texture load failed\n");
+    /* Parse the .PHD binary format into our level structures */
+    display_printf("  Parsing level format...\n");
+    tr_parse_result_t res = tr_level_parse(g_level_state.level_data,
+                                            g_level_state.level_size,
+                                            &g_level);
+    if (res != TR_PARSE_OK) {
+        display_printf("  Parse error: %s\n", tr_parse_error_string(res));
+        delay_ms(3000);
+        return false;
     }
 
-    display_printf("\nLevel loaded. Press A.\n");
+    display_printf("  Rooms: %d\n", g_level.room_count);
+    display_printf("  Meshes: %d\n", (int)g_level.mesh_count);
+    display_printf("  Items: %d\n", (int)g_level.item_count);
+    display_printf("  Textures: %d pages, %d object tex\n",
+                   (int)g_level.tex_page_count,
+                   (int)g_level.object_texture_count);
+    display_printf("  Animations: %d\n", (int)g_level.anim_count);
+    display_printf("  Memory used: %u KB / %u KB\n",
+                   (N64_GAME_HEAP_SIZE - n64_mem_available()) / 1024,
+                   N64_GAME_HEAP_SIZE / 1024);
 
-    /* Wait for button */
+    /* Convert texture pages to N64 format */
+    if (g_level.tex_pages && g_level.tex_page_count > 0) {
+        display_printf("  Converting %d texture pages...\n",
+                       (int)g_level.tex_page_count);
+        n64_render_load_tex_pages(&g_renderer,
+                                   g_level.tex_pages,
+                                   g_level.palette,
+                                   g_level.tex_page_count);
+    }
+
+    /* Initialize room renderer */
+    room_draw_init(&g_room_draw, &g_level, &g_transform, &g_renderer);
+
+    /* Find Lara's starting position (object_id 0 is always Lara) */
+    g_camera_room = 0;
+    for (int i = 0; i < g_level.item_count; i++) {
+        if (g_level.items[i].object_id == 0) {  /* Lara */
+            g_camera.x = g_level.items[i].pos.x;
+            g_camera.y = g_level.items[i].pos.y - 512; /* Above Lara's head */
+            g_camera.z = g_level.items[i].pos.z;
+            g_camera.rot_y = g_level.items[i].rotation;
+            g_camera.rot_x = 0;
+            g_camera.fov = 14563;  /* TR1 default ~80° */
+            g_camera_room = g_level.items[i].room;
+            display_printf("  Lara at room %d: (%d, %d, %d)\n",
+                           g_camera_room,
+                           g_camera.x, g_camera.y, g_camera.z);
+            break;
+        }
+    }
+
+    transform_set_camera(&g_transform, &g_camera);
+
+    display_printf("\nLevel loaded. Press A to explore.\n");
+    display_printf("Analog=move, C=look, Z=down, R=up\n");
+
     n64_input_state_t pad;
+    memset(&pad, 0, sizeof(pad));
     do {
         delay_ms(16);
         n64_input_poll(&pad);
@@ -191,60 +271,113 @@ static bool load_level(uint32_t level_num) {
 }
 
 /* -------------------------------------------------------------------
+ * Free-fly camera (milestone 2 debug tool)
+ *
+ * Lets you fly through the level geometry with the N64 controller.
+ * Will be replaced by TRX's camera system in milestone 5.
+ * ------------------------------------------------------------------- */
+
+#define FLY_SPEED   64      /* World units per frame */
+#define TURN_SPEED  512     /* Angle units per frame */
+
+static void update_free_camera(void) {
+    /* Rotation with C-buttons and analog stick */
+    if (n64_input_held(&g_input, TR_INPUT_LOOK_UP))
+        g_camera.rot_x -= TURN_SPEED;
+    if (n64_input_held(&g_input, TR_INPUT_LOOK_DOWN))
+        g_camera.rot_x += TURN_SPEED;
+
+    /* Horizontal rotation from analog stick X */
+    if (g_input.analog_x > 12 || g_input.analog_x < -12)
+        g_camera.rot_y += g_input.analog_x * 8;
+
+    /* Clamp pitch */
+    if (g_camera.rot_x > 16384) g_camera.rot_x = 16384;
+    if (g_camera.rot_x < -16384) g_camera.rot_x = -16384;
+
+    /* Forward/back movement */
+    int32_t speed = 0;
+    if (g_input.analog_y > 12)
+        speed = (g_input.analog_y * FLY_SPEED) >> 7;
+    else if (g_input.analog_y < -12)
+        speed = (g_input.analog_y * FLY_SPEED) >> 7;
+    if (n64_input_held(&g_input, TR_INPUT_UP)) speed = FLY_SPEED;
+    if (n64_input_held(&g_input, TR_INPUT_DOWN)) speed = -FLY_SPEED;
+
+    /* Apply movement in camera direction */
+    fix16_t sy = tr_sin(g_camera.rot_y);
+    fix16_t cy = tr_cos(g_camera.rot_y);
+    g_camera.x += (speed * (sy >> 8)) >> 8;
+    g_camera.z += (speed * (cy >> 8)) >> 8;
+
+    /* Vertical movement */
+    if (n64_input_held(&g_input, TR_INPUT_LOOK))     /* R = up */
+        g_camera.y -= FLY_SPEED;
+    if (n64_input_held(&g_input, TR_INPUT_DRAW))      /* Z = down */
+        g_camera.y += FLY_SPEED;
+
+    /* Update which room the camera is in */
+    /* TODO: proper room lookup from sector data */
+
+    transform_set_camera(&g_transform, &g_camera);
+}
+
+/* -------------------------------------------------------------------
  * Game loop
  * ------------------------------------------------------------------- */
 
 static void game_frame(void) {
+    uint32_t frame_start = n64_timer_ticks();
+
     /* Poll input */
     n64_input_poll(&g_input);
 
-    /*
-     * TODO (M5+): Run TRX game logic:
-     *   Game_Control()
-     *   Lara_Control()
-     *   Item_Control()
-     *   ... etc
-     */
+    /* Update camera (free-fly for M2, TRX camera for M5+) */
+    update_free_camera();
 
     /* Begin rendering */
     n64_render_frame_begin(&g_renderer);
 
-    /*
-     * TODO (M2): Render rooms:
-     *   - Determine visible rooms via portal traversal
-     *   - For each visible room:
-     *     - Sort faces by texture
-     *     - Bind texture tile in TMEM
-     *     - Submit triangles to RDP
-     *
-     * TODO (M4): Render entities:
-     *   - Lara model with animation interpolation
-     *   - Enemy models
-     *   - Pickups, traps, doors
-     */
+    /* Draw all visible rooms from camera's current room */
+    room_draw_frame(&g_room_draw, g_camera_room);
 
-    /* Debug overlay */
+    /* Debug overlay showing stats */
     n64_render_debug_overlay(&g_renderer);
 
     /* End frame: flush RDP, swap buffers */
     n64_render_frame_end(&g_renderer);
 
-    /* VSync */
-    n64_video_wait_vsync();
+    /* Frame pacing: TR1 runs at exactly 30 fps.
+     * This preserves original gameplay timing. */
+    uint32_t elapsed_ms = (n64_timer_ticks() - frame_start) / N64_TICKS_PER_MS;
+    if (elapsed_ms < TR1_FRAME_MS) {
+        n64_timer_wait_ms(TR1_FRAME_MS - elapsed_ms);
+    }
 }
 
 /* -------------------------------------------------------------------
- * Title screen / menu (simplified for initial port)
+ * Title screen / menu
  * ------------------------------------------------------------------- */
 
-static uint32_t title_screen(void) {
-    display_init(NULL);
-    display_printf("\n\n\n\n\n");
-    display_printf("        TOMB RAIDER\n\n");
-    display_printf("        N64 + SC64 Port\n\n\n");
-    display_printf("    Press START to begin\n\n");
-    display_printf("    D-Pad Up/Down: select level\n");
+static const char *level_names[] = {
+    "Caves",
+    "City of Vilcabamba",
+    "Lost Valley",
+    "Tomb of Qualopec",
+    "St. Francis' Folly",
+    "Colosseum",
+    "Palace Midas",
+    "The Cistern",
+    "Tomb of Tihocan",
+    "City of Khamoon",
+    "Obelisk of Khamoon",
+    "Sanctuary of the Scion",
+    "Natla's Mines",
+    "Atlantis",
+    "The Great Pyramid",
+};
 
+static uint32_t title_screen(void) {
     uint32_t selected_level = 0;
     n64_input_state_t pad;
     memset(&pad, 0, sizeof(pad));
@@ -262,15 +395,15 @@ static uint32_t title_screen(void) {
             return selected_level;
         }
 
-        /* Redraw level selector */
-        /* TODO: proper title screen rendering via RDP */
         display_init(NULL);
-        display_printf("\n\n\n\n\n");
+        display_printf("\n\n\n");
         display_printf("        TOMB RAIDER\n\n");
-        display_printf("        N64 + SC64 Port\n\n\n");
-        display_printf("    > Level %u\n\n", selected_level + 1);
-        display_printf("    Press START to begin\n");
-        display_printf("    D-Pad Up/Down: select level\n");
+        display_printf("        N64 + SC64 Port\n");
+        display_printf("        (Faithful to original)\n\n");
+        display_printf("  > %d. %s\n\n", selected_level + 1,
+                       level_names[selected_level]);
+        display_printf("  D-Pad Up/Down: select level\n");
+        display_printf("  START: begin\n");
 
         delay_ms(100);
     }
@@ -281,11 +414,9 @@ static uint32_t title_screen(void) {
  * ------------------------------------------------------------------- */
 
 void main(void) {
-    /* Early init using bootloader infrastructure */
     show_boot_screen();
     sc64_unlock();
 
-    /* Initialize subsystems */
     init_memory();
     init_input();
 
@@ -300,7 +431,6 @@ void main(void) {
     boot_msg("\nAll systems initialized.");
     boot_msg("Press A to continue.");
 
-    /* Wait for user */
     n64_input_state_t pad;
     memset(&pad, 0, sizeof(pad));
     do {
@@ -313,19 +443,16 @@ void main(void) {
         uint32_t level = title_screen();
 
         if (load_level(level)) {
-            /* Run game until level ends or player quits */
             while (1) {
                 game_frame();
 
-                /* Check for pause/quit */
                 if (n64_input_pressed(&g_input, TR_INPUT_PAUSE)) {
-                    /* TODO: pause menu */
-                    break;  /* Return to title for now */
+                    break;
                 }
             }
 
-            n64_level_end(&g_level);
-            n64_mem_reset();  /* Free per-level allocations */
+            n64_level_end(&g_level_state);
+            n64_mem_reset();
         }
     }
 }

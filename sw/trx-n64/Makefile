@@ -66,7 +66,10 @@ PORT_SRCS = \
 	src/main.c \
 	src/platform/n64_platform.c \
 	src/render/n64_render.c \
-	src/level/n64_level_loader.c
+	src/render/n64_transform.c \
+	src/render/n64_room_draw.c \
+	src/level/n64_level_loader.c \
+	src/level/tr_level_parse.c
 
 # TRX game logic (portable C files)
 # These are added incrementally as we integrate each subsystem.
@@ -120,6 +123,12 @@ $(BUILD)/port_n64_platform.c.o: src/platform/n64_platform.c
 $(BUILD)/port_n64_render.c.o: src/render/n64_render.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_n64_level_loader.c.o: src/level/n64_level_loader.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_n64_transform.c.o: src/render/n64_transform.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_n64_room_draw.c.o: src/render/n64_room_draw.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_level_parse.c.o: src/level/tr_level_parse.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # TRX game logic

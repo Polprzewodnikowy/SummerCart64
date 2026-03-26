@@ -43,12 +43,6 @@
 #define SIZE_4BIT   0
 #define SIZE_16BIT  2
 
-static void rdp_emit(rdp_cmd_buffer_t *buf, uint64_t cmd) {
-    if (buf->cmd_count < buf->cmd_capacity) {
-        buf->cmds[buf->cmd_count++] = cmd;
-    }
-}
-
 static void rdp_sync_pipe(rdp_cmd_buffer_t *buf) {
     rdp_emit(buf, (uint64_t)RDP_SYNC_PIPE << 56);
 }

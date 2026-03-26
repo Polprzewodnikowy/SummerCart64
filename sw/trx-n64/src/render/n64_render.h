@@ -83,6 +83,12 @@ typedef struct {
     uint32_t cmd_capacity;  /* Max 64-bit words */
 } rdp_cmd_buffer_t;
 
+static inline void rdp_emit(rdp_cmd_buffer_t *buf, uint64_t cmd) {
+    if (buf->cmd_count < buf->cmd_capacity) {
+        buf->cmds[buf->cmd_count++] = cmd;
+    }
+}
+
 /* -------------------------------------------------------------------
  * Texture cache (TMEM management)
  * ------------------------------------------------------------------- */
