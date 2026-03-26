@@ -282,6 +282,21 @@ void game_get_collision_info(game_state_t *gs,
 void game_shift_item(game_item_t *item, const coll_info_t *coll);
 
 /* -------------------------------------------------------------------
+ * API: Trigger system
+ * ------------------------------------------------------------------- */
+
+/* Execute trigger commands at a sector (when Lara steps on it) */
+void game_execute_trigger(game_state_t *gs, const tr_sector_t *sector);
+
+/* Get floor height with full tilt calculation */
+int32_t game_get_floor_height_full(const game_state_t *gs,
+                                    const tr_sector_t *sector,
+                                    int32_t x, int32_t y, int32_t z);
+
+/* Control all active items (enemies, traps, doors) */
+void game_control_items(game_state_t *gs);
+
+/* -------------------------------------------------------------------
  * API: Per-frame update
  * ------------------------------------------------------------------- */
 

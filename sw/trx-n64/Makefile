@@ -76,6 +76,9 @@ PORT_SRCS = \
 	src/game/tr_collision.c \
 	src/game/tr_lara.c \
 	src/game/tr_camera.c \
+	src/game/tr_triggers.c \
+	src/game/tr_objects.c \
+	src/game/tr_creature.c \
 	src/level/n64_level_loader.c \
 	src/level/tr_level_parse.c
 
@@ -153,6 +156,12 @@ $(BUILD)/port_tr_collision.c.o: src/game/tr_collision.c
 $(BUILD)/port_tr_lara.c.o: src/game/tr_lara.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 $(BUILD)/port_tr_camera.c.o: src/game/tr_camera.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_triggers.c.o: src/game/tr_triggers.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_objects.c.o: src/game/tr_objects.c
+	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD)/port_tr_creature.c.o: src/game/tr_creature.c
 	$(CC) $(FLAGS) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 # TRX game logic

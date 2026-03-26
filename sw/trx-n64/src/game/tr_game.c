@@ -133,14 +133,19 @@ void game_map_input(game_state_t *gs, const void *n64_input_ptr) {
         gs->input |= IN_ROLL;
 }
 
+/* Forward declarations */
+extern void game_control_items(game_state_t *gs);
+extern void game_execute_trigger(game_state_t *gs, const tr_sector_t *sector);
+
 /* -------------------------------------------------------------------
  * Main game tick — one frame at 30fps
  *
  * Update order matches TR1 exactly:
  *   1. Map input
  *   2. Control Lara (movement, state machine, physics)
- *   3. Control other items (enemies, traps, etc.)
- *   4. Update camera
+ *   3. Test trigger at Lara's feet
+ *   4. Control other items (enemies, traps, etc.)
+ *   5. Update camera
  * ------------------------------------------------------------------- */
 
 void game_frame_tick(game_state_t *gs) {
@@ -149,12 +154,18 @@ void game_frame_tick(game_state_t *gs) {
     /* Control Lara */
     game_lara_control(gs);
 
-    /*
-     * TODO (M6): Control other active items
-     *   for each active item:
-     *     call item->control_func(item_num)
-     *   This runs enemy AI, trap logic, door animations, etc.
-     */
+    /* Test trigger at Lara's current sector */
+    if (gs->lara_item) {
+        const tr_sector_t *sector = game_get_sector(gs, gs->lara_item->room_num,
+                                                      gs->lara_item->pos.x,
+                                                      gs->lara_item->pos.z);
+        if (sector) {
+            game_execute_trigger(gs, sector);
+        }
+    }
+
+    /* Control all other active items (enemies, traps, doors, etc.) */
+    game_control_items(gs);
 
     /* Update camera to follow Lara */
     game_camera_update(gs);
