@@ -63,22 +63,46 @@ def quantize_to_ci8(img, target_size=(128, 128)):
     return ci8_data, palette_5551
 
 
+def generate_mipmaps(img, base_size=128):
+    """
+    Generate mipmap chain (Lambert LOD technique).
+    Returns list of (size, ci8_data, palette) from highest to lowest detail.
+    Sizes: 128, 64, 32, 16, 8 — each half the previous.
+    Lowest 2 LODs (16, 8) always resident in RDRAM.
+    """
+    mips = []
+    size = base_size
+    while size >= 8:
+        ci8_data, palette = quantize_to_ci8(img, (size, size))
+        mips.append((size, ci8_data, palette))
+        size //= 2
+    return mips
+
+
 def convert_texture(inpath, outpath, target_size=(128, 128)):
-    """Convert a single texture file to CI8 binary."""
+    """Convert a single texture file to CI8 binary with mipmap chain."""
     try:
         img = Image.open(inpath)
     except Exception as e:
         print(f"  SKIP {os.path.basename(inpath)}: {e}")
         return False
 
-    ci8_data, palette = quantize_to_ci8(img, target_size)
+    mips = generate_mipmaps(img, target_size[0])
 
-    # Write binary: [4B width][4B height][512B palette][W×H bytes pixels]
+    # Write binary with mipmap chain:
+    # [4B magic "MIP8"][4B mip_count][4B base_width][4B base_height]
+    # For each mip level:
+    #   [4B width][4B height][512B palette][W×H bytes pixels]
     with open(outpath, 'wb') as f:
+        f.write(b'MIP8')
+        f.write(struct.pack('<I', len(mips)))
         f.write(struct.pack('<II', target_size[0], target_size[1]))
-        for c in palette:
-            f.write(struct.pack('<H', c))
-        f.write(ci8_data)
+
+        for size, ci8_data, palette in mips:
+            f.write(struct.pack('<II', size, size))
+            for c in palette:
+                f.write(struct.pack('<H', c))
+            f.write(ci8_data)
 
     return True
 

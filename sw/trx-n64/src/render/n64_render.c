@@ -110,6 +110,22 @@ static void rdp_set_other_modes_1cycle(rdp_cmd_buffer_t *buf, bool z_compare, bo
     if (z_compare) w |= (1ULL << 4);   /* z_compare_en */
     if (z_update)  w |= (1ULL << 5);   /* z_update_en */
     w |= (1ULL << 13);  /* image_read_en (for blending) */
+    /* Texture filter: bilinear (bilerp_0 + bilerp_1) for smoother look */
+    w |= (1ULL << 12);  /* sample_type = 2x2 */
+    rdp_emit(buf, w);
+}
+
+/*
+ * Z-buffer-off mode (Lambert technique).
+ * Saves 48 bits written + 16 bits read per pixel = 75% bandwidth.
+ * Requires caller to submit faces in back-to-front order.
+ */
+static void rdp_set_other_modes_1cycle_no_z(rdp_cmd_buffer_t *buf) {
+    uint64_t w = ((uint64_t)RDP_SET_OTHER_MODES << 56)
+               | ((uint64_t)0 << 52);  /* cycle_type = 1-cycle */
+    /* No z_compare, no z_update */
+    w |= (1ULL << 13);  /* image_read_en */
+    w |= (1ULL << 12);  /* sample_type = 2x2 (bilinear) */
     rdp_emit(buf, w);
 }
 
@@ -545,6 +561,57 @@ void n64_draw_screen_sprite(n64_renderer_t *r,
     (void)r; (void)sx; (void)sy; (void)scale_h; (void)scale_v;
     (void)sprite_idx;
     /* TODO: textured screen-space sprite */
+}
+
+/* -------------------------------------------------------------------
+ * Lambert fog via combiner (SET_FOG_COLOR + fog combiner mode)
+ *
+ * RDP SET_FOG_COLOR (opcode 0x38):
+ *   Word: [0x38 << 56] | [R << 24] | [G << 16] | [B << 8] | [A]
+ *
+ * Fog combiner: output = lerp(TEXEL0, FOG_COLOR, SHADE.a)
+ *   sub_a = TEXEL0, sub_b = FOG_COLOR, mul = SHADE_ALPHA, add = FOG_COLOR
+ *   This blends texture toward fog color based on vertex alpha.
+ *
+ * Vertex alpha encodes fog: 0=clear (no fog), 255=full fog.
+ * ------------------------------------------------------------------- */
+
+void n64_render_set_fog_color(n64_renderer_t *r,
+                               uint8_t fog_r, uint8_t fog_g, uint8_t fog_b) {
+    rdp_cmd_buffer_t *buf = &r->cmd_buf;
+    rdp_emit(buf, ((uint64_t)0x38 << 56)
+                | ((uint64_t)fog_r << 24)
+                | ((uint64_t)fog_g << 16)
+                | ((uint64_t)fog_b << 8)
+                | (uint64_t)0xFF);
+}
+
+void n64_render_set_fog_combiner(n64_renderer_t *r) {
+    rdp_cmd_buffer_t *buf = &r->cmd_buf;
+    /*
+     * Fog combiner: color = (TEXEL0 - FOG) * SHADE_ALPHA + FOG
+     * This lerps from FOG_COLOR (when shade_alpha=0) to TEXEL0 (when shade_alpha=1).
+     * We invert the convention: vertex alpha 0 = no fog, 255 = full fog.
+     *
+     * So actually: color = (FOG - TEXEL0) * SHADE_ALPHA + TEXEL0
+     *   sub_a = FOG_COLOR(3), sub_b = TEXEL0(1), mul = SHADE_ALPHA(varies), add = TEXEL0(1)
+     *
+     * SET_COMBINE (0x3C):
+     *   Cycle 0 color: sub_a=FOG(3), sub_b=TEXEL0(1), mul=SHADE_ALPHA, add=TEXEL0(1)
+     */
+    uint64_t combine =
+        ((uint64_t)0x3C << 56)
+        | ((uint64_t)3  << 52)   /* sub_a_rgb_0 = FOG_COLOR */
+        | ((uint64_t)1  << 28)   /* sub_b_rgb_0 = TEXEL0 */
+        | ((uint64_t)11 << 47)   /* mul_rgb_0 = SHADE_ALPHA */
+        | ((uint64_t)1  << 15)   /* add_rgb_0 = TEXEL0 */
+        /* Alpha: pass through shade alpha */
+        | ((uint64_t)7  << 44)   /* sub_a_a_0 = 0 */
+        | ((uint64_t)7  << 12)   /* sub_b_a_0 = 0 */
+        | ((uint64_t)7  << 41)   /* mul_a_0 = 0 */
+        | ((uint64_t)4  << 9)    /* add_a_0 = SHADE */
+        ;
+    rdp_emit(buf, combine);
 }
 
 /* -------------------------------------------------------------------

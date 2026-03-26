@@ -222,4 +222,20 @@ void n64_draw_screen_sprite(n64_renderer_t *r,
 /* Debug overlay */
 void n64_render_debug_overlay(n64_renderer_t *r);
 
+/*
+ * Lambert fog combiner: vertex color channel used for fog interpolation.
+ *
+ * When Z-buffer is off and faces are sorted back-to-front, we don't
+ * need vertex colors for depth. Instead, encode fog intensity in the
+ * vertex color (0=no fog, 255=full fog) and use the combiner to blend:
+ *
+ *   output = TEXEL0 * (1 - SHADE.a) + FOG_COLOR * SHADE.a
+ *
+ * This gives per-vertex distance fog at zero extra cost.
+ * Fog color is set via SET_FOG_COLOR command.
+ */
+void n64_render_set_fog_color(n64_renderer_t *r,
+                               uint8_t fog_r, uint8_t fog_g, uint8_t fog_b);
+void n64_render_set_fog_combiner(n64_renderer_t *r);
+
 #endif /* TRX_N64_RENDER_H */
