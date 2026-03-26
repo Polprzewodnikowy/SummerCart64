@@ -197,11 +197,15 @@ void esm_build_index(esm_reader_t *r, esm_index_t *index) {
                     index->cells[ci].is_interior = false;
 
                     while (esm_next_subrecord(r)) {
-                        if (r->sub_name == ESM_NAME) {
+                        if (r->sub_name == ESM_FRMR) {
+                            /* Hit first ref — stop reading cell header */
+                            esm_skip_subrecord(r);
+                            break;
+                        } else if (r->sub_name == ESM_NAME) {
                             char name[64];
                             read_string(r, name, 64, r->sub_size);
                             index->cells[ci].name_hash = hash_string(name);
-                        } else if (r->sub_name == ESM_DATA && r->sub_size >= 12) {
+                        } else if (r->sub_name == ESM_DATA && r->sub_size == 12) {
                             int32_t flags = read_s32(r);
                             index->cells[ci].grid_x = read_s32(r);
                             index->cells[ci].grid_y = read_s32(r);
@@ -269,7 +273,7 @@ void esm_build_index(esm_reader_t *r, esm_index_t *index) {
                             read_string(r, npc->class_, 64, r->sub_size);
                         else if (r->sub_name == ESM_MODL)
                             read_string(r, npc->model, 128, r->sub_size);
-                        else if (r->sub_name == ESM_NPDT && r->sub_size >= 52) {
+                        else if (r->sub_name == ESM_NPDT && r->sub_size >= 12) {
                             npc->level = read_s16(r);
                             esm_read_bytes(r, npc->attributes, 8);
                             skip_bytes(r, 27); /* skills */
