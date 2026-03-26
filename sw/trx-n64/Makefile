@@ -192,7 +192,7 @@ $(BUILD)/trx-n64.bin: $(BUILD)/trx-n64.elf
 
 # Also produce a .z64 with the N64 header (first 64 bytes = PI settings + entry point)
 $(BUILD)/trx-n64.z64: $(BUILD)/trx-n64.bin
-	@python3 tools/make_z64.py $< $@
+	@python3 tools/make_z64.py $< $@ "TOMB RAIDER N64"
 	@echo "Z64: $@ ($$(stat -c%s $@ 2>/dev/null || stat -f%z $@ 2>/dev/null) bytes)"
 
 # ---- Asset packing ----

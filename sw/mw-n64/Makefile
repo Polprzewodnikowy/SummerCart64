@@ -105,7 +105,7 @@ $(BUILD)/mw-n64.bin: $(BUILD)/mw-n64.elf
 	@echo "ROM: $@ ($$(stat -c%s $@) bytes)"
 
 $(BUILD)/mw-n64.z64: $(BUILD)/mw-n64.bin
-	@$(PYTHON) ../trx-n64/tools/make_z64.py $< $@
+	@$(PYTHON) ../trx-n64/tools/make_z64.py $< $@ "MORROWIND N64"
 	@echo "Z64: $@ ($$(stat -c%s $@) bytes)"
 
 pack: tools/mw_pack.py

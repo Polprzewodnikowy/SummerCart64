@@ -92,7 +92,7 @@ def create_ipl3_stub():
     return bytes(code)
 
 
-def make_z64(bin_path, z64_path):
+def make_z64(bin_path, z64_path, rom_name="N64 GAME"):
     with open(bin_path, "rb") as f:
         rom_data = f.read()
 
@@ -120,7 +120,7 @@ def make_z64(bin_path, z64_path):
     struct.pack_into(">I", header, 0x14, 0)
 
     # ROM name (20 bytes, space-padded)
-    name = b"TOMB RAIDER N64     "
+    name = rom_name.encode('ascii')[:20].ljust(20)
     header[0x20:0x34] = name[:20]
 
     # Media format + Game ID
@@ -177,7 +177,8 @@ def make_z64(bin_path, z64_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <input.bin> <output.z64>")
+    if len(sys.argv) < 3:
+        print(f"Usage: {sys.argv[0]} <input.bin> <output.z64> [rom_name]")
         sys.exit(1)
-    make_z64(sys.argv[1], sys.argv[2])
+    rom_name = sys.argv[3] if len(sys.argv) > 3 else "N64 GAME"
+    make_z64(sys.argv[1], sys.argv[2], rom_name)
