@@ -1,0 +1,837 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TRX gameflow schema",
+  "$defs": {
+    "path": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name for this mod, shown in the Switch Game menu."
+    },
+    "engine": {
+      "type": "integer",
+      "enum": [1, 2, 3],
+      "description": "Engine version this mod runs on (1 = TR1, 2 = TR2, 3 = TR3)."
+    },
+    "extends": {
+      "type": "string",
+      "description": "Directory name of the base mod this mod extends. Used for asset fallback."
+    },
+    "main_menu_picture": {
+      "type": "string",
+      "description": "Path to the main menu background image."
+    },
+    "main_script": {
+      "type": "string",
+      "description": "Path to a global Lua script to execute after game initialization, before the first level loads."
+    },
+    "savegame_file_fmt": {
+      "type": "string",
+      "description": "Path pattern to look for the savegame files."
+    },
+    "demo_version": {
+      "type": "boolean",
+      "description": "Legacy demo version flag (scheduled for removal)."
+    },
+    "title": {
+      "$ref": "#/definitions/title",
+      "description": "Configuration for the title screen."
+    },
+    "sfx_path": {
+      "type": "string",
+      "description": "Path to the sound effects (.sfx) file to use in the game."
+    },
+    "injections": {
+      "type": "array",
+      "description": "Global data injection file paths applied to all levels unless overridden.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "globe_select_entries": {
+      "type": "array",
+      "description": "Array of globe entries to define how level area selection works.",
+      "items": {
+        "$ref": "#/definitions/globe_select"
+      }
+    },
+    "levels": {
+      "type": "array",
+      "description": "Array of regular level definitions.",
+      "items": {
+        "$ref": "#/definitions/level"
+      }
+    },
+    "cutscenes": {
+      "type": "array",
+      "description": "Array of cutscene level definitions.",
+      "items": {
+        "$ref": "#/definitions/level"
+      }
+    },
+    "demos": {
+      "type": "array",
+      "description": "Array of demo level definitions.",
+      "items": {
+        "$ref": "#/definitions/level"
+      }
+    },
+    "fmvs": {
+      "type": "array",
+      "description": "Array of FMV entries.",
+      "items": {
+        "$ref": "#/definitions/fmv"
+      }
+    },
+    "convert_dropped_guns": {
+      "type": "boolean",
+      "description": "Forces guns dropped by enemies to be converted to the equivalent ammo if Lara already has the gun."
+    },
+    "enable_tr2_item_drops": {
+      "type": "boolean",
+      "description": "Forces enemies who are placed in the same position as pickup items to carry those items and drop them when killed."
+    },
+    "enforced_config": {
+      "type": "object",
+      "description": "Overrides for any regular game config settings.",
+      "additionalProperties": true
+    },
+    "hidden_config": {
+      "type": "array",
+      "description": "List of config settings to hide from the in-game settings dialogs.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fog_start": {
+      "type": "number",
+      "description": "The distance (in tiles) at which objects and the world start to fade into blackness."
+    },
+    "fog_end": {
+      "type": "number",
+      "description": "The distance (in tiles) at which objects and the world are clipped away."
+    },
+    "water_color": {
+      "description": "Water color (R, G, B) or `#RRGGBB`. 1.0 or `FF` means pass-through, 0.0 or `00` means completely black color.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "ambient_tracks": {
+      "type": "array",
+      "description": "List of music track IDs treated as ambient music (persists on save/load).",
+      "items": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": [
+    "engine",
+    "main_menu_picture",
+    "savegame_file_fmt",
+    "levels"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "command": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "param": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "title": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "music_track": {
+          "type": "integer"
+        },
+        "inherit_injections": {
+          "type": "boolean"
+        },
+        "injections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sequence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sequence"
+          }
+        }
+      },
+      "required": [
+        "path",
+        "sequence"
+      ],
+      "additionalProperties": false
+    },
+    "level": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "script": {
+          "type": "string",
+          "description": "Path to a Lua script executed after loading this level."
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "music_track": {
+          "type": "integer"
+        },
+        "lara_outfit": {
+          "type": "string"
+        },
+        "weather_type": {
+          "type": "string",
+          "enum": [
+            "rain",
+            "snow"
+          ],
+          "description": "Enables a per-level weather effect."
+        },
+        "water_particles": {
+          "type": "boolean",
+          "description": "TR3 only. Enables PSX-style underwater water particles in this level."
+        },
+        "cold_water": {
+          "type": "boolean"
+        },
+        "death_tile": {
+          "type": "string",
+          "description": "Defines death-tile behavior (for TR3 only).",
+          "enum": [
+            "lava",
+            "rapids",
+            "electric"
+          ]
+        },
+        "sequence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sequence"
+          }
+        },
+        "inherit_injections": {
+          "type": "boolean"
+        },
+        "injections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "item_drops": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/item_drop"
+          }
+        },
+        "water_color": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "fog_start": {
+          "type": "number"
+        },
+        "fog_end": {
+          "type": "number"
+        },
+        "unobtainable_pickups": {
+          "type": "integer"
+        },
+        "unobtainable_kills": {
+          "type": "integer"
+        },
+        "unobtainable_ally_kills": {
+          "type": "integer"
+        },
+        "unobtainable_secrets": {
+          "type": "integer"
+        }
+      },
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "current",
+              "dummy"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "else": {
+        "required": [
+          "path",
+          "sequence",
+          "lara_outfit"
+        ]
+      },
+      "additionalProperties": false
+    },
+    "item_drop": {
+      "type": "object",
+      "properties": {
+        "enemy_num": {
+          "type": "integer"
+        },
+        "object_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "enemy_num",
+        "object_ids"
+      ],
+      "additionalProperties": false
+    },
+    "globe_select": {
+      "type": "object",
+      "properties": {
+        "rot": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "start_level_ordinal": {
+          "type": "integer"
+        },
+        "completion_level_ordinal": {
+          "type": "integer"
+        },
+        "prereq_zones": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "mesh_idx": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rot",
+        "start_level_ordinal",
+        "completion_level_ordinal",
+        "prereq_zones",
+        "mesh_idx"
+      ],
+      "additionalProperties": false
+    },
+    "fmv": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "legal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "sequence": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/seq_loop_game"
+        },
+        {
+          "$ref": "#/definitions/seq_level_complete"
+        },
+        {
+          "$ref": "#/definitions/seq_exit_to_title"
+        },
+        {
+          "$ref": "#/definitions/seq_level_stats"
+        },
+        {
+          "$ref": "#/definitions/seq_total_stats"
+        },
+        {
+          "$ref": "#/definitions/seq_display_picture"
+        },
+        {
+          "$ref": "#/definitions/seq_loading_screen"
+        },
+        {
+          "$ref": "#/definitions/seq_play_fmv"
+        },
+        {
+          "$ref": "#/definitions/seq_give_item"
+        },
+        {
+          "$ref": "#/definitions/seq_add_secret_reward"
+        },
+        {
+          "$ref": "#/definitions/seq_play_music"
+        },
+        {
+          "$ref": "#/definitions/seq_remove_ammo"
+        },
+        {
+          "$ref": "#/definitions/seq_remove_weapons"
+        },
+        {
+          "$ref": "#/definitions/seq_remove_medipacks"
+        },
+        {
+          "$ref": "#/definitions/seq_remove_scions"
+        },
+        {
+          "$ref": "#/definitions/seq_remove_flares"
+        },
+        {
+          "$ref": "#/definitions/seq_play_cutscene"
+        },
+        {
+          "$ref": "#/definitions/seq_enable_sunset"
+        },
+        {
+          "$ref": "#/definitions/seq_set_lara_start_anim"
+        },
+        {
+          "$ref": "#/definitions/seq_setup_bacon_lara"
+        },
+        {
+          "$ref": "#/definitions/seq_disable_floor"
+        },
+        {
+          "$ref": "#/definitions/seq_globe_select"
+        }
+      ]
+    },
+    "seq_loop_game": {
+      "type": "object",
+      "description": "Plays the main game loop.",
+      "properties": {
+        "type": {
+          "const": "loop_game"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_level_complete": {
+      "type": "object",
+      "description": "Ends the current level and plays the next one, if available.",
+      "properties": {
+        "type": {
+          "const": "level_complete"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_exit_to_title": {
+      "type": "object",
+      "description": "Returns to the title level.",
+      "properties": {
+        "type": {
+          "const": "exit_to_title"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_level_stats": {
+      "type": "object",
+      "description": "Displays the end of level statistics for the current level. In a Gym level, this fades the screen to black.",
+      "properties": {
+        "type": {
+          "const": "level_stats"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_total_stats": {
+      "type": "object",
+      "description": "Displays the end of game statistics with the given picture file shown as a background.",
+      "properties": {
+        "type": {
+          "const": "total_stats"
+        },
+        "background_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "background_path"
+      ],
+      "additionalProperties": false
+    },
+    "seq_display_picture": {
+      "type": "object",
+      "description": "Displays the specified picture for a fixed time. Files that are needed to function only with a specific aspect ratio can be placed in a directory adjacent to the main image, named according to the aspect ratio – for example, 4x3/title.png or 16x10/title.png. The game won't attempt to match these precisely; instead, it will select the file with the aspect ratio closest to the game's viewport. The main image designated by path is presumed to have a 16:9 aspect ratio for this purpose, and as such there's no need for 16x9-specific directory. This logic applies to all images.",
+      "properties": {
+        "type": {
+          "const": "display_picture"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "display_time": {
+          "type": "number"
+        },
+        "fade_in_time": {
+          "type": "number"
+        },
+        "fade_out_time": {
+          "type": "number"
+        },
+        "credit": {
+          "type": "boolean"
+        },
+        "legal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "seq_loading_screen": {
+      "type": "object",
+      "description": "Shows a picture prior to loading a level. Functions identically to display_picture, except these pictures can be enabled/disabled by the user with the loading screen option in the config tool.",
+      "properties": {
+        "type": {
+          "const": "loading_screen"
+        },
+        "path": {
+          "type": "string"
+        },
+        "display_time": {
+          "type": "number"
+        },
+        "fade_in_time": {
+          "type": "number"
+        },
+        "fade_out_time": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "seq_play_cutscene": {
+      "type": "object",
+      "description": "Plays the specified cinematic level (from the cutscenes).",
+      "properties": {
+        "type": {
+          "const": "play_cutscene"
+        },
+        "cutscene_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "cutscene_id"
+      ],
+      "additionalProperties": false
+    },
+    "seq_play_fmv": {
+      "type": "object",
+      "description": "Plays the specified FMV. fmv_id must be a valid index into the fmvs root key.",
+      "properties": {
+        "type": {
+          "const": "play_fmv"
+        },
+        "fmv_id": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "fmv_id"
+      ],
+      "additionalProperties": false
+    },
+    "seq_give_item": {
+      "type": "object",
+      "description": "Adds the specified item and quantity to Lara's inventory.",
+      "properties": {
+        "type": {
+          "const": "give_item"
+        },
+        "object_id": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "quantity": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "object_id"
+      ],
+      "additionalProperties": false
+    },
+    "seq_add_secret_reward": {
+      "type": "object",
+      "description": "Adds the specified item to the current level's list of rewards for collecting all secrets.",
+      "properties": {
+        "type": {
+          "const": "add_secret_reward"
+        },
+        "object_id": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "quantity": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "object_id"
+      ],
+      "additionalProperties": false
+    },
+    "seq_play_music": {
+      "type": "object",
+      "description": "Plays the given audio track.",
+      "properties": {
+        "type": {
+          "const": "play_music"
+        },
+        "music_track": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "music_track"
+      ],
+      "additionalProperties": false
+    },
+    "seq_remove_ammo": {
+      "type": "object",
+      "description": "Any combination of these sequences can be used to modify Lara's inventory at the start of a level. `remove_weapons` does not remove the ammo for those guns, and `remove_ammo` does not remove the guns. Item removal is performed first, followed by addition.",
+      "properties": {
+        "type": {
+          "const": "remove_ammo"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_remove_weapons": {
+      "type": "object",
+      "description": "Any combination of these sequences can be used to modify Lara's inventory at the start of a level. `remove_weapons` does not remove the ammo for those guns, and `remove_ammo` does not remove the guns. Item removal is performed first, followed by addition.",
+      "properties": {
+        "type": {
+          "const": "remove_weapons"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_remove_medipacks": {
+      "type": "object",
+      "description": "Any combination of these sequences can be used to modify Lara's inventory at the start of a level. `remove_weapons` does not remove the ammo for those guns, and `remove_ammo` does not remove the guns. Item removal is performed first, followed by addition.",
+      "properties": {
+        "type": {
+          "const": "remove_medipacks"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_remove_scions": {
+      "type": "object",
+      "description": "Any combination of these sequences can be used to modify Lara's inventory at the start of a level. `remove_weapons` does not remove the ammo for those guns, and `remove_ammo` does not remove the guns. Item removal is performed first, followed by addition.",
+      "properties": {
+        "type": {
+          "const": "remove_scions"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_remove_flares": {
+      "type": "object",
+      "description": "Any combination of these sequences can be used to modify Lara's inventory at the start of a level. `remove_weapons` does not remove the ammo for those guns, and `remove_ammo` does not remove the guns. Item removal is performed first, followed by addition.",
+      "properties": {
+        "type": {
+          "const": "remove_flares"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_enable_sunset": {
+      "type": "object",
+      "description": "Enables the sunset effect, like in Bartoli's Hideout. At present, this feature is hardcoded to gradually darken the game 40 minutes into playing a level.",
+      "properties": {
+        "type": {
+          "const": "enable_sunset"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "seq_set_lara_start_anim": {
+      "type": "object",
+      "description": "Applies the selected animation to Lara when the level begins. This is used, for example, in the Offshore Rig of Tomb Raider II.",
+      "properties": {
+        "type": {
+          "const": "set_lara_start_anim"
+        },
+        "anim": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "anim"
+      ],
+      "additionalProperties": false
+    },
+    "seq_setup_bacon_lara": {
+      "type": "object",
+      "description": "Sets the room number in which Bacon Lara will be anchored to enable correct mirroring behaviour with Lara.",
+      "properties": {
+        "type": {
+          "const": "setup_bacon_lara"
+        },
+        "anchor_room": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "anchor_room"
+      ],
+      "additionalProperties": false
+    },
+    "seq_disable_floor": {
+      "type": "object",
+      "description": "Configures a specific height (with 256 representing 1 click and 1024 representing 1 sector) to define an abyss that will invariably lead to Lara's death if she falls into it. Additionally, it employs special rendering to ensure it isn't treated as solid ground.",
+      "properties": {
+        "type": {
+          "const": "disable_floor"
+        },
+        "height": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "seq_globe_select": {
+      "type": "object",
+      "description": "Displays the area selection globe using the specified background image.",
+      "properties": {
+        "type": {
+          "const": "globe_select"
+        },
+        "image": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "image"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

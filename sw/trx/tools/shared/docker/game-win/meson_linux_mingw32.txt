@@ -1,0 +1,19 @@
+[binaries]
+c = ['ccache', '/usr/bin/i686-w64-mingw32-gcc']
+cpp = ['ccache', '/usr/bin/i686-w64-mingw32-g++']
+objc = ['ccache', '/usr/bin/i686-w64-mingw32-gcc']
+ar = '/usr/bin/i686-w64-mingw32-ar'
+strip = '/usr/bin/i686-w64-mingw32-strip'
+pkg-config = '/usr/bin/i686-w64-mingw32-pkg-config'
+windres = '/usr/bin/i686-w64-mingw32-windres'
+exe_wrapper = 'wine'
+ld = '/usr/bin/i686-w64-mingw32-ld'
+
+[properties]
+skip_sanity_check = true
+
+[host_machine]
+system = 'windows'
+cpu_family = 'x86'
+cpu = 'i686'
+endian = 'little'

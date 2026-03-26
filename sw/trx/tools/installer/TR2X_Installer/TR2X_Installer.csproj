@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyName>TR2X_Installer</AssemblyName>
+    <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TRX_InstallerLib\TRX_InstallerLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\const.json" />
+    <None Remove="Resources\icon.ico" />
+    <None Remove="Resources\Lang\en.json" />
+    <None Remove="Resources\release.zip" />
+    <None Remove="Resources\side1.jpg" />
+    <None Remove="Resources\side2.jpg" />
+    <None Remove="Resources\side3.jpg" />
+    <None Remove="Resources\side4.jpg" />
+    <None Remove="Resources\TR2X.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\CDRom.png" />
+    <Resource Include="Resources\GOG.png" />
+    <Resource Include="Resources\icon.ico" />
+    <Resource Include="Resources\side1.jpg" />
+    <Resource Include="Resources\side2.jpg" />
+    <Resource Include="Resources\side3.jpg" />
+    <Resource Include="Resources\side4.jpg" />
+    <Resource Include="Resources\Steam.png" />
+    <Resource Include="Resources\TR2X.png" />
+    <EmbeddedResource Include="Resources\const.json" />
+    <EmbeddedResource Include="Resources\Lang\en.json" />
+    <EmbeddedResource Include="Resources\release.zip" Condition="Exists('Resources\release.zip')" />
+  </ItemGroup>
+</Project>

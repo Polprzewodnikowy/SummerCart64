@@ -1,0 +1,12 @@
+X_UI_CFG(gameplay.enable_cheats)
+X_UI_CFG(gameplay.enable_console)
+
+X_UI_CFG(gameplay.harpoon_recoil,              .min_value = 0, .max_value = 1000, .delta_slow = 1, .delta_fast = 1, .custom_handler = { .is_available = UI_Settings_Harpoon_IsAvailable })
+
+X_UI_CFG(gameplay.start_lara_hitpoints,        .min_value = 1, .max_value = LARA_MAX_HITPOINTS, .delta_slow = 10, .delta_fast = 100)
+X_UI_CFG(gameplay.disable_healing_between_levels)
+X_UI_CFG(gameplay.disable_medpacks)
+X_UI_CFG(gameplay.disable_extra_guns)
+X_UI_CFG(debug.enable_endless_sprint)
+X_UI_CFG(debug.enable_endless_flare_time,      .custom_handler = { .is_available = UI_Settings_Flare_IsAvailable })
+X_UI_CFG_ENUM(gameplay.projectile_area_damage, .misc = UI_Settings_ProjectileAreaDamageEnumEntries, .custom_handler = { .is_available = UI_Settings_ProjectileAreaDamage_IsAvailable })

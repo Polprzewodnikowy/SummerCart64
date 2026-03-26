@@ -1,0 +1,122 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "extends": "en",
+    "language_name": "English (British)",
+    "general": {
+        "settings": {
+            "controls": {
+                "customize": "Customise Controls",
+            }
+        },
+        "stats": {
+            "distance_travelled": "Distance Travelled",
+        }
+    },
+    "dynamic": {
+        "mods": {
+            "tr3-la": {
+                "title": "The Lost Artefact",
+            }
+        }
+    },
+    "enums": {
+        "UI_ELEMENT_LOCATION": {
+            "UI_ELEMENT_LOCATION_BOTTOM_CENTER": "Bottom centre",
+            "UI_ELEMENT_LOCATION_TOP_CENTER": "Top centre",
+        }
+    },
+    "settings": {
+        "gameplay.enable_bouncy_grenades": {
+            "description": "Enables TR3-style grenade behaviour: they ricochet off walls and slopes and produce a larger blast radius, but at the expense of reduced velocity.",
+        },
+        "gameplay.enable_enemy_rotation": {
+            "title": "Randomise enemy start angle",
+        },
+        "gameplay.enable_swing_cancel": {
+            "description": "Allows Lara's ledge-swinging animation to be cancelled by letting go and quickly grabbing again.",
+        },
+        "gameplay.projectile_area_damage": {
+            "description": "Controls how the area-of-effect for Rocket Launcher and Grenade Launcher propagates.\n\n- Single-sweep: TR1 & TR2 behaviour.\n- Multi-sweep: TR3 behaviour.\n\nThe multi-sweep option often ends up doing double damage to individual enemies.",
+        },
+        "gameplay.target_mode": {
+            "description": "Changes the behaviour of how weapons lock onto targets.\n\n- Full lock: always keep target lock even if the enemy moves out of sight or dies (OG TR1-3).\n- Semi lock: keep target lock if the enemy moves out of sight but lose target lock if the enemy dies.\n- No lock: lose target lock if the enemy goes out of sight or dies (TR4+).",
+        },
+        "gameplay.wall_glitch_mode": {
+            "description": "Allows using TR1 wall glitch behaviour in TR2 and vice-versa; equally allows fixing all types of wall glitch.",
+        },
+        "input.quick_guns_mode": {
+            "description": "Controls the behaviour of the quick gun equip keys.\n\n- Draw only: pressing a key will cause Lara to equip the assigned gun.\n- Draw or holster: same as above, plus Lara will undraw the assigned gun if she's currently carrying it.",
+        },
+        "ui.airbar_color": {
+            "title": "Airbar colour",
+            "description": "Colour of the airbar.",
+        },
+        "ui.airbar_color_ps1": {
+            "title": "Airbar colour",
+            "description": "Colour of the airbar.",
+        },
+        "ui.enable_smooth_bars": {
+            "description": "Makes the UI bars use smooth colour transitions.",
+        },
+        "ui.enemy_healthbar_color": {
+            "title": "Enemy bar colour",
+            "description": "Colour of the enemy healthbar.",
+        },
+        "ui.enemy_healthbar_color_allies": {
+            "title": "Ally bar colour",
+            "description": "Colour of the allies healthbar. Shown in the location of the enemy healthbars.",
+        },
+        "ui.enemy_healthbar_color_allies_ps1": {
+            "title": "Ally bar colour",
+            "description": "Colour of the allies healthbar. Shown in the location of the enemy healthbars.",
+        },
+        "ui.enemy_healthbar_color_ps1": {
+            "title": "Enemy bar colour",
+            "description": "Colour of the enemy healthbar.",
+        },
+        "ui.exposurebar_color": {
+            "title": "Exposure bar colour",
+            "description": "Colour of the cold water exposure bar.",
+        },
+        "ui.exposurebar_color_ps1": {
+            "title": "Exposure bar colour",
+            "description": "Colour of the cold water exposure bar.",
+        },
+        "ui.healthbar_color": {
+            "title": "Healthbar colour",
+            "description": "Colour of the healthbar.",
+        },
+        "ui.healthbar_color_ps1": {
+            "title": "Healthbar colour",
+            "description": "Colour of the healthbar.",
+        },
+        "ui.healthbar_poison_color": {
+            "title": "Poison healthbar colour",
+            "description": "Colour of the healthbar when Lara is poisoned.",
+        },
+        "ui.healthbar_poison_color_ps1": {
+            "title": "Poison healthbar colour",
+            "description": "Colour of the healthbar when Lara is poisoned.",
+        },
+        "ui.sprintbar_color": {
+            "title": "Sprintbar colour",
+            "description": "Colour of the sprintbar.",
+        },
+        "ui.sprintbar_color_ps1": {
+            "title": "Sprintbar colour",
+            "description": "Colour of the sprintbar.",
+        },
+        "visuals.fog_color": {
+            "title": "Fog colour",
+            "description": "Colour of the fog.",
+        },
+        "visuals.gamma": {
+            "description": "Adjusts the gamma curve. Higher values mean brighter lighting. The value of 2.5 means default colours.",
+        },
+        "visuals.water_color": {
+            "title": "Water colour",
+            "description": "Colour of the water.",
+        }
+    }
+}

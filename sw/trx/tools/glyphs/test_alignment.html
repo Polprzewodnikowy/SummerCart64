@@ -1,0 +1,195 @@
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: sans-serif;
+    text-align: center;
+  }
+  #wrapper {
+    height: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-around;
+  }
+</style>
+
+<main id="wrapper">
+  <p>
+    Run me with <code>python3 -m http.server 8000 -d .</code> in the repository
+    directory,<br />
+    then visiting
+    <a href="http://localhost:8000/tools/glyphs/test_alignment.html"
+      ><code>http://localhost:8000/tools/glyphs/test_alignment.html</code></a
+    >
+    rather than opening this file directly.
+  </p>
+</main>
+
+<script>
+  const columns = 16;
+  const color1 = "red";
+  const color2 = "blue";
+  const imageBorderColor = "lime";
+  const cellSize = 20;
+  const scale = 4;
+  const adjustPos = true;
+
+  async function getDefs(filename) {
+    const response = await fetch(`/data/tr1/glyphs/${filename}`, {
+      cache: "no-store",
+    });
+    const content = await response.text();
+
+    const results = [];
+
+    for (const match of content.matchAll(/include "(?<file>[^\"]+)"/g)) {
+      results.push(...(await getDefs(match.groups.file)));
+    }
+
+    results.push(
+      ...content
+        .matchAll(
+          /^(?<text>.*?)\s+\w\s+manual_sprite\("(?<name>[^"]+)",\s*(?<x>\d+),\s*(?<y>\d+),\s*(?<w>\d+),\s*(?<h>\d+)(?:,\s*offset_y=(?<offset_y>-?\d+))?(?:,\s*index=(?<index>\d+))?\)/gm,
+        )
+        .map((match) => ({
+          name: match.groups.name,
+          x: +match.groups.x,
+          y: +match.groups.y,
+          w: +match.groups.w,
+          h: +match.groups.h,
+          text: match.groups.text.trim(),
+        })),
+    );
+
+    results.push(
+      ...content
+        .matchAll(
+          /^(?<text>.*?)\s+\w\s+grid_sprite\("(?<name>[^"]+)",\s*(?<x>\d+),\s*(?<y>\d+)(?:[^\)]*)?\)/gm,
+        )
+        .map((match) => ({
+          name: match.groups.name,
+          x: +match.groups.x * 20,
+          y: +match.groups.y * 20,
+          w: 20,
+          h: 20,
+          text: match.groups.text.trim(),
+        })),
+    );
+
+    return results;
+  }
+
+  async function loadDataAndDraw() {
+    const wrapper = document.getElementById("wrapper");
+    wrapper.innerHTML = "";
+
+    const defs = await getDefs("mapping.txt");
+    const uniqueFilenames = [...new Set(defs.map((def) => def.name))];
+    const images = await downloadImage(uniqueFilenames);
+
+    for (const filename of uniqueFilenames) {
+      const image = images.find((img) => img.src.includes(filename));
+      const relevantDefs = defs.filter((def) => def.name === filename);
+
+      const outerContainer = document.createElement("div");
+      const header = document.createElement("h1");
+      header.textContent = `${filename}`;
+
+      const container = document.createElement("div");
+      container.style.position = "relative";
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+
+      container.appendChild(canvas);
+      outerContainer.appendChild(header);
+      outerContainer.appendChild(container);
+      wrapper.appendChild(outerContainer);
+
+      const ctx = canvas.getContext("2d");
+      ctx.canvas.width = image.width;
+      ctx.canvas.height = image.height;
+
+      drawRect(ctx, 0, 0, image.width, image.height, imageBorderColor);
+      for (const [idx, def] of relevantDefs.entries()) {
+        drawDef(ctx, def, idx);
+      }
+
+      drawImage(ctx, image, 0, 0);
+
+      upscaleCanvas(canvas, scale);
+
+      for (const def of relevantDefs) {
+        const zone = document.createElement("div");
+        zone.title = def.text || def.name;
+        zone.style.position = "absolute";
+        zone.style.left = `${def.x * scale}px`;
+        zone.style.top = `${def.y * scale}px`;
+        zone.style.width = `${def.w * scale}px`;
+        zone.style.height = `${def.h * scale}px`;
+        zone.style.cursor = "help";
+        zone.style.background = "transparent";
+        container.appendChild(zone);
+      }
+    }
+  }
+
+  async function downloadImage(urls) {
+    return Promise.all(
+      urls.map(
+        (url) =>
+          new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = `/data/tr1/glyphs/${url}`;
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(img);
+          }),
+      ),
+    );
+  }
+
+  function drawImage(ctx, img, x, y) {
+    ctx.drawImage(img, x, y, img.width, img.height);
+  }
+
+  function drawDef(ctx, def, idx) {
+    const strokeColor = idx % 2 === 0 ? color1 : color2;
+    drawRect(ctx, def.x, def.y, def.x + def.w, def.y + def.h, strokeColor);
+  }
+
+  function drawRect(ctx, x1, y1, x2, y2, color) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.strokeRect(x1 + 0.5, y1 + 0.5, x2 - x1 - 1, y2 - y1 - 1);
+  }
+
+  function upscaleCanvas(canvas, scale) {
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const offscreenCanvas = new OffscreenCanvas(width * scale, height * scale);
+    const offscreenCtx = offscreenCanvas.getContext("2d");
+    offscreenCtx.imageSmoothingEnabled = false;
+    offscreenCtx.putImageData(imageData, 0, 0);
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      offscreenCanvas,
+      0,
+      0,
+      width,
+      height,
+      0,
+      0,
+      width * scale,
+      height * scale,
+    );
+  }
+
+  loadDataAndDraw();
+</script>

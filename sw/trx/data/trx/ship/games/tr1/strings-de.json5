@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- Leerer SLOT %d -",
+        },
+        "stats": {
+            "ammo": "Munition Treffer/Verbraucht",
+            "ammo_hits": "\\{review}TREFFER",
+            "ammo_used": "\\{review}VERBRAUCHTE MUNITION",
+            "deaths": "Tode",
+            "distance_travelled": "Zurückgelegte Distanz",
+            "kills": "Besiegte Gegner",
+            "level": "Level",
+            "medipacks_used": "Benötigte Medi-Packs",
+            "none": "\\{review}KEINE",
+            "pickups": "Pickups",
+            "secrets": "Geheimnisse",
+            "time_taken": "Benötigte Zeit",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Aktiviert die Verwendung von dynamischer Beleuchtung für Schüsse und Explosionen., ähnlich wie in TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Fixt originale Fehler in Die Zisterne und Grab des Tihocan, bei denen Pflanzen-Sprites in Wassergebieten nicht animiert sind.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Großes Medi-Pack",
+        },
+        "small_medipack": {
+            "name": "Kleines Medi-Pack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Zwischensequenz 1",
+        },
+        {
+            "title": "Zwischensequenz 2",
+        },
+        {
+            "title": "Zwischensequenz 3",
+        },
+        {
+            "title": "Zwischensequenz 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Laras Haus",
+        },
+        {
+            "title": "Die Kavernen",
+        },
+        {
+            "title": " Die Stadt Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Silberner Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Goldener Götze",
+                }
+            }
+        },
+        {
+            "title": "Das verlorene Tal",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Zahnrad",
+                }
+            }
+        },
+        {
+            "title": "Das Grab des Qualopec",
+        },
+        {
+            "title": "St. Francis' Folly",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel des Neptun",
+                },
+                "key_2": {
+                    "name": "Schlüssel des Atlas",
+                },
+                "key_3": {
+                    "name": "Schlüssel des Damokles",
+                },
+                "key_4": {
+                    "name": "Schlüssel des Thor",
+                }
+            }
+        },
+        {
+            "title": "Kolosseum",
+            "objects": {
+                "key_1": {
+                    "name": "Rostiger Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Der Palast des Midas",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Goldbarren",
+                }
+            }
+        },
+        {
+            "title": "Die Zisterne",
+            "objects": {
+                "key_1": {
+                    "name": "Goldener Schlüssel",
+                },
+                "key_2": {
+                    "name": "Silberner Schlüssel",
+                },
+                "key_3": {
+                    "name": "Rostiger Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Das Grab des Tihocan",
+            "objects": {
+                "key_1": {
+                    "name": "Goldener Schlüssel",
+                },
+                "key_2": {
+                    "name": "Rostiger Schlüssel",
+                },
+                "key_3": {
+                    "name": "Rostiger Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Die Stadt Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Saphir Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Der Obelisk von Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Saphir Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Auge des Horus",
+                },
+                "puzzle_2": {
+                    "name": "Skarabäus",
+                },
+                "puzzle_3": {
+                    "name": "Siegel des Anubis",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Das Heiligtum des Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Goldener Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Skarabäus",
+                }
+            }
+        },
+        {
+            "title": "Natlas Katakomben",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Sicherung",
+                },
+                "puzzle_2": {
+                    "name": "Schlüssel der Pyramide",
+                }
+            }
+        },
+        {
+            "title": "Atlantis",
+        },
+        {
+            "title": "Die Große Pyramide",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Titel",
+        },
+        {
+            "title": "Aktuelle Position",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Die Stadt Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Silberner Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Goldener Götze",
+                }
+            }
+        },
+        {
+            "title": "Das verlorene Tal",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Zahnrad",
+                }
+            }
+        }
+    ]
+}

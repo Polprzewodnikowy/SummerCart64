@@ -1,0 +1,591 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 1,
+
+    "main_menu_picture": "title.webp",
+    "savegame_file_fmt": "save_tr1_%02d.dat",
+
+    "injections": [
+        "braid.bin",
+        "bubbles.bin",
+        "gun_glow.bin",
+        "lara_animations.bin",
+        "lara_guns.bin",
+        "purple_crystal.bin",
+        "uzi_sfx.bin",
+        "explosion.bin",
+        "font.bin",
+        "pickup_aid.bin",
+        "sprite_alignment.bin",
+        "pda_model.bin",
+        "winston_model.bin",
+        "lara_extra.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "enable_tr2_item_drops": false,
+    "convert_dropped_guns": false,
+
+    "title": {
+        "path": "title.phd",
+        "music_track": 2,
+        "inherit_injections": false,
+        "sequence": [
+            {"type": "display_picture", "path": "eidos.webp", "legal": true, "display_time": 1, "fade_in_time": 1.0, "fade_out_time": 1.0},
+            {"type": "play_fmv", "fmv_id": 0},
+            {"type": "play_fmv", "fmv_id": 1},
+            {"type": "play_fmv", "fmv_id": 2},
+            {"type": "exit_to_title"},
+        ],
+        "injections": [
+            "pda_model.bin",
+            "font.bin",
+            "title_textures.bin",
+            "misc_sprites.bin",
+        ],
+    },
+
+    "levels": [
+        // Level 0: Lara's Home
+        {
+            "path": "gym.phd",
+            "script": "gym.lua",
+            "type": "gym",
+            "music_track": 0,
+            "inherit_injections": false,
+            "lara_outfit": "tr1_gym",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 3},
+                {"type": "loading_screen", "path": "gym.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "exit_to_title"},
+            ],
+            "injections": [
+                "lara_gym_guns.bin",
+                "braid.bin",
+                "bubbles.bin",
+                "gun_glow.bin",
+                "gym_textures.bin",
+                "lara_animations.bin",
+                "uzi_sfx.bin",
+                "explosion.bin",
+                "pda_model.bin",
+                "font.bin",
+                "winston_model.bin",
+                "misc_sprites.bin",
+                "lara_feet_sfx.bin",
+                "lara_outfits.bin",
+            ],
+        },
+
+        // Level 1: Caves
+        {
+            "path": "level1.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 4},
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "caves_fd.bin",
+                "caves_itemrots.bin",
+                "caves_textures.bin",
+            ],
+        },
+
+        // Level 2: City of Vilcabamba
+        {
+            "path": "level2.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "vilcabamba_door_sfx.bin",
+                "vilcabamba_itemrots.bin",
+                "vilcabamba_textures.bin",
+            ],
+        },
+
+        // Level 3: Lost Valley
+        {
+            "path": "level3a.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "valley_fd.bin",
+                "valley_itemrots.bin",
+                "valley_skybox.bin",
+                "valley_textures.bin",
+            ],
+        },
+
+        // Level 4: Tomb of Qualopec
+        {
+            "path": "level3b.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 0},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "qualopec_door_sfx.bin",
+                "qualopec_fd.bin",
+                "qualopec_itemrots.bin",
+                "qualopec_textures.bin",
+            ],
+        },
+
+        // Level 5: St. Francis' Folly
+        {
+            "path": "level4.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 5},
+                {"type": "loading_screen", "path": "greece.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "door59_frames.bin",
+                "folly_fd.bin",
+                "folly_itemrots.bin",
+                "folly_pickup_meshes.bin",
+                "folly_textures.bin",
+            ],
+        },
+
+        // Level 6: Colosseum
+        {
+            "path": "level5.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "greece.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "colosseum_fd.bin",
+                "colosseum_itemrots.bin",
+                "colosseum_skybox.bin",
+                "colosseum_textures.bin",
+                "door58_frames.bin",
+            ],
+        },
+
+        // Level 7: Palace Midas
+        {
+            "path": "level6.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "greece.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "midas_itemrots.bin",
+                "midas_textures.bin",
+            ],
+            "unobtainable_pickups": 1,
+        },
+
+        // Level 8: The Cistern
+        {
+            "path": "level7a.phd",
+            "music_track": 58,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "greece.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "cistern_fd.bin",
+                "cistern_itemrots.bin",
+                "cistern_plants.bin",
+                "cistern_skybox.bin",
+                "cistern_textures.bin",
+            ],
+        },
+
+        // Level 9: Tomb of Tihocan
+        {
+            "path": "level7b.phd",
+            "music_track": 58,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "greece.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 1},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "cistern_plants.bin",
+                "tihocan_skybox.bin",
+                "door60_frames.bin",
+                "tihocan_fd.bin",
+                "tihocan_itemrots.bin",
+                "tihocan_textures.bin",
+            ],
+            "item_drops": [
+                {"enemy_num": 82, "object_ids": [86, 144, 129]},
+            ],
+        },
+
+        // Level 10: City of Khamoon
+        {
+            "path": "level8a.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 6},
+                {"type": "loading_screen", "path": "egypt.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "khamoon_fd.bin",
+                "khamoon_itemrots.bin",
+                "khamoon_meshfixes.bin",
+                "khamoon_mummy.bin",
+                "khamoon_textures.bin",
+                "panther_sfx.bin",
+            ],
+        },
+
+        // Level 11: Obelisk of Khamoon
+        {
+            "path": "level8b.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "egypt.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "obelisk_fd.bin",
+                "obelisk_itemrots.bin",
+                "obelisk_meshfixes.bin",
+                "obelisk_skybox.bin",
+                "obelisk_textures.bin",
+                "panther_sfx.bin",
+            ],
+        },
+
+        // Level 12: Sanctuary of the Scion
+        {
+            "path": "level8c.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "egypt.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "door59_frames.bin",
+                "door59_sfx.bin",
+                "sanctuary_fd.bin",
+                "sanctuary_itemrots.bin",
+                "sanctuary_scion.bin",
+                "sanctuary_textures.bin",
+            ],
+        },
+
+        // Level 13: Natla's Mines
+        {
+            "path": "level10a.phd",
+            "music_track": 58,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 7},
+                {"type": "loading_screen", "path": "atlantis.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "remove_weapons"},
+                {"type": "remove_scions"},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "play_cutscene", "cutscene_id": 2},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "mines_cameras.bin",
+                "mines_door_sfx.bin",
+                "mines_fd.bin",
+                "mines_itemrots.bin",
+                "mines_meshfixes.bin",
+                "mines_pushblocks.bin",
+                "mines_textures.bin",
+                "skate_kid_sfx.bin",
+            ],
+            "item_drops": [
+                {"enemy_num": 17, "object_ids": [86]},
+                {"enemy_num": 50, "object_ids": [87]},
+                {"enemy_num": 75, "object_ids": [85]},
+            ],
+        },
+
+        // Level 14: Atlantis
+        {
+            "path": "level10b.phd",
+            "music_track": 60,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 8},
+                {"type": "loading_screen", "path": "atlantis.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "pistols", "quantity": 1},
+                {"type": "setup_bacon_lara", "anchor_room": 10},
+                {"type": "loop_game"},
+                {"type": "play_fmv", "fmv_id": 9},
+                {"type": "play_cutscene", "cutscene_id": 3},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "atlantis_door_sfx.bin",
+                "atlantis_fd.bin",
+                "atlantis_itemrots.bin",
+                "atlantis_textures.bin",
+            ],
+            "unobtainable_pickups": 3,
+        },
+
+        // Level 15: The Great Pyramid
+        {
+            "path": "level10c.phd",
+            "music_track": 60,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "atlantis.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "play_fmv", "fmv_id": 10},
+                {"type": "play_music", "music_track": 19},
+                {"type": "level_complete"},
+                {"type": "display_picture", "credit": true, "path": "end.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_1.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_2.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_3.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "total_stats", "background_path": "install.webp"},
+            ],
+            "injections": [
+                "atlantis_door_sfx.bin",
+                "pyramid_fd.bin",
+                "pyramid_itemrots.bin",
+                "pyramid_textures.bin",
+                "scion_collision.bin",
+            ],
+        },
+
+        // Level 16-20: Legacy savegame placeholders
+        {"type": "dummy"},
+        {"type": "dummy"},
+        {"type": "dummy"},
+        {"type": "dummy"},
+        {"type": "dummy"},
+
+        // Level 21: Current Position
+        // This level is necessary to read TombATI's save files!
+        // OG has a special level called LV_CURRENT to handle save/load logic.
+        // TRX does away without this hack. However, the existing save games
+        // expect the level count to match, otherwise the game will crash.
+        // Hence this dummy level.
+        {
+            "path": "current.phd",
+            "type": "current",
+            "music_track": 0,
+            "inherit_injections": false,
+            "sequence": [
+                {"type": "exit_to_title"},
+            ],
+        },
+    ],
+
+    "demos": [
+        // Demo 1: City of Vilcabamba
+        {
+            "path": "level2.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "injections": [
+                "vilcabamba_door_sfx.bin",
+                "vilcabamba_itemrots.bin",
+                "vilcabamba_textures.bin",
+            ],
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_complete"},
+            ],
+        },
+
+        // Demo 2: Lost Valley
+        {
+            "path": "level3a.phd",
+            "music_track": 57,
+            "lara_outfit": "tr1_classic",
+            "injections": [
+                "valley_itemrots.bin",
+                "valley_skybox.bin",
+                "valley_textures.bin",
+            ],
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_complete"},
+            ],
+        },
+
+    ],
+
+    "cutscenes": [
+        // Cutscene 1
+        {
+            "path": "cut1.phd",
+            "music_track": 23,
+            "lara_outfit": "tr1_classic",
+            "inherit_injections": false,
+            "injections": [
+                "cut1_setup.bin",
+                "braid.bin",
+                "photo.bin",
+                "pda_model.bin",
+                "font.bin",
+                "lara_outfits.bin",
+                "misc_sprites.bin",
+            ],
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+        },
+
+        // Cutscene 2
+        {
+            "path": "cut2.phd",
+            "music_track": 25,
+            "lara_outfit": "tr1_classic",
+            "inherit_injections": false,
+            "injections": [
+                "cut2_setup.bin",
+                "braid.bin",
+                "photo.bin",
+                "pda_model.bin",
+                "font.bin",
+                "lara_outfits.bin",
+                "misc_sprites.bin",
+            ],
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+        },
+
+        // Cutscene 3
+        {
+            "path": "cut3.phd",
+            "music_track": 24,
+            "lara_outfit": "tr1_classic",
+            "inherit_injections": false,
+            "injections": [
+                "cut3_setup.bin",
+                "cut3_textures.bin",
+                "photo.bin",
+                "pda_model.bin",
+                "font.bin",
+                "lara_outfits.bin",
+                "misc_sprites.bin",
+            ],
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+        },
+
+        // Cutscene 4
+        {
+            "path": "cut4.phd",
+            "music_track": 22,
+            "lara_outfit": "tr1_classic",
+            "fog_start": 12.0,
+            "fog_end": 18.0,
+            "inherit_injections": false,
+            "injections": [
+                "cut4_setup.bin",
+                "braid.bin",
+                "cut4_textures.bin",
+                "photo.bin",
+                "pda_model.bin",
+                "font.bin",
+                "lara_outfits.bin",
+                "misc_sprites.bin",
+            ],
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+        },
+    ],
+
+    // FMVs
+    "fmvs": [
+        {"path": "core.avi", "legal": true},
+        {"path": "escape.avi", "legal": true},
+        {"path": "cafe.avi"},
+        {"path": "mansion.avi"},
+        {"path": "snow.avi"},
+        {"path": "lift.avi"},
+        {"path": "vision.avi"},
+        {"path": "canyon.avi"},
+        {"path": "pyramid.avi"},
+        {"path": "prison.avi"},
+        {"path": "end.avi"},
+    ],
+
+    "hidden_config": [
+        "enable_item_examining", // TR1 has no special item descriptions
+        "healthbar_poison_color",
+        "healthbar_poison_color_ps1",
+        "enemy_healthbar_color_allies",
+        "enemy_healthbar_color_allies_ps1",
+        "exposurebar_color",
+        "exposurebar_color_ps1",
+        "exposurebar_location",
+        "exposurebar_show_mode",
+        "enable_ally_targeting",
+        "enable_weather",
+        "enable_footprints",
+        "ally_hostility_policy",
+        "fix_monkey_pickup_priority",
+        "fix_pipeman_aim",
+    ],
+}

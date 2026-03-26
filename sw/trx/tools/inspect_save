@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+import json
+import struct
+import zlib
+from pathlib import Path
+
+import bson
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=Path)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    with args.path.open("rb") as handle:
+        magic = handle.read(4)
+        version, compressed_size, uncompressed_size = struct.unpack(
+            "III", handle.read(12)
+        )
+        data = bson.loads(zlib.decompress(handle.read(compressed_size)))
+        flags, counter, level_num, title_size = struct.unpack("I" * 4, handle.read(16))
+        title = handle.read(title_size)
+        print(json.dumps(data, indent=4))
+        print("flags:", flags, file=sys.stderr)
+        print("counter:", counter, file=sys.stderr)
+        print("level_num:", level_num, file=sys.stderr)
+        print("title:", title, file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

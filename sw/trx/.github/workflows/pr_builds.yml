@@ -1,0 +1,39 @@
+name: Create a test build
+
+permissions:
+  contents: write
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '!stable'
+      - '!develop'
+
+jobs:
+  package_linux:
+    name: Linux
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: linux
+      target: debug
+      zip: false
+    secrets: inherit
+
+  package_win:
+    name: Windows
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: win
+      target: debug
+      zip: false
+    secrets: inherit
+
+  # package_mac:
+  #   name: Mac
+  #   if: vars.MACOS_ENABLE == 'true'
+  #   uses: ./.github/workflows/job_build_macos.yml
+  #   with:
+  #     target: debug
+  #     let_mac_fail: true
+  #   secrets: inherit

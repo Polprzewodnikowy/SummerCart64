@@ -1,0 +1,33 @@
+name: Build Docker toolchain
+
+on:
+  - workflow_dispatch
+
+jobs:
+  publish_docker_image:
+    name: Build Docker toolchain
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: win
+          - platform: linux
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Install dependencies
+        uses: taiki-e/install-action@just
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Build Docker image (${{ matrix.platform }})
+        run: |
+          just image-${{ matrix.platform }}
+          just push-image-${{ matrix.platform }}

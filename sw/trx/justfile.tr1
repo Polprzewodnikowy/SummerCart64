@@ -1,0 +1,13 @@
+[group('tr1')]
+tr1-build-win-installer: (image-win-installer "0") (_docker_run "rrdash/trx-installer" "1")
+
+[group('tr1')]
+tr1-package-linux target='release' *args: (trx-build-linux target) (_docker_run "rrdash/trx-linux" "package" "--tr-version" "1" args)
+[group('tr1')]
+tr1-package-win target='release' *args: (trx-build-win target) (_docker_run "rrdash/trx-win" "package" "--tr-version" "1" args)
+[group('tr1')]
+tr1-package-win-installer target='release' *args: \
+    (trx-build-win target) \
+    (_docker_run "rrdash/trx-win" "package" "--tr-version" "1" "-o" "tools/installer/TR1X_Installer/Resources/release.zip") \
+    (tr1-build-win-installer) \
+    (_docker_run "rrdash/trx-win" "package" "--platform" "win-installer" "--tr-version" "1" args)

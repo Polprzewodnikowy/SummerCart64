@@ -1,0 +1,7 @@
+#pragma once
+
+#define MAX_ASSAULT_TIMES 10
+#define CONFIG_MIN_BRIGHTNESS 0.1f
+#define CONFIG_MAX_BRIGHTNESS 2.0f
+#define CONFIG_MIN_GAMMA 1.0f
+#define CONFIG_MAX_GAMMA 10.0f

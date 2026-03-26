@@ -1,0 +1,30 @@
+X_UI_CFG(gameplay.fix_floor_data_issues)
+X_UI_CFG(visuals.fix_texture_issues)
+X_UI_CFG(visuals.fix_item_rots,             .custom_handler = { .is_available = UI_Settings_FixItemRots_IsAvailable })
+
+X_UI_CFG(audio.load_music_triggers)
+X_UI_CFG(visuals.fix_animated_sprites)
+X_UI_CFG(gameplay.fix_bridge_collision)
+
+X_UI_CFG(gameplay.fix_walk_run_jump)
+X_UI_CFG(gameplay.fix_flare_throw_priority, .custom_handler = { .is_available = UI_Settings_Flare_IsAvailable })
+
+X_UI_CFG(gameplay.fix_m16_accuracy,         .custom_handler = { .is_available = UI_Settings_M16_IsAvailable })
+
+X_UI_CFG(gameplay.fix_descending_glitch)
+
+X_UI_CFG_ENUM(gameplay.wall_glitch_mode,    .misc = UI_Settings_WallGlitchEnumEntries)
+
+X_UI_CFG(gameplay.fix_wade_wall_hit,        .custom_handler = { .is_available = UI_Settings_FixWadeWallHit_IsAvailable })
+X_UI_CFG(gameplay.fix_water_exit)
+X_UI_CFG(gameplay.fix_qwop_glitch)
+X_UI_CFG(gameplay.fix_step_glitch,          .custom_handler = { .is_available = UI_Settings_FixStepGlitch_IsAvailable })
+X_UI_CFG(gameplay.fix_item_duplication_glitch)
+X_UI_CFG(gameplay.fix_lara_pickup_embed)
+X_UI_CFG(gameplay.fix_free_flare_glitch,    .custom_handler = { .is_available = UI_Settings_Flare_IsAvailable })
+
+X_UI_CFG(gameplay.fix_alligator_ai)
+X_UI_CFG(gameplay.fix_bear_ai)
+X_UI_CFG(gameplay.fix_monkey_pickup_priority)
+X_UI_CFG(gameplay.fix_pipeman_aim)
+X_UI_CFG(audio.fix_chainblock_secret_sound)

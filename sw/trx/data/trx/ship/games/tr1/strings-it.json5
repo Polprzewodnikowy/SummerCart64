@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- SLOT VUOTO %d -",
+        },
+        "stats": {
+            "ammo": "MUNIZIONI A SEGNO/USATE",
+            "ammo_hits": "COLPI A SEGNO",
+            "ammo_used": "MUNIZIONI USATE",
+            "deaths": "MORTI",
+            "distance_travelled": "DISTANZA PERCORSA",
+            "kills": "UCCISIONI",
+            "level": "LIVELLO",
+            "medipacks_used": "KIT MEDICI USATI",
+            "none": "NESSUNO",
+            "pickups": "OGGETTI",
+            "secrets": "SEGRETI",
+            "time_taken": "TEMPO IMPIEGATO",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Abilita l'illuminazione dinamica per spari ed esplosioni, simile a TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Risolve i problemi preesistenti nei livelli \"Cisterna\" e \"Tomba di Tihocan\" per cui le animazioni degli sprite delle piante nelle aree acquatiche non funzionano.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Kit Medico Grande",
+        },
+        "small_medipack": {
+            "name": "Kit Medico Piccolo",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Intermezzo 1",
+        },
+        {
+            "title": "Intermezzo 2",
+        },
+        {
+            "title": "Intermezzo 3",
+        },
+        {
+            "title": "Intermezzo 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Casa di Lara",
+        },
+        {
+            "title": "Caverne",
+        },
+        {
+            "title": "Città di Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Argento",
+                },
+                "puzzle_1": {
+                    "name": "Idolo d'Oro",
+                }
+            }
+        },
+        {
+            "title": "Valle Perduta",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Ruota Dentata",
+                }
+            }
+        },
+        {
+            "title": "Tomba di Qualopec",
+        },
+        {
+            "title": "Rovine di St. Francis",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave di Nettuno",
+                },
+                "key_2": {
+                    "name": "Chiave di Atlante",
+                },
+                "key_3": {
+                    "name": "Chiave di Damocle",
+                },
+                "key_4": {
+                    "name": "Chiave di Thor",
+                }
+            }
+        },
+        {
+            "title": "Colosseo",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave Arrugginita",
+                }
+            }
+        },
+        {
+            "title": "Palazzo di Mida",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Lingotto d'Oro",
+                }
+            }
+        },
+        {
+            "title": "Cisterna",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Oro",
+                },
+                "key_2": {
+                    "name": "Chiave d'Argento",
+                },
+                "key_3": {
+                    "name": "Chiave Arrugginita",
+                }
+            }
+        },
+        {
+            "title": "Tomba di Tihocan",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Oro",
+                },
+                "key_2": {
+                    "name": "Chiave Arrugginita",
+                },
+                "key_3": {
+                    "name": "Chiave Arrugginita",
+                }
+            }
+        },
+        {
+            "title": "Città di Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave di Zaffiro",
+                }
+            }
+        },
+        {
+            "title": "Obelisco di Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave di Zaffiro",
+                },
+                "puzzle_1": {
+                    "name": "Occhio di Horus",
+                },
+                "puzzle_2": {
+                    "name": "Scarabeo",
+                },
+                "puzzle_3": {
+                    "name": "Sigillo di Anubi",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Santuario dello Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Oro",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Scarabeo",
+                }
+            }
+        },
+        {
+            "title": "Miniere di Natla",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Fusibile",
+                },
+                "puzzle_2": {
+                    "name": "Chiave della Piramide",
+                }
+            }
+        },
+        {
+            "title": "Atlantide",
+        },
+        {
+            "title": "La Grande Piramide",
+        },
+        {
+            "title": "Vuoto",
+        },
+        {
+            "title": "Vuoto",
+        },
+        {
+            "title": "Vuoto",
+        },
+        {
+            "title": "Vuoto",
+        },
+        {
+            "title": "Titoli",
+        },
+        {
+            "title": "Posizione Attuale",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Città di Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Argento",
+                },
+                "puzzle_1": {
+                    "name": "Idolo d'Oro",
+                }
+            }
+        },
+        {
+            "title": "Valle Perduta",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Ruota Dentata",
+                }
+            }
+        }
+    ]
+}

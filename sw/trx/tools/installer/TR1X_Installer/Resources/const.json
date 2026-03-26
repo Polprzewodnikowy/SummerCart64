@@ -1,0 +1,11 @@
+{
+  "Game": "TR1X",
+  "GoldGame": "TR1X - UB",
+  "GoldFileIdentifier": "cat.phd",
+  "AllowExpansionTypeSelection": true,
+  "ShortcutTitle": "Tomb Raider I: Community Edition",
+  "GoldZips": {
+    "0": "trub-music.zip",
+    "1": "trub-vanilla.zip"
+  }
+}

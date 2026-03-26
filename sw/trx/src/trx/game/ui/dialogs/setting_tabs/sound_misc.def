@@ -1,0 +1,12 @@
+X_UI_CFG(audio.enable_music_in_menu)
+X_UI_CFG(audio.fix_secrets_killing_music)
+X_UI_CFG(audio.fix_speeches_killing_music)
+
+X_UI_CFG(audio.enable_music_in_inventory)
+X_UI_CFG_ENUM(audio.music_load_condition, .misc = UI_Settings_MusicLoadConditionEnumEntries)
+X_UI_CFG(audio.enable_underwater_anim_sfx)
+X_UI_CFG(audio.mute_out_of_focus)
+
+X_UI_CFG(audio.enable_pitched_sounds)
+X_UI_CFG(audio.enable_ps1_sfx)
+X_UI_CFG(audio.enable_lara_mic)

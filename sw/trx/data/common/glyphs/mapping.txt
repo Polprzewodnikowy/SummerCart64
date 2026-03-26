@@ -1,0 +1,28 @@
+# This file is used by the tooling in the tools/glyphs/ directory and is
+# crucial for the game's graphical text handling, serving two roles:
+#
+# 1. Hardcoding Unicode to sprite mapping
+#    It generates C macros that map Unicode code points and escaped sequences
+#    to O_ALPHABET's sprite indices, specify glyph dimensions, and instruct how
+#    to compose compound characters - all getting hardcoded into the executable.
+# 2. Guidance for font.bin creation
+#    It directs the injector tool in creating the font.bin file that contains
+#    O_ALPHABET sprite bitmaps, along with additional positional information.
+#
+# Important notes:
+# - Some sprite indices are fixed. This is for compatibility with the original
+#   game to retains original text format even if font.bin goes missing.
+
+include "mapping_basic_latin.txt"
+include "mapping_icons.txt"
+include "mapping_combining_diactrics.txt"
+include "mapping_latin-1_supplement.txt"
+include "mapping_latin_extended-a.txt"
+include "mapping_latin_extended-b.txt"
+include "mapping_greek_and_coptic.txt"
+include "mapping_cyrillic.txt"
+include "mapping_latin_extended_additional.txt"
+include "mapping_misc.txt"
+include "mapping_keyboard.txt"
+include "mapping_controller.txt"
+include "mapping_small.txt"

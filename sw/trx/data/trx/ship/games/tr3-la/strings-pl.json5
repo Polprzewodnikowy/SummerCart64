@@ -1,0 +1,92 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "objects": {
+        "quest_1": {
+            "description": "",
+            "name": "Dłoń Rathmore'a",
+        }
+    },
+    "levels": [
+        {
+            "title": "Dom Lary",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do toru wyścigowego",
+                }
+            }
+        },
+        {
+            "title": "Wypad na wzgórza",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Łom",
+                },
+                "puzzle_2": {
+                    "name": "Kamień Ostu",
+                }
+            }
+        },
+        {
+            "title": "Kryjówka Willarda",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do kurhanu",
+                },
+                "puzzle_1": {
+                    "name": "Łom",
+                }
+            }
+        },
+        {
+            "title": "Klif Szekspira",
+            "objects": {
+                "key_1": {
+                    "name": "Karta uruchamiająca wiertło",
+                },
+                "puzzle_1": {
+                    "name": "Dysk dostępu do pompy",
+                }
+            }
+        },
+        {
+            "title": "Na dnie z rybami",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Żarówka układu",
+                },
+                "puzzle_2": {
+                    "name": "Próbka mutanta",
+                },
+                "puzzle_3": {
+                    "name": "Próbka mutanta",
+                },
+                "puzzle_4": {
+                    "name": "Żarówka układu",
+                }
+            }
+        },
+        {
+            "title": "Dom wariatów!",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do zoo",
+                },
+                "key_4": {
+                    "name": "Klucz do woliery",
+                },
+                "puzzle_1": {
+                    "name": "Dłoń Rathmore'a",
+                }
+            }
+        },
+        {
+            "title": "Spotkanie po latach",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Dłoń Rathmore'a",
+                }
+            }
+        }
+    ]
+}

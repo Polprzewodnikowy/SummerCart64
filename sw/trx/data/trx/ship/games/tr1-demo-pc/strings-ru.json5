@@ -1,0 +1,17 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Город Вилкабамба",
+            "objects": {
+                "key_1": {
+                    "name": "Серебряный ключ",
+                },
+                "puzzle_1": {
+                    "name": "Золотой идол",
+                }
+            }
+        }
+    ]
+}

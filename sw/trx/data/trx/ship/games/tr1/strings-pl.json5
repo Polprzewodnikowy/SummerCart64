@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- PUSTY SLOT %d -",
+        },
+        "stats": {
+            "ammo": "AMUNICJA/TRAFIENIA",
+            "ammo_hits": "TRAFIENIA",
+            "ammo_used": "ZUŻYTA AMUNICJA",
+            "deaths": "ŚMIERCI",
+            "distance_travelled": "PRZEBYTA ODLEGŁOŚĆ",
+            "kills": "ZABÓJSTWA",
+            "level": "POZIOM",
+            "medipacks_used": "UŻYTE APTECZKI",
+            "none": "BRAK",
+            "pickups": "PRZEDMIOTY",
+            "secrets": "SEKRETY",
+            "time_taken": "SPĘDZONY CZAS",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Włącza dynamiczne oświetlenie przy strzelaniu z broni i eksplozjach, podobnie jak w TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Naprawia błędy oryginalnej gry w Rezerwuarze i Grobowcu Tihocana, gdzie glony w wodnych obszarach nie są animowane.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Duża apteczka",
+        },
+        "small_medipack": {
+            "name": "Mała apteczka",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Przerywnik 1",
+        },
+        {
+            "title": "Przerywnik 2",
+        },
+        {
+            "title": "Przerywnik 3",
+        },
+        {
+            "title": "Przerywnik 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Dom Lary",
+        },
+        {
+            "title": "Jaskinie",
+        },
+        {
+            "title": "Miasto Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Srebrny klucz",
+                },
+                "puzzle_1": {
+                    "name": "Złoty posążek",
+                }
+            }
+        },
+        {
+            "title": "Zaginiona Dolina",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Zębatka",
+                }
+            }
+        },
+        {
+            "title": "Grobowiec Qualopeca",
+        },
+        {
+            "title": "Kompleks św. Franciszka",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz Neptuna",
+                },
+                "key_2": {
+                    "name": "Klucz Atlasa",
+                },
+                "key_3": {
+                    "name": "Klucz Damoklesa",
+                },
+                "key_4": {
+                    "name": "Klucz Thora",
+                }
+            }
+        },
+        {
+            "title": "Koloseum",
+            "objects": {
+                "key_1": {
+                    "name": "Zardzewiały klucz",
+                }
+            }
+        },
+        {
+            "title": "Pałac Midasa",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Sztabka złota",
+                }
+            }
+        },
+        {
+            "title": "Rezerwuar",
+            "objects": {
+                "key_1": {
+                    "name": "Złoty klucz",
+                },
+                "key_2": {
+                    "name": "Srebrny klucz",
+                },
+                "key_3": {
+                    "name": "Zardzewiały klucz",
+                }
+            }
+        },
+        {
+            "title": "Grobowiec Tihocana",
+            "objects": {
+                "key_1": {
+                    "name": "Złoty klucz",
+                },
+                "key_2": {
+                    "name": "Zardzewiały klucz",
+                },
+                "key_3": {
+                    "name": "Zardzewiały klucz",
+                }
+            }
+        },
+        {
+            "title": "Miasto Khamoona",
+            "objects": {
+                "key_1": {
+                    "name": "Szafirowy klucz",
+                }
+            }
+        },
+        {
+            "title": "Obelisk Khamoona",
+            "objects": {
+                "key_1": {
+                    "name": "Szafirowy klucz",
+                },
+                "puzzle_1": {
+                    "name": "Oko Horusa",
+                },
+                "puzzle_2": {
+                    "name": "Skarabeusz",
+                },
+                "puzzle_3": {
+                    "name": "Pieczęć Anubisa",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Sanktuarium Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Złoty klucz",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Skarabeusz",
+                }
+            }
+        },
+        {
+            "title": "Kopalnie Natli",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Bezpiecznik",
+                },
+                "puzzle_2": {
+                    "name": "Klucz do piramidy",
+                }
+            }
+        },
+        {
+            "title": "Atlantis",
+        },
+        {
+            "title": "Wielka Piramida",
+        },
+        {
+            "title": "-",
+        },
+        {
+            "title": "-",
+        },
+        {
+            "title": "-",
+        },
+        {
+            "title": "-",
+        },
+        {
+            "title": "Menu główne",
+        },
+        {
+            "title": "Aktualna pozycja",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Miasto Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Srebrny klucz",
+                },
+                "puzzle_1": {
+                    "name": "Złoty posążek",
+                }
+            }
+        },
+        {
+            "title": "Zaginiona Dolina",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Zębatka",
+                }
+            }
+        }
+    ]
+}

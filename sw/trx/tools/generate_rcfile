@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+
+from shared.paths import DATA_DIR
+from shared.versioning import generate_version
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-o", "--output", type=Path, nargs="+")
+    return parser.parse_args()
+
+
+def write_rc_template(
+    input_path: Path, output_path: Path, version: str
+) -> None:
+    template = input_path.read_text()
+    template = template.replace("{version}", version)
+    template = template.replace(
+        "{icon_path}", str(DATA_DIR / input_path.parent.name / 'icon.ico')
+    )
+    output_path.write_text(template)
+
+
+def main() -> None:
+    args = parse_args()
+    version = generate_version()
+
+    for output_path in args.output or []:
+        write_rc_template(
+            input_path=DATA_DIR / output_path.name.replace('_', '/'),
+            output_path=output_path,
+            version=version,
+        )
+
+
+if __name__ == "__main__":
+    main()

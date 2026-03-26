@@ -1,0 +1,84 @@
+name: Publish a release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branch: stable
+    tags:
+      - "trx-*"
+
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: "Draft"
+        required: true
+        type: boolean
+        default: false
+      prerelease:
+        description: "Prerelease"
+        required: true
+        type: boolean
+        default: false
+      tag_name:
+        description: "Tag name"
+        required: false
+        type: string
+        default: github.ref_name
+
+jobs:
+  package_linux:
+    name: Build Linux
+    if: vars.RELEASE_ENABLE == 'true'
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: linux
+      target: release
+      zip: true
+    secrets: inherit
+
+  package_win:
+    name: Build Windows
+    if: vars.RELEASE_ENABLE == 'true'
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: win
+      target: release
+      zip: true
+    secrets: inherit
+
+  package_win_installer:
+    name: Build Windows installer
+    if: vars.RELEASE_ENABLE == 'true'
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: win-installer
+      target: release
+      zip: false
+    secrets: inherit
+
+  package_mac:
+    name: Build Mac
+    if: |
+      vars.RELEASE_ENABLE == 'true' &&
+      vars.MACOS_ENABLE == 'true'
+    uses: ./.github/workflows/job_build_macos.yml
+    with:
+      target: release
+      let_mac_fail: ${{ inputs.let_mac_fail == true || inputs.let_mac_fail == 'true' }}
+    secrets: inherit
+
+  publish_release:
+    if: always() && (vars.RELEASE_ENABLE == 'true')
+    name: Create a GitHub release
+    needs:
+      - package_linux
+      - package_win
+      - package_win_installer
+      - package_mac
+    with:
+      draft: ${{ inputs.draft || false }}
+      prerelease: ${{ inputs.draft || false }}
+      tag_name: ${{ inputs.tag_name || github.ref_name }}
+    uses: ./.github/workflows/job_release.yml

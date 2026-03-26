@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+import unicodedata
+from pathlib import Path
+
+# pip install pyicu
+import icu
+
+# HACK: Ensure the shared module is visible for this script.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from shared.glyph_mapping import get_glyph_map
+from shared.paths import PROJECT_PATHS
+
+MISSING_PRINT_LIMIT = 10
+
+LOCALES_TO_TEST = {
+    "ar_SA": "Arabic",
+    "az_AZ": "Azerbaijani",
+    "be_BY": "Belarusian",
+    "bg_BG": "Bulgarian",
+    "bn_IN": "Bengali",
+    "bs_BA": "Bosnian",
+    "ca_ES": "Catalan",
+    "cs_CZ": "Czech",
+    "da_DK": "Danish",
+    "de_DE": "German",
+    "el_GR": "Greek",
+    "en_US": "English",
+    "es_ES": "Spanish",
+    "et_EE": "Estonian",
+    "eu_ES": "Basque",
+    "fa_IR": "Persian",
+    "fi_FI": "Finnish",
+    "fo_FO": "Faroese",
+    "fr_FR": "French",
+    "ga_IE": "Irish",
+    "gl_ES": "Galician",
+    "gu_IN": "Gujarati",
+    "he_IL": "Hebrew",
+    "hi_IN": "Hindi",
+    "hr_HR": "Croatian",
+    "hu_HU": "Hungarian",
+    "hy_AM": "Armenian",
+    "id_ID": "Indonesian",
+    "is_IS": "Icelandic",
+    "it_IT": "Italian",
+    "ja_JP": "Japanese",
+    "ka_GE": "Georgian",
+    "kk_KZ": "Kazakh",
+    "kn_IN": "Kannada",
+    "ko_KR": "Korean",
+    "kok_IN": "Konkani",
+    "lt_LT": "Lithuanian",
+    "lv_LV": "Latvian",
+    "mk_MK": "Macedonian",
+    "ml_IN": "Malayalam",
+    "mn_MN": "Mongolian",
+    "mr_IN": "Marathi",
+    "ms_MY": "Malay",
+    "mt_MT": "Maltese",
+    "nb_NO": "Norwegian Bokmål",
+    "nl_NL": "Dutch",
+    "nn_NO": "Norwegian Nynorsk",
+    "no_NO": "Norwegian",
+    "pa_IN": "Punjabi",
+    "pl_PL": "Polish",
+    "pt_BR": "Portuguese",
+    "pt_PT": "Portuguese",
+    "ro_RO": "Romanian",
+    "ru_RU": "Russian",
+    "se_NO": "Northern Sami",
+    "sk_SK": "Slovak",
+    "sl_SI": "Slovenian",
+    "sr_BA": "Serbian",
+    "sv_SE": "Swedish",
+    "tr_TR": "Turkish",
+    "zh_CN": "Chinese",
+    "zh_TW": "Chinese",
+}
+
+
+def get_glyphs_for_locale(locale_code: str) -> list[str]:
+    locale = icu.LocaleData(locale_code)
+    results: set[str] = set()
+    for glyph in locale.getExemplarSet(0, 0):
+        results.add(unicodedata.normalize("NFC", glyph.lower()))
+        results.add(unicodedata.normalize("NFC", glyph.upper()))
+    return sorted(r for r in results if len(r) == 1)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("game", type=int)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    input_dir = PROJECT_PATHS[args.game].data_dir / "glyphs"
+    glyph_map = {glyph.text: glyph for glyph in get_glyph_map(input_dir)}
+    present_glyphs = set(glyph_map.keys())
+
+    for locale_code, language_name in LOCALES_TO_TEST.items():
+        requested_glyphs = set(get_glyphs_for_locale(locale_code))
+        missing_glyphs = requested_glyphs - present_glyphs
+
+        print(f"{locale_code:>10s} {language_name} ", end="")
+        if missing_glyphs:
+            print("not supported: missing ", end="")
+            for glyph in sorted(missing_glyphs)[:MISSING_PRINT_LIMIT]:
+                print(f"U+{ord(glyph):04X}:{glyph}", end=" ")
+            if len(missing_glyphs) >= MISSING_PRINT_LIMIT:
+                print(f"...", end=" ")
+            print(f"({len(missing_glyphs)} total)")
+        else:
+            print("supported!")
+
+
+if __name__ == "__main__":
+    main()

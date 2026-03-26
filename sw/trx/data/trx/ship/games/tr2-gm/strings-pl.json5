@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Dom Lary",
+        },
+        {
+            "title": "Zimna Wojna",
+            "objects": {
+                "tiger": {
+                    "name": "Lampart śnieżny",
+                },
+                "key_1": {
+                    "name": "Klucz do strażnicy",
+                },
+                "key_2": {
+                    "name": "Klucz do szybu 'B'",
+                }
+            }
+        },
+        {
+            "title": "Złoto głupców",
+            "objects": {
+                "key_1": {
+                    "name": "Karta dostępu 1",
+                },
+                "key_4": {
+                    "name": "Karta dostępu 2",
+                },
+                "puzzle_1": {
+                    "name": "Układ elektroniczny",
+                }
+            }
+        },
+        {
+            "title": "Piec bogów",
+            "objects": {
+                "big_spider": {
+                    "name": "Niedźwiedź polarny",
+                },
+                "spider": {
+                    "name": "Wilk",
+                },
+                "puzzle_1": {
+                    "name": "Maska Tornarsuka",
+                },
+                "puzzle_2": {
+                    "name": "Złoty samorodek",
+                }
+            }
+        },
+        {
+            "title": "Królestwo",
+            "objects": {
+                "tiger": {
+                    "name": "Lampart śnieżny",
+                },
+                "puzzle_1": {
+                    "name": "Maska Tornarsuka",
+                }
+            }
+        },
+        {
+            "title": "Koszmar w Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do hotelu",
+                },
+                "puzzle_1": {
+                    "name": "Węzeł windy",
+                },
+                "puzzle_2": {
+                    "name": "Obwód drzwi",
+                }
+            }
+        }
+    ]
+}

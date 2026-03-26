@@ -1,0 +1,12 @@
+[binaries]
+c = ['clang', '--target=x86_64-apple-darwin']
+cpp = ['clang++', '--target=x86_64-apple-darwin']
+ar = 'ar'
+strip = 'strip'
+pkg-config = '/opt/local/bin/pkg-config'
+
+[host_machine]
+system = 'darwin'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

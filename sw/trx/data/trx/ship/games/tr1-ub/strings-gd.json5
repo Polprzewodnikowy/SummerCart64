@@ -1,0 +1,34 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "A' tilleadh dhan Eiphit",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Òir",
+                }
+            }
+        },
+        {
+            "title": "Teampall a' Chait",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Grinn",
+                }
+            }
+        },
+        {
+            "title": "An Daingneach Atlantais",
+        },
+        {
+            "title": "An Nead",
+        },
+        {
+            "title": "Tiotal",
+        },
+        {
+            "title": "Suidheachadh Làithreach",
+        }
+    ]
+}

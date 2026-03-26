@@ -1,0 +1,7 @@
+#pragma once
+
+typedef enum {
+    TEXTURE_FILTER_POINT,
+    TEXTURE_FILTER_BILINEAR,
+    TEXTURE_FILTER_NUMBER_OF,
+} TEXTURE_FILTER;

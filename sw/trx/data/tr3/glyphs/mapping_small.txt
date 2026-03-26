@@ -1,0 +1,16 @@
+# --------------------------------------------------
+# Small text
+# --------------------------------------------------
+U+0030:0 1 T render("Times.ttf")
+U+0031:1 1 T render("Times.ttf")
+U+0032:2 1 T render("Times.ttf")
+U+0033:3 1 T render("Times.ttf")
+U+0034:4 1 T render("Times.ttf")
+U+0035:5 1 T render("Times.ttf")
+U+0036:6 1 T render("Times.ttf")
+U+0037:7 1 T render("Times.ttf")
+U+0038:8 1 T render("Times.ttf")
+U+0039:9 1 T render("Times.ttf")
+U+002D:- 1 T render("Times.ttf")
+U+002C:, 1 T render("Times.ttf")
+U+00B0:° 1 T render("Times.ttf")

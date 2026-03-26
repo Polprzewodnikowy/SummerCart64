@@ -1,0 +1,47 @@
+# --------------------------------------------------
+# Unicode Block "General Punctuation" (U+2000 to U+206F)
+# --------------------------------------------------
+U+2013:– 0 T manual_sprite("glyphs.png", 35, 221, 11, 18)
+U+2014:— 0 T manual_sprite("glyphs.png", 46, 221, 18, 18)
+U+2018:‘ 0 T manual_sprite("glyphs.png", 64, 221, 6, 9)
+U+2019:’ 0 T manual_sprite("glyphs.png", 64, 230, 6, 9)
+U+201C:“ 0 T manual_sprite("glyphs.png", 70, 221, 9, 9)
+U+201D:” 0 T manual_sprite("glyphs.png", 70, 230, 9, 9)
+U+2020:† 0 T manual_sprite("glyphs.png", 80, 221, 10, 18)
+U+2021:‡ 0 T manual_sprite("glyphs.png", 90, 221, 10, 18)
+U+2022:• 0 T manual_sprite("glyphs.png", 100, 221, 8, 18)
+U+2026:… 0 T manual_sprite("glyphs.png", 108, 221, 12, 18)
+U+2030:‰ 0 T manual_sprite("glyphs.png", 120, 221, 16, 18)
+U+2039:‹ 0 T manual_sprite("glyphs.png", 137, 221, 7, 18)
+U+203A:› 0 T manual_sprite("glyphs.png", 144, 221, 7, 18)
+
+
+
+# --------------------------------------------------
+# Unicode Block "Superscripts and Subscripts" (U+2070 to U+209F)
+# --------------------------------------------------
+U+2074:⁴ 0 T manual_sprite("glyphs.png", 20,  104, 7,  9)
+
+
+
+# --------------------------------------------------
+# Unicode Block "Currency Symbols" (U+20A0 to U+20CF)
+# --------------------------------------------------
+U+20AC:€ 0 T manual_sprite("glyphs.png", 170, 221, 14, 18)
+U+20AF:₯ 0 T manual_sprite("glyphs.png", 151, 221, 19, 18)
+
+
+
+# --------------------------------------------------
+# Unicode Block "Letterlike Symbols" (U+2100 to U+214F)
+# --------------------------------------------------
+U+2116:№ 0 T manual_sprite("glyphs.png", 184, 221, 18, 18)
+U+2122:™ 0 T manual_sprite("glyphs.png", 203, 221, 18, 18)
+
+
+
+# --------------------------------------------------
+# Unicode Block "Alphabetic Presentation Forms" (U+FB00 to U+FB4F)
+# --------------------------------------------------
+U+FB01:ﬁ 0 T manual_sprite("glyphs.png", 221, 221, 13, 18)
+U+FB02:ﬂ 0 T manual_sprite("glyphs.png", 234, 221, 13, 18)

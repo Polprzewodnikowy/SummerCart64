@@ -1,0 +1,47 @@
+# --------------------------------------------------
+# Unicode Block "General Punctuation" (U+2000 to U+206F)
+# --------------------------------------------------
+U+2013:– 0 T render("Timesbd.ttf")
+U+2014:— 0 T render("Timesbd.ttf")
+U+2018:‘ 0 T render("Timesbd.ttf")
+U+2019:’ 0 T render("Timesbd.ttf")
+U+201C:“ 0 T render("Timesbd.ttf")
+U+201D:” 0 T render("Timesbd.ttf")
+U+2020:† 0 T render("Timesbd.ttf")
+U+2021:‡ 0 T render("Timesbd.ttf")
+U+2022:• 0 T render("Timesbd.ttf")
+U+2026:… 0 T render("Timesbd.ttf")
+U+2030:‰ 0 T render("Timesbd.ttf")
+U+2039:‹ 0 T render("Timesbd.ttf")
+U+203A:› 0 T render("Timesbd.ttf")
+
+
+
+# --------------------------------------------------
+# Unicode Block "Superscripts and Subscripts" (U+2070 to U+209F)
+# --------------------------------------------------
+U+2074:⁴ 0 T render("Timesbd.ttf")
+
+
+
+# --------------------------------------------------
+# Unicode Block "Currency Symbols" (U+20A0 to U+20CF)
+# --------------------------------------------------
+U+20AC:€ 0 T render("Timesbd.ttf")
+U+20AF:₯ 0 T render("Timesbd.ttf")
+
+
+
+# --------------------------------------------------
+# Unicode Block "Letterlike Symbols" (U+2100 to U+214F)
+# --------------------------------------------------
+U+2116:№ 0 T render("Timesbd.ttf")
+U+2122:™ 0 T render("Timesbd.ttf")
+
+
+
+# --------------------------------------------------
+# Unicode Block "Alphabetic Presentation Forms" (U+FB00 to U+FB4F)
+# --------------------------------------------------
+U+FB01:ﬁ 0 T render("Timesbd.ttf")
+U+FB02:ﬂ 0 T render("Timesbd.ttf")

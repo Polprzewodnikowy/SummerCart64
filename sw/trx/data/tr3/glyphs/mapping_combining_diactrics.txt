@@ -1,0 +1,16 @@
+# --------------------------------------------------
+# Combining diactrics
+# --------------------------------------------------
+"\\{grave accent}"        0 T render("Timesbd.ttf", index=77)
+"\\{acute accent}"        0 T render("Timesbd.ttf", index=70)
+"\\{circumflex accent}"   0 T render("Timesbd.ttf", index=69)
+"\\{circumflex}"          0 T link("\\{circumflex accent}")
+"\\{macron}"              0 T render("Timesbd.ttf")
+"\\{breve}"               0 T render("Timesbd.ttf")
+"\\{dot above}"           0 T render("Timesbd.ttf")
+"\\{umlaut}"              0 T render("Timesbd.ttf", index=67)
+"\\{caron}"               0 T render("Timesbd.ttf")
+"\\{ring above}"          0 T render("Timesbd.ttf")
+"\\{tilde}"               0 T render("Timesbd.ttf")
+"\\{double acute accent}" 0 T render("Timesbd.ttf")
+"\\{acute umlaut}"        0 T render("Timesbd.ttf")

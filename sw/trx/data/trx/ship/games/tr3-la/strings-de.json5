@@ -1,0 +1,86 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Laras Anwesen",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zur Rennstrecke",
+                }
+            }
+        },
+        {
+            "title": "Das Hochland",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Brechstange",
+                },
+                "puzzle_2": {
+                    "name": "Distelstein",
+                }
+            }
+        },
+        {
+            "title": "Willards Unterschlupf",
+            "objects": {
+                "key_1": {
+                    "name": "Steinhaufen-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Brechstange",
+                }
+            }
+        },
+        {
+            "title": "Shakespeare-Klippe",
+            "objects": {
+                "key_1": {
+                    "name": "Bohrer-Aktivierungs-Karte",
+                },
+                "puzzle_1": {
+                    "name": "Pumoen-Zugangs-Disk",
+                }
+            }
+        },
+        {
+            "title": "Mit den Fischen schlafen",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Blaue Stromkreis-Glühbirne",
+                },
+                "puzzle_2": {
+                    "name": "Mutant-Probe",
+                },
+                "puzzle_3": {
+                    "name": "Mutant-Probe",
+                },
+                "puzzle_4": {
+                    "name": "Gelbe Stromkreis-Glühbirne",
+                }
+            }
+        },
+        {
+            "title": "Es ist ein Irrenhaus!",
+            "objects": {
+                "key_1": {
+                    "name": "Zoo-Schlüssel",
+                },
+                "key_4": {
+                    "name": "Vogelhaus-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Hand von Rathmore",
+                }
+            }
+        },
+        {
+            "title": "Wiedervereinigung",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Hand von Rathmore",
+                }
+            }
+        }
+    ]
+}

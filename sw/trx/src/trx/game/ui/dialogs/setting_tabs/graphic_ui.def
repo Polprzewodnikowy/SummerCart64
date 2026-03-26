@@ -1,0 +1,22 @@
+X_UI_CFG(language,                           .custom_handler = { .format_value = UI_Settings_Language_FormatValue, .can_change_value = UI_Settings_Language_CanChangeValue, .request_change_value = UI_Settings_Language_RequestChangeValue })
+
+X_UI_CFG(ui.text_scale,                      .min_value = 50, .max_value = 200, .delta_slow = 1, .delta_fast = 5)
+X_UI_CFG(ui.pickup_scale,                    .min_value = 50, .max_value = 200, .delta_slow = 1, .delta_fast = 5)
+X_UI_CFG(ui.show_pickups_overlay)
+X_UI_CFG(ui.enable_wraparound)
+
+X_UI_CFG_ENUM(ui.menu_style,                 .misc = UI_Settings_MenuStyleEnumEntries)
+X_UI_CFG_ENUM(ui.stat_detail_mode,           .misc = UI_Settings_StatDetailModeEnumEntries)
+X_UI_CFG(ui.enable_stats_level_header)
+
+X_UI_CFG_ENUM(ui.inventory_background_style, .misc = UI_Settings_BackgroundStyleEnumEntries, .custom_handler = { .is_enum_value_available = UI_Settings_BackgroundStyle_IsEnumValueAvailable })
+X_UI_CFG(ui.inventory_fade_effects,          .custom_handler = { .is_available = UI_Settings_EnableFadeEffects_IsAvailable })
+X_UI_CFG_ENUM(ui.pause_background_style,     .misc = UI_Settings_BackgroundStyleEnumEntries, .custom_handler = { .is_enum_value_available = UI_Settings_BackgroundStyle_IsEnumValueAvailable })
+X_UI_CFG(ui.pause_fade_effects,              .custom_handler = { .is_available = UI_Settings_EnableFadeEffects_IsAvailable })
+X_UI_CFG_ENUM(ui.stats_background_style,     .misc = UI_Settings_BackgroundStyleEnumEntries, .custom_handler = { .is_enum_value_available = UI_Settings_BackgroundStyle_IsEnumValueAvailable })
+X_UI_CFG(ui.stats_fade_effects,              .custom_handler = { .is_available = UI_Settings_EnableFadeEffects_IsAvailable })
+
+X_UI_CFG(visuals.enable_fade_effects)
+X_UI_CFG(visuals.enable_exit_fade_effects,   .custom_handler = { .is_available = UI_Settings_EnableFadeEffects_IsAvailable })
+
+X_UI_CFG_ENUM(ui.ammo_counter.location,      .misc = UI_Settings_UIElementLocationEnumEntries)

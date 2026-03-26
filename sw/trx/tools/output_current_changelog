@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+import argparse
+
+from shared.changelog import Changelog, get_current_version_changelog
+from shared.git import Git
+from shared.paths import CommonPaths
+from shared.versioning import generate_version
+
+
+def output_changelog(changelog: Changelog, commit_hash: str) -> None:
+    print(f"**{changelog.release_name}** – ", end="")
+    if changelog.release_date:
+        print(f"{changelog.release_date:%Y-%m-%d}", end=" - ")
+    print(f"**{commit_hash}**", end=" · ")
+    print(f"[Diff]({changelog.diff_url})", end=" · ")
+    print(f"[History]({changelog.commits_url})")
+    print()
+
+    if changelog.video_id:
+        print(
+            f"[![Video](https://i.ytimg.com/vi/{changelog.video_id}/maxresdefault.jpg)]"
+            f"(https://www.youtube.com/watch?v={changelog.video_id})"
+        )
+        print()
+
+    if changelog.body:
+        print(changelog.body.strip())
+    else:
+        print("(no changes yet)")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stable", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    commit_hash = Git().get_current_commit_hash()
+    changelog = get_current_version_changelog(
+        CommonPaths.changelog_path, skip_unstable=args.stable
+    )
+    output_changelog(changelog, commit_hash=commit_hash)
+
+
+if __name__ == "__main__":
+    main()

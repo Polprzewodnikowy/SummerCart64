@@ -1,0 +1,852 @@
+{
+    "outfits": {
+        // TR1 Gym
+        "tr1_gym" : {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_gym",
+            "mesh_object": "O_LARA_SKIN_SWAP_1",
+            "gun_map": 0,
+            "footstep_sample_id": "SFX_LARA_BAREFOOT",
+            "combat_face_offset": 1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_HEAD_ONLY",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_lara",
+            },
+        },
+
+        // TR1 Classic
+        "tr1_classic": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_classic",
+            "mesh_object": "O_LARA_SKIN_SWAP_2",
+            "gun_map": 0,
+            "combat_face_offset": 1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_FULL",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 1,
+                "thigh_l": 2,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_TREX_KILL": "tr1_mauled",
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_lara",
+            },
+        },
+
+        // TR1 Mauled
+        "tr1_mauled": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_mauled",
+            "mesh_object": "O_LARA_SKIN_SWAP_3",
+            "gun_map": 0,
+            "combat_face_offset": 1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_MAULED",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 3,
+                "thigh_l": 4,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_lara",
+            },
+        },
+
+        // TR1 Combo
+        "tr1_combo": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_combo",
+            "mesh_object": "O_LARA_SKIN_SWAP_4",
+            "gun_map": 0,
+            "combat_face_offset": 1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_HEAD_ONLY",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 1,
+                "thigh_l": 2,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_lara",
+            },
+        },
+
+        // TR1 N-Gage
+        "tr1_ngage": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_ngage",
+            "mesh_object": "O_LARA_SKIN_SWAP_24",
+            "gun_map": 0,
+            "combat_face_offset": 1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_HEAD_ONLY",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 25,
+                "thigh_l": 26,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_lara",
+            },
+        },
+
+        // TR1 Golden Lara
+        "tr1_golden_lara": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_golden_lara",
+            "mesh_object": "O_LARA_SKIN_SWAP_5",
+            "gun_map": 1,
+            "is_reflective": true,
+            "combat_face_offset": -1,
+            "braid": {
+                "mode": "BRAID_MODE_TR1_GOLD",
+                "mesh_offset": 10,
+                "gold_offset": 16,
+                "hair_pos": {
+                    "x": 0,
+                    "y": 20,
+                    "z": -45,
+                },
+            },
+        },
+
+        // Bacon Lara
+        "tr1_bacon_lara": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_bacon_lara",
+            "mesh_object": "O_LARA_SKIN_SWAP_6",
+            "gun_map": 0,
+            "footstep_sample_id": "SFX_LARA_BAREFOOT",
+            "combat_face_offset": -1,
+            "supports_sunglasses": false,
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr1_golden_bacon_lara",
+            },
+        },
+
+        // Golden Bacon Lara
+        "tr1_golden_bacon_lara": {
+            "name_gs": "dynamic/enums/lara_outfit/tr1_golden_bacon_lara",
+            "mesh_object": "O_LARA_SKIN_SWAP_7",
+            "gun_map": 1,
+            "is_reflective": true,
+            "supports_sunglasses": false,
+            "combat_face_offset": -1,
+        },
+
+        // TR2 Gym
+        "tr2_gym": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_gym",
+            "mesh_object": "O_LARA_SKIN_SWAP_8",
+            "gun_map": 2,
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 5,
+                "thigh_l": 6,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // TR2 Classic
+        "tr2_classic": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_classic",
+            "mesh_object": "O_LARA_SKIN_SWAP_9",
+            "gun_map": 2,
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 7,
+                "thigh_l": 8,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Diving Suit
+        "tr2_diving_suit": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_diving_suit",
+            "mesh_object": "O_LARA_SKIN_SWAP_10",
+            "gun_map": 2,
+            "footstep_sample_id": "SFX_LARA_BAREFOOT",
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Diving Suit Alpha
+        "tr2_diving_suit_alpha": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_diving_suit_alpha",
+            "mesh_object": "O_LARA_SKIN_SWAP_23",
+            "gun_map": 2,
+            "footstep_sample_id": "SFX_LARA_BAREFOOT",
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Bomber Jacket
+        "tr2_bomber_jacket": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_bomber_jacket",
+            "mesh_object": "O_LARA_SKIN_SWAP_11",
+            "gun_map": 2,
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 7,
+                "thigh_l": 8,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Robe
+        "tr2_robe": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_robe",
+            "mesh_object": "O_LARA_SKIN_SWAP_12",
+            "gun_map": 2,
+            "footstep_sample_id": "SFX_LARA_BAREFOOT",
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 9,
+                "thigh_l": 10,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Vegas
+        "tr2_vegas": {
+            "name_gs": "dynamic/enums/lara_outfit/tr2_vegas",
+            "mesh_object": "O_LARA_SKIN_SWAP_13",
+            "gun_map": 2,
+            "combat_face_offset": 2,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 11,
+                "thigh_l": 12,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // TR2/3 Golden Lara
+        "tr23_golden_lara": {
+            "name_gs": "dynamic/enums/lara_outfit/tr23_golden_lara",
+            "mesh_object": "O_LARA_SKIN_SWAP_14",
+            "gun_map": 1,
+            "is_reflective": true,
+            "combat_face_offset": -1,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+        },
+
+        // TR3 Gym
+        "tr3_gym": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_gym",
+            "mesh_object": "O_LARA_SKIN_SWAP_15",
+            "gun_map": 4,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 13,
+                "thigh_l": 14,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // TR3 Classic
+        "tr3_classic": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_classic",
+            "mesh_object": "O_LARA_SKIN_SWAP_16",
+            "gun_map": 3,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 15,
+                "thigh_l": 16,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // South Pacific
+        "tr3_south_pacific": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_south_pacific",
+            "mesh_object": "O_LARA_SKIN_SWAP_17",
+            "gun_map": 3,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 17,
+                "thigh_l": 18,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Catsuit
+        "tr3_catsuit": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_catsuit",
+            "mesh_object": "O_LARA_SKIN_SWAP_18",
+            "gun_map": 3,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 19,
+                "thigh_l": 20,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Nevada
+        "tr3_nevada": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_nevada",
+            "mesh_object": "O_LARA_SKIN_SWAP_19",
+            "gun_map": 4,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 21,
+                "thigh_l": 22,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Antarctica
+        "tr3_antarctica": {
+            "name_gs": "dynamic/enums/lara_outfit/tr3_antarctica",
+            "mesh_object": "O_LARA_SKIN_SWAP_20",
+            "gun_map": 4,
+            "combat_face_offset": 3,
+            "braid": {
+                "mesh_offset": 22,
+                "gold_offset": 28,
+                "hair_pos": {
+                    "x": 0,
+                    "y": -23,
+                    "z": -55,
+                },
+            },
+            "no_holster_offsets": {
+                "thigh_r": 23,
+                "thigh_l": 24,
+            },
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "tr23_golden_lara",
+            },
+        },
+
+        // Sophia Leigh
+        "sophia": {
+            "name_gs": "dynamic/enums/lara_outfit/sophia",
+            "mesh_object": "O_LARA_SKIN_SWAP_21",
+            "gun_map": 3,
+            "combat_face_offset": -1,
+            "extra_outfits": {
+                "LS_EXTRA_MIDAS_KILL": "golden_sophia",
+            },
+        },
+
+        // Golden Sophia Leigh
+        "golden_sophia": {
+            "name_gs": "dynamic/enums/lara_outfit/golden_sophia",
+            "mesh_object": "O_LARA_SKIN_SWAP_22",
+            "gun_map": 1,
+            "is_selectable": false,
+            "is_reflective": true,
+            "combat_face_offset": -1,
+        },
+    },
+
+    "extra_meshes": {
+        "EXTRA_MESH_TR1_BRAID_DEFAULT_HEAD": 7,
+        "EXTRA_MESH_TR1_BRAID_COMBAT_HEAD": 9,
+        "EXTRA_MESH_TR1_BRAID_DEFAULT_TORSO": 4,
+        "EXTRA_MESH_TR1_BRAID_MAULED_TORSO": 5,
+        "EXTRA_MESH_TR1_BRAID_GOLD_HEAD": 8,
+        "EXTRA_MESH_TR1_BRAID_GOLD_TORSO": 6,
+        "EXTRA_MESH_DAGGER_HAND": 35,
+        "EXTRA_MESH_DAGGER_HIPS": 34,
+        "EXTRA_MESH_OAR": 36,
+        "EXTRA_MESH_SPANNER": 37,
+        "EXTRA_MESH_DRINK_CAN": 38,
+        "EXTRA_MESH_GLASSES_OPAQUE": 39,
+        "EXTRA_MESH_GLASSES_TRANSPARENT": 40,
+    },
+
+    "gun_maps": [
+        // 0. TR1 style
+        {
+            "LGT_UNARMED": {
+                "thigh_r": 1,
+                "thigh_l": 2,
+            },
+            "LGT_PISTOLS": {
+                "hand_r": 56,
+                "hand_l": 57,
+                "thigh_r": 3,
+                "thigh_l": 4,
+            },
+            "LGT_MAGNUMS": {
+                "hand_r": 58,
+                "hand_l": 59,
+                "thigh_r": 5,
+                "thigh_l": 6,
+            },
+            "LGT_AUTOS": {
+                "hand_r": 60,
+                "hand_l": 61,
+                "thigh_r": 7,
+                "thigh_l": 8,
+            },
+            "LGT_DESERT_EAGLE": {
+                "hand_r": 62,
+                "thigh_r": 9,
+                "thigh_l": 2,
+            },
+            "LGT_UZIS": {
+                "hand_r": 63,
+                "hand_l": 64,
+                "thigh_r": 10,
+                "thigh_l": 11,
+            },
+            "LGT_SHOTGUN": {
+                "hand_r": 65,
+                "torso": 72,
+            },
+            "LGT_FLARE": {
+                "hand_l": 66,
+            },
+            "LGT_M16": {
+                "hand_r": 67,
+                "torso": 73,
+            },
+            "LGT_MP5": {
+                "hand_r": 68,
+                "torso": 74,
+            },
+            "LGT_GRENADE": {
+                "hand_r": 69,
+                "torso": 75,
+            },
+            "LGT_HARPOON": {
+                "hand_r": 70,
+                "torso": 76,
+            },
+            "LGT_ROCKET": {
+                "hand_r": 71,
+                "torso": 77,
+            },
+        },
+
+        // 1. Gold style
+        {
+            "LGT_UNARMED": {
+                "thigh_r": 12,
+                "thigh_l": 13,
+            },
+            "LGT_PISTOLS": {
+                "hand_r": 56,
+                "hand_l": 57,
+                "thigh_r": 14,
+                "thigh_l": 15,
+            },
+            "LGT_MAGNUMS": {
+                "hand_r": 58,
+                "hand_l": 59,
+                "thigh_r": 16,
+                "thigh_l": 17,
+            },
+            "LGT_AUTOS": {
+                "hand_r": 60,
+                "hand_l": 61,
+                "thigh_r": 18,
+                "thigh_l": 19,
+            },
+            "LGT_DESERT_EAGLE": {
+                "hand_r": 62,
+                "thigh_r": 20,
+                "thigh_l": 13,
+            },
+            "LGT_UZIS": {
+                "hand_r": 63,
+                "hand_l": 64,
+                "thigh_r": 21,
+                "thigh_l": 22,
+            },
+            "LGT_SHOTGUN": {
+                "hand_r": 65,
+                "torso": 72,
+            },
+            "LGT_FLARE": {
+                "hand_l": 66,
+            },
+            "LGT_M16": {
+                "hand_r": 67,
+                "torso": 73,
+            },
+            "LGT_MP5": {
+                "hand_r": 68,
+                "torso": 74,
+            },
+            "LGT_GRENADE": {
+                "hand_r": 69,
+                "torso": 75,
+            },
+            "LGT_HARPOON": {
+                "hand_r": 70,
+                "torso": 76,
+            },
+            "LGT_ROCKET": {
+                "hand_r": 71,
+                "torso": 77,
+            },
+        },
+
+        // 2. TR2 style
+        {
+            "LGT_UNARMED": {
+                "thigh_r": 23,
+                "thigh_l": 24,
+            },
+            "LGT_PISTOLS": {
+                "hand_r": 56,
+                "hand_l": 57,
+                "thigh_r": 25,
+                "thigh_l": 26,
+            },
+            "LGT_MAGNUMS": {
+                "hand_r": 58,
+                "hand_l": 59,
+                "thigh_r": 27,
+                "thigh_l": 28,
+            },
+            "LGT_AUTOS": {
+                "hand_r": 60,
+                "hand_l": 61,
+                "thigh_r": 29,
+                "thigh_l": 30,
+            },
+            "LGT_DESERT_EAGLE": {
+                "hand_r": 62,
+                "thigh_r": 31,
+                "thigh_l": 24,
+            },
+            "LGT_UZIS": {
+                "hand_r": 63,
+                "hand_l": 64,
+                "thigh_r": 32,
+                "thigh_l": 33,
+            },
+            "LGT_SHOTGUN": {
+                "hand_r": 65,
+                "torso": 72,
+            },
+            "LGT_FLARE": {
+                "hand_l": 66,
+            },
+            "LGT_M16": {
+                "hand_r": 67,
+                "torso": 73,
+            },
+            "LGT_MP5": {
+                "hand_r": 68,
+                "torso": 74,
+            },
+            "LGT_GRENADE": {
+                "hand_r": 69,
+                "torso": 75,
+            },
+            "LGT_HARPOON": {
+                "hand_r": 70,
+                "torso": 76,
+            },
+            "LGT_ROCKET": {
+                "hand_r": 71,
+                "torso": 77,
+            },
+        },
+
+        // 3. TR3 style
+        {
+            "LGT_UNARMED": {
+                "thigh_r": 34,
+                "thigh_l": 35,
+            },
+            "LGT_PISTOLS": {
+                "hand_r": 56,
+                "hand_l": 57,
+                "thigh_r": 36,
+                "thigh_l": 37,
+            },
+            "LGT_MAGNUMS": {
+                "hand_r": 58,
+                "hand_l": 59,
+                "thigh_r": 38,
+                "thigh_l": 39,
+            },
+            "LGT_AUTOS": {
+                "hand_r": 60,
+                "hand_l": 61,
+                "thigh_r": 40,
+                "thigh_l": 41,
+            },
+            "LGT_DESERT_EAGLE": {
+                "hand_r": 62,
+                "thigh_r": 42,
+                "thigh_l": 35,
+            },
+            "LGT_UZIS": {
+                "hand_r": 63,
+                "hand_l": 64,
+                "thigh_r": 43,
+                "thigh_l": 44,
+            },
+            "LGT_SHOTGUN": {
+                "hand_r": 65,
+                "torso": 72,
+            },
+            "LGT_FLARE": {
+                "hand_l": 66,
+            },
+            "LGT_M16": {
+                "hand_r": 67,
+                "torso": 73,
+            },
+            "LGT_MP5": {
+                "hand_r": 68,
+                "torso": 74,
+            },
+            "LGT_GRENADE": {
+                "hand_r": 69,
+                "torso": 75,
+            },
+            "LGT_HARPOON": {
+                "hand_r": 70,
+                "torso": 76,
+            },
+            "LGT_ROCKET": {
+                "hand_r": 71,
+                "torso": 77,
+            },
+        },
+
+        // 4. TR3 alt style
+        {
+            "LGT_UNARMED": {
+                "thigh_r": 45,
+                "thigh_l": 46,
+            },
+            "LGT_PISTOLS": {
+                "hand_r": 56,
+                "hand_l": 57,
+                "thigh_r": 47,
+                "thigh_l": 48,
+            },
+            "LGT_MAGNUMS": {
+                "hand_r": 58,
+                "hand_l": 59,
+                "thigh_r": 49,
+                "thigh_l": 50,
+            },
+            "LGT_AUTOS": {
+                "hand_r": 60,
+                "hand_l": 61,
+                "thigh_r": 51,
+                "thigh_l": 52,
+            },
+            "LGT_DESERT_EAGLE": {
+                "hand_r": 62,
+                "thigh_r": 53,
+                "thigh_l": 46,
+            },
+            "LGT_UZIS": {
+                "hand_r": 63,
+                "hand_l": 64,
+                "thigh_r": 54,
+                "thigh_l": 55,
+            },
+            "LGT_SHOTGUN": {
+                "hand_r": 65,
+                "torso": 72,
+            },
+            "LGT_FLARE": {
+                "hand_l": 66,
+            },
+            "LGT_M16": {
+                "hand_r": 67,
+                "torso": 73,
+            },
+            "LGT_MP5": {
+                "hand_r": 68,
+                "torso": 74,
+            },
+            "LGT_GRENADE": {
+                "hand_r": 69,
+                "torso": 75,
+            },
+            "LGT_HARPOON": {
+                "hand_r": 70,
+                "torso": 76,
+            },
+            "LGT_ROCKET": {
+                "hand_r": 71,
+                "torso": 77,
+            },
+        },
+    ],
+}

@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "\\{review}Demeure de Lara",
+        },
+        {
+            "title": "\\{review}Guerre froide",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Léopard des Neiges",
+                },
+                "key_1": {
+                    "name": "\\{review}Clé de la Salle des Gardiens",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé de l'Ascenseur 'B'",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Désillusion",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de Carte 1",
+                },
+                "key_4": {
+                    "name": "\\{review}Clé de Carte 2",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Carte de Circuit",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Le Fournaise des dieux",
+            "objects": {
+                "big_spider": {
+                    "name": "\\{review}Ours Polaire",
+                },
+                "spider": {
+                    "name": "\\{review}Loup",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Masque de Tornarsuk",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Pépite d'Or",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Royaume",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Léopard des Neiges",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Masque de Tornarsuk",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Cauchemar à Las Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé d'Hôtel",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Jonction de l'Ascenseur",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Circuit de Porte",
+                }
+            }
+        }
+    ]
+}

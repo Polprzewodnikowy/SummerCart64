@@ -1,0 +1,16 @@
+---
+AlignAfterOpenBracket: AlwaysBreak
+AllowShortFunctionsOnASingleLine: None
+AlwaysBreakAfterReturnType: None
+BasedOnStyle: Webkit
+BreakBeforeBinaryOperators: NonAssignment
+BreakAdjacentStringLiterals: true
+AlwaysBreakBeforeMultilineStrings: true
+ColumnLimit: 80
+IndentPPDirectives: BeforeHash
+NamespaceIndentation: None
+PenaltyReturnTypeOnItsOwnLine: 1000
+PointerAlignment: Right
+SortIncludes: false
+InsertBraces: true
+SpaceInEmptyBraces: Never

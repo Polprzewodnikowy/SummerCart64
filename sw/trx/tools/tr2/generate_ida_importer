@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Converts symbols.txt to an IDC script usable with IDA Free, that propagates
+the IDA database with typing information, function declarations and variable
+declarations.
+"""
+import argparse
+import json
+import re
+import tempfile
+from pathlib import Path
+
+import regex
+from shared.ida_progress import Symbol, parse_progress_file
+from shared.paths import TR2Paths
+
+
+def generate_types(types: list[str], file) -> None:
+    for definition in types:
+        # strip comments
+        definition = " ".join(
+            re.sub(r"//.*", "", line.strip())
+            for line in definition.splitlines()
+        )
+
+        # merge consecutive whitespace
+        definition = re.sub(r"\s\s+", " ", definition)
+
+        # convert: typedef struct { … } FOO;
+        # to:      typedef struct FOO { … } FOO;
+        # for readability purposes.
+        if match := re.search(
+            r"(?P<prefix>typedef\s+(?:struct|enum)(?:\s+__\S+)?\s*)(?P<body>{.*})(?P<suffix>\s+(?P<name>\S+);)",
+            definition,
+            flags=re.M | re.DOTALL,
+        ):
+            definition = (
+                match.group("prefix")
+                + match.group("name")
+                + " "
+                + match.group("body")
+                + match.group("suffix")
+            )
+
+        print(f"parse_decls({json.dumps(definition)}, 0);", file=file)
+
+
+def import_symbol(symbol: Symbol, file) -> None:
+    known = not re.match(r"(\s+|^)(dword|sub)_", symbol.signature)
+
+    if known:
+        signature = symbol.signature
+
+        print(
+            f"apply_type(0x{symbol.offset:x}, parse_decl({json.dumps(symbol.signature)}, 0));",
+            file=file,
+        )
+        if symbol.name:
+            print(
+                f"set_name(0x{symbol.offset:x}, {json.dumps(symbol.name)});",
+                file=file,
+            )
+
+
+def generate_symbols(symbols: list[Symbol], file) -> None:
+    error_count = 0
+    for symbol in symbols:
+        import_symbol(symbol, file=file)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-o", "--output", type=Path, default=Path("Tomb2.idc"))
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    progress_file = parse_progress_file(TR2Paths.progress_file)
+
+    output = Path(args.output)
+    with output.open("w") as file:
+        print("#define CIC_FUNC 2", file=file)
+        print("static main() {", file=file)
+        generate_types(progress_file.types, file=file)
+        generate_symbols(progress_file.functions, file=file)
+        generate_symbols(progress_file.variables, file=file)
+        print("}", file=file)
+
+
+if __name__ == "__main__":
+    main()

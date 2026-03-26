@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+
+from shared.files import find_versioned_files, is_binary_file
+from shared.import_sorter import sort_imports
+from shared.paths import SHARED_SRC_DIR, SRC_DIR, TR1Paths, TR2Paths
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=Path, nargs="*")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if args.path:
+        paths = [path.absolute() for path in args.path]
+    else:
+        paths = [
+            path
+            for path in find_versioned_files(SRC_DIR)
+            if path.suffix in [".c", ".h"]
+        ]
+
+    sort_imports(
+        paths=[path for path in paths if path.is_relative_to(SHARED_SRC_DIR)],
+        root_dir=SRC_DIR,
+        system_include_dirs=[],
+        own_include_map={
+            "trx/core/json/bson_write.c": "trx/core/bson.h",
+            "trx/core/json/bson_parse.c": "trx/core/bson.h",
+            "trx/core/json/json_base.c": "trx/core/json.h",
+            "trx/core/json/json_write.c": "trx/core/json.h",
+            "trx/core/json/json_parse.c": "trx/core/json.h",
+            "trx/core/log_unknown.c": "trx/core/log.h",
+            "trx/core/log_linux.c": "trx/core/log.h",
+            "trx/core/log_windows.c": "trx/core/log.h",
+            "trx/av/audio.c": "trx/av/audio_internal.h",
+            "trx/av/audio_reverb.c": "trx/av/audio_internal.h",
+            "trx/av/audio_sample.c": "trx/av/audio_internal.h",
+            "trx/av/audio_stream.c": "trx/av/audio_internal.h",
+        },
+        fix_map={},
+        forced_order=[
+            "<dsound.h>",
+            "<windows.h>",
+            "<dbghelp.h>",
+            "<tlhelp32.h>",
+        ],
+    )
+
+
+if __name__ == "__main__":
+    main()

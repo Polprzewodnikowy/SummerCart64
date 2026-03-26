@@ -1,0 +1,65 @@
+name: Publish a pre-release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+    - develop
+
+jobs:
+  package_linux:
+    name: Build Linux
+    if: vars.PRERELEASE_ENABLE == 'true'
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: linux
+      target: debug
+      zip: true
+    secrets: inherit
+
+  package_win:
+    name: Build Windows
+    if: vars.PRERELEASE_ENABLE == 'true'
+    uses: ./.github/workflows/job_build.yml
+    with:
+      platform: win
+      target: debug
+      zip: true
+    secrets: inherit
+
+  # package_win_installer:
+  #   name: Build Windows installer
+  #   if: vars.PRERELEASE_ENABLE == 'true'
+  #   uses: ./.github/workflows/job_build.yml
+  #   with:
+  #     platform: win-installer
+  #     target: debug
+  #     zip: false
+  #   secrets: inherit
+
+  package_mac:
+    name: Build Mac
+    if: |
+      vars.PRERELEASE_ENABLE == 'true' &&
+      vars.MACOS_ENABLE == 'true'
+    uses: ./.github/workflows/job_build_macos.yml
+    with:
+      target: debug
+      let_mac_fail: true
+    secrets: inherit
+
+  publish_prerelease:
+    if: always() && (vars.PRERELEASE_ENABLE == 'true')
+    name: Create a prerelease
+    needs:
+      - package_linux
+      - package_mac
+      - package_win
+      # - package_win_installer
+    with:
+      draft: false
+      prerelease: true
+      tag_name: 'latest'
+    uses: ./.github/workflows/job_release.yml

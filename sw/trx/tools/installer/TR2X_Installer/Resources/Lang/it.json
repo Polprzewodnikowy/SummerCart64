@@ -1,0 +1,10 @@
+{
+  "Controls": {
+    "window_title_main": "Programma di installazione di TR2X",
+    "step_source_content": "Per eseguire TR2X, sono richiesti i file di gioco di Tomb Raider II.\nSeleziona il percorso da cui copiare questi file.\nSe stai aggiornando un'installazione già esistente, seleziona 'TR2X'.",
+    "step_settings_music_content": "Questa opzione ti consente di scaricare automaticamente i file musicali compatibili per il gioco (60 MB). La legalità di questi file è discutibile; il modo più legale per importare la musica su PC è estrarre le tracce audio da un disco fisico in tuo possesso - TR2X supporta i formati FLAC, OGG, MP3 e WAV.",
+    "step_settings_expansion_heading": "Scarica l'espansione La Maschera Dorata",
+    "step_settings_expansion_content": "Il pacchetto di espansione La Maschera Dorata è stato reso gratuito. Tuttavia, le versioni Steam e GOG non lo includono. Questa opzione ti consente di scaricare automaticamente i file dell'espansione (15 MB).",
+    "step_settings_saves_content": "Importa i file di salvataggio esistenti."
+  }
+}

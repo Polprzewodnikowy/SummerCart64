@@ -1,0 +1,208 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 3,
+    "extends": "tr3",
+
+    "main_menu_picture": "title_eu_gm.webp",
+    "savegame_file_fmt": "save_trla_%02d.dat",
+
+    "enable_tr2_item_drops": true,
+    "convert_dropped_guns": true,
+
+    "title": {
+        "path": "title_la.tr2",
+        "music_track": 5,
+        "sequence": [
+            {"type": "display_picture", "path": "legal_eu.webp", "legal": true},
+            {"type": "play_fmv", "fmv_id": 0},
+            {"type": "play_fmv", "fmv_id": 1},
+            {"type": "exit_to_title"},
+        ],
+    },
+
+    "ambient_tracks": [
+        26, 27, 28, 29, 30, 31, 32, 33, 34,
+        35, 36, 73, 74, 75, 76, 77, 78,
+    ],
+
+    "sfx_path": "main_la.sfx",
+    "injections": [
+        "font.bin",
+        "lara_animations.bin",
+        "pda_model.bin",
+        "lara_extra.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "levels": [
+        // 0. Lara's Home
+        {
+            "type": "gym",
+            "path": "house.tr2",
+            "music_track": -1,
+            "lara_outfit": "tr3_gym",
+            "sequence": [
+                {"type": "loading_screen", "path": "house.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+            ],
+            "injections": [
+                "gym_sky.bin",
+                "lara_gym_guns.bin",
+            ],
+        },
+
+        // 1. Highland Fling
+        {
+            "path": "scotland.tr2",
+            "music_track": 36,
+            "lara_outfit": "tr3_classic",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loading_screen", "path": "highland.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "small_medipack"},
+                {"type": "give_item", "object_id": "large_medipack"},
+                {"type": "give_item", "object_id": "flare", "quantity": 2},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "scotland_sky.bin",
+            ],
+        },
+
+        // 2. Willard's Lair
+        {
+            "path": "willsden.tr2",
+            "music_track": 30,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "willard.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "scotland_sky.bin",
+                "willsden_heli.bin",
+            ],
+        },
+
+        // 3. Shakespeare Cliff
+        {
+            "path": "chunnel.tr2",
+            "music_track": 74,
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loading_screen", "path": "chunnel.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+            ],
+        },
+
+        // 4. Sleeping with the Fishes
+        {
+            "path": "undersea.tr2",
+            "music_track": 27,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loading_screen", "path": "undersea.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "antarc_airlock.bin",
+                "lara_guns.bin",
+                "undersea_animating_bounds.bin",
+                "undersea_train.bin",
+            ],
+        },
+
+        // 5. It's a Madhouse!
+        {
+            "path": "zoo.tr2",
+            "script": "zoo.lua",
+            "music_track": 34,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loading_screen", "path": "zoo.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "remove_scions"},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "zoo_train.bin",
+            ],
+        },
+
+        // 6. Reunion
+        {
+            "path": "slinc.tr2",
+            "music_track": 26,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loading_screen", "path": "slinc.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "play_music", "music_track": 121},
+                {"type": "display_picture", "credit": true, "path": "theend2.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit01.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit02.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit03.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit04.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit05.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit06.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit07.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit08.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit09.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "total_stats", "background_path": "theend2.webp"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "reunion_flames.bin",
+            ],
+        },
+    ],
+
+    "fmvs": [
+        {"path": "logo.rpl", "legal": true},
+        {"path": "intr_eng.rpl"},
+    ],
+
+    "hidden_config": [
+        "enable_3d_pickups", // TR3 has no sprite pickups
+        "enable_item_examining",
+        "disable_trex_collision",
+        "fix_bear_ai",
+        "enable_save_crystals",
+        "enable_ps1_crystals",
+        "fix_chainblock_secret_sound",
+        "enable_compass_stats",
+        "enable_crawling",
+        "enable_wading",
+        "restore_ps1_enemies",
+        "change_pierre_spawn",
+        "fix_speeches_killing_music",
+        "fix_pipeman_aim",
+    ],
+}

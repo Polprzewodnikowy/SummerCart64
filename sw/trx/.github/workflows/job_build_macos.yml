@@ -1,0 +1,171 @@
+name: Build TRX and the installer (macOS)
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        description: "Target to build for"
+        required: true
+      let_mac_fail:
+        type: boolean
+        description: "Do not require Mac builds to pass"
+        required: false
+        default: false
+
+env:
+  FFMPEG_INSTALL_FINAL: /opt/local
+  FFMPEG_INSTALL_TMP_UNIVERSAL: /tmp/install_universal
+  FFMPEG_INSTALL_TMP_ARM64: /tmp/install_arm64
+  FFMPEG_INSTALL_TMP_X86_64: /tmp/install_x86_64
+  CACHE_TMP_DIR: /tmp/opt_local/
+  CACHE_DST_DIR: /opt/local/
+  C_INCLUDE_PATH: /opt/local/include/uthash/:/opt/local/include/
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        game:
+          - { version: 1 }
+          - { version: 2 }
+          - { version: 3 }
+
+    name: Build release assets
+    runs-on: macos-14
+    continue-on-error: ${{ inputs.let_mac_fail == true || inputs.let_mac_fail == 'true' }}
+    steps:
+      - name: Set up signing certificate
+        env:
+          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$MACOS_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          security create-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$MACOS_KEYCHAIN_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH -T /usr/bin/codesign
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k $MACOS_KEYCHAIN_PWD $KEYCHAIN_PATH
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - id: vars
+        name: Prepare variables
+        run: |
+          echo "version=$(tools/get_version)" >> $GITHUB_OUTPUT
+          echo "tag=tr${{matrix.game.version}}" >> $GITHUB_OUTPUT
+          echo "name=TR${{matrix.game.version}}X" >> $GITHUB_OUTPUT
+          echo "asset_name=$(tools/output_package_name --game ${{matrix.game.version}} --platform mac)" >> $GITHUB_OUTPUT
+
+      - name: Extend PATH for MacPorts
+        run: |
+          echo -e "/opt/local/bin" >> $GITHUB_PATH
+          echo -e "/opt/local/sbin" >> $GITHUB_PATH
+
+      - name: "Try restore dependencies from cache"
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ runner.os }}-tooling-${{ hashFiles('.github/actions/prepare_macos_tooling/action.yml') }}
+          path: |
+            /tmp/opt_local/
+      - name: "Build MacOS dependencies"
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: ./.github/actions/prepare_macos_tooling
+        with:
+          CACHE_DIR: /tmp/opt_local/
+      - name: "Prepare cached dependencies for use"
+        if: steps.restore-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          sudo rsync -arvq /tmp/opt_local/ /opt/local/
+          sudo dscl . -create /Groups/macports
+          sudo dscl . -create /Groups/macports RealName "MacPorts"
+          sudo dscl . -create /Groups/macports PrimaryGroupID 501
+          sudo dscl . -create /Groups/macports GeneratedUID 172D097F-351A-4579-BBD1-430D99BC4ABF
+          sudo dscl . -append /Groups/macports GroupMembership macports
+
+          sudo dscl . -create /Users/macports
+          sudo dscl . -create /Users/macports RealName "MacPorts"
+          sudo dscl . -create /Users/macports UniqueID 502
+          sudo dscl . -create /Users/macports PrimaryGroupID 501
+          sudo dscl . -create /Users/macports UserShell /usr/bin/false
+          sudo dscl . -create /Users/macports NFSHomeDirectory /opt/local/var/macports/home
+          sudo mkdir -p /opt/local/var/macports/home
+          sudo chown -R macports:macports /opt/local/var/macports
+
+      - name: Setup CA
+        run: |
+          sudo port -N install apple-pki-bundle curl-ca-bundle
+
+      - name: Download large assets
+        #if: ${{ inputs.target == 'release' }}
+        run: tools/download_assets ${{ matrix.game.version }}
+
+      - name: Build arm64 and create app bundle
+        env:
+          CC: clang
+        run: |
+          BUILD_DIR=build-arm64
+          BUILD_OPTIONS="src --prefix=/tmp/${{ steps.vars.outputs.name }}.app --bindir=Contents/MacOS --buildtype ${{ inputs.target }}"
+          meson setup $BUILD_DIR $BUILD_OPTIONS
+          meson install -C $BUILD_DIR --tags "${{ steps.vars.outputs.tag }},common"
+
+      - name: Build x86-64
+        env:
+          CC: clang
+        run: |
+          BUILD_DIR=build-x86-64
+          BUILD_OPTIONS="src --prefix=/tmp/${{ steps.vars.outputs.name }}.app --bindir=Contents/MacOS --cross-file tools/shared/mac/x86-64_cross_file.txt --buildtype ${{ inputs.target }}"
+          meson setup $BUILD_DIR $BUILD_OPTIONS
+          meson compile -C $BUILD_DIR
+
+      - name: Fuse universal executable
+        run: |
+          BUNDLE_EXEC_DIR=/tmp/${{ steps.vars.outputs.name }}.app/Contents/MacOS
+
+          # Fuse executable and move it into the app bundle.
+          lipo -create build-x86-64/TRX $BUNDLE_EXEC_DIR/TRX -output $BUNDLE_EXEC_DIR/TRX_universal
+          mv $BUNDLE_EXEC_DIR/TRX_universal $BUNDLE_EXEC_DIR/TRX
+
+          # Update dynamic library links in the fused executable.
+          ./tools/shared/mac/bundle_dylibs -a ${{ steps.vars.outputs.name }} --links-only
+
+      - name: Sign app bundle
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | awk -F'"' '{print $2}')
+          xattr -cr /tmp/${{ steps.vars.outputs.name }}.app
+          /usr/bin/codesign --force --deep --options runtime -s "${IDENTITY}" --keychain $KEYCHAIN_PATH -v /tmp/${{ steps.vars.outputs.name }}.app
+
+      - name: Create, sign and notarize disk image
+        env:
+          MACOS_APPLEID: ${{ secrets.MACOS_APPLEID }}
+          MACOS_APP_PWD: ${{ secrets.MACOS_APP_PWD }}
+          MACOS_TEAMID: ${{ secrets.MACOS_TEAMID }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | awk -F'"' '{print $2}')
+          DMG_NAME="${{ steps.vars.outputs.asset_name }}.dmg"
+          tools/shared/mac/create_installer -a ${{ steps.vars.outputs.name }} -i "data/${{ steps.vars.outputs.tag }}/mac/icon.icns" -d "${DMG_NAME}"
+          xattr -cr "${DMG_NAME}"
+          /usr/bin/codesign --force --options runtime -s "${IDENTITY}" --keychain $KEYCHAIN_PATH -v "${DMG_NAME}"
+          xcrun notarytool submit --wait --apple-id "$MACOS_APPLEID" --password "$MACOS_APP_PWD" --team-id "$MACOS_TEAMID" "${DMG_NAME}"
+          xcrun stapler staple -v "${DMG_NAME}"
+
+      - name: Upload signed+notarized installer image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.asset_name }}
+          path: |
+            *.dmg
+          compression-level: 0 # .dmg is already compressed.

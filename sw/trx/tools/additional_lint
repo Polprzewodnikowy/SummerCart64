@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+from collections.abc import Iterable
+from fnmatch import fnmatch
+from pathlib import Path
+
+from shared.files import find_versioned_files, is_binary_file
+from shared.linting import LintContext, lint_repo, lint_bulk_files, lint_file
+from shared.paths import REPO_DIR
+
+IGNORED_PATTERNS = ["*.patch", "*.bin"]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", type=Path, nargs="*")
+    parser.add_argument("-D", "--debug", action="store_true")
+    parser.add_argument("-a", "--all", action="store_true")
+    return parser.parse_args()
+
+
+def filter_files(
+    files: Iterable[Path], ignored_patterns: list[str] | None, debug: bool
+) -> Iterable[Path]:
+    for path in files:
+        if not path.exists():
+            continue
+        if path.is_dir():
+            continue
+        if is_binary_file(path):
+            if debug:
+                print(f"{path} is a binary file, ignoring", file=sys.stderr)
+            continue
+        if ignored_patterns and any(
+            fnmatch(path.name, pattern) for pattern in ignored_patterns
+        ):
+            if debug:
+                print(
+                    f"{path} has a prohibited extension, ignoring",
+                    file=sys.stderr,
+                )
+            continue
+        yield path
+
+
+def main(root_dir: Path) -> None:
+    args = parse_args()
+
+    context = LintContext(
+        root_dir=root_dir,
+        versioned_files=list(find_versioned_files(root_dir=REPO_DIR)),
+    )
+    if args.path:
+        files = args.path
+    else:
+        files = context.versioned_files
+    files = list(
+        filter_files(
+            files, ignored_patterns=IGNORED_PATTERNS, debug=args.debug
+        )
+    )
+
+    exit_code = 0
+    for file in files:
+        if args.debug:
+            print(f"Checking {file}...", file=sys.stderr)
+        for lint_warning in lint_file(context, file):
+            print(str(lint_warning), file=sys.stderr)
+            exit_code = 1
+
+    if args.debug:
+        print(f"Checking files in bulk {file}...", file=sys.stderr)
+    for lint_warning in lint_bulk_files(context, files):
+        print(str(lint_warning), file=sys.stderr)
+        exit_code = 1
+
+    if args.all:
+        if args.debug:
+            print(f"Checking for repository-wide warnings...", file=sys.stderr)
+        for lint_warning in lint_repo(context):
+            print(str(lint_warning), file=sys.stderr)
+            exit_code = 1
+
+    exit(exit_code)
+
+
+if __name__ == "__main__":
+    main(root_dir=REPO_DIR)

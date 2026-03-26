@@ -1,0 +1,19 @@
+#pragma once
+
+#include <trx/game/lara/cheat.h>
+#include <trx/game/lara/cheat_keys.h>
+#include <trx/game/lara/col.h>
+#include <trx/game/lara/common.h>
+#include <trx/game/lara/const.h>
+#include <trx/game/lara/control.h>
+#include <trx/game/lara/draw.h>
+#include <trx/game/lara/enum.h>
+#include <trx/game/lara/flare.h>
+#include <trx/game/lara/hair.h>
+#include <trx/game/lara/look.h>
+#include <trx/game/lara/mesh.h>
+#include <trx/game/lara/misc.h>
+#include <trx/game/lara/skin.h>
+#include <trx/game/lara/state.h>
+#include <trx/game/lara/types.h>
+#include <trx/game/lara/vehicle.h>

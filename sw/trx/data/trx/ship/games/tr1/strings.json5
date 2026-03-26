@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- EMPTY SLOT %d -",
+        },
+        "stats": {
+            "ammo": "AMMO HITS/USED",
+            "ammo_hits": "HITS",
+            "ammo_used": "AMMO USED",
+            "deaths": "DEATHS",
+            "distance_travelled": "DISTANCE TRAVELED",
+            "kills": "KILLS",
+            "level": "LEVEL",
+            "medipacks_used": "HEALTH PACKS USED",
+            "none": "NONE",
+            "pickups": "PICKUPS",
+            "secrets": "SECRETS",
+            "time_taken": "TIME TAKEN",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Enables dynamic lighting to be generated for gunshots and explosions, similar to TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Fixes original issues in The Cistern and Tomb of Tihocan where plant sprites in water areas do not animate.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Large Medi Pack",
+        },
+        "small_medipack": {
+            "name": "Small Medi Pack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cutscene 1",
+        },
+        {
+            "title": "Cutscene 2",
+        },
+        {
+            "title": "Cutscene 3",
+        },
+        {
+            "title": "Cutscene 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Lara's Home",
+        },
+        {
+            "title": "Caves",
+        },
+        {
+            "title": "City of Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Silver Key",
+                },
+                "puzzle_1": {
+                    "name": "Gold Idol",
+                }
+            }
+        },
+        {
+            "title": "Lost Valley",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Machine Cog",
+                }
+            }
+        },
+        {
+            "title": "Tomb of Qualopec",
+        },
+        {
+            "title": "St. Francis' Folly",
+            "objects": {
+                "key_1": {
+                    "name": "Neptune Key",
+                },
+                "key_2": {
+                    "name": "Atlas Key",
+                },
+                "key_3": {
+                    "name": "Damocles Key",
+                },
+                "key_4": {
+                    "name": "Thor Key",
+                }
+            }
+        },
+        {
+            "title": "Colosseum",
+            "objects": {
+                "key_1": {
+                    "name": "Rusty Key",
+                }
+            }
+        },
+        {
+            "title": "Palace Midas",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Gold Bar",
+                }
+            }
+        },
+        {
+            "title": "The Cistern",
+            "objects": {
+                "key_1": {
+                    "name": "Gold Key",
+                },
+                "key_2": {
+                    "name": "Silver Key",
+                },
+                "key_3": {
+                    "name": "Rusty Key",
+                }
+            }
+        },
+        {
+            "title": "Tomb of Tihocan",
+            "objects": {
+                "key_1": {
+                    "name": "Gold Key",
+                },
+                "key_2": {
+                    "name": "Rusty Key",
+                },
+                "key_3": {
+                    "name": "Rusty Key",
+                }
+            }
+        },
+        {
+            "title": "City of Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Sapphire Key",
+                }
+            }
+        },
+        {
+            "title": "Obelisk of Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Sapphire Key",
+                },
+                "puzzle_1": {
+                    "name": "Eye of Horus",
+                },
+                "puzzle_2": {
+                    "name": "Scarab",
+                },
+                "puzzle_3": {
+                    "name": "Seal of Anubis",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Sanctuary of the Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Gold Key",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Scarab",
+                }
+            }
+        },
+        {
+            "title": "Natla's Mines",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Fuse",
+                },
+                "puzzle_2": {
+                    "name": "Pyramid Key",
+                }
+            }
+        },
+        {
+            "title": "Atlantis",
+        },
+        {
+            "title": "The Great Pyramid",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Title",
+        },
+        {
+            "title": "Current Position",
+        }
+    ],
+    "demos": [
+        {
+            "title": "City of Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Silver Key",
+                },
+                "puzzle_1": {
+                    "name": "Gold Idol",
+                }
+            }
+        },
+        {
+            "title": "Lost Valley",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Machine Cog",
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Lara's Home",
+        },
+        {
+            "title": "The Cold War",
+            "objects": {
+                "tiger": {
+                    "name": "Snow Leopard",
+                },
+                "key_1": {
+                    "name": "Guardroom Key",
+                },
+                "key_2": {
+                    "name": "Shaft 'B' Key",
+                }
+            }
+        },
+        {
+            "title": "Fool's Gold",
+            "objects": {
+                "key_1": {
+                    "name": "CardKey 1",
+                },
+                "key_4": {
+                    "name": "CardKey 2",
+                },
+                "puzzle_1": {
+                    "name": "Circuit Board",
+                }
+            }
+        },
+        {
+            "title": "Furnace of the Gods",
+            "objects": {
+                "big_spider": {
+                    "name": "Polar Bear",
+                },
+                "spider": {
+                    "name": "Wolf",
+                },
+                "puzzle_1": {
+                    "name": "Mask of Tornarsuk",
+                },
+                "puzzle_2": {
+                    "name": "Gold Nugget",
+                }
+            }
+        },
+        {
+            "title": "Kingdom",
+            "objects": {
+                "tiger": {
+                    "name": "Snow Leopard",
+                },
+                "puzzle_1": {
+                    "name": "Mask of Tornarsuk",
+                }
+            }
+        },
+        {
+            "title": "Nightmare in Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "Hotel Key",
+                },
+                "puzzle_1": {
+                    "name": "Elevator Junction",
+                },
+                "puzzle_2": {
+                    "name": "Door Circuit",
+                }
+            }
+        }
+    ]
+}

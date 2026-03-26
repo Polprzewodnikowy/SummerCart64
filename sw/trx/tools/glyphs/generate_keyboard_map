@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+import warnings
+from pathlib import Path
+
+# pip install rectpack Pillow
+import rectpack
+from PIL import Image, ImageDraw, ImageFont
+
+# HACK: Ensure the shared module is visible for this script.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from shared.glyph_mapping import CombineSource, Glyph, get_glyph_map
+from shared.paths import DATA_DIR, PROJECT_PATHS, REPO_DIR
+
+MAX_WIDTH = 500
+TEXT_MIN_PADDING = 3
+TEXT_SHIFT_Y = 1
+TEXT_COLOR = "#060100"
+
+KEYCAP_BORDER = 5
+KEYCAP_WIDTHS = [15, 21, 32, 36, 50, 60]
+
+KEY_TO_TEXT: dict[str, str] = {
+    r"\\{keyboard l_ctrl}": "Ctrl",
+    r"\\{keyboard r_ctrl}": "Ctrl",
+    r"\\{keyboard r_shift}": "Shift",
+    r"\\{keyboard l_shift}": "Shift",
+    r"\\{keyboard r_alt}": "Alt",
+    r"\\{keyboard l_alt}": "Alt",
+    r"\\{keyboard l_win}": "Win",
+    r"\\{keyboard r_win}": "Win",
+    r"\\{keyboard left}": "←",
+    r"\\{keyboard up}": "↑",
+    r"\\{keyboard right}": "→",
+    r"\\{keyboard down}": "↓",
+    r"\\{keyboard return}": "Return ↵",
+    r"\\{keyboard escape}": "Esc",
+    r"\\{keyboard backspace}": "Backspace",
+    r"\\{keyboard tab}": "Tab",
+    r"\\{keyboard space}": "Space",
+    r"\\{keyboard caps_lock}": "CapsLock",
+    r"\\{keyboard print_screen}": "Screen",
+    r"\\{keyboard scroll_lock}": "ScrollLock",
+    r"\\{keyboard pause}": "Pause",
+    r"\\{keyboard insert}": "Insert",
+    r"\\{keyboard home}": "Home",
+    r"\\{keyboard page_up}": "PgUp",
+    r"\\{keyboard delete}": "Del",
+    r"\\{keyboard end}": "End",
+    r"\\{keyboard page_down}": "PgDn",
+    r"\\{keyboard a}": "A",
+    r"\\{keyboard b}": "B",
+    r"\\{keyboard c}": "C",
+    r"\\{keyboard d}": "D",
+    r"\\{keyboard e}": "E",
+    r"\\{keyboard f}": "F",
+    r"\\{keyboard g}": "G",
+    r"\\{keyboard h}": "H",
+    r"\\{keyboard i}": "I",
+    r"\\{keyboard j}": "J",
+    r"\\{keyboard k}": "K",
+    r"\\{keyboard l}": "L",
+    r"\\{keyboard m}": "M",
+    r"\\{keyboard n}": "N",
+    r"\\{keyboard o}": "O",
+    r"\\{keyboard p}": "P",
+    r"\\{keyboard q}": "Q",
+    r"\\{keyboard r}": "R",
+    r"\\{keyboard s}": "S",
+    r"\\{keyboard t}": "T",
+    r"\\{keyboard u}": "U",
+    r"\\{keyboard v}": "V",
+    r"\\{keyboard w}": "W",
+    r"\\{keyboard x}": "X",
+    r"\\{keyboard y}": "Y",
+    r"\\{keyboard z}": "Z",
+    r"\\{keyboard 0}": "0",
+    r"\\{keyboard 1}": "1",
+    r"\\{keyboard 2}": "2",
+    r"\\{keyboard 3}": "3",
+    r"\\{keyboard 4}": "4",
+    r"\\{keyboard 5}": "5",
+    r"\\{keyboard 6}": "6",
+    r"\\{keyboard 7}": "7",
+    r"\\{keyboard 8}": "8",
+    r"\\{keyboard 9}": "9",
+    r"\\{keyboard minus}": "-",
+    r"\\{keyboard equals}": "=",
+    r"\\{keyboard left_square_bracket}": "[",
+    r"\\{keyboard right_square_bracket}": "]",
+    r"\\{keyboard backslash}": "\\",
+    r"\\{keyboard hash}": "#",
+    r"\\{keyboard semicolon}": ";",
+    r"\\{keyboard apostrophe}": "'",
+    r"\\{keyboard backtick}": "`",
+    r"\\{keyboard comma}": ",",
+    r"\\{keyboard period}": ".",
+    r"\\{keyboard slash}": "/",
+    r"\\{keyboard f1}": "F1",
+    r"\\{keyboard f2}": "F2",
+    r"\\{keyboard f3}": "F3",
+    r"\\{keyboard f4}": "F4",
+    r"\\{keyboard f5}": "F5",
+    r"\\{keyboard f6}": "F6",
+    r"\\{keyboard f7}": "F7",
+    r"\\{keyboard f8}": "F8",
+    r"\\{keyboard f9}": "F9",
+    r"\\{keyboard f10}": "F10",
+    r"\\{keyboard f11}": "F11",
+    r"\\{keyboard f12}": "F12",
+    r"\\{keyboard f13}": "F13",
+    r"\\{keyboard f14}": "F14",
+    r"\\{keyboard f15}": "F15",
+    r"\\{keyboard f16}": "F16",
+    r"\\{keyboard f17}": "F17",
+    r"\\{keyboard f18}": "F18",
+    r"\\{keyboard f19}": "F19",
+    r"\\{keyboard f20}": "F20",
+    r"\\{keyboard f21}": "F21",
+    r"\\{keyboard f22}": "F22",
+    r"\\{keyboard f23}": "F23",
+    r"\\{keyboard f24}": "F24",
+    r"\\{keyboard num_lock}": "NumLock",
+    r"\\{keyboard num_0}": "Num0",
+    r"\\{keyboard num_1}": "Num1",
+    r"\\{keyboard num_2}": "Num2",
+    r"\\{keyboard num_3}": "Num3",
+    r"\\{keyboard num_4}": "Num4",
+    r"\\{keyboard num_5}": "Num5",
+    r"\\{keyboard num_6}": "Num6",
+    r"\\{keyboard num_7}": "Num7",
+    r"\\{keyboard num_8}": "Num8",
+    r"\\{keyboard num_9}": "Num9",
+    r"\\{keyboard num_period}": "Num.",
+    r"\\{keyboard num_divide}": "Num/",
+    r"\\{keyboard num_multiply}": "Num*",
+    r"\\{keyboard num_minus}": "Num-",
+    r"\\{keyboard num_plus}": "Num+",
+    r"\\{keyboard num_equals}": "Num=",
+    r"\\{keyboard num_comma}": "Num,",
+    r"\\{keyboard num_enter}": "Num↵",
+    r"\\{keyboard unknown}": "????",
+}
+
+
+def align(value: int, align: int) -> int:
+    return ((value + align - 1) // align) * align
+
+
+def generate_keycap_images(image_path: Path, widths: list[int]) -> list[Image.Image]:
+    base_keycap = Image.open(image_path)
+    keycap_images = []
+
+    original_width, original_height = base_keycap.size
+    inner_width = original_width - 2 * KEYCAP_BORDER
+
+    for width in widths:
+        # Create a new image with the desired width and original height
+        keycap_image = Image.new('RGBA', (width, original_height))
+
+        # Paste corners
+        keycap_image.paste(base_keycap.crop((0, 0, KEYCAP_BORDER, original_height)), (0, 0))
+        keycap_image.paste(base_keycap.crop((original_width - KEYCAP_BORDER, 0, original_width, original_height)),
+                           (width - KEYCAP_BORDER, 0))
+
+        # Stretch the middle part
+        middle = base_keycap.crop((KEYCAP_BORDER, 0, original_width - KEYCAP_BORDER, original_height))
+        stretched_middle = middle.resize((width - 2 * KEYCAP_BORDER, original_height), Image.LANCZOS)
+
+        # Paste the stretched middle part
+        keycap_image.paste(stretched_middle, (KEYCAP_BORDER, 0))
+
+        keycap_images.append(keycap_image)
+
+    return keycap_images
+
+
+def find_best_keycap(
+    visible_text: str,
+    blank_keycap_images: list[Image.Image],
+    font: ImageFont.ImageFont,
+) -> Image.Image | None:
+    # find all keycap images that can fit the text, then choose the smallest one
+    candidates: list[Image.Image] = []
+    for keycap_img in blank_keycap_images:
+        text_bbox = ImageDraw.Draw(keycap_img).textbbox(
+            (0, 0), visible_text, font=font
+        )
+        text_width = text_bbox[2] - text_bbox[0]
+        if text_width + 2 * TEXT_MIN_PADDING <= keycap_img.width:
+            candidates.append(keycap_img)
+    if candidates:
+        # choose the keycap with the smallest width
+        return min(candidates, key=lambda img: img.width)
+    warnings.warn(f"No suitable keycap image for text: {visible_text}")
+    return None
+
+
+def create_sprite_sheet(
+    font_path: Path,
+    blank_keycap_images: list[Image],
+    cell_size: int = 1
+) -> tuple[Image.Image, list[tuple[str, tuple[int, int, int, int]]]]:
+    for i in range(5, 21):
+        try:
+            font = ImageFont.truetype(str(font_path), size=i)
+        except Exception:
+            continue
+        else:
+            break
+
+    sprites = []
+    for key_name, visible_text in KEY_TO_TEXT.items():
+        keycap_img = find_best_keycap(visible_text, blank_keycap_images, font)
+        if not keycap_img:
+            continue
+        keycap_copy = keycap_img.copy()
+
+        # render text on a separate image and trim horizontal transparent pixels
+        text_img = Image.new("RGBA", keycap_copy.size, (0, 0, 0, 0))
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text((0, 0), visible_text, font=font, fill=TEXT_COLOR)
+        x0, y0, x1, y1 = text_draw.textbbox((0, 0), visible_text, font=font)
+
+        cropped = text_img.crop((x0, 0, x0 + x1, text_img.height))
+        text_x = (keycap_copy.width + 1 - cropped.width) // 2
+        text_y = (keycap_copy.height - cropped.height) // 2
+        text_y += TEXT_SHIFT_Y
+        keycap_copy.paste(cropped, (text_x, text_y), cropped)
+
+        sprites.append((key_name, keycap_copy))
+
+    packer = rectpack.newPacker(rotation=False)
+    for i, (_, keycap_copy) in enumerate(sprites):
+        packer.add_rect(
+            align(keycap_copy.width, cell_size),
+            align(keycap_copy.height, cell_size),
+            i,
+        )
+    packer.add_bin(MAX_WIDTH, float("inf"))
+    packer.pack()
+    packed_areas = packer.rect_list()
+
+    total_width = max(x + w for _, x, _, w, _, _ in packed_areas)
+    total_height = max(y + h for _, _, y, _, h, _ in packed_areas)
+    sprite_sheet = Image.new("RGBA", (total_width, total_height))
+
+    definitions = []
+    for _sheet, x, y, w, h, i in packed_areas:
+        key_name, keycap_copy = sprites[i]
+        sprite_sheet.paste(keycap_copy, (x, y))
+        definitions.append(
+            (key_name, (x, y, keycap_copy.width, keycap_copy.height))
+        )
+
+    return sprite_sheet, definitions
+
+
+def output_definitions(
+    definitions: list[tuple[str, tuple[int, int, int, int]]],
+    output_image_name: str,
+    file,
+):
+    for key_name, (x, y, w, h) in definitions:
+        print(
+            f'"{key_name}" N manual_sprite("{output_image_name}", {x}, {y}, {w}, {h}) translate(y=2)',
+            file=file,
+        )
+
+
+
+def main():
+    font_path = DATA_DIR / "tomb-11.bdf"
+    image_name = "keyboard.png"
+    mapping_name = "mapping_keyboard.txt"
+
+    glyphs_dir = DATA_DIR / "common/glyphs"
+    keycap_images = generate_keycap_images(
+        glyphs_dir / "blank.png", KEYCAP_WIDTHS
+    )
+
+    image_path = glyphs_dir / image_name
+    mapping_path = glyphs_dir / mapping_name
+    sprite_sheet, definitions = create_sprite_sheet(font_path, keycap_images)
+    sprite_sheet.save(image_path)
+    print(f"{image_path} updated")
+
+    with mapping_path.open("w") as file:
+        output_definitions(definitions, image_name, file=file)
+        print(f"{mapping_path} updated")
+
+
+if __name__ == "__main__":
+    main()

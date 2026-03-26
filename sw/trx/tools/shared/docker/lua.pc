@@ -1,0 +1,10 @@
+prefix=/ext
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Lua
+Description: The Lua interpreter and library
+Version: 5.4.8
+Libs: -L${libdir} -llua
+Cflags: -I${includedir}

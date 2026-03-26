@@ -1,0 +1,1 @@
+../../common/glyphs/mapping_small.txt

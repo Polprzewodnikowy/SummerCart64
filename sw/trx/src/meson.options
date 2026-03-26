@@ -1,0 +1,1 @@
+option('staticdeps', type: 'boolean', value: true, description: 'Try to build against static dependencies. default: true')

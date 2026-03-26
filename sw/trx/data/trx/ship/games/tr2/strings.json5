@@ -1,0 +1,339 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "settings": {
+        "gameplay.fix_bear_ai": {
+            "description": "Fixes the bear pat attack in The Golden Mask so it does not miss Lara.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Fixes original issues in 40 Fathoms, Wreck of the Maria Doria and The Deck where plant sprites in water areas do not animate.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Large Medipack",
+        },
+        "small_medipack": {
+            "name": "Small Medipack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cutscene 1",
+        },
+        {
+            "title": "Cutscene 2",
+        },
+        {
+            "title": "Cutscene 3",
+        },
+        {
+            "title": "Cutscene 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Lara's Home",
+        },
+        {
+            "title": "The Great Wall",
+            "objects": {
+                "key_1": {
+                    "name": "Guardhouse Key",
+                },
+                "key_2": {
+                    "name": "Rusty Key",
+                }
+            }
+        },
+        {
+            "title": "Venice",
+            "objects": {
+                "key_1": {
+                    "name": "Boathouse Key",
+                },
+                "key_2": {
+                    "name": "Steel Key",
+                },
+                "key_3": {
+                    "name": "Iron Key",
+                }
+            }
+        },
+        {
+            "title": "Bartoli's Hideout",
+            "objects": {
+                "key_1": {
+                    "name": "Library Key",
+                },
+                "key_2": {
+                    "name": "Detonator Key",
+                }
+            }
+        },
+        {
+            "title": "Opera House",
+            "objects": {
+                "key_1": {
+                    "name": "Ornate Key",
+                },
+                "puzzle_1": {
+                    "name": "Relay Box",
+                },
+                "puzzle_2": {
+                    "name": "Circuit Board",
+                }
+            }
+        },
+        {
+            "title": "Offshore Rig",
+            "objects": {
+                "key_1": {
+                    "name": "Red Pass Card",
+                },
+                "key_2": {
+                    "name": "Yellow Pass Card",
+                },
+                "key_3": {
+                    "name": "Green Pass Card",
+                }
+            }
+        },
+        {
+            "title": "Diving Area",
+            "objects": {
+                "key_1": {
+                    "name": "Red Pass Card",
+                },
+                "key_4": {
+                    "name": "Blue Pass Card",
+                },
+                "puzzle_1": {
+                    "name": "Machine Chip",
+                }
+            }
+        },
+        {
+            "title": "40 Fathoms",
+        },
+        {
+            "title": "Wreck of the Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Rest Room Key",
+                },
+                "key_2": {
+                    "name": "Rusty Key",
+                },
+                "key_3": {
+                    "name": "Cabin Key",
+                },
+                "puzzle_1": {
+                    "name": "Circuit Breaker",
+                }
+            }
+        },
+        {
+            "title": "Living Quarters",
+            "objects": {
+                "key_1": {
+                    "name": "Theater Key",
+                },
+                "key_2": {
+                    "name": "Rusty Key",
+                }
+            }
+        },
+        {
+            "title": "The Deck",
+            "objects": {
+                "key_2": {
+                    "name": "Stern Key",
+                },
+                "key_3": {
+                    "name": "Storage Key",
+                },
+                "key_4": {
+                    "name": "Cabin Key",
+                },
+                "puzzle_4": {
+                    "name": "The Seraph",
+                }
+            }
+        },
+        {
+            "title": "Tibetan Foothills",
+            "objects": {
+                "tiger": {
+                    "name": "Snow Leopard",
+                },
+                "key_1": {
+                    "name": "Drawbridge Key",
+                },
+                "key_2": {
+                    "name": "Hut Key",
+                },
+                "puzzle_4": {
+                    "name": "The Seraph",
+                }
+            }
+        },
+        {
+            "title": "Barkhang Monastery",
+            "objects": {
+                "key_1": {
+                    "name": "Strongroom Key",
+                },
+                "key_2": {
+                    "name": "Trapdoor Key",
+                },
+                "key_3": {
+                    "name": "Rooftops Key",
+                },
+                "key_4": {
+                    "name": "Main Hall Key",
+                },
+                "puzzle_1": {
+                    "name": "Prayer Wheels",
+                },
+                "puzzle_2": {
+                    "name": "Gemstones",
+                },
+                "puzzle_4": {
+                    "name": "The Seraph",
+                }
+            }
+        },
+        {
+            "title": "Catacombs of the Talion",
+            "objects": {
+                "tiger": {
+                    "name": "Snow Leopard",
+                },
+                "pickup_1": {
+                    "name": "Gong Hammer",
+                },
+                "puzzle_1": {
+                    "name": "Tibetan Mask",
+                }
+            }
+        },
+        {
+            "title": "Ice Palace",
+            "objects": {
+                "tiger": {
+                    "name": "White Tiger",
+                },
+                "key_2": {
+                    "name": "Gong Hammer",
+                },
+                "pickup_2": {
+                    "name": "Talion",
+                },
+                "puzzle_1": {
+                    "name": "Tibetan Mask",
+                }
+            }
+        },
+        {
+            "title": "Temple of Xian",
+            "objects": {
+                "key_2": {
+                    "name": "Gold Key",
+                },
+                "key_3": {
+                    "name": "Silver Key",
+                },
+                "key_4": {
+                    "name": "Main Chamber Key",
+                },
+                "puzzle_1": {
+                    "name": "The Dragon Seal",
+                }
+            }
+        },
+        {
+            "title": "Floating Islands",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mystic Plaque",
+                },
+                "puzzle_2": {
+                    "name": "Mystic Plaque",
+                }
+            }
+        },
+        {
+            "title": "The Dragon's Lair",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mystic Plaque",
+                },
+                "puzzle_2": {
+                    "name": "Dagger of Xian",
+                }
+            }
+        },
+        {
+            "title": "Home Sweet Home",
+            "objects": {
+                "key_1": {
+                    "name": "Gun Cupboard Key",
+                },
+                "puzzle_1": {
+                    "name": "Dagger of Xian",
+                }
+            }
+        }
+    ],
+    "demos": [
+        {
+            "title": "Venice",
+            "objects": {
+                "key_1": {
+                    "name": "Boathouse Key",
+                },
+                "key_2": {
+                    "name": "Steel Key",
+                },
+                "key_3": {
+                    "name": "Iron Key",
+                }
+            }
+        },
+        {
+            "title": "Wreck of the Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Rest Room Key",
+                },
+                "key_2": {
+                    "name": "Rusty Key",
+                },
+                "key_3": {
+                    "name": "Cabin Key",
+                },
+                "puzzle_1": {
+                    "name": "Circuit Breaker",
+                }
+            }
+        },
+        {
+            "title": "Tibetan Foothills",
+            "objects": {
+                "tiger": {
+                    "name": "Snow Leopard",
+                },
+                "key_1": {
+                    "name": "Drawbridge Key",
+                },
+                "key_2": {
+                    "name": "Hut Key",
+                },
+                "puzzle_4": {
+                    "name": "The Seraph",
+                }
+            }
+        }
+    ]
+}

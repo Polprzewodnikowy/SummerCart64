@@ -1,0 +1,17 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "\\{review}Ville de Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé en argent",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Idole en or",
+                }
+            }
+        }
+    ]
+}

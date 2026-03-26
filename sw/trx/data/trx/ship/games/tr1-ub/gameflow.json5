@@ -1,0 +1,190 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 1,
+    "extends": "tr1",
+
+    "main_menu_picture": "title_ub.webp",
+    "savegame_file_fmt": "save_trub_%02d.dat",
+
+    "injections": [
+        "braid.bin",
+        "bubbles.bin",
+        "gun_glow.bin",
+        "lara_animations.bin",
+        "lara_guns.bin",
+        "uzi_sfx.bin",
+        "explosion.bin",
+        "pickup_aid.bin",
+        "sprite_alignment.bin",
+        "pda_model.bin",
+        "font.bin",
+        "winston_model.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "enable_tr2_item_drops": false,
+    "convert_dropped_guns": false,
+
+    "enforced_config": {
+        "enable_save_crystals": false,
+        "fix_water_exit": false,
+    },
+
+    "title": {
+        "path": "title.phd",
+        "music_track": 2,
+        "inherit_injections": false,
+        "injections": [
+            "pda_model.bin",
+            "font.bin",
+            "title_textures.bin",
+            "misc_sprites.bin",
+        ],
+        "sequence": [
+            {"type": "display_picture", "path": "eidos.webp", "legal": true, "display_time": 1, "fade_in_time": 1.0, "fade_out_time": 1.0},
+            {"type": "play_fmv", "fmv_id": 0},
+            {"type": "play_fmv", "fmv_id": 1},
+            {"type": "exit_to_title"},
+        ],
+    },
+
+    "levels": [
+        // Level 1: Return to Egypt
+        {
+            "path": "egypt.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "ub_loading1.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "egypt_cameras.bin",
+                "egypt_fd.bin",
+                "egypt_itemrots.bin",
+                "egypt_meshfixes.bin",
+                "egypt_textures.bin",
+                "panther_sfx.bin",
+            ],
+            "unobtainable_kills": 1,
+        },
+
+        // Level 2: Temple of the Cat
+        {
+            "path": "cat.phd",
+            "music_track": 59,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "ub_loading1.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "cat_cameras.bin",
+                "cat_fd.bin",
+                "cat_itemrots.bin",
+                "cat_meshfixes.bin",
+                "cat_textures.bin",
+                "panther_sfx.bin",
+            ],
+            "unobtainable_pickups": 1,
+        },
+
+        // Level 3: Atlantean Stronghold
+        {
+            "path": "end.phd",
+            "music_track": 60,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "ub_loading2.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "door61_sfx.bin",
+                "stronghold_fd.bin",
+                "stronghold_itemrots.bin",
+                "stronghold_textures.bin",
+            ],
+            "unobtainable_kills": 1,
+        },
+
+        // Level 4: The Hive
+        {
+            "path": "end2.phd",
+            "music_track": 60,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "ub_loading2.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "play_music", "music_track": 19},
+                {"type": "display_picture", "credit": true, "path": "end.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_ub.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_1.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_2.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credits_3.webp", "display_time": 7.5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "total_stats", "background_path": "install.webp"},
+                {"type": "exit_to_title"},
+            ],
+            "injections": [
+                "hive_fd.bin",
+                "hive_itemrots.bin",
+                "hive_textures.bin",
+            ],
+        },
+
+        {"type": "dummy"},
+
+        // Level 6: Current Position
+        // This level is necessary to read TombATI's save files.
+        {
+            "path": "current.phd",
+            "type": "current",
+            "music_track": 0,
+            "inherit_injections": false,
+            "sequence": [{"type": "exit_to_title"}],
+        },
+    ],
+
+    "fmvs": [
+        {"path": "core.avi", "legal": true},
+        {"path": "escape.avi", "legal": true},
+    ],
+
+    "hidden_config": [
+        "enable_cutscenes",       // UB has no cutscenes
+        "enable_demo",            // UB has no demos
+        "enable_save_crystals",   // UB has no save crystals
+        "enable_ps1_crystals",    // UB has no save crystals
+        "enable_item_examining",  // UB has no special item descriptions
+        "healthbar_poison_color",
+        "healthbar_poison_color_ps1",
+        "enemy_healthbar_color_allies",
+        "enemy_healthbar_color_allies_ps1",
+        "exposurebar_color",
+        "exposurebar_color_ps1",
+        "exposurebar_location",
+        "exposurebar_show_mode",
+        "fix_water_exit",
+        "change_pierre_spawn",
+        "fix_bear_ai",
+        "fix_monkey_pickup_priority",
+        "restore_ps1_enemies",
+        "disable_trex_collision",
+        "fix_tihocan_secret_sound",
+        "fix_animated_sprites",
+        "enable_ally_targeting",
+        "enable_weather",
+        "enable_footprints",
+        "ally_hostility_policy",
+        "fix_pipeman_aim",
+    ],
+}

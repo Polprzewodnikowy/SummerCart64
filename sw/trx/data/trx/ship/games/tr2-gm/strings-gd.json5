@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Dachaigh Lara",
+        },
+        {
+            "title": "An Cogadh Fuar",
+            "objects": {
+                "tiger": {
+                    "name": "Lìopaird-shneachda",
+                },
+                "key_1": {
+                    "name": "Iuchair an t-Seòmair-ghàrda",
+                },
+                "key_2": {
+                    "name": "Iuchair Toll 'B'",
+                }
+            }
+        },
+        {
+            "title": "Òr nan Amadan",
+            "objects": {
+                "key_1": {
+                    "name": "Cairt-iuchrach 1",
+                },
+                "key_4": {
+                    "name": "Cairt-iuchrach 2",
+                },
+                "puzzle_1": {
+                    "name": "Bòrd-chuairt",
+                }
+            }
+        },
+        {
+            "title": "Àmhainn nan Diathan",
+            "objects": {
+                "big_spider": {
+                    "name": "Mathan-pòla",
+                },
+                "spider": {
+                    "name": "Madadh-allaidh",
+                },
+                "puzzle_1": {
+                    "name": "Masg Thornarsuk",
+                },
+                "puzzle_2": {
+                    "name": "Bleideag Òir",
+                }
+            }
+        },
+        {
+            "title": "Rìoghachd",
+            "objects": {
+                "tiger": {
+                    "name": "Lìopaird-shneachda",
+                },
+                "puzzle_1": {
+                    "name": "Masg Thornarsuk",
+                }
+            }
+        },
+        {
+            "title": "Cuthag ann am Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Taigh-òsta",
+                },
+                "puzzle_1": {
+                    "name": "Ceangal an Lioft",
+                },
+                "puzzle_2": {
+                    "name": "Cuairt na Dorsan",
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+{
+  "Controls": {
+    "window_title_main": "Programma di installazione di TR1X",
+    "step_source_content": "Per eseguire TR1X, sono richiesti i file di gioco di Tomb Raider.\nSeleziona il percorso da cui copiare questi file.\nSe stai aggiornando un'installazione già esistente, seleziona 'TR1X'.",
+    "step_settings_music_content": "Né la versione Steam né quella GOG del gioco includono la colonna sonora completa presente nelle versioni PlayStation e Saturn. Questa opzione ti consente di scaricare automaticamente le tracce audio mancanti (164 MB). La legalità di questi file è discutibile; il modo più legale per importare la musica su PC è estrarre le tracce audio da un disco fisico in tuo possesso della versione PlayStation o Saturn.",
+    "step_settings_expansion_heading": "Scarica l'espansione Conti in Sospeso",
+    "step_settings_expansion_content": "Il pacchetto di espansione Conti in Sospeso è stato reso gratuito. Tuttavia, le versioni Steam e GOG non lo includono. Questa opzione ti consente di scaricare automaticamente i file dell'espansione (6 MB).",
+    "step_settings_expansion_music": "Edizione amatoriale (aggiunge il supporto alle tracce musicali)",
+    "step_settings_expansion_vanilla": "Edizione originale (senza supporto alle tracce musicali)",
+    "step_settings_saves_content": "Importa i file di salvataggio esistenti. Al momento sono supportati solo i formati di salvataggio di TombATI e TR1X."
+  }
+}

@@ -1,0 +1,230 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 2,
+    "extends": "tr2",
+
+    "main_menu_picture": "title_eu_gm.webp",
+    "savegame_file_fmt": "save_trgm_%02d.dat",
+
+    "demo_version": false,
+    "enable_tr2_item_drops": true,
+    "convert_dropped_guns": true,
+
+    "title": {
+        "path": "title_gm.tr2",
+        "music_track": 60,
+        "sequence": [
+            {"type": "display_picture", "path": "legal_eu_gm.webp", "legal": true},
+            {"type": "exit_to_title"},
+        ],
+        "inherit_injections": false,
+        "injections": [
+            "font.bin",
+            "inv_background.bin",
+            "pda_model.bin",
+            "title_textures.bin",
+            "misc_sprites.bin",
+        ]
+    },
+
+    "sfx_path": "main_gm.sfx",
+    "injections": [
+        "font.bin",
+        "lara_animations.bin",
+        "pda_model.bin",
+        "pickup_aid.bin",
+        "lara_extra.bin",
+        "lara_rifle_sfx.bin",
+        "secret_models_gm.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "levels": [
+        // 0. Legacy savegame placeholder
+        {"type": "dummy"},
+
+        // 1. The Cold War
+        {
+            "path": "level1.tr2",
+            "script": "level1.lua",
+            "music_track": 29,
+            "lara_outfit": "tr2_bomber_jacket",
+            "sequence": [
+                {"type": "loading_screen", "path": "gm_level1.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "shotgun"},
+                {"type": "give_item", "object_id": "small_medipack"},
+                {"type": "give_item", "object_id": "large_medipack"},
+                {"type": "give_item", "object_id": "flare", "quantity": 2},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 37},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "coldwar_fd.bin",
+                "coldwar_itemrots.bin",
+                "coldwar_music_tracks.bin",
+                "coldwar_objects.bin",
+                "coldwar_textures.bin",
+                "common_pickup_meshes_gm.bin",
+                "lara_guns.bin",
+                "shark_sfx.bin",
+                "winston_model.bin",
+            ],
+        },
+
+        // 2. Fool's Gold
+        {
+            "path": "level2.tr2",
+            "music_track": 54,
+            "lara_outfit": "tr2_bomber_jacket",
+            "sequence": [
+                {"type": "loading_screen", "path": "gm_level2.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 37},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "door107_sfx.bin",
+                "door108_sfx.bin",
+                "fools_itemrots.bin",
+                "fools_music_tracks.bin",
+                "fools_pickup_meshes.bin",
+                "fools_textures.bin",
+                "lara_guns.bin",
+                "winston_model.bin",
+            ],
+        },
+
+        // 3. Furnace of the Gods
+        {
+            "path": "level3.tr2",
+            "script": "level3.lua",
+            "music_track": 55,
+            "lara_outfit": "tr2_bomber_jacket",
+            "sequence": [
+                {"type": "loading_screen", "path": "gm_level3.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 37},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "furnace_itemrots.bin",
+                "lara_guns.bin",
+                "furnace_music_tracks.bin",
+                "furnace_objects.bin",
+                "furnace_pickup_meshes.bin",
+                "furnace_textures.bin",
+                "winston_model.bin",
+            ],
+        },
+
+        // 4. Kingdom
+        {
+            "path": "level4.tr2",
+            "script": "level4.lua",
+            "music_track": 27,
+            "lara_outfit": "tr2_bomber_jacket",
+            "sequence": [
+                {"type": "loading_screen", "path": "gm_level4.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "puzzle_1"},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 48},
+                {"type": "level_stats"},
+                {"type": "display_picture", "credit": true, "path": "credit00_gm.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit01.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit02.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit03.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit04.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit05.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit06.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit07_gm.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "display_picture", "credit": true, "path": "credit08.webp", "display_time": 15, "fade_in_time": 0.5, "fade_out_time": 0.5},
+                {"type": "total_stats", "background_path": "end.webp"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "common_pickup_meshes_gm.bin",
+                "door108_sfx.bin",
+                "guardian_death_commands.bin",
+                "lara_guns.bin",
+                "kingdom_cameras.bin",
+                "kingdom_itemrots.bin",
+                "kingdom_music_tracks.bin",
+                "kingdom_textures.bin",
+                "winston_model.bin",
+            ],
+        },
+
+        // 5. Nightmare in Vegas
+        {
+            "path": "level5.tr2",
+            "type": "bonus",
+            "music_track": 30,
+            "lara_outfit": "tr2_vegas",
+            "sequence": [
+                {"type": "loading_screen", "path": "gm_level5.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "remove_weapons"},
+                {"type": "remove_ammo"},
+                {"type": "remove_flares"},
+                {"type": "remove_medipacks"},
+                {"type": "give_item", "object_id": "pistols"},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 37},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "common_pickup_meshes_gm.bin",
+                "door108_sfx.bin",
+                "guardian_death_commands.bin",
+                "lara_vegas_guns.bin",
+                "vegas_fd.bin",
+                "vegas_itemrots.bin",
+                "vegas_music_tracks.bin",
+                "vegas_textures.bin",
+            ],
+        },
+    ],
+
+    "demos": [
+    ],
+
+    "cutscenes": [
+    ],
+
+    "fmvs": [
+    ],
+
+    "hidden_config": [
+        "enable_cutscenes",       // TR2G has no cutscenes
+        "enable_demo",            // TR2G has no demos
+        "enable_fmv",             // TR2G has no FMVs
+        "enable_item_examining",  // TR2G has no special item descriptions
+        "fix_alligator_ai",       // TR2G has no alligators
+        "fix_animated_sprites",
+        "healthbar_poison_color",
+        "healthbar_poison_color_ps1",
+        "exposurebar_color",
+        "exposurebar_color_ps1",
+        "exposurebar_location",
+        "exposurebar_show_mode",
+        "change_pierre_spawn",
+        "enable_save_crystals",
+        "enable_ps1_crystals",
+        "fix_chainblock_secret_sound",
+        "enable_compass_stats",
+        "enable_wading",
+        "restore_ps1_enemies",
+        "fix_speeches_killing_music",
+        "enable_weather",
+        "enable_footprints",
+        "fix_monkey_pickup_priority",
+        "fix_pipeman_aim",
+    ],
+}

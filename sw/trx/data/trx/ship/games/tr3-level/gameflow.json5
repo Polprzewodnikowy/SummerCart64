@@ -1,0 +1,35 @@
+{
+    // This file is used to enable the -l argument support.
+
+    "engine": 3,
+    "extends": "tr3",
+
+    "main_menu_picture": "title_eu.webp",
+    "savegame_file_fmt": "save_tr3_custom_%02d.dat",
+
+    "demo_version": false,
+    "enable_tr2_item_drops": true,
+    "convert_dropped_guns": true,
+
+    "sfx_path": "main.sfx",
+    "injections": [
+        "font.bin",
+        "lara_animations.bin",
+        "pda_model.bin",
+        "lara_extra.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "levels": [
+        {
+            "path": "%direct_level%",
+            "music_track": -1,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+            ],
+        },
+    ],
+}

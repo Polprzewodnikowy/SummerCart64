@@ -1,0 +1,34 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Powrót do Egiptu",
+            "objects": {
+                "key_1": {
+                    "name": "Złoty klucz",
+                }
+            }
+        },
+        {
+            "title": "Świątynia Kota",
+            "objects": {
+                "key_1": {
+                    "name": "Ozdobny klucz",
+                }
+            }
+        },
+        {
+            "title": "Twierdza Atlantydów",
+        },
+        {
+            "title": "Rój",
+        },
+        {
+            "title": "Menu główne",
+        },
+        {
+            "title": "Aktualna pozycja",
+        }
+    ]
+}

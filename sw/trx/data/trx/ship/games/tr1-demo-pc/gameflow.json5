@@ -1,0 +1,87 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 1,
+    "extends": "tr1",
+
+    // path to the main menu background image
+    "main_menu_picture": "title.webp",
+
+    // path to the savegame file
+    "savegame_file_fmt": "save_demo_pc_%02d.dat",
+
+    "injections": [
+        "braid.bin",
+        "bubbles.bin",
+        "gun_glow.bin",
+        "lara_animations.bin",
+        "lara_guns.bin",
+        "uzi_sfx.bin",
+        "explosion.bin",
+        "pickup_aid.bin",
+        "sprite_alignment.bin",
+        "pda_model.bin",
+        "font.bin",
+        "winston_model.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "enable_tr2_item_drops": false,
+    "convert_dropped_guns": false,
+
+    "title": {
+        "path": [
+            "data_demo_pc/title.phd",
+            "title.phd",
+        ],
+        "music_track": 0,
+        "inherit_injections": false,
+        "sequence": [
+            {"type": "exit_to_title"},
+        ],
+        "injections": [
+            "pda_model.bin",
+            "font.bin",
+            "title_textures.bin",
+            "misc_sprites.bin",
+        ],
+    },
+
+    "levels": [
+        // Level 2: City of Vilcabamba
+        {
+            "path": [
+                "data_demo_pc/level2.phd",
+                "level2.phd",
+            ],
+            "music_track": 0,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "peru.webp"},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+        },
+    ],
+
+    "hidden_config": [
+        "enable_item_examining",
+        "healthbar_poison_color",
+        "healthbar_poison_color_ps1",
+        "enemy_healthbar_color_allies",
+        "enemy_healthbar_color_allies_ps1",
+        "exposurebar_color",
+        "exposurebar_color_ps1",
+        "exposurebar_location",
+        "exposurebar_show_mode",
+        "enable_ally_targeting",
+        "enable_weather",
+        "enable_footprints",
+        "ally_hostility_policy",
+        "fix_monkey_pickup_priority",
+        "fix_pipeman_aim",
+    ],
+}

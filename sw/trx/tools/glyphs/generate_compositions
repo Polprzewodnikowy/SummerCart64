@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+import json
+import string
+import unicodedata
+
+
+def quote(letter):
+    return json.dumps(letter, ensure_ascii=False)
+
+
+def show(accented, letter, accent):
+    print(
+        f"U+{ord(accented):04X}:{accented} C combine({quote(letter)}, {quote(accent)})"
+    )
+
+
+def add_accent(letter, accent):
+    return unicodedata.normalize("NFC", letter + accent)
+
+
+for accent_name, accent_char in [
+    ("\\{grave accent}", "\u0300"),
+    ("\\{acute accent}", "\u0301"),
+    ("\\{circumflex}", "\u0302"),
+    ("\\{tilde}", "\u0303"),
+    ("\\{macron}", "\u0304"),
+    ("\\{overline}", "\u0305"),
+    ("\\{breve}", "\u0306"),
+    ("\\{dot above}", "\u0307"),
+    ("\\{umlaut}", "\u0308"),
+    ("\\{ring above}", "\u030A"),
+    ("\\{double acute accent}", "\u030B"),
+    ("\\{caron}", "\u030C"),
+]:
+    print("#", accent_name)
+    for letter in string.ascii_uppercase + string.ascii_lowercase:
+        accented = add_accent(letter, accent_char)
+        if len(accented) == 1:
+            show(accented, letter, accent_name)
+    print()

@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- SLOT FALAMH %d -",
+        },
+        "stats": {
+            "ammo": "BUAIDHEAN / LOSGADH",
+            "ammo_hits": "BUILEACHDAN",
+            "ammo_used": "AMHACHD AIR A CHLEACHD",
+            "deaths": "BÀSAN",
+            "distance_travelled": "ASTAR AIR A SHIUBHAL",
+            "kills": "MARBHAIN",
+            "level": "ÌRE",
+            "medipacks_used": "PASGANAN CLEACHDTE",
+            "none": "GIN",
+            "pickups": "TOGAILTEAN",
+            "secrets": "DÌOMHAIREACHDAN",
+            "time_taken": "ÙINE AIR A GHABHAIL",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Cuiridh seo solais fiùghantach ri losgadh armachd is spreadhaidhean, coltach ri TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Càraichidh bugan san t-Siasarn is Uaigh Tihocan far nach gluais planntrais anns an uisge.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Pasgan Mòr Slàinte",
+        },
+        "small_medipack": {
+            "name": "Pasgan Beag Slàinte",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Sealladh-film 1",
+        },
+        {
+            "title": "Sealladh-film 2",
+        },
+        {
+            "title": "Sealladh-film 3",
+        },
+        {
+            "title": "Sealladh-film 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Dachaigh Lara",
+        },
+        {
+            "title": "Uaimhean",
+        },
+        {
+            "title": "Baile Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Airgid",
+                },
+                "puzzle_1": {
+                    "name": "Ìomhaigh Òir",
+                }
+            }
+        },
+        {
+            "title": "Gleann Caillte",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Gèar Inneil",
+                }
+            }
+        },
+        {
+            "title": "Uaigh Qualopec",
+        },
+        {
+            "title": "Gòraiche Naoimh Frang",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Neaptain",
+                },
+                "key_2": {
+                    "name": "Iuchair Atlas",
+                },
+                "key_3": {
+                    "name": "Iuchair Damocles",
+                },
+                "key_4": {
+                    "name": "Iuchair Thor",
+                }
+            }
+        },
+        {
+            "title": "Colasaem",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Meirgeach",
+                }
+            }
+        },
+        {
+            "title": "Lùchairt Mìdas",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Bàr Òir",
+                }
+            }
+        },
+        {
+            "title": "An t-Siasarn",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Òir",
+                },
+                "key_2": {
+                    "name": "Iuchair Airgid",
+                },
+                "key_3": {
+                    "name": "Iuchair Meirgeach",
+                }
+            }
+        },
+        {
+            "title": "Uaigh Tihocan",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Òir",
+                },
+                "key_2": {
+                    "name": "Iuchair Meirgeach",
+                },
+                "key_3": {
+                    "name": "Iuchair Meirgeach",
+                }
+            }
+        },
+        {
+            "title": "Baile Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Saoirbheir",
+                }
+            }
+        },
+        {
+            "title": "Obelisk Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Saoirbheir",
+                },
+                "puzzle_1": {
+                    "name": "Sùil Horus",
+                },
+                "puzzle_2": {
+                    "name": "Sgarab",
+                },
+                "puzzle_3": {
+                    "name": "Ròn Anubis",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Naomh-chomhnaidh an Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Òir",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Sgarab",
+                }
+            }
+        },
+        {
+            "title": "Mèinnean Natla",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Tadhail",
+                },
+                "puzzle_2": {
+                    "name": "Iuchair Pioramaid",
+                }
+            }
+        },
+        {
+            "title": "Atlantais",
+        },
+        {
+            "title": "Am Pioramaid Mhòr",
+        },
+        {
+            "title": "Neach-àite",
+        },
+        {
+            "title": "Neach-àite",
+        },
+        {
+            "title": "Neach-àite",
+        },
+        {
+            "title": "Neach-àite",
+        },
+        {
+            "title": "Tiotal",
+        },
+        {
+            "title": "Ionad Làithreach",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Baile Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Airgid",
+                },
+                "puzzle_1": {
+                    "name": "Ìomhaigh Òir",
+                }
+            }
+        },
+        {
+            "title": "Gleann Caillte",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Fiaclan Inneil",
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- ПУСТОЙ СЛОТ %d -",
+        },
+        "stats": {
+            "ammo": "Попадания/выстрелы",
+            "ammo_hits": "\\{review}ПОПАДАНИЯ",
+            "ammo_used": "\\{review}ИСПОЛЬЗОВАННЫЕ ПАТРОНЫ",
+            "deaths": "Смертей",
+            "distance_travelled": "Пройденное расстояние",
+            "kills": "Убито",
+            "level": "Уровень",
+            "medipacks_used": "Использовано аптечек",
+            "none": "\\{review}НЕТ",
+            "pickups": "Предметы",
+            "secrets": "Секреты",
+            "time_taken": "Время",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Позволяет генерировать динамическое освещение для выстрелов и взрывов, аналогично TR2+.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Исправляет изначальные проблемы в Цистерне и Гробнице Тихокана, из-за которых спрайты растений в водных зонах не анимировались.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Большая аптечка",
+        },
+        "small_medipack": {
+            "name": "Маленькая аптечка",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cutscene 1",
+        },
+        {
+            "title": "Cutscene 2",
+        },
+        {
+            "title": "Cutscene 3",
+        },
+        {
+            "title": "Cutscene 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Дом Лары",
+        },
+        {
+            "title": "Пещеры",
+        },
+        {
+            "title": "Город Вилкабамба",
+            "objects": {
+                "key_1": {
+                    "name": "Серебряный ключ",
+                },
+                "puzzle_1": {
+                    "name": "Золотой идол",
+                }
+            }
+        },
+        {
+            "title": "Затерянная долина",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Шестерёнка",
+                }
+            }
+        },
+        {
+            "title": "Гробница Куалопека",
+        },
+        {
+            "title": "Монастырь св. Франциска",
+            "objects": {
+                "key_1": {
+                    "name": "Ключ Нептуна",
+                },
+                "key_2": {
+                    "name": "Ключ Атласа",
+                },
+                "key_3": {
+                    "name": "Ключ Дамокла",
+                },
+                "key_4": {
+                    "name": "Ключ Тора",
+                }
+            }
+        },
+        {
+            "title": "Колизей",
+            "objects": {
+                "key_1": {
+                    "name": "Ржавый ключ",
+                }
+            }
+        },
+        {
+            "title": "Дворец Мидаса",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Золотой слиток",
+                }
+            }
+        },
+        {
+            "title": "Цистерна",
+            "objects": {
+                "key_1": {
+                    "name": "Золотой ключ",
+                },
+                "key_2": {
+                    "name": "Серебряный ключ",
+                },
+                "key_3": {
+                    "name": "Ржавый ключ",
+                }
+            }
+        },
+        {
+            "title": "Гробница Тихокана",
+            "objects": {
+                "key_1": {
+                    "name": "Золотой ключ",
+                },
+                "key_2": {
+                    "name": "Ржавый ключ",
+                },
+                "key_3": {
+                    "name": "Ржавый ключ",
+                }
+            }
+        },
+        {
+            "title": "Город Хамун",
+            "objects": {
+                "key_1": {
+                    "name": "Сапфировый ключ",
+                }
+            }
+        },
+        {
+            "title": "Обелиск Хамун",
+            "objects": {
+                "key_1": {
+                    "name": "Сапфировый ключ",
+                },
+                "puzzle_1": {
+                    "name": "Глаз Гора",
+                },
+                "puzzle_2": {
+                    "name": "Скарабей",
+                },
+                "puzzle_3": {
+                    "name": "Печать Анубиса",
+                },
+                "puzzle_4": {
+                    "name": "Анк",
+                }
+            }
+        },
+        {
+            "title": "Святилище Наследия",
+            "objects": {
+                "key_1": {
+                    "name": "Золотой ключ",
+                },
+                "puzzle_1": {
+                    "name": "Анк",
+                },
+                "puzzle_2": {
+                    "name": "Скарабей",
+                }
+            }
+        },
+        {
+            "title": "Раскопки Натлы",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Предохранитель",
+                },
+                "puzzle_2": {
+                    "name": "Ключ к пирамиде",
+                }
+            }
+        },
+        {
+            "title": "Атлантида",
+        },
+        {
+            "title": "Великая пирамида",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Dummy",
+        },
+        {
+            "title": "Title",
+        },
+        {
+            "title": "Current Position",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Город Вилкабамба",
+            "objects": {
+                "key_1": {
+                    "name": "Серебряный ключ",
+                },
+                "puzzle_1": {
+                    "name": "Золотой идол",
+                }
+            }
+        },
+        {
+            "title": "Затерянная долина",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Шестерёнка",
+                }
+            }
+        }
+    ]
+}

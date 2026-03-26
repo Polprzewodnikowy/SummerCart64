@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Casa di Lara",
+        },
+        {
+            "title": "La Guerra Fredda",
+            "objects": {
+                "tiger": {
+                    "name": "Leopardo delle Nevi",
+                },
+                "key_1": {
+                    "name": "Chiave della Guardiola",
+                },
+                "key_2": {
+                    "name": "Chiave del Tunnel \"B\"",
+                }
+            }
+        },
+        {
+            "title": "L'Oro degli Sciocchi",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave Magnetica 1",
+                },
+                "key_4": {
+                    "name": "Chiave Magnetica 2",
+                },
+                "puzzle_1": {
+                    "name": "Circuito d'Avvio",
+                }
+            }
+        },
+        {
+            "title": "Crogiolo degli Dèi",
+            "objects": {
+                "big_spider": {
+                    "name": "Orso Polare",
+                },
+                "spider": {
+                    "name": "Lupo",
+                },
+                "puzzle_1": {
+                    "name": "Maschera di Tornarsuk",
+                },
+                "puzzle_2": {
+                    "name": "Pepita d'Oro",
+                }
+            }
+        },
+        {
+            "title": "Il Regno",
+            "objects": {
+                "tiger": {
+                    "name": "Leopardo delle Nevi",
+                },
+                "puzzle_1": {
+                    "name": "Maschera di Tornarsuk",
+                }
+            }
+        },
+        {
+            "title": "Incubo a Las Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave dell'Hotel",
+                },
+                "puzzle_1": {
+                    "name": "Giunto per Ascensore",
+                },
+                "puzzle_2": {
+                    "name": "Circuito della Porta",
+                }
+            }
+        }
+    ]
+}

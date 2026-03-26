@@ -1,0 +1,31 @@
+X_UI_CFG(visuals.fog_start,            .min_value = 1, .max_value = 100, .delta_slow = 1, .delta_fast = 10)
+X_UI_CFG(visuals.fog_end,              .min_value = 1, .max_value = 100, .delta_slow = 1, .delta_fast = 10)
+X_UI_CFG(visuals.fog_transparency)
+X_UI_CFG_RGB888(visuals.fog_color,     .custom_handler = { .format_value = UI_Settings_ColorEditor_FormatValue, .can_change_value = UI_Settings_ColorEditor_CanChangeValue, .is_available = UI_Settings_FogColor_IsAvailable })
+
+X_UI_CFG_RGB888(visuals.water_color,   .custom_handler = { .format_value = UI_Settings_ColorEditor_FormatValue, .can_change_value = UI_Settings_ColorEditor_CanChangeValue })
+
+X_UI_CFG_ENUM(visuals.camera_mode,     .misc = UI_Settings_CameraModeEnumEntries)
+X_UI_CFG(visuals.enable_glide_cameras)
+
+X_UI_CFG(visuals.fov,                  .min_value = 30, .max_value = 150, .delta_slow = 1, .delta_fast = 5)
+
+X_UI_CFG(visuals.enable_reflections)
+X_UI_CFG(visuals.enable_skybox)
+X_UI_CFG(visuals.enable_weather)
+X_UI_CFG(visuals.enable_footprints)
+X_UI_CFG(visuals.enable_responsive_mesh_tint)
+X_UI_CFG_DYN_ENUM(visuals.lara_outfit)
+X_UI_CFG(visuals.enable_braid)
+X_UI_CFG_ENUM(visuals.sunglasses_mode, .misc = UI_Settings_SunglassesModeEnumEntries)
+X_UI_CFG(visuals.enable_breeze,        .custom_handler = { .is_available = UI_Settings_EnableBreeze_IsAvailable })
+X_UI_CFG(visuals.enable_3d_pickups)
+X_UI_CFG(gameplay.enable_pickup_aids)
+
+X_UI_CFG(visuals.enable_ps1_crystals,  .custom_handler = { .is_available = UI_Settings_EnablePS1Crystals_IsAvailable })
+
+X_UI_CFG_ENUM(visuals.shadow_type,     .misc = UI_Settings_ShadowTypeEnumEntries, .custom_handler = { .is_enum_value_available = UI_Settings_ShadowType_IsEnumValueAvailable })
+X_UI_CFG(visuals.enable_gun_lighting)
+X_UI_CFG(visuals.enable_fire_lighting)
+
+X_UI_CFG(visuals.enable_shotgun_flash)

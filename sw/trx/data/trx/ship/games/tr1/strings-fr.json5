@@ -1,0 +1,242 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "misc": {
+            "empty_slot_fmt": "- EMPLACEMENT VIDE -",
+        },
+        "stats": {
+            "ammo": "TIRS RÉUSSIS/EFFECTUÉS",
+            "ammo_hits": "\\{review}COUPS",
+            "ammo_used": "\\{review}MUNITIONS UTILISÉES",
+            "deaths": "MORTS",
+            "distance_travelled": "DISTANCE PARCOURUE",
+            "kills": "ENNEMIS TUÉS",
+            "level": "\\{review}NIVEAU",
+            "medipacks_used": "TROUSSES DE SOIN UTILISÉES",
+            "none": "\\{review}AUCUN",
+            "pickups": "OBJETS RAMASSÉS",
+            "secrets": "SECRETS",
+            "time_taken": "TEMPS ÉCOULÉ",
+        }
+    },
+    "settings": {
+        "visuals.enable_gun_lighting": {
+            "description": "Génère un éclairage dynamique pour les coups de feu et les explosions, comme apparu depuis TR2.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Corrige le fait que les sprites des végétations ne s'animent pas dans les zones aquatiques de La Citerne et de la Tombe de Tihocan.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Grande trousse de soins",
+        },
+        "small_medipack": {
+            "name": "Petite trousse de soins",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cinématique 1",
+        },
+        {
+            "title": "Cinématique 2",
+        },
+        {
+            "title": "Cinématique 3",
+        },
+        {
+            "title": "Cinématique 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Demeure de Lara",
+        },
+        {
+            "title": "Cavernes",
+        },
+        {
+            "title": "Cité de Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Clé en Argent",
+                },
+                "puzzle_1": {
+                    "name": "Idole d'Or",
+                }
+            }
+        },
+        {
+            "title": "La Vallée Perdue",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Roue dentée",
+                }
+            }
+        },
+        {
+            "title": "Tombe de Qualopec",
+        },
+        {
+            "title": "Monument St Francis",
+            "objects": {
+                "key_1": {
+                    "name": "Clé de Neptune",
+                },
+                "key_2": {
+                    "name": "Clé d'Atlas",
+                },
+                "key_3": {
+                    "name": "Clé de Damoclès",
+                },
+                "key_4": {
+                    "name": "Clé de Thor",
+                }
+            }
+        },
+        {
+            "title": "Colosseum",
+            "objects": {
+                "key_1": {
+                    "name": "Clé Rouillée",
+                }
+            }
+        },
+        {
+            "title": "Palais de Midas",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Lingot d'Or",
+                }
+            }
+        },
+        {
+            "title": "La Citerne",
+            "objects": {
+                "key_1": {
+                    "name": "Clé en Or",
+                },
+                "key_2": {
+                    "name": "Clé en Argent",
+                },
+                "key_3": {
+                    "name": "Clé Rouillée",
+                }
+            }
+        },
+        {
+            "title": "Tombe de Tihocan",
+            "objects": {
+                "key_1": {
+                    "name": "Clé en Or",
+                },
+                "key_2": {
+                    "name": "Clé Rouillée",
+                },
+                "key_3": {
+                    "name": "Clé Rouillée",
+                }
+            }
+        },
+        {
+            "title": "Cité de Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Clé de Saphir",
+                }
+            }
+        },
+        {
+            "title": "Obélisque de Khamoon",
+            "objects": {
+                "key_1": {
+                    "name": "Clé de Saphir",
+                },
+                "puzzle_1": {
+                    "name": "Œil d'Horus",
+                },
+                "puzzle_2": {
+                    "name": "Scarabée",
+                },
+                "puzzle_3": {
+                    "name": "Sceau d'Anubis",
+                },
+                "puzzle_4": {
+                    "name": "Ankh",
+                }
+            }
+        },
+        {
+            "title": "Sanctuaire du Scion",
+            "objects": {
+                "key_1": {
+                    "name": "Clé en Or",
+                },
+                "puzzle_1": {
+                    "name": "Ankh",
+                },
+                "puzzle_2": {
+                    "name": "Scarabée",
+                }
+            }
+        },
+        {
+            "title": "Mines de Natla",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Fusible",
+                },
+                "puzzle_2": {
+                    "name": "Clé de la Pyramide",
+                }
+            }
+        },
+        {
+            "title": "Atlantide",
+        },
+        {
+            "title": "La Grande Pyramide",
+        },
+        {
+            "title": "Réservé",
+        },
+        {
+            "title": "Réservé",
+        },
+        {
+            "title": "Réservé",
+        },
+        {
+            "title": "Réservé",
+        },
+        {
+            "title": "Titre",
+        },
+        {
+            "title": "Position Actuelle",
+        }
+    ],
+    "demos": [
+        {
+            "title": "Cité de Vilcabamba",
+            "objects": {
+                "key_1": {
+                    "name": "Clé en Argent",
+                },
+                "puzzle_1": {
+                    "name": "Idole d'Or",
+                }
+            }
+        },
+        {
+            "title": "Vallée perdue",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Roue dentée",
+                }
+            }
+        }
+    ]
+}

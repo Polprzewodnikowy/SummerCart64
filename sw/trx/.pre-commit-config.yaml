@@ -1,0 +1,48 @@
+repos:
+- repo: local
+  hooks:
+  - id: clang-format
+    name: clang-format
+    entry: clang-format
+    args: ["-style=file", "-i"]
+    language: system
+    files: \.[ch](pp)?$
+
+  - id: additional-lint
+    name: Run additional linters
+    entry: tools/additional_lint
+    language: python
+    stages: [pre-commit]
+    additional_dependencies:
+      - pyjson5
+      - jsonschema
+
+  - id: additional-lint -a
+    name: Run additional linters (repo-wide)
+    entry: tools/additional_lint -a
+    language: python
+    stages: [pre-commit]
+    pass_filenames: false
+    additional_dependencies:
+      - pyjson5
+      - jsonschema
+
+  - id: imports
+    name: imports
+    entry: tools/sort_imports
+    language: system
+    files: \.[ch](pp)?$
+
+  - id: update-game-strings
+    name: Update game strings to match source code
+    entry: tools/update_game_strings
+    language: python
+    stages: [pre-commit]
+    pass_filenames: false
+    additional_dependencies:
+      - pyjson5
+
+- repo: https://github.com/JohnnyMorganz/StyLua
+  rev: v2.3.0
+  hooks:
+    - id: stylua-github

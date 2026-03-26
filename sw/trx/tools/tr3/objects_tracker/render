@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+
+import argparse
+import csv
+import json
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from typing import Any
+
+
+class Status(StrEnum):
+    NOT_IMPLEMENTED = "not implemented"
+    PARTIALLY_IMPLEMENTED = "partially implemented"
+    IN_PROGRESS = "in progress"
+    FULLY_IMPLEMENTED = "fully implemented"
+
+
+REPO_DIR = Path(__file__).parents[3]
+
+type Level = dict[str, Any]
+type Catalog = dict[int, str]
+type SupportStatus = dict[str, tuple[Status, str | None]]
+
+
+@dataclass(frozen=True, slots=True)
+class SvgSquare:
+    title: str
+    # Absolute pixel position.
+    x: int
+    y: int
+    size: int = 10
+
+
+def load_catalog(path: Path) -> Catalog:
+    with path.open(newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        return {int(row[0]): row[1].strip() for row in reader if row}
+
+
+def load_support_status(path: Path) -> SupportStatus:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    out: SupportStatus = {}
+    for name, payload in raw.items():
+        status = Status(payload["status"])
+        note = payload.get("notes") or payload.get("todo")
+        out[str(name)] = (status, note)
+    return out
+
+
+def get_object_name(catalog: Catalog, object_id: int) -> str:
+    return catalog.get(object_id, "unknown object")
+
+def build_object_tooltip(
+    *,
+    level_id: int,
+    level: Level,
+    object_id: int,
+    object_name: str,
+    status: Status,
+    todo: str | None,
+    items: list[Level],
+) -> str:
+    extra = f" – note: {todo}" if todo else ""
+    header = (
+        f"Level #{level_id} ({level['title']})\n"
+        f"Object #{object_id} ({object_name})\n"
+        f"Status: {status!s}{extra}"
+    )
+
+    locs: list[str] = []
+    for item in items:
+        x1024 = item["x"] / 1024.0
+        y1024 = item["y"] / 1024.0
+        z1024 = item["z"] / 1024.0
+        room_num = int(item["room_num"])
+        locs.append(f"({x1024:.1f}, {y1024:.1f}, {z1024:.1f}) room {room_num}")
+    locs = sorted(set(locs))
+
+    if not locs:
+        return header
+
+    lines = [header, "Locations:"]
+    for loc in locs[:5]:
+        lines.append(f"- {loc}")
+    if len(locs) > 5:
+        lines.append(f"- +{len(locs) - 5} more")
+    return "\n".join(lines)
+
+
+def build_level_summary_tooltip(
+    *,
+    level_id: int,
+    level: Level,
+    stats: str,
+) -> str:
+    return f"Level #{level_id} ({level['title']})\nSummary: {stats}"
+
+
+def parse_objects_dump(
+    dump_path: Path,
+) -> tuple[list[Level], list[int], dict[int, dict[int, list[Level]]]]:
+    # `objects_dump.json` is a list of levels, each having "items".
+    dump = json.loads(dump_path.read_text(encoding="utf-8"))
+
+    used_object_ids: set[int] = set()
+    data: dict[int, dict[int, list[Level]]] = {}
+    for lvl_idx, level in enumerate(dump):
+        items = level.get("items") or []
+        if not items:
+            continue
+        for item in items:
+            obj_id = int(item["object_id"])
+            used_object_ids.add(obj_id)
+            data.setdefault(obj_id, {}).setdefault(lvl_idx, []).append(item)
+
+    object_ids = sorted(used_object_ids)
+    return dump, object_ids, data
+
+
+def make_todo_list(
+    catalog: Catalog,
+    support_status: SupportStatus,
+    levels: list[Level],
+) -> str:
+    lines: list[str] = []
+    prev_zone_num: int | None = None
+
+    for level in levels:
+        items = level.get("items") or []
+        if not items:
+            continue
+
+        object_counts: dict[str, int] = {}
+        for item in items:
+            object_id = int(item["object_id"])
+            object_name = get_object_name(catalog, object_id)
+            object_counts[object_name] = object_counts.get(object_name, 0) + 1
+
+        level_rows: list[str] = []
+        sorted_objects = sorted(
+            object_counts.items(),
+            key=lambda pair: (-pair[1], pair[0]),
+        )
+        for object_name, count in sorted_objects:
+            status, note = support_status.get(
+                object_name, (Status.NOT_IMPLEMENTED, None)
+            )
+            if status == Status.FULLY_IMPLEMENTED:
+                continue
+
+            label = "instance" if count == 1 else "instances"
+            suffix = f", {note}" if note else ""
+            level_rows.append(
+                f"\t🟨 `{object_name}` ({count} {label}{suffix})"
+            )
+
+        if not level_rows:
+            continue
+
+        zone_num = int(level.get("zone_num", -1))
+        if prev_zone_num is not None and zone_num != prev_zone_num:
+            lines.append("")
+
+        title = str(level.get("title", "Unknown level"))
+        lines.append(f"🟨 {title}\t")
+        lines.extend(level_rows)
+        prev_zone_num = zone_num
+
+    return "\n".join(lines)
+
+
+def make_svg(
+    catalog: Catalog,
+    support_status: SupportStatus,
+    levels: list[Level],
+    object_ids: list[int],
+    data: dict[int, dict[int, list[Level]]],
+) -> str:
+    padding = 1
+    squares: list[tuple[SvgSquare, str]] = []
+
+    status_colors: dict[tuple[bool, Status], str] = {
+        (False, Status.NOT_IMPLEMENTED): "#fee",
+        (False, Status.PARTIALLY_IMPLEMENTED): "#ffc",
+        (False, Status.IN_PROGRESS): "#cff",
+        (False, Status.FULLY_IMPLEMENTED): "#dfd",
+        (True, Status.NOT_IMPLEMENTED): "tomato",
+        (True, Status.IN_PROGRESS): "deepskyblue",
+        (True, Status.PARTIALLY_IMPLEMENTED): "gold",
+        (True, Status.FULLY_IMPLEMENTED): "limegreen",
+    }
+
+    status_order = list(Status)
+    status_rank = {s: i for i, s in enumerate(status_order)}
+
+    y = 0
+    prev_lvl: Level | None = None
+    for lvl_id, lvl in enumerate(levels):
+        if prev_lvl and lvl["zone_num"] != prev_lvl["zone_num"]:
+            y += 4
+
+        row_squares: list[tuple[SvgSquare, str]] = []
+        x = 0
+        row_statuses: list[Status] = []
+        for obj_id in object_ids:
+            obj_name = get_object_name(catalog, obj_id)
+            items = data.get(obj_id, {}).get(lvl_id, [])
+            present = bool(items)
+            status, todo = support_status.get(
+                obj_name, (Status.NOT_IMPLEMENTED, None)
+            )
+            tooltip = ""
+            if present:
+                row_statuses.append(status)
+                tooltip = build_object_tooltip(
+                    level_id=lvl_id,
+                    level=lvl,
+                    object_id=obj_id,
+                    object_name=obj_name,
+                    status=status,
+                    todo=todo,
+                    items=items,
+                )
+            color = status_colors[(present, status)]
+            square = SvgSquare(title=tooltip, x=x, y=y)
+            row_squares.append((square, color))
+            x += square.size + padding
+
+        if row_statuses:
+            lowest = min(
+                row_statuses, key=lambda s: status_rank.get(s, float("inf"))
+            )
+            counts = {s: row_statuses.count(s) for s in status_order}
+            stats = ", ".join(f"{s!s}: {n}" for s, n in counts.items() if n)
+            tooltip = build_level_summary_tooltip(
+                level_id=lvl_id,
+                level=lvl,
+                stats=stats,
+            )
+            summary_color = status_colors[(True, lowest)]
+        else:
+            tooltip = build_level_summary_tooltip(
+                level_id=lvl_id,
+                level=lvl,
+                stats="no items",
+            )
+            summary_color = status_colors[(False, Status.NOT_IMPLEMENTED)]
+
+        # Summary square goes immediately after the last object square.
+        x += 4
+        summary_square = SvgSquare(title=tooltip, x=x, y=y)
+        row_squares.append((summary_square, summary_color))
+        x_end = summary_square.x + summary_square.size
+
+        squares.extend(row_squares)
+
+        row_height = max(square.size for square, _ in row_squares)
+        y += row_height + padding
+        prev_lvl = lvl
+
+    width = 0
+    height = 0
+    if squares:
+        width = max(square.x + square.size for square, _ in squares)
+        height = max(square.y + square.size for square, _ in squares)
+
+    svg_parts: list[str] = [
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{width}' height='{height}' shape-rendering='crispEdges'>"
+    ]
+    for square, color in squares:
+        svg_parts.append(
+            f"<rect x='{square.x}' y='{square.y}' "
+            f"width='{square.size}' height='{square.size}' fill='{color}'>"
+            f"<title>{square.title}</title></rect>"
+        )
+    svg_parts.append("</svg>")
+    return "\n".join(svg_parts)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate SVG grid of object IDs per level."
+    )
+    parser.add_argument(
+        "--dump",
+        type=Path,
+        default=Path(__file__).with_name("objects_dump.json"),
+        help="Path to objects_dump.json from read_levels.",
+    )
+    parser.add_argument(
+        "--support",
+        type=Path,
+        default=Path(__file__).with_name("objects_support.json"),
+        help="Path to objects_support.json (support status mapping).",
+    )
+    parser.add_argument(
+        "--todo",
+        action="store_true",
+        help="Output todo list for non-fully-implemented objects per level.",
+    )
+    args = parser.parse_args()
+
+    catalog = load_catalog(REPO_DIR / "data/tr3/ship/cfg/catalog_objects.csv")
+    support_status = load_support_status(args.support)
+    levels, object_ids, data = parse_objects_dump(args.dump)
+    if args.todo:
+        print(make_todo_list(catalog, support_status, levels))
+        return
+    svg = make_svg(catalog, support_status, levels, object_ids, data)
+    print(svg)
+
+
+if __name__ == "__main__":
+    main()

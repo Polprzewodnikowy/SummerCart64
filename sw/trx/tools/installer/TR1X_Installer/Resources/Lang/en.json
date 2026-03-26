@@ -1,0 +1,12 @@
+{
+  "Controls": {
+    "window_title_main": "TR1X Installer",
+    "step_source_content": "TR1X requires original game files to run.\nPlease choose the source location where to install the data files from.\nIf you're upgrading an existing installation, please choose TR1X.",
+    "step_settings_music_content": "Neither the Steam nor GOG versions of the game ship with the full soundtrack found on the PlayStation or Saturn retail releases. This option lets you download the missing tracks automatically (164 MB). The legality of these files is disputable; the most legal way to import the music to PC is to rip the audio tracks yourself from a physical PlayStation or Saturn disc.",
+    "step_settings_expansion_heading": "Download Unfinished Business expansion pack",
+    "step_settings_expansion_content": "The Unfinished Business expansion pack was made freeware. However, the Steam and GOG versions do not ship it. This option lets you download the expansion files automatically (6 MB).",
+    "step_settings_expansion_music": "Fan-made edition (includes music triggers)",
+    "step_settings_expansion_vanilla": "Original edition (does not include music triggers)",
+    "step_settings_saves_content": "Imports existing savegame files. Only TombATI and TR1X savegame format is supported at this time."
+  }
+}

@@ -1,0 +1,339 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "settings": {
+        "gameplay.fix_bear_ai": {
+            "description": "Naprawia atak niedźwiedzia w dodatku Złota Maska, aby nie chybiał Lary.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Przywraca brakującą animację glonów w podwodnych poziomach.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Duża apteczka",
+        },
+        "small_medipack": {
+            "name": "Mała apteczka",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Przerywnik 1",
+        },
+        {
+            "title": "Przerywnik 2",
+        },
+        {
+            "title": "Przerywnik 3",
+        },
+        {
+            "title": "Przerywnik 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Dom Lary",
+        },
+        {
+            "title": "Wielki Mur",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do strażnicy",
+                },
+                "key_2": {
+                    "name": "Zardzewiały klucz",
+                }
+            }
+        },
+        {
+            "title": "Wenecja",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do hangaru łodzi",
+                },
+                "key_2": {
+                    "name": "Stalowy klucz",
+                },
+                "key_3": {
+                    "name": "Żelazny klucz",
+                }
+            }
+        },
+        {
+            "title": "Kryjówka Bartoliego",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do biblioteki",
+                },
+                "key_2": {
+                    "name": "Klucz do detonatora",
+                }
+            }
+        },
+        {
+            "title": "Opera",
+            "objects": {
+                "key_1": {
+                    "name": "Ozdobny klucz",
+                },
+                "puzzle_1": {
+                    "name": "Skrzynka przekaźnikowa",
+                },
+                "puzzle_2": {
+                    "name": "Układ elektroniczny",
+                }
+            }
+        },
+        {
+            "title": "Platforma wiertnicza",
+            "objects": {
+                "key_1": {
+                    "name": "Czerwona karta dostępu",
+                },
+                "key_2": {
+                    "name": "Żółta karta dostępu",
+                },
+                "key_3": {
+                    "name": "Zielona karta dostępu",
+                }
+            }
+        },
+        {
+            "title": "Strefa nurkowania",
+            "objects": {
+                "key_1": {
+                    "name": "Czerwona karta dostępu",
+                },
+                "key_4": {
+                    "name": "Niebieska karta dostępu",
+                },
+                "puzzle_1": {
+                    "name": "Chip maszynowy",
+                }
+            }
+        },
+        {
+            "title": "40 sążni",
+        },
+        {
+            "title": "Wrak statku Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do łazienki",
+                },
+                "key_2": {
+                    "name": "Zardzewiały klucz",
+                },
+                "key_3": {
+                    "name": "Klucz do kajuty",
+                },
+                "puzzle_1": {
+                    "name": "Wyłącznik obwodu",
+                }
+            }
+        },
+        {
+            "title": "Strefa pasażerska",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do teatru",
+                },
+                "key_2": {
+                    "name": "Zardzewiały klucz",
+                }
+            }
+        },
+        {
+            "title": "Pokład",
+            "objects": {
+                "key_2": {
+                    "name": "Klucz do zamka rufowego",
+                },
+                "key_3": {
+                    "name": "Klucz do magazynu",
+                },
+                "key_4": {
+                    "name": "Klucz do kajuty",
+                },
+                "puzzle_4": {
+                    "name": "Seraf",
+                }
+            }
+        },
+        {
+            "title": "Pogórze Tybetu",
+            "objects": {
+                "tiger": {
+                    "name": "Lampart śnieżny",
+                },
+                "key_1": {
+                    "name": "Klucz do zwodzonego mostu",
+                },
+                "key_2": {
+                    "name": "Klucz do chaty",
+                },
+                "puzzle_4": {
+                    "name": "Seraf",
+                }
+            }
+        },
+        {
+            "title": "Klasztor Barkhang",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do skarbca",
+                },
+                "key_2": {
+                    "name": "Klucz do zapadni",
+                },
+                "key_3": {
+                    "name": "Klucz do wyjścia na dach",
+                },
+                "key_4": {
+                    "name": "Klucz do głównej sali",
+                },
+                "puzzle_1": {
+                    "name": "Młynek modlitewny",
+                },
+                "puzzle_2": {
+                    "name": "Kamień szlachetny",
+                },
+                "puzzle_4": {
+                    "name": "Seraf",
+                }
+            }
+        },
+        {
+            "title": "Katakumby Talionu",
+            "objects": {
+                "tiger": {
+                    "name": "Śnieżny lampart",
+                },
+                "pickup_1": {
+                    "name": "Pałka do gongu",
+                },
+                "puzzle_1": {
+                    "name": "Tybetańska maska",
+                }
+            }
+        },
+        {
+            "title": "Pałac lodowy",
+            "objects": {
+                "tiger": {
+                    "name": "Biały tygrys",
+                },
+                "key_2": {
+                    "name": "Pałka do gongu",
+                },
+                "pickup_2": {
+                    "name": "Talion",
+                },
+                "puzzle_1": {
+                    "name": "Tybetańska maska",
+                }
+            }
+        },
+        {
+            "title": "Świątynia Xian",
+            "objects": {
+                "key_2": {
+                    "name": "Złoty klucz",
+                },
+                "key_3": {
+                    "name": "Srebrny klucz",
+                },
+                "key_4": {
+                    "name": "Klucz do głównej komnaty",
+                },
+                "puzzle_1": {
+                    "name": "Smocza pieczęć",
+                }
+            }
+        },
+        {
+            "title": "Podniebne wyspy",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mistyczna tabliczka",
+                },
+                "puzzle_2": {
+                    "name": "Mistyczna tabliczka",
+                }
+            }
+        },
+        {
+            "title": "Legowisko smoka",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mistyczna tabliczka",
+                },
+                "puzzle_2": {
+                    "name": "Sztylet Xian",
+                }
+            }
+        },
+        {
+            "title": "Dom, słodki dom",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do szafki na broń",
+                },
+                "puzzle_1": {
+                    "name": "Sztylet Xian",
+                }
+            }
+        }
+    ],
+    "demos": [
+        {
+            "title": "Wenecja",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do hangaru łodzi",
+                },
+                "key_2": {
+                    "name": "Stalowy klucz",
+                },
+                "key_3": {
+                    "name": "Żelazny klucz",
+                }
+            }
+        },
+        {
+            "title": "Wrak statku Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do łazienki",
+                },
+                "key_2": {
+                    "name": "Zardzewiały klucz",
+                },
+                "key_3": {
+                    "name": "Klucz do kajuty",
+                },
+                "puzzle_1": {
+                    "name": "Wyłącznik obwodu",
+                }
+            }
+        },
+        {
+            "title": "Pogórze Tybetu",
+            "objects": {
+                "tiger": {
+                    "name": "Lampart śnieżny",
+                },
+                "key_1": {
+                    "name": "Klucz do zwodzonego mostu",
+                },
+                "key_2": {
+                    "name": "Klucz do chaty",
+                },
+                "puzzle_4": {
+                    "name": "Seraf",
+                }
+            }
+        }
+    ]
+}

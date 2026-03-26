@@ -1,0 +1,44 @@
+name: Build lint image
+
+on:
+  push:
+    branches:
+      - main
+      - lint
+    paths:
+      - .github/docker/lint.Dockerfile
+      - .github/workflows/build_lint_image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build and push lint image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize repository owner
+        id: vars
+        run: echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push lint image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .github/docker/lint.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/trx-lint:latest
+            ghcr.io/${{ steps.vars.outputs.owner_lc }}/trx-lint:${{ github.sha }}

@@ -1,0 +1,82 @@
+#pragma once
+
+typedef enum {
+    GFLT_UNKNOWN = -1,
+    GFLT_TITLE,
+    GFLT_MAIN,
+    GFLT_CUTSCENES,
+    GFLT_DEMOS,
+    GFLT_NUMBER_OF,
+} GF_LEVEL_TABLE_TYPE;
+
+typedef enum {
+    // Genuine level types
+    GFL_TITLE,
+    GFL_NORMAL,
+    GFL_CUTSCENE,
+    GFL_DEMO,
+    GFL_GYM,
+    GFL_BONUS,
+
+    // Legacy level types to maintain savegame backwards compatibility.
+    // TODO: get rid of these.
+    GFL_DUMMY,
+    GFL_CURRENT,
+} GF_LEVEL_TYPE;
+
+typedef enum {
+    GFSC_NORMAL,
+    GFSC_SAVED,
+    GFSC_RESTART,
+    GFSC_SELECT,
+    GFSC_STORY,
+} GF_SEQUENCE_CONTEXT;
+
+typedef enum {
+    GF_NOOP = -1,
+    GF_START_GAME,
+    GF_START_CINE,
+    GF_START_FMV,
+    GF_START_DEMO,
+    GF_EXIT_TO_TITLE,
+    GF_LEVEL_COMPLETE,
+    GF_EXIT_GAME,
+    GF_SWITCH_MOD,
+    GF_START_SAVED_GAME,
+    GF_RESTART_GAME,
+    GF_SELECT_GAME,
+    GF_GLOBE_SELECT,
+    GF_STORY_SO_FAR,
+} GF_ACTION;
+
+typedef enum {
+    GFS_DISPLAY_PICTURE,
+    GFS_LOOP_GAME,
+    GFS_PLAY_CUTSCENE,
+    GFS_PLAY_FMV,
+    GFS_PLAY_MUSIC,
+    GFS_EXIT_TO_TITLE,
+    GFS_LEVEL_STATS,
+    GFS_TOTAL_STATS,
+    GFS_GLOBE_SELECT,
+    GFS_LEVEL_COMPLETE,
+    GFS_LOADING_SCREEN,
+    GFS_ADD_ITEM,
+    GFS_ADD_SECRET_REWARD,
+    GFS_REMOVE_WEAPONS,
+    GFS_REMOVE_AMMO,
+    GFS_REMOVE_MEDIPACKS,
+    GFS_REMOVE_FLARES,
+    GFS_REMOVE_SCIONS,
+    GFS_DISABLE_FLOOR,
+    GFS_SETUP_BACON_LARA,
+    GFS_SET_START_ANIM,
+    GFS_ENABLE_SUNSET,
+    GFS_NUMBER_OF,
+} GF_SEQUENCE_EVENT_TYPE;
+
+typedef enum {
+    GF_DEATH_TILE_LAVA,
+    GF_DEATH_TILE_RAPIDS,
+    GF_DEATH_TILE_ELECTRIC,
+} GF_DEATH_TILE;

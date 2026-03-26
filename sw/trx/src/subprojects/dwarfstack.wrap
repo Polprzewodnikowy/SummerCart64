@@ -1,0 +1,9 @@
+[wrap-file]
+directory = dwarfstack-2.2
+source_url = https://github.com/ssbssa/dwarfstack/archive/refs/tags/2.2.tar.gz
+source_filename = dwarfstack-2.2.tar.gz
+source_hash = 1fca1d12756941c4c932b50f9abe56a3756f012a1e93deef553e141a78cc2709
+patch_directory = dwarfstack
+
+[provide]
+dwarfstack = dwarfstack_dep

@@ -1,0 +1,1 @@
+../../common/glyphs/mapping_latin-1_supplement.txt

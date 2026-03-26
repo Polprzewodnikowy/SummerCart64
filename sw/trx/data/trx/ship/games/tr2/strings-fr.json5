@@ -1,0 +1,339 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "settings": {
+        "gameplay.fix_bear_ai": {
+            "description": "\\{review}Corrige l'attaque de patte d'ours dans The Golden Mask pour qu'elle ne manque pas Lara.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "\\{review}Corrige le fait que les sprites des végétations ne s'animent pas dans les zones aquatiques du 40 brasses, Épave du Maria Doria et Le Pont.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "\\{review}Grand medipack",
+        },
+        "small_medipack": {
+            "name": "\\{review}Petit medipack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "\\{review}Scène cinématique 1",
+        },
+        {
+            "title": "\\{review}Scène cinématique 2",
+        },
+        {
+            "title": "\\{review}Scène cinématique 3",
+        },
+        {
+            "title": "\\{review}Scène cinématique 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "\\{review}Demeure de Lara",
+        },
+        {
+            "title": "\\{review}La Grande Muraille",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de la Garde",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé Rouillée",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Venise",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé du Hangar à Bateaux",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé en Acier",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé en Fer",
+                }
+            }
+        },
+        {
+            "title": "\\{review}La cache de Bartoli",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de la Bibliothèque",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé de Détonateur",
+                }
+            }
+        },
+        {
+            "title": "\\{review}L’Opéra",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé Ornate",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Boîte de Relais",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Carte de Circuit",
+                }
+            }
+        },
+        {
+            "title": "\\{review}La plate-forme offshore",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Carte d'Accès Rouge",
+                },
+                "key_2": {
+                    "name": "\\{review}Carte d'Accès Jaune",
+                },
+                "key_3": {
+                    "name": "\\{review}Carte d'Accès Verte",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Zone de plongée",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Carte d'Accès Rouge",
+                },
+                "key_4": {
+                    "name": "\\{review}Carte d'Accès Bleue",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Puce de Machine",
+                }
+            }
+        },
+        {
+            "title": "\\{review}40 brasses",
+        },
+        {
+            "title": "\\{review}Épave du Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de la Salle de Repos",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé Rouillée",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé de Cabine",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Disjoncteur",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Quartiers d'habitation",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de Théâtre",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé Rouillée",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Le Pont",
+            "objects": {
+                "key_2": {
+                    "name": "\\{review}Clé de Poupe",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé de Stockage",
+                },
+                "key_4": {
+                    "name": "\\{review}Clé de Cabine",
+                },
+                "puzzle_4": {
+                    "name": "\\{review}Le Séraphin",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Les Contreforts tibétains",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Léopard des Neiges",
+                },
+                "key_1": {
+                    "name": "\\{review}Clé du Pont-Levis",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé de la Hutte",
+                },
+                "puzzle_4": {
+                    "name": "\\{review}Le Séraphin",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Le Monastère de Barkhang",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de Chambre Forte",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé de Trappe",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé des Toits",
+                },
+                "key_4": {
+                    "name": "\\{review}Clé du Hall Principal",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Moulins à Prière",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Gemmes",
+                },
+                "puzzle_4": {
+                    "name": "\\{review}Le Séraphin",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Les Catacombes du Talion",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Léopard des neiges",
+                },
+                "pickup_1": {
+                    "name": "\\{review}Marteau de gong",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Masque tibétain",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Le Palais de glace",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Tigre blanc",
+                },
+                "key_2": {
+                    "name": "\\{review}Marteau de gong",
+                },
+                "pickup_2": {
+                    "name": "\\{review}Talion",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Masque tibétain",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Le Temple de Xian",
+            "objects": {
+                "key_2": {
+                    "name": "\\{review}Clé en or",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé en argent",
+                },
+                "key_4": {
+                    "name": "\\{review}Clé de la chambre principale",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Le sceau du dragon",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Les Îles flottantes",
+            "objects": {
+                "puzzle_1": {
+                    "name": "\\{review}Plaque mystique",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Plaque mystique",
+                }
+            }
+        },
+        {
+            "title": "\\{review}L’Antre du dragon",
+            "objects": {
+                "puzzle_1": {
+                    "name": "\\{review}Plaque mystique",
+                },
+                "puzzle_2": {
+                    "name": "\\{review}Dague de Xian",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Home Sweet Home",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé du placard à armes",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Dague de Xian",
+                }
+            }
+        }
+    ],
+    "demos": [
+        {
+            "title": "\\{review}Venise",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé du bateau",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé en acier",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé en fer",
+                }
+            }
+        },
+        {
+            "title": "\\{review}É épave de la Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "\\{review}Clé de la salle de repos",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé rouillée",
+                },
+                "key_3": {
+                    "name": "\\{review}Clé de la cabane",
+                },
+                "puzzle_1": {
+                    "name": "\\{review}Disjoncteur",
+                }
+            }
+        },
+        {
+            "title": "\\{review}Contreforts tibétains",
+            "objects": {
+                "tiger": {
+                    "name": "\\{review}Léopard des neiges",
+                },
+                "key_1": {
+                    "name": "\\{review}Clé du pont-levis",
+                },
+                "key_2": {
+                    "name": "\\{review}Clé de la hutte",
+                },
+                "puzzle_4": {
+                    "name": "\\{review}Le séraphin",
+                }
+            }
+        }
+    ]
+}

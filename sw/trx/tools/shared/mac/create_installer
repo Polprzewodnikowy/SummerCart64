@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import subprocess
+from pathlib import Path
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=f"Create a DMG installer.")
+    parser.add_argument("-a", "--app-name")
+    parser.add_argument("-d", "--dmg-name", type=Path)
+    parser.add_argument("-i", "--icon-path", type=Path)
+    return parser.parse_args()
+
+
+def create_dmg(app_name: str, dmg_name: str, icon_path: Path, app_bundle_path: Path) -> None:
+    subprocess.run(
+        (
+            "create-dmg",
+            "--volname",
+            f"{app_name} Installer",
+            "--volicon",
+            str(icon_path),
+            "--window-pos",
+            "200",
+            "120",
+            "--window-size",
+            "800",
+            "400",
+            "--icon-size",
+            "100",
+            "--icon",
+            f"{app_name}.app",
+            "200",
+            "190",
+            "--hide-extension",
+            f"{app_name}.app",
+            "--app-drop-link",
+            "600",
+            "185",
+            str(dmg_name),
+            str(app_bundle_path),
+        )
+    )
+
+
+def main() -> None:
+    args = parse_args()
+
+    if args.dmg_name.is_file():
+        args.dmg_name.unlink()
+
+    app_bundle_path = Path(f"/tmp/{args.app_name}.app")
+    create_dmg(args.app_name, args.dmg_name, args.icon_path, app_bundle_path)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an improvement, enhancement, or new idea
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests can be lightweight.
+        A clear problem statement is more useful than a fully detailed spec.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+      description: Describe the idea in plain terms.
+      placeholder: I'd like photo mode to remember the last-used HUD visibility setting.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain the pain point, limitation, or workflow this would improve.
+      placeholder: Re-enabling the same setting every time is repetitive when taking several screenshots in a row.
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposed_behavior
+    attributes:
+      label: Extra context
+      description: Add mockups, examples, references, screenshots, videos, related issues, etc.
+      placeholder: Add any extra context here that helps.
+    validations:
+      required: false

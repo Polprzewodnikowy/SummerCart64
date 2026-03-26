@@ -1,0 +1,11 @@
+{
+  "Game": "TR2X",
+  "GoldGame": "TR2X - GM",
+  "GoldFileIdentifier": "title_gm.tr2",
+  "AllowExpansionTypeSelection": false,
+  "ShortcutTitle": "Tomb Raider II: Community Edition",
+  "GoldZips": {
+    "0": "trgm.zip",
+    "1": "trgm.zip"
+  }
+}

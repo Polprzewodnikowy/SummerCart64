@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+import argparse
+import io
+import json
+import struct
+from dataclasses import dataclass
+from enum import IntEnum
+from pathlib import Path
+
+
+def read_and_unpack(f, fmt):
+    size = struct.calcsize(fmt)
+    return struct.unpack(fmt, f.read(size))
+
+
+def read_string_array(f, count, xor_byte):
+    offsets = read_and_unpack(f, f"<{count}H")
+    (datasz,) = read_and_unpack(f, "<H")
+    data = bytearray(f.read(datasz))
+    if xor_byte:
+        for i in range(len(data)):
+            data[i] ^= xor_byte
+    out = []
+    for off in offsets:
+        end = data.find(b"\x00", off)
+        out.append(data[off:end].decode("ascii", "replace"))
+    return out
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file", type=Path, help="Path to TOMBPC.DAT")
+    return parser.parse_args()
+
+
+class GameFlowEvent(IntEnum):
+    PICTURE = 0
+    LIST_START = 1
+    LIST_END = 2
+    PLAY_FMV = 3
+    START_LEVEL = 4
+    CUTSCENE = 5
+    LEVEL_COMPLETE = 6
+    DEMO_PLAY = 7
+    JUMP_TO_SEQ = 8
+    END_SEQ = 9
+    SET_TRACK = 10
+    SUNSET = 11
+    LOADING_PIC = 12
+    DEADLY_WATER = 13
+    REMOVE_WEAPONS = 14
+    GAME_COMPLETE = 15
+    CUT_ANGLE = 16
+    NO_FLOOR = 17
+    ADD_TO_INV = 18
+    START_ANIM = 19
+    NUM_SECRETS = 20
+    KILL_TO_COMPLETE = 21
+    REMOVE_AMMO = 22
+
+
+@dataclass
+class GameScript:
+    version: int
+    description: str
+    cmd_init: int
+    cmd_title: int
+    cmd_death_in_demo: int
+    cmd_death_in_game: int
+    demo_time: int
+    cmd_demo_interrupt: int
+    cmd_demo_end: int
+
+    num_levels: int
+    num_chapter_screens: int
+    num_titles: int
+    num_fmvs: int
+    num_cutscenes: int
+    num_demos: int
+    title_sound: int
+    single_level: int
+    flags: int
+    secret_sound: int
+
+    level_names: list[str]
+    chapter_screen_names: list[str]
+    title_file_names: list[str]
+    fmv_file_names: list[str]
+    level_file_names: list[str]
+    cutscene_file_names: list[str]
+
+    script_offsets: list[int]
+    script_size: int
+    script_data: list[int]
+
+    demo_levels: list[int]
+
+    game_strings: list[str]
+    pc_strings: list[str]
+    puzzle_1_strings: list[str]
+    puzzle_2_strings: list[str]
+    puzzle_3_strings: list[str]
+    puzzle_4_strings: list[str]
+    pickup_1_strings: list[str]
+    pickup_2_strings: list[str]
+    key_1_strings: list[str]
+    key_2_strings: list[str]
+    key_3_strings: list[str]
+    key_4_strings: list[str]
+
+
+def parse_game_script(path: Path) -> GameScript:
+    f = io.BytesIO(path.read_bytes())
+
+    (version, desc_b, header_size) = read_and_unpack(f, "<I 256s H")
+    description = desc_b.decode("ascii", "ignore").rstrip("\x00")
+
+    (
+        cmd_init,
+        cmd_title,
+        cmd_death_in_demo,
+        cmd_death_in_game,
+        demo_time,
+        cmd_demo_interrupt,
+        cmd_demo_end,
+    ) = read_and_unpack(f, "<7i")
+
+    (
+        num_levels,
+        num_chapter_screens,
+        num_titles,
+        num_fmvs,
+        num_cutscenes,
+        num_demos,
+        title_sound,
+        single_level,
+        flags,
+        xor_byte,
+        secret_sound,
+    ) = read_and_unpack(f, "<36x HHHHHHhh 32x H 6x B x H 4x")
+
+    level_names = read_string_array(f, num_levels, xor_byte)
+    chapter_screen_names = read_string_array(f, num_chapter_screens, xor_byte)
+    title_file_names = read_string_array(f, num_titles, xor_byte)
+    fmv_file_names = read_string_array(f, num_fmvs, xor_byte)
+    level_file_names = read_string_array(f, num_levels, xor_byte)
+    cutscene_file_names = read_string_array(f, num_cutscenes, xor_byte)
+
+    script_offsets = read_and_unpack(f, f"<{num_levels + 1}H")
+    script_offsets = [offset // 2 for offset in script_offsets]
+    (script_size,) = read_and_unpack(f, "<H")
+    script_data = list(read_and_unpack(f, f"<{script_size // 2}H"))
+
+    demo_levels = read_and_unpack(f, f"<{num_demos}H")
+
+    (game_string_count,) = read_and_unpack(f, "<H")
+    game_strings = read_string_array(f, game_string_count, xor_byte)
+    pc_strings = read_string_array(f, 41, xor_byte)
+    puzzle_1_strings = read_string_array(f, num_levels, xor_byte)
+    puzzle_2_strings = read_string_array(f, num_levels, xor_byte)
+    puzzle_3_strings = read_string_array(f, num_levels, xor_byte)
+    puzzle_4_strings = read_string_array(f, num_levels, xor_byte)
+    pickup_1_strings = read_string_array(f, num_levels, xor_byte)
+    pickup_2_strings = read_string_array(f, num_levels, xor_byte)
+    key_1_strings = read_string_array(f, num_levels, xor_byte)
+    key_2_strings = read_string_array(f, num_levels, xor_byte)
+    key_3_strings = read_string_array(f, num_levels, xor_byte)
+    key_4_strings = read_string_array(f, num_levels, xor_byte)
+
+    return GameScript(
+        **{
+            k: v
+            for k, v in locals().items()
+            if k in GameScript.__dataclass_fields__
+        }
+    )
+
+
+def create_trx_strings(game_script: GameScript):
+    return {
+        "levels": [
+            {
+                "title": game_script.level_names[i],
+                "objects": {
+                    k: v
+                    for k, v, placeholder in [
+                        ("key_1", game_script.key_1_strings[i], "K1"),
+                        ("key_2", game_script.key_2_strings[i], "K2"),
+                        ("key_3", game_script.key_3_strings[i], "K3"),
+                        ("key_4", game_script.key_4_strings[i], "K4"),
+                        ("puzzle_1", game_script.puzzle_1_strings[i], "P1"),
+                        ("puzzle_2", game_script.puzzle_2_strings[i], "P2"),
+                        ("puzzle_3", game_script.puzzle_3_strings[i], "P3"),
+                        ("puzzle_4", game_script.puzzle_4_strings[i], "P4"),
+                        ("pickup_1", game_script.pickup_1_strings[i], "P1"),
+                        ("pickup_2", game_script.pickup_2_strings[i], "P2"),
+                    ]
+                    if v != placeholder
+                },
+            }
+            for i in range(game_script.num_levels)
+        ],
+    }
+
+
+def transform_script(script: list[int]):
+    while script:
+        opcode = script.pop(0)
+
+        match opcode:
+            case GameFlowEvent.PICTURE:
+                picture_num = script.pop(0)
+                yield {
+                    "type": "display_picture",
+                    "path": game_script.picture_strings[picture_num],
+                }
+
+            case GameFlowEvent.LIST_START | GameFlowEvent.LIST_END:
+                pass
+
+            case GameFlowEvent.PLAY_FMV:
+                fmv_id = script.pop(0)
+                yield {"type": "play_fmv", "fmv_id": fmv_id}
+
+            case GameFlowEvent.START_LEVEL:
+                level_id = script.pop(0)
+                yield {"type": "play_level", "level_id": level_id}
+
+            case GameFlowEvent.CUTSCENE:
+                cutscene_id = script.pop(0)
+                yield {"type": "play_level", "cutscene_id": cutscene_id}
+
+            case GameFlowEvent.LEVEL_COMPLETE:
+                yield {"type": "play_music", "music_track": 41}
+                yield {"type": "level_stats"}
+                yield {"type": "level_complete"}
+
+            case GameFlowEvent.DEMO_PLAY:
+                demo_num = script.pop(0)
+                yield {"type": "play_level", "level_id": demo_num}
+
+            case GameFlowEvent.JUMP_TO_SEQ:
+                seq_num = script.pop(0)
+                yield {"type": "jump_to_seq", "seq_num": seq_num}
+
+            case GameFlowEvent.SET_TRACK:
+                music_track = script.pop(0)
+                yield {"type": "set_music_track", "music_track": music_track}
+
+            case GameFlowEvent.SUNSET:
+                yield {"type": "enable_sunset"}
+
+            case GameFlowEvent.LOADING_PIC:
+                picture_num = script.pop(0)
+                yield {
+                    "type": "set_loading_pic",
+                    "path": game_script.picture_strings[picture_num],
+                }
+
+            case GameFlowEvent.DEADLY_WATER:
+                pass
+
+            case GameFlowEvent.REMOVE_WEAPONS:
+                yield {"type": "remove_weapons"}
+
+            case GameFlowEvent.GAME_COMPLETE:
+                yield {"type": "game_complete"}
+
+            case GameFlowEvent.CUT_ANGLE:
+                yield {"type": "set_cutscene_angle", "angle": script.pop(0)}
+
+            case GameFlowEvent.NO_FLOOR:
+                yield {"type": "disable_floor", "height": script.pop(0)}
+
+            case GameFlowEvent.ADD_TO_INV:
+                item = script.pop(0)
+                if item < 1000:
+                    yield {"type": "add_secret_reward", "item": item}
+                else:
+                    yield {"type": "give_item", "item": item - 1000}
+
+            case GameFlowEvent.START_ANIM:
+                yield {"type": "set_lara_start_anim", "anim": script.pop(0)}
+
+            case GameFlowEvent.NUM_SECRETS:
+                script.pop(0)
+                pass
+
+            case GameFlowEvent.KILL_TO_COMPLETE:
+                yield {"type": "enable_kill_to_complete"}
+
+            case GameFlowEvent.REMOVE_AMMO:
+                yield {"type": "remove_ammo"}
+
+            case GameFlowEvent.END_SEQ:
+                pass
+
+            case _:
+                pass
+
+
+def transform_path(path: str) -> str:
+    return path.replace("\\", "/").lower()
+
+
+def transform_command(command: int):
+    if command == 0x500:
+        return {"action": "exit_to_title"}
+    elif command in [0, -1]:
+        return {"action": "noop"}
+    raise NotImplementedError("not implemented")
+
+
+def create_trx_game_flow(game_script: GameScript):
+    return {
+        "cmd_init": transform_command(game_script.cmd_init),
+        "cmd_title": transform_command(game_script.cmd_title),
+        "cmd_death_in_demo": transform_command(game_script.cmd_death_in_demo),
+        "cmd_death_in_game": transform_command(game_script.cmd_death_in_game),
+        "cmd_demo_interrupt": transform_command(
+            game_script.cmd_demo_interrupt
+        ),
+        "cmd_demo_end": transform_command(game_script.cmd_demo_end),
+        "cheat_keys": True if game_script.flags & 4 else False,
+        "load_save_disabled": True if game_script.flags & 16 else False,
+        "play_any_level": True if game_script.flags & 1024 else False,
+        "lockout_option_ring": True if game_script.flags & 64 else False,
+        "demo_version": True if game_script.flags & 1 else False,
+        "single_level": game_script.single_level,
+        "demo_delay": game_script.demo_time / 30,
+        "title_track": game_script.title_sound,
+        "secret_track": game_script.secret_sound,
+        **(
+            {
+                "title": {
+                    "path": transform_path(game_script.title_file_names[0]),
+                    "sequence": list(
+                        transform_script(
+                            game_script.script_data[
+                                game_script.script_offsets[
+                                    0
+                                ] : game_script.script_offsets[1]
+                            ]
+                        )
+                    ),
+                }
+            }
+            if game_script.flags & 2 == 0
+            else {}
+        ),
+        "levels": [
+            {
+                "path": transform_path(game_script.level_file_names[i]),
+                "sequence": list(
+                    transform_script(
+                        game_script.script_data[
+                            game_script.script_offsets[i + 1] : (
+                                game_script.script_offsets[i + 2]
+                                if i + 1 < game_script.num_levels
+                                else -1
+                            )
+                        ]
+                    )
+                ),
+            }
+            for i in range(game_script.num_levels)
+        ],
+        "cutscenes": [
+            {"path": transform_path(game_script.cutscene_file_names[i])}
+            for i in range(game_script.num_cutscenes)
+        ],
+        "fmvs": [
+            {"path": transform_path(game_script.fmv_file_names[i])}
+            for i in range(game_script.num_fmvs)
+        ],
+    }
+
+
+import json
+from collections import OrderedDict
+
+
+class CustomEncoder(json.JSONEncoder):
+    def __init__(self, *args, **kwargs):
+        # Set the base indentation level
+        self.indent_level = kwargs.pop("indent", 4)
+        super().__init__(*args, **kwargs)
+
+    def encode(self, obj):
+        return self._encode(obj, 0)
+
+    def _encode(self, obj, current_indent):
+        if isinstance(obj, dict):
+            # Determine if this is an innermost dictionary
+            if not any(isinstance(v, (list, dict)) for v in obj.values()):
+                # Serialize innermost dictionary on a single line
+                items = [
+                    f"{json.dumps(k)}: {self._encode(v, current_indent)}"
+                    for k, v in obj.items()
+                ]
+                return "{" + ", ".join(items) + "}"
+            else:
+                # Serialize with indentation
+                items = []
+                indent_space = " " * (self.indent_level * (current_indent + 1))
+                for k, v in obj.items():
+                    encoded_key = json.dumps(k)
+                    encoded_val = self._encode(v, current_indent + 1)
+                    items.append(
+                        f"\n{indent_space}{encoded_key}: {encoded_val}"
+                    )
+                closing_indent = " " * (self.indent_level * current_indent)
+                return "{" + ",".join(items) + f"\n{closing_indent}" + "}"
+        elif isinstance(obj, list):
+            # Handle lists with potential nested structures
+            if not any(isinstance(item, (dict, list)) for item in obj):
+                return json.dumps(obj)
+            else:
+                items = []
+                indent_space = " " * (self.indent_level * (current_indent + 1))
+                for item in obj:
+                    encoded_item = self._encode(item, current_indent + 1)
+                    items.append(f"\n{indent_space}{encoded_item}")
+                closing_indent = " " * (self.indent_level * current_indent)
+                return "[" + ",".join(items) + f"\n{closing_indent}" + "]"
+        else:
+            return json.dumps(obj)
+
+
+def main() -> None:
+    args = parse_args()
+
+    game_script = parse_game_script(args.file)
+    trx_game_strings = create_trx_strings(game_script)
+    trx_game_flow = create_trx_game_flow(game_script)
+
+    print("strings.json5:")
+    print(json.dumps(trx_game_strings, indent=4))
+    print()
+    print("gameflow.json5:")
+    print(json.dumps(trx_game_flow, cls=CustomEncoder, indent=4))
+
+
+if __name__ == "__main__":
+    main()

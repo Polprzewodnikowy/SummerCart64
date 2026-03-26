@@ -1,0 +1,151 @@
+﻿<UserControl
+    x:Class="TRX_InstallerLib.Controls.InstallSettingsStepControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="clr-namespace:TRX_InstallerLib.Models"
+    xmlns:utils="clr-namespace:TRX_InstallerLib.Utils"
+    d:DataContext="{d:DesignInstance Type=models:InstallSettingsStep}"
+    mc:Ignorable="d"
+    d:DesignHeight="450" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/TRX_InstallerLib;component/Resources/styles.xaml" />
+                <ResourceDictionary>
+                    <utils:BoolToVisibilityConverter
+                        x:Key="BoolToVisibleConverter"
+                        FalseValue="Collapsed"
+                        TrueValue="Visible" />
+                </ResourceDictionary>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Style="{StaticResource heading}"
+            Text="{Binding ViewText[step_settings_heading]}"/>
+
+        <ScrollViewer Grid.Row="1" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ScrollViewer.Template>
+                <ControlTemplate TargetType="{x:Type ScrollViewer}">
+                    <Grid x:Name="Grid" Background="{TemplateBinding Background}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ScrollContentPresenter
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            x:Name="PART_ScrollContentPresenter"
+                            CanContentScroll="{TemplateBinding CanContentScroll}"
+                            CanHorizontallyScroll="False"
+                            CanVerticallyScroll="False"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Content="{TemplateBinding Content}"
+                            Margin="{TemplateBinding Padding}" />
+                        <Rectangle
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            x:Name="Corner"
+                            Fill="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+                        <ScrollBar
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            x:Name="PART_VerticalScrollBar"
+                            AutomationProperties.AutomationId="VerticalScrollBar"
+                            Cursor="Arrow"
+                            Minimum="0"
+                            Maximum="{TemplateBinding ScrollableHeight}"
+                            Value="{Binding VerticalOffset, Mode=OneWay, RelativeSource={RelativeSource TemplatedParent}}"
+                            Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                            ViewportSize="{TemplateBinding ViewportHeight}"
+                            Margin="12,0,0,0" />
+                        <ScrollBar
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            x:Name="PART_HorizontalScrollBar"
+                            AutomationProperties.AutomationId="HorizontalScrollBar"
+                            Orientation="Horizontal"
+                            Cursor="Arrow"
+                            Minimum="0"
+                            Maximum="{TemplateBinding ScrollableWidth}"
+                            Value="{Binding HorizontalOffset, Mode=OneWay, RelativeSource={RelativeSource TemplatedParent}}"
+                            Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                            ViewportSize="{TemplateBinding ViewportWidth}" />
+                    </Grid>
+                </ControlTemplate>
+            </ScrollViewer.Template>
+
+            <StackPanel Orientation="Vertical">
+                <CheckBox VerticalAlignment="Center" Margin="0,0,0,12" IsChecked="{Binding InstallSettings.DownloadMusic}" IsEnabled="{Binding InstallSettings.IsDownloadingMusicNeeded}">
+                    <TextBlock TextWrapping="Wrap">
+                        <Run Text="{Binding ViewText[step_settings_music_heading]}"/>
+                        <Run Foreground="ForestGreen" Text="{Binding InstallSettings.IsDownloadingMusicNeeded, Converter={utils:ConditionalViewTextConverter TrueValue='', FalseValue='label_already_found'}, Mode=OneWay}" />
+                        <LineBreak />
+                        <Run Style="{StaticResource small}" Text="{Binding ViewText[step_settings_music_content]}"/>
+                    </TextBlock>
+                </CheckBox>
+
+                <CheckBox VerticalAlignment="Center" Margin="0,0,0,6" IsChecked="{Binding InstallSettings.DownloadExpansionPack}" IsEnabled="{Binding InstallSettings.IsDownloadingExpansionNeeded}">
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel.Resources>
+                            <utils:ComparisonConverter x:Key="ComparisonConverter" />
+                        </StackPanel.Resources>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,6">
+                            <Run Text="{Binding ViewText[step_settings_expansion_heading]}"/>
+                            <Run Foreground="ForestGreen" Text="{Binding InstallSettings.IsDownloadingExpansionNeeded, Converter={utils:ConditionalViewTextConverter TrueValue='', FalseValue='label_already_found'}, Mode=OneWay}" />
+                            <LineBreak />
+                            <Run Style="{StaticResource small}" Text="{Binding ViewText[step_settings_expansion_content]}"/>
+                        </TextBlock>
+                        <StackPanel Orientation="Vertical" Visibility="{Binding InstallSettings.AllowExpansionTypeSelection, Converter={StaticResource BoolToVisibleConverter}}">
+                            <RadioButton IsEnabled="{Binding InstallSettings.DownloadExpansionPack}" Style="{StaticResource small}" Margin="0,0,0,6" Content="{Binding ViewText[step_settings_expansion_music]}"
+                                         IsChecked="{Binding Path=InstallSettings.ExpansionPackType, Converter={StaticResource ComparisonConverter}, ConverterParameter={x:Static models:ExpansionPackType.Music}}"/>
+                            <RadioButton IsEnabled="{Binding InstallSettings.DownloadExpansionPack}" Style="{StaticResource small}" Margin="0,0,0,6" Content="{Binding ViewText[step_settings_expansion_vanilla]}"
+                                         IsChecked="{Binding Path=InstallSettings.ExpansionPackType, Converter={StaticResource ComparisonConverter}, ConverterParameter={x:Static models:ExpansionPackType.Vanilla}}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </CheckBox>
+
+                <CheckBox VerticalAlignment="Center" Margin="0,0,0,12" IsChecked="{Binding InstallSettings.ImportSaves}" IsEnabled="{Binding InstallSettings.InstallSource.IsImportingSavesSupported}">
+                    <TextBlock TextWrapping="Wrap">
+                        <Run Text="{Binding ViewText[step_settings_saves_header]}"/>
+                        <LineBreak />
+                        <Run Style="{StaticResource small}" Text="{Binding ViewText[step_settings_saves_content]}"/>
+                    </TextBlock>
+                </CheckBox>
+
+                <CheckBox
+                    VerticalAlignment="Center"
+                    Margin="0,0,0,12"
+                    IsChecked="{Binding InstallSettings.CreateDesktopShortcut}"
+                    Content="{Binding ViewText[step_settings_shortcut_heading]}"/>
+
+                <Separator />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Label Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0" Padding="0" Content="{Binding ViewText[label_destination_folder]}" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding InstallSettings.TargetDirectory}" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0" Command="{Binding ChooseLocationCommand}" Content="{Binding ViewText[command_change]}" />
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

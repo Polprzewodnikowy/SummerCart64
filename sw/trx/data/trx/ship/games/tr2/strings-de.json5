@@ -1,0 +1,339 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "settings": {
+        "gameplay.fix_bear_ai": {
+            "description": "Fixt, dass die aufrecht stehend ausgeführten Prankenhiebe von Bären Lara, im Addon 'Die Goldene Maske', nicht mehr verfehlen.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "\\{review}Fixt originale Fehler in 40 Faden, Das Wrack der Maria Doria und An Deck, bei denen Pflanzen-Sprites in Wassergebieten nicht animiert sind.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Großes Medi-Pack",
+        },
+        "small_medipack": {
+            "name": "Kleines Medi-Pack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cutscene 1",
+        },
+        {
+            "title": "Cutscene 2",
+        },
+        {
+            "title": "Cutscene 3",
+        },
+        {
+            "title": "Cutscene 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Laras Haus",
+        },
+        {
+            "title": "Die Große Mauer",
+            "objects": {
+                "key_1": {
+                    "name": "Wachstuben-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Rostiger Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Venedig",
+            "objects": {
+                "key_1": {
+                    "name": "Bootshaus-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Stählernder Schlüssel",
+                },
+                "key_3": {
+                    "name": "Eiserner Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Bartolis Versteck",
+            "objects": {
+                "key_1": {
+                    "name": "Bibliothek-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Sprengschlüssel",
+                }
+            }
+        },
+        {
+            "title": "Das Opernhaus",
+            "objects": {
+                "key_1": {
+                    "name": "Ornament-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Relais",
+                },
+                "puzzle_2": {
+                    "name": "Schaltkteis",
+                }
+            }
+        },
+        {
+            "title": "Der Bohrturm",
+            "objects": {
+                "key_1": {
+                    "name": "Rote Karte",
+                },
+                "key_2": {
+                    "name": "Gelbe Karte",
+                },
+                "key_3": {
+                    "name": "Grüne Karte",
+                }
+            }
+        },
+        {
+            "title": "Die Tiefe",
+            "objects": {
+                "key_1": {
+                    "name": "Rote Karte",
+                },
+                "key_4": {
+                    "name": "Blaue Karte",
+                },
+                "puzzle_1": {
+                    "name": "Chip",
+                }
+            }
+        },
+        {
+            "title": "40 Faden",
+        },
+        {
+            "title": "Das Wrack der Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Waschraumschlüssel",
+                },
+                "key_2": {
+                    "name": "Rostiger Schlüssel",
+                },
+                "key_3": {
+                    "name": "Kabinen-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Unterbrecher",
+                }
+            }
+        },
+        {
+            "title": "Die Quatiere",
+            "objects": {
+                "key_1": {
+                    "name": "Theater-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Rostiger Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "An Deck",
+            "objects": {
+                "key_2": {
+                    "name": "Stern-Schlüssel",
+                },
+                "key_3": {
+                    "name": "Lager-Schlüssel",
+                },
+                "key_4": {
+                    "name": "Kabinen-Schlüssel",
+                },
+                "puzzle_4": {
+                    "name": "Seraph",
+                }
+            }
+        },
+        {
+            "title": "Das tibetanische Hochland",
+            "objects": {
+                "tiger": {
+                    "name": "Schneeleopard",
+                },
+                "key_1": {
+                    "name": "Zugbrücken-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Hüttenschlüssel",
+                },
+                "puzzle_4": {
+                    "name": "Seraph",
+                }
+            }
+        },
+        {
+            "title": "Das Kloster von Barkhang",
+            "objects": {
+                "key_1": {
+                    "name": "Kammer-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Falltür-Schlüssel",
+                },
+                "key_3": {
+                    "name": "Dachboden-Schlüssel",
+                },
+                "key_4": {
+                    "name": "Hallen-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Gebets-Rolle",
+                },
+                "puzzle_2": {
+                    "name": "Edelstein",
+                },
+                "puzzle_4": {
+                    "name": "Seraph",
+                }
+            }
+        },
+        {
+            "title": "Die Katakomben des Talion",
+            "objects": {
+                "tiger": {
+                    "name": "Schneeleopard",
+                },
+                "pickup_1": {
+                    "name": "Gong-Hammer",
+                },
+                "puzzle_1": {
+                    "name": "Tibetanische Maske",
+                }
+            }
+        },
+        {
+            "title": "Eispalast",
+            "objects": {
+                "tiger": {
+                    "name": "Weißer Tiger",
+                },
+                "key_2": {
+                    "name": "Gong-Hammer",
+                },
+                "pickup_2": {
+                    "name": "Talion",
+                },
+                "puzzle_1": {
+                    "name": "Tibetanische Maske",
+                }
+            }
+        },
+        {
+            "title": "Der Tempel von Xian",
+            "objects": {
+                "key_2": {
+                    "name": "Goldener Schlüssel",
+                },
+                "key_3": {
+                    "name": "Silberner Schlüssel",
+                },
+                "key_4": {
+                    "name": "Kammer-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Siegel des Drachen",
+                }
+            }
+        },
+        {
+            "title": "Die schwimmenden Inseln",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mystische Plakette",
+                },
+                "puzzle_2": {
+                    "name": "Mystische Plakette",
+                }
+            }
+        },
+        {
+            "title": "Der Hort des Drachen",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Mystische Plakette",
+                },
+                "puzzle_2": {
+                    "name": "Dolch von Xian",
+                }
+            }
+        },
+        {
+            "title": "Zuhause",
+            "objects": {
+                "key_1": {
+                    "name": "Waffenschrank-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Dolch von Xian",
+                }
+            }
+        }
+    ],
+    "demos": [
+        {
+            "title": "Venedig",
+            "objects": {
+                "key_1": {
+                    "name": "Bootshaus-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Stählerner Schlüssel",
+                },
+                "key_3": {
+                    "name": "Eiserner Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Das Wrack der Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Waschraum-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Rostiger Schlüssel",
+                },
+                "key_3": {
+                    "name": "Kabinen-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Unterbrecher",
+                }
+            }
+        },
+        {
+            "title": "Das tibetanische Hochland",
+            "objects": {
+                "tiger": {
+                    "name": "Schneeleopard",
+                },
+                "key_1": {
+                    "name": "Zugbrücken-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Hüttenschlüssel",
+                },
+                "puzzle_4": {
+                    "name": "Seraph",
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,196 @@
+name: Cache TRX MacOS Dependencies
+
+inputs:
+  FFMPEG_INSTALL_TMP_ARM64:
+    required: false
+    default: /opt/local/install_arm64
+  FFMPEG_INSTALL_TMP_X86_64:
+    required: false
+    default: /opt/local/install_x86_64
+  CACHE_SRC_DIR:
+    required: false
+    default: /opt/local
+  CACHE_DIR:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Select latest stable Xcode
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Install and update MacPorts
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        wget -O ${{ github.workspace }}/macports.pkg https://github.com/macports/macports-base/releases/download/v2.9.2/MacPorts-2.9.2-14-Sonoma.pkg
+        sudo installer -pkg ${{ github.workspace }}/macports.pkg -target /
+
+    - name: Install build and deployment tools
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Install Python first to avoid multiple Python in the dep tree later on.
+        sudo port -N install python313 py313-pip
+        sudo port select --set python python313
+        sudo port select --set python3 python313
+        sudo port select --set pip pip313
+        sudo port select --set pip3 pip313
+
+        # Install Clang to get better C23 support.
+        sudo port -N install clang-16
+        sudo port select --set clang mp-clang-16
+
+        # Install the rest.
+        sudo port -N install create-dmg meson ninja pkgconfig
+        sudo pip3 install pyjson5
+
+    - name: "Build dependencies: Compression libraries (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        sudo port -N install zlib +universal
+        sudo port -N install bzip2 +universal
+        sudo port -N install xz +universal
+
+    - name: "Build dependency: pcre2 (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo port -N install pcre2 +universal
+
+    - name: "Build dependency: GLEW (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo port -N install glew +universal
+
+    - name: "Build dependency: libsdl2 (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo port -N install libsdl2 +universal
+
+    - name: "Build dependency: lua (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo port -N install lua +universal
+
+    - name: "Build dependency: uthash (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo port -N install uthash +universal
+
+    - name: "Build dependency: ffmpeg (universal)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Install to separate staging paths for all architectures in
+        # preparation for fusing universal libraries in a follow-up step.
+        cd "$RUNNER_TEMP"
+        git clone https://github.com/FFmpeg/FFmpeg ffmpeg-arm64
+        cd ffmpeg-arm64
+        git checkout 066432ebcf
+
+        # Common FFmpeg configure options
+        FFMPEG_CONFIG_OPTIONS=" \
+          --enable-shared \
+          --disable-static \
+          $(cat $GITHUB_WORKSPACE/tools/ffmpeg_flags.txt)"
+
+        # Configure for arm64.
+        ./configure \
+          --arch=arm64 \
+          --prefix=${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }} \
+          --cc='clang' \
+          $FFMPEG_CONFIG_OPTIONS
+
+        # Build and install.
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+        cd "$RUNNER_TEMP"
+        git clone https://github.com/FFmpeg/FFmpeg ffmpeg-x86-64
+        cd ffmpeg-x86-64
+        git checkout 066432ebcf
+        # Configure for x86-64.
+        ./configure \
+          --arch=x86_64 \
+          --enable-cross-compile \
+          --prefix=${{ inputs.FFMPEG_INSTALL_TMP_X86_64 }} \
+          --cc='clang -arch x86_64' \
+          $FFMPEG_CONFIG_OPTIONS
+
+        # Build and install.
+        make -j$(sysctl -n hw.ncpu)
+        sudo make install
+
+    - name: "Build dependency: ffmpeg (fuse universal libraries)"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Libs
+        FFMPEG_LIBS=(
+          "libavcodec"
+          "libavdevice"
+          "libavfilter"
+          "libavformat"
+          "libavutil"
+          "libswresample"
+          "libswscale"
+        )
+
+        # Recreate include tree in MacPorts install prefix.
+        sudo rsync -arvL ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/include/ ${{ inputs.CACHE_SRC_DIR }}/include/
+
+        # Recreate library symlinks in MacPorts install prefix.
+        sudo find ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/ -type l -exec cp -P '{}' ${{ inputs.CACHE_SRC_DIR }}/lib/ ';'
+
+        # Fuse platform-specific binaries into a universal binary.
+        for LIB in ${FFMPEG_LIBS[@]}; do
+            RESOLVED_LIB=$(ls -l ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/${LIB}* \
+              | grep -v '^l' \
+              | awk -F'/' '{print $NF}')
+
+            sudo lipo -create \
+              ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/$RESOLVED_LIB \
+              ${{ inputs.FFMPEG_INSTALL_TMP_X86_64 }}/lib/$RESOLVED_LIB \
+              -output ${{ inputs.CACHE_SRC_DIR }}/lib/$RESOLVED_LIB
+
+            sudo ln -s -f \
+              ${{ inputs.CACHE_SRC_DIR }}/lib/$RESOLVED_LIB \
+              ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/$RESOLVED_LIB
+            sudo ln -s -f \
+              ${{ inputs.CACHE_SRC_DIR }}/lib/$RESOLVED_LIB \
+              ${{ inputs.FFMPEG_INSTALL_TMP_X86_64 }}/lib/$RESOLVED_LIB
+        done
+
+        # Update and install pkgconfig files.
+        for file in "${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/pkgconfig"/*.pc; do
+          sudo sed -i '' "s:${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}:${{ inputs.CACHE_SRC_DIR }}:g" "$file"
+        done
+        sudo mv ${{ inputs.FFMPEG_INSTALL_TMP_ARM64 }}/lib/pkgconfig/* ${{ inputs.CACHE_SRC_DIR }}/lib/pkgconfig/
+
+    - name: "Prepare dependencies for caching"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Remove MacPorts leftover build and download files
+        sudo rm -rf /opt/local/var/macports/build/*
+        sudo rm -rf /opt/local/var/macports/distfiles/*
+        sudo rm -rf /opt/local/var/macports/packages/*
+
+        # Delete broken symlinks
+        sudo find ${{ inputs.CACHE_SRC_DIR }} -type l ! -exec test -e {} \; -exec rm {} \;
+
+        # Trying to cache the source directory directly leads to permission errors,
+        # so copy it to an intermediate temporary directory.
+        sudo rsync -arvq ${{ inputs.CACHE_SRC_DIR }}/ ${{ inputs.CACHE_DIR }}
+
+    - name: "Save dependencies to cache"
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        key: ${{ runner.os }}-tooling-${{ hashFiles('.github/actions/prepare_macos_tooling/action.yml') }}
+        path: |
+          ${{ inputs.CACHE_DIR }}

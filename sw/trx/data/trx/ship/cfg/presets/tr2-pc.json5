@@ -1,0 +1,11 @@
+{
+    "name_gs": "dynamic/config_presets/tr2_pc",
+    "config": {
+        "ui.menu_style": "pc",
+        "ui.enable_smooth_bars": false,
+        "ui.bar_look": "tr2_pc",
+        "ui.ammo_counter_location": "top-right",
+        "audio.enable_ps1_sfx": false,
+        "gameplay.restore_ps1_enemies": false,
+    },
+}

@@ -1,0 +1,34 @@
+X_UI_CFG(gameplay.enable_legal)
+X_UI_CFG(gameplay.enable_credits)
+X_UI_CFG(gameplay.enable_fmv)
+X_UI_CFG(gameplay.enable_demo)
+X_UI_CFG(gameplay.enable_cutscenes)
+X_UI_CFG_ENUM(gameplay.loading_screens,       .misc = UI_Settings_LoadingScreensModeEnumEntries)
+
+X_UI_CFG(gameplay.enable_game_modes)
+X_UI_CFG(gameplay.enable_play_previous_levels)
+X_UI_CFG(gameplay.enable_save_crystals)
+
+X_UI_CFG(gameplay.enable_auto_item_selection)
+X_UI_CFG(gameplay.enable_item_examining)
+
+X_UI_CFG(gameplay.enable_compass_stats)
+X_UI_CFG(gameplay.enable_total_stats)
+
+X_UI_CFG(gameplay.enable_timer_in_inventory)
+X_UI_CFG(gameplay.enable_deaths_counter)
+
+X_UI_CFG(gameplay.maximum_save_slots,         .min_value = 1, .max_value = 1000, .delta_fast = 10, .delta_slow = 1)
+X_UI_CFG(gameplay.maximum_quick_save_slots,   .min_value = 0, .max_value = 1000, .delta_fast = 10, .delta_slow = 1)
+X_UI_CFG(gameplay.enable_enhanced_saves)
+X_UI_CFG(gameplay.enable_bouncy_grenades,     .custom_handler = { .is_available = UI_Settings_Grenade_IsAvailable })
+X_UI_CFG(gameplay.remember_gun_status)
+
+X_UI_CFG(gameplay.restore_ps1_enemies)
+X_UI_CFG(gameplay.change_pierre_spawn)
+X_UI_CFG(gameplay.disable_trex_collision)
+X_UI_CFG(gameplay.enable_enemy_rotation)
+X_UI_CFG(gameplay.enable_killer_pushblocks)
+X_UI_CFG(gameplay.enable_boulder_shake)
+X_UI_CFG(gameplay.enable_ally_targeting)
+X_UI_CFG_ENUM(gameplay.ally_hostility_policy, .misc = UI_Settings_AllyHostilityPolicyEnumEntries)

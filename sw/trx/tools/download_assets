@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+import argparse
+import shutil
+import ssl
+import sys
+import tempfile
+from pathlib import Path
+from urllib.request import Request, urlopen
+from zipfile import ZipFile
+
+from shared.paths import PROJECT_PATHS
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Downloads large binary assets into local "
+            "data/*/ship/ directories."
+        )
+    )
+    parser.add_argument(
+        "game_version",
+        choices=["1", "2", "3", "all"],
+        default="all",
+        nargs="?",
+    )
+    return parser.parse_args()
+
+
+def download_to_file(url: str, path: Path) -> None:
+    print(f"Downloading {url}...")
+    req = Request(url, headers={"User-Agent": "download_assets"})
+    context = ssl._create_unverified_context()
+    with urlopen(req, context=context) as response:
+        if getattr(response, "status", None) not in (None, 200):
+            sys.exit(
+                f"Error: failed to download {url}. Status: {response.status}"
+            )
+        with path.open("wb") as f:
+            shutil.copyfileobj(response, f)
+
+
+def extract_zip(zip_path: Path, dest_dir: Path) -> None:
+    print(f"Extracting {zip_path} to {dest_dir}...")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    with ZipFile(zip_path) as z:
+        z.extractall(dest_dir)
+
+
+def download_assets(asset_urls: list[str], target_dir: Path) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir_str:
+        tmpdir = Path(tmpdir_str)
+        for url in asset_urls:
+            filename = Path(url).name
+            local_zip = tmpdir / filename
+            download_to_file(url, local_zip)
+            extract_zip(local_zip, target_dir)
+    print("Asset download and extraction complete.")
+
+
+def main() -> None:
+    args = parse_args()
+    asset_urls_map: dict[int, list[str]] = {
+        1: [
+            "https://lostartefacts.dev/aux/tr1x/main.zip",
+            "https://lostartefacts.dev/aux/tr1x/trub.zip",
+        ],
+        2: [
+            "https://lostartefacts.dev/aux/tr2x/main.zip",
+            "https://lostartefacts.dev/aux/tr2x/trgm.zip",
+        ],
+        3: ["https://lostartefacts.dev/aux/tr3x/main.zip"],
+    }
+
+    versions = {"1": [1], "2": [2], "3": [3], "all": [1, 2, 3]}[
+        args.game_version
+    ]
+    for version in versions:
+        download_assets(
+            asset_urls_map[version],
+            target_dir=PROJECT_PATHS[version].shipped_data_dir,
+        )
+
+
+if __name__ == "__main__":
+    main()

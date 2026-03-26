@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+import argparse
+import re
+from collections import defaultdict
+from collections.abc import Callable, Iterable
+from pathlib import Path
+
+from shared.paths import DATA_DIR, DOCS_DIR, PROJECT_PATHS, REPO_DIR
+from shared.vfs import VirtualFilesystem
+
+DATA_REPO_ROOT_DIR = REPO_DIR.parent / "TRX-data"
+
+IGNORED_FILES = """
+    max_stats.cache.json
+"""
+
+TR1_OG_FILES = """
+data/cat.phd
+data/cut1.phd
+data/cut2.phd
+data/cut3.phd
+data/cut4.phd
+data/egypt.phd
+data/end2.phd
+data/end.phd
+data/gym.phd
+data/level10a.phd
+data/level10b.phd
+data/level10c.phd
+data/level1.phd
+data/level2.phd
+data/level3a.phd
+data/level3b.phd
+data/level4.phd
+data/level5.phd
+data/level6.phd
+data/level7a.phd
+data/level7b.phd
+data/level8a.phd
+data/level8b.phd
+data/level8c.phd
+data/title.phd
+fmv/cafe.rpl
+fmv/canyon.rpl
+fmv/core.avi
+fmv/end.rpl
+fmv/escape.rpl
+fmv/lift.rpl
+fmv/mansion.rpl
+fmv/prison.rpl
+fmv/pyramid.rpl
+fmv/snow.rpl
+fmv/vision.rpl
+music/track02.flac
+music/track03.flac
+music/track04.flac
+music/track05.flac
+music/track06.flac
+music/track07.flac
+music/track08.flac
+music/track09.flac
+music/track10.flac
+music/track11.flac
+music/track12.flac
+music/track13.flac
+music/track14.flac
+music/track15.flac
+music/track16.flac
+music/track17.flac
+music/track18.flac
+music/track19.flac
+music/track20.flac
+music/track21.flac
+music/track22.flac
+music/track23.flac
+music/track24.flac
+music/track25.flac
+music/track26.flac
+music/track27.flac
+music/track28.flac
+music/track29.flac
+music/track30.flac
+music/track31.flac
+music/track32.flac
+music/track33.flac
+music/track34.flac
+music/track35.flac
+music/track36.flac
+music/track37.flac
+music/track38.flac
+music/track39.flac
+music/track40.flac
+music/track41.flac
+music/track42.flac
+music/track43.flac
+music/track44.flac
+music/track45.flac
+music/track46.flac
+music/track47.flac
+music/track48.flac
+music/track49.flac
+music/track50.flac
+music/track51.flac
+music/track52.flac
+music/track53.flac
+music/track54.flac
+music/track55.flac
+music/track56.flac
+music/track57.flac
+music/track58.flac
+music/track59.flac
+music/track60.flac
+"""
+
+TR2_OG_FILES = """
+data/assault.tr2
+data/boat.tr2
+data/catacomb.tr2
+data/cut1.tr2
+data/cut2.tr2
+data/cut3.tr2
+data/cut4.tr2
+data/deck.tr2
+data/emprtomb.tr2
+data/floating.tr2
+data/house.tr2
+data/icecave.tr2
+data/keel.tr2
+data/level1.tr2
+data/level2.tr2
+data/level3.tr2
+data/level4.tr2
+data/level5.tr2
+data/living.tr2
+data/main.sfx
+data/main_gm.sfx
+data/monastry.tr2
+data/opera.tr2
+data/platform.tr2
+data/rig.tr2
+data/skidoo.tr2
+data/title.tr2
+data/title_gm.tr2
+data/unwater.tr2
+data/venice.tr2
+data/wall.tr2
+data/xian.tr2
+fmv/ancient.rpl
+fmv/crash.rpl
+fmv/end.rpl
+fmv/jeep.rpl
+fmv/landing.rpl
+fmv/logo.rpl
+fmv/modern.rpl
+fmv/ms.rpl
+music/2.mp3
+music/3.mp3
+music/4.mp3
+music/5.mp3
+music/6.mp3
+music/7.mp3
+music/8.mp3
+music/9.mp3
+music/10.mp3
+music/11.mp3
+music/12.mp3
+music/13.mp3
+music/14.mp3
+music/15.mp3
+music/16.mp3
+music/17.mp3
+music/18.mp3
+music/19.mp3
+music/20.mp3
+music/21.mp3
+music/22.mp3
+music/23.mp3
+music/24.mp3
+music/25.mp3
+music/26.mp3
+music/27.mp3
+music/28.mp3
+music/29.mp3
+music/30.mp3
+music/31.mp3
+music/32.mp3
+music/33.mp3
+music/34.mp3
+music/35.mp3
+music/36.mp3
+music/37.mp3
+music/38.mp3
+music/39.mp3
+music/40.mp3
+music/41.mp3
+music/42.mp3
+music/43.mp3
+music/44.mp3
+music/45.mp3
+music/46.mp3
+music/47.mp3
+music/48.mp3
+music/49.mp3
+music/50.mp3
+music/51.mp3
+music/52.mp3
+music/53.mp3
+music/54.mp3
+music/55.mp3
+music/56.mp3
+music/57.mp3
+music/58.mp3
+music/59.mp3
+music/60.mp3
+music/61.mp3
+"""
+
+TR3_OG_FILES = """
+data/main.sfx
+data/tombpc.dat
+fmv/crsh_eng.rpl
+fmv/endgame.rpl
+fmv/intr_eng.rpl
+fmv/sail_eng.rpl
+fmv/logo.rpl
+audio/cdaudio.wad
+cuts/cut1.tr2
+cuts/cut2.tr2
+data/antarc.tr2
+data/chamber.tr2
+data/city.tr2
+data/compound.tr2
+data/crash.tr2
+data/house.tr2
+data/jungle.tr2
+data/mines.tr2
+data/nevada.tr2
+data/office.tr2
+data/quadchas.tr2
+data/rapids.tr2
+data/roofs.tr2
+data/sewer.tr2
+data/shore.tr2
+data/stpaul.tr2
+data/temple.tr2
+data/title.tr2
+data/tonyboss.tr2
+data/tower.tr2
+data/triboss.tr2
+data/vict.tr2
+cuts/cut3.tr2
+cuts/cut4.tr2
+cuts/cut5.tr2
+cuts/cut6.tr2
+cuts/cut7.tr2
+cuts/cut8.tr2
+cuts/cut9.tr2
+cuts/cut11.tr2
+cuts/cut12.tr2
+data/area51.tr2
+"""
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Update game strings JSON files to reflect GS_DEFINE() macros."
+    )
+    parser.add_argument(
+        "-d",
+        "--dry-run",
+        action="store_true",
+        help="Perform a dry run: show unified diffs instead of writing files.",
+    )
+    return parser.parse_args()
+
+
+def collect(root_dir: Path) -> Iterable[Path]:
+    return (
+        path.relative_to(root_dir)
+        for path in root_dir.rglob("*", recurse_symlinks=True)
+        if path.is_file()
+        and path.name not in IGNORED_FILES
+    )
+
+
+def tr1_og_files() -> Iterable[Path]:
+    yield from (Path(line) for line in TR1_OG_FILES.splitlines() if line)
+
+
+def tr1_ship_files() -> Iterable[Path]:
+    yield from collect(DATA_DIR / "common/ship")
+    yield from collect(PROJECT_PATHS[1].data_dir / "ship")
+    yield from collect(DATA_REPO_ROOT_DIR / "tr1/ship")
+    yield from collect(DATA_REPO_ROOT_DIR / "tr1ub/ship")
+
+
+def tr1_files_win() -> Iterable[Path]:
+    yield Path("TRX.exe")
+    yield Path("cfg/TR1X.json5*")
+    yield from tr1_og_files()
+    yield from tr1_ship_files()
+
+
+def tr1_files_mac() -> Iterable[Path]:
+    yield Path("Contents/_CodeSignature")
+    yield Path("Contents/Frameworks")
+    yield Path("Contents/info.plist")
+    yield Path("Contents/MacOS")
+    yield from (Path("Contents/Resources/") / sub for sub in tr1_ship_files())
+    yield from (Path("Contents/Resources/") / sub for sub in tr1_og_files())
+    yield Path("Contents/Resources/icon.icns")
+
+
+def tr2_og_files() -> Iterable[Path]:
+    yield from (Path(line) for line in TR2_OG_FILES.splitlines() if line)
+
+
+def tr2_ship_files() -> Iterable[Path]:
+    yield from collect(DATA_DIR / "common/ship")
+    yield from collect(PROJECT_PATHS[2].data_dir / "ship")
+    yield from collect(DATA_REPO_ROOT_DIR / "tr2/ship")
+    yield from collect(DATA_REPO_ROOT_DIR / "tr2gm/ship")
+
+
+def tr2_files_win() -> Iterable[Path]:
+    yield Path("TRX.exe")
+    yield Path("cfg/TR2X.json5*")
+    yield from tr2_og_files()
+    yield from tr2_ship_files()
+
+
+def tr2_files_mac() -> Iterable[Path]:
+    yield Path("Contents/_CodeSignature")
+    yield Path("Contents/Frameworks")
+    yield Path("Contents/info.plist")
+    yield Path("Contents/MacOS")
+    yield from (Path("Contents/Resources/") / sub for sub in tr2_ship_files())
+    yield from (Path("Contents/Resources/") / sub for sub in tr2_og_files())
+    yield Path("Contents/Resources/icon.icns")
+
+
+def tr3_og_files() -> Iterable[Path]:
+    yield from (Path(line) for line in TR3_OG_FILES.splitlines() if line)
+
+
+def tr3_ship_files() -> Iterable[Path]:
+    yield from collect(DATA_DIR / "common/ship")
+    yield from collect(PROJECT_PATHS[3].data_dir / "ship")
+    yield from collect(DATA_REPO_ROOT_DIR / "tr3/ship")
+
+
+def tr3_files_win() -> Iterable[Path]:
+    yield Path("TRX.exe")
+    yield Path("cfg/TR3X.json5*")
+    yield from tr3_og_files()
+    yield from tr3_ship_files()
+
+
+def tr3_files_mac() -> Iterable[Path]:
+    yield Path("Contents/_CodeSignature")
+    yield Path("Contents/Frameworks")
+    yield Path("Contents/info.plist")
+    yield Path("Contents/MacOS")
+    yield from (Path("Contents/Resources/") / sub for sub in tr3_ship_files())
+    yield from (Path("Contents/Resources/") / sub for sub in tr3_og_files())
+    yield Path("Contents/Resources/icon.icns")
+
+
+
+
+def make_tree_string(paths: list[Path]) -> str:
+    type Node = defaultdict[Any, Any]
+
+    # build nested dict
+    def tree() -> Node:
+        return defaultdict(tree)
+
+    root = tree()
+    for path in paths:
+        node = root
+        for part in str(path).split("/"):
+            node = node[part]
+
+    def natural_sort_key(s: str) -> list[str | int]:
+        return [
+            int(text) if text.isdigit() else text.lower()
+            for text in re.split("([0-9]+)", s)
+        ]
+
+    # recursive render
+    def render(node: Node, prefix: str = "") -> list[str]:
+        entries = sorted(node.keys(), key=natural_sort_key)
+        lines = []
+        for i, name in enumerate(entries):
+            last = i == len(entries) - 1
+            branch = "└── " if last else "├── "
+            subprefix = "    " if last else "│   "
+            lines.append(prefix + branch + name)
+            if node[name]:
+                lines.extend(render(node[name], prefix + subprefix))
+        return lines
+
+    return ".\n" + "\n".join(render(root))
+
+
+def process_install_doc(content: str, platform: str, paths: list[Path]) -> str:
+    result: list[str] = []
+    found_marker = False
+    lines = content.splitlines()
+    while lines:
+        line = lines.pop(0)
+        if line == f'<details data-id="file-tree-{platform}">':
+            result.append(line)
+            while lines:
+                line = lines.pop(0)
+                if not line:
+                    break
+            result.append(
+                "<pre><code>" + make_tree_string(paths) + "</code></pre>"
+            )
+            result.append("</details>")
+            if lines:
+                result.append(line)
+        else:
+            result.append(line)
+    return "\n".join(result) + "\n"
+
+
+def main() -> None:
+    args = parse_args()
+    vfs = VirtualFilesystem()
+
+    trees: list[Path, str, Callable[[], Iterable[Path]]] = [
+        (PROJECT_PATHS[1].docs_dir / "INSTALLING.md", "win", tr1_files_win),
+        (PROJECT_PATHS[1].docs_dir / "INSTALLING.md", "mac", tr1_files_mac),
+        (PROJECT_PATHS[2].docs_dir / "INSTALLING.md", "win", tr2_files_win),
+        (PROJECT_PATHS[2].docs_dir / "INSTALLING.md", "mac", tr2_files_mac),
+        (PROJECT_PATHS[3].docs_dir / "INSTALLING.md", "win", tr3_files_win),
+        (PROJECT_PATHS[3].docs_dir / "INSTALLING.md", "mac", tr3_files_mac),
+    ]
+
+    for path, platform, func in trees:
+        vfs.put(
+            path, process_install_doc(vfs.get(path), platform, list(func()))
+        )
+
+    if args.dry_run:
+        vfs.show_diff()
+    else:
+        vfs.commit()
+
+
+if __name__ == "__main__":
+    main()

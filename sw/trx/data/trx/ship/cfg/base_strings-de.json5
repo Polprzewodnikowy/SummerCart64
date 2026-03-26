@@ -1,0 +1,2774 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "language_name": "Deutsch",
+    "general": {
+        "actions": {
+            "examine_item": "Untersuchen",
+            "hide_dialog": "Dialog ausblenden",
+            "reset_defaults": "Auf Standard zurücksetzen",
+            "rotate": "Drehen",
+            "unbind": "Freigeben",
+            "use_item": "Benutzen",
+        },
+        "config_presets": {
+            "applied": "\\{review}Voreinstellung angewendet.",
+            "confirm_description": "\\{review}Die folgenden Einstellungen werden geändert:",
+            "confirm_restart_note": "\\{review}Hinweis: Einige Einstellungen erfordern möglicherweise einen Neustart des Spiels, um wirksam zu werden.",
+            "empty": "\\{review}Keine Voreinstellungen gefunden.",
+            "no_changes": "\\{review}Keine Änderungen anzuwenden.",
+            "title_fmt": "\\{review}Voreinstellung %s anwenden?",
+        },
+        "globe_select": {
+            "area_1": "\\{review}Bereich 1",
+            "area_2": "\\{review}Bereich 2",
+            "area_3": "\\{review}Bereich 3",
+            "area_4": "\\{review}Bereich 4",
+            "area_5": "\\{review}Bereich 5",
+            "area_6": "\\{review}Bereich 6",
+        },
+        "inventory_ring": {
+            "heading_adventure": "\\{review}Abenteuer",
+            "heading_fmt": "%s",
+            "heading_game_over": "GAME OVER",
+            "heading_inventory": "INVENTAR",
+            "heading_items": "ITEMS",
+            "heading_option": "OPTION",
+            "item_count_fmt": "\\{small}%s",
+            "object_name_fmt": "%s",
+        },
+        "misc": {
+            "demo_mode": "Demo Modus",
+            "direction_keys_controller": "Steuerkreuz",
+            "direction_keys_keyboard": "Pfeile",
+            "empty_slot_fmt": "- LEERER SLOT -",
+            "exit": "Beenden",
+            "hold_fmt": "Gedrückt halten %s",
+            "off": "Aus",
+            "on": "Ein",
+            "pagination_nav": "%d / %d",
+        },
+        "osd": {
+            "ambiguous_input_2": "Mehrdeutige Eingabe: %s und %s",
+            "ambiguous_input_3": "Mehrdeutige Eingabe: %s, %s, ...",
+            "bilinear_filter_off": "Bilinear-Filter: aus",
+            "bilinear_filter_on": "Bilinear-Filter: ein",
+            "command_bad_invocation": "Unzulässiger Aufruf: %s",
+            "command_bool": "ein, aus",
+            "command_decimal": "[Dezimal]",
+            "command_integer": "[Integer]",
+            "command_percent": "[Integer]",
+            "command_unavailable": "Dieses Kommando ist momentan nicht ausführbar",
+            "command_valid_values": "Zulässige Werte: %s",
+            "complete_level": "Level abgeschlossen!",
+            "config_option_get": "%s ist momentan eingestellt auf %s",
+            "config_option_set": "%s geändert zu %s",
+            "config_option_unknown_option": "Unbekannte Option: %s",
+            "current_health_get": "Laras aktuelle Lebensenergie: %d",
+            "current_health_set": "Laras Lebensenergie eingestellt auf %d",
+            "door_close": "Sesam, schließe dich!",
+            "door_open": "Sesam, öffne dich!",
+            "door_open_fail": "Keine Türen in Laras Nähe",
+            "flipmap_fail_already_off": "Flipmap ist bereits AUS",
+            "flipmap_fail_already_on": "Flipmap ist bereits AN",
+            "flipmap_off": "Flipmap ",
+            "flipmap_on": "Flipmap eingeschaltet",
+            "fly_mode_off": "Flug-Modus ausgeschaltet",
+            "fly_mode_on": "Flug-Modus eingeschaltet",
+            "fps_counter_off": "FPS-Counter ausgeschaltet",
+            "fps_counter_on": "FPS-Counter eingeschaltet",
+            "give_item": "Es wurde %s zu Laras Inventar hinzugefügt.",
+            "give_item_all_guns": "Geladen und entsichert - Lara ist bis zu ihren Zähnen bewaffnet!",
+            "give_item_all_keys": "Überraschung! Jedes Schlüsselitem, dass Lara benötigt, ist jetzt in ihrem Inventar.",
+            "give_item_cheat": "Laras Rucksack ist schwerer geworden!",
+            "heal_already_full_hp": "Laras Gesundheit ist schon vollständig gefüllt.",
+            "heal_success": "Laras Gesundheit ist wieder vollständig wiederhergestellt.",
+            "invalid_cutscene": "Unzulässige Zwischensequenz",
+            "invalid_demo": "Unzulässige Demo",
+            "invalid_item": "Unbekanntes Item: %s",
+            "invalid_level": "Unzulässiger Level",
+            "invalid_object": "Unzulässiges Objekt",
+            "invalid_room": "Unzulässiger Raum: %d. Zulässige Räume sind 0-%d",
+            "invalid_sample": "Unzulässiger Sound: %d",
+            "kill": "Bye-bye!",
+            "kill_all": "Poof! %d Feinde verschwunden!",
+            "kill_all_fail": "Oh oh, es sind keine Feinde mehr zum Töten da...",
+            "kill_fail": "Kein Feind in der Nähe...",
+            "lighting_contrast_fmt": "Beleuchtungs-Kontrast: %s",
+            "load_game": "Spiel laden von folgendem Speicher-Slot %d",
+            "load_game_fail_invalid_slot": "Unzulässiger Speicher-Slot %d",
+            "load_game_fail_unavailable_slot": "Speicher-Slot %d ist nicht verfügbar",
+            "object_not_found": "Objekt nicht gefunden",
+            "play_cutscene": "Lade Zwischensequenz %d",
+            "play_demo": "Lade Demo %d",
+            "play_level": "Lade %s",
+            "pos_lara_missing": "Lara nicht vorhanden",
+            "pos_lara_pos_fmt": "Raum: %d\nPosition: %.3f, %.3f, %.3f\nRotation: %.3f, %.3f, %.3f",
+            "pos_level_fmt": "Level %d",
+            "pos_level_fmt_cutscene": "Zwischensequenz %d",
+            "pos_level_fmt_demo": "Demo %d",
+            "quick_load": "\\{review}Schnell geladener Slot %d",
+            "quick_load_fail_no_bound_slot": "\\{review}Kein Speicherplatz ist derzeit zugewiesen",
+            "quick_load_fail_unavailable_bound_slot": "\\{review}Der zugewiesene Speicherplatz ist nicht verfügbar",
+            "quick_save": "\\{review}Schnell gespeichert",
+            "quick_save_fail_no_slots": "\\{review}Keine Schnellspeicherplätze konfiguriert",
+            "save_game": "Spiel gespeichert auf Speicher-Slot %d",
+            "save_game_fail_invalid_slot": "Unzulässiger Speicher-Slot %d",
+            "sound_available_samples": "Verfügbare Sounds: %s",
+            "sound_playing_sample": "Spiele Sound: %d",
+            "speed_get": "Momentane Geschwindigkeit: %d",
+            "speed_set": "Geschwindigkeit eingestellt auf %d",
+            "strings_failed": "Neu Laden der Sprachdateien ist fehlgeschlagen",
+            "strings_reloaded": "Sprachdateien neu geladen",
+            "textures_off": "\\{review}Texturen: aus",
+            "textures_on": "\\{review}Texturen: an",
+            "trapezoid_filter_off": "Deaktiviert Trapezoid-Filter",
+            "trapezoid_filter_on": "Aktiviert Trapezoid-Filter",
+            "ui_off": "UI deakiviert",
+            "ui_on": "UI aktiviert",
+            "unknown_command": "Unbekanntes Kommando: %s",
+            "upscaling_factor": "Uscaling-Faktor: x%d",
+            "wireframe_mode_off": "Gitterrahmen-Modus: aus",
+            "wireframe_mode_on": "Gitterrahmen-Modus: ein",
+        },
+        "overlay": {
+            "debug_animation": "Animation: ",
+            "debug_animation_state": "\\{review}Status: ",
+            "debug_camera_pos": "\\{review}Kamerastandort: ",
+            "debug_camera_target": "\\{review}Kameraziel: ",
+            "debug_immune": "Unverwundbarkeit ein",
+            "debug_position": "Position: ",
+            "debug_rotation": "Rotation: ",
+            "debug_speed": "Geschwindigkeit: ",
+            "item_count_fmt_pc": "\\{small}%s",
+            "item_count_fmt_ps1": "\\{small}%s",
+        },
+        "passport": {
+            "exit_game": "Spiel beenden",
+            "exit_to_title": "Zurück zum Hauptmenü",
+            "load_game": "Spiel laden",
+            "mode_new_game": "Neues Spiel",
+            "mode_new_game_jp": "Japanisch NS",
+            "mode_new_game_jp_plus": "Japanisch NS+",
+            "mode_new_game_plus": "Neues Spiel+",
+            "new_game": "Neues Spiel",
+            "play_previous_levels": "\\{review}Vorherige Level spielen",
+            "restart_level": "Level Neu starten",
+            "save_game": "Spiel speichern",
+            "save_slot_unsupported": "\\{review}Dieser Speicherstand unterstützt diese Funktion nicht.",
+            "select_level": "Level auswählen",
+            "select_mod": "\\{review}Spiel auswählen",
+            "select_mode": "Modus Auswählen",
+            "select_save": "\\{review}Speicher auswählen",
+            "story_so_far": "Bisherige Geschichte...",
+            "switch_mod": "\\{review}Spiel wechseln",
+        },
+        "pause": {
+            "are_you_sure": "Sind sie sicher?",
+            "continue": "Fortsetzen",
+            "exit_to_title": "Wirklich zum Hauptmenü zurückkehren?",
+            "no": "Nein",
+            "paused": "Pause",
+            "quit": "Beenden",
+            "yes": "Ja",
+        },
+        "photo_mode": {
+            "advance_frame": "Frame Vorwärts",
+            "camera_move_prompt": "Kamera bewegen",
+            "camera_reset_prompt": "Kamera zurücksetzen",
+            "camera_roll_prompt": "Rolle Kamera",
+            "camera_rotate_90_prompt": "Rotiere um 90 Grad",
+            "camera_rotate_prompt": "Rotiere Kamera",
+            "change_lara_pose": "Pose ändern",
+            "fov_prompt": "FOV einstellen",
+            "lara_move_prompt": "\\{review}Bewege Lara",
+            "lara_reset_prompt": "\\{review}Setze Lara zurück",
+            "lara_roll_prompt": "\\{review}Rolle Lara",
+            "lara_rotate_90_prompt": "\\{review}Drehe Lara um 90°",
+            "lara_rotate_prompt": "\\{review}Drehe Lara",
+            "snap_prompt": "Bild aufnehmen",
+            "title_camera_pos": "Foto-Modus",
+            "title_lara_pos": "\\{review}Lara bewegen",
+            "toggle_help": "Hilfe Ein/Aus",
+        },
+        "settings": {
+            "common": {
+                "all_hidden_disclaimer": "\\{review}Die Einstellungen sind für dieses Level-Set deaktiviert.",
+                "chroma": "Chroma",
+                "edit_value": "Wert bearbeiten",
+                "frozen_option_disclaimer": "Diese Einstellung ist vom Ersteller des Levels erzwungen und kann nicht geändert werden.",
+                "hue": "Farbton",
+                "lightness": "Helligkeit",
+                "restore_default": "Standard wiederherstellen",
+                "toggle_help": "Hilfe Ein/Aus",
+            },
+            "controls": {
+                "backend": {
+                    "controller": "Kontroller",
+                    "keyboard": "Tastatur",
+                },
+                "customize": "Steuerung anpassen",
+                "layout": {
+                    "custom_1": "Eigene Steuerung 1",
+                    "custom_2": "Eigene Steuerung 2",
+                    "custom_3": "Eigene Steuerung 3",
+                    "default": "Standardtasten",
+                },
+                "tabs": {
+                    "basics": "Bewegung",
+                    "items": "Items",
+                    "misc": "Sonstiges",
+                    "system": "System",
+                }
+            },
+            "gameplay": {
+                "tabs": {
+                    "controls": "Steuerung",
+                    "fixes": "Fixes",
+                    "general": "Allgemeines",
+                    "mods": "Mods",
+                    "presets": "\\{review}Voreinstellungen",
+                },
+                "title": "Gameplay-Optionen",
+            },
+            "graphic_settings": {
+                "tabs": {
+                    "bars": "\\{review}Leisten",
+                    "rendering": "\\{review}Rendern",
+                    "ui": "\\{review}Benutzeroberfläche",
+                    "visuals": "\\{review}Darstellung",
+                },
+                "title": "Grafik Optionen",
+            },
+            "sound": {
+                "tabs": {
+                    "misc": "\\{review}Verschiedenes",
+                    "volume": "\\{review}Lautstärke",
+                },
+                "title": "Sound-Optionen",
+            }
+        },
+        "stats": {
+            "ammo": "Munition Treffer/Verbraucht",
+            "ammo_hits": "Treffer",
+            "ammo_used": "Benötigte Munition",
+            "assault_best_time_fmt": "\\{review}%s",
+            "assault_finish": "Zeit",
+            "assault_no_times_set": "Keine Zeiten gesetzt",
+            "assault_other_times_fmt": "\\{review}%s",
+            "assault_title": "Bestzeiten",
+            "basic_fmt": "%d",
+            "bonus_statistics": "Bonusstatistiken",
+            "deaths": "Tode",
+            "detail_fmt": "%d von %d",
+            "distance_travelled": "Zurückgelegte Distanz",
+            "final_statistics": "Finale Statistiken",
+            "gym_assault_course": "\\{review}Angriffskurs",
+            "gym_racetrack_course": "\\{review}Rennstrecke",
+            "kills": "Besiegte Gegner",
+            "level": "Level",
+            "medipacks_used": "Benötigte Medi-Packs",
+            "none": "None",
+            "pickups": "Pickups",
+            "secrets": "Gefundene Geheimnisse",
+            "time_taken": "Benötigte Zeit",
+        }
+    },
+    "console": {
+        "cmd": {
+            "braid": {
+                "help": "Aktiviert und deaktiviert Laras Zopf.",
+            },
+            "cheats": {
+                "help": "Schaltet In-Game Cheats ein oder aus.",
+            },
+            "clear": {
+                "help": "\\{review}Löscht sichtbare Konsolenprotokolle.",
+            },
+            "debug": {
+                "help": "Aktiviert und deaktiviert visuele Debuginformationen.",
+            },
+            "drain": {
+                "help": "Entfernt das gesamte Wasser aus dem Raum, in dem sie sich im Moment befinden.",
+            },
+            "end_level": {
+                "help": "Beendet das aktuelle Level.",
+            },
+            "exit": {
+                "help": "Beendet das Spiel.",
+            },
+            "flipmap": {
+                "help": "Aktiviert und deaktiviert die Flip-Map.",
+            },
+            "flood": {
+                "help": "Überflutet den Raum, in dem sie sich im Moment befinden, mit Wasser.",
+            },
+            "fly": {
+                "help": "Aktiviert und deaktiviert den Flug-Modus-Cheat.",
+            },
+            "fps": {
+                "help": "Erhöht oder senkt den FPS-Wert.",
+            },
+            "give": {
+                "help": "Fügt ein angegebenes Item zu Laras Inventar hinzu.",
+                "invalid_secret": "Unzulässiges Geheimnis: #%d (zulässige Geheimnisse: %s)",
+                "secret_given": "Geheimnis hinzugefügt %s",
+                "secret_list": "Gesammelte Geheimnisse: %d von %d (%s)",
+                "secret_none": "Gesammelte Geheimnisse: %d von %d",
+                "secret_taken": "Geheimnis enfernt %s",
+            },
+            "give_secret": {
+                "help": "Listet Laras Geheimnisse auf oder nimmt/gibt ein nach Nummern sortiertes Geheimnis.",
+            },
+            "heal": {
+                "help": "Heilt Lara zurück auf volle Lebensenergie.",
+            },
+            "help": {
+                "help": "Zeigt Hilfe für alle Kommandos oder detaillierte Hilfe für ein bestimmtes.",
+                "list": "Verfügbare Kommandos:",
+            },
+            "hp": {
+                "help": "Stellt Laras Lebensenergie auf den bestimmten Wert ein.",
+            },
+            "immune": {
+                "help": "Aktiviet oder deaktiviert Unverwundbarkeit. (Lara kann unter bestimmten Umständen immernoch sterben.)",
+                "off": "Lara ist nun verwundbar",
+                "on": "Lara ist nun unverwundbar",
+            },
+            "inf_sprint": {
+                "help": "\\{review}Schaltet unendliches Sprinten um.",
+                "off": "\\{review}Lara kann nicht mehr ewig sprinten",
+                "on": "\\{review}Lara kann jetzt ewig sprinten",
+            },
+            "kill": {
+                "help": "Tötet in der Nähe befindliche Feinde.",
+            },
+            "lighting": {
+                "help": "Aktiviet oder deaktiviert Beleuchtungs-Sytem.",
+            },
+            "load": {
+                "help": "\\{review}Lädt das Spiel aus dem angegebenen Speicherplatz oder von einem Schnell-Speicher.",
+            },
+            "lua": {
+                "help": "\\{review}Führt den angegebenen Lua-Code-String aus.",
+                "runtime_error": "\\{review}Lua-Laufzeitfehler: %s",
+                "syntax_error": "\\{review}Lua-Syntaxfehler: %s",
+            },
+            "mod": {
+                "help": "\\{review}Wechselt zum angegebenen Mod und startet das Spiel neu.",
+            },
+            "music": {
+                "help": "Spielt Musik-Titel mit dazugehöriger ID ab.",
+            },
+            "play_cutscene": {
+                "help": "Spielt Zwischensequenz mit dazugehöriger Nummer ab.",
+            },
+            "play_demo": {
+                "help": "Spielt eine Demo mit der angegebenen Nummer ab.",
+            },
+            "play_gym": {
+                "help": "Startet das Gym-Level.",
+            },
+            "play_level": {
+                "help": "Startet einen Level mit dem angegebenen Namen oder der dazugehörigen Nummer.",
+            },
+            "play_music": {
+                "invalid_track": "Unzulässiger Musik Titel",
+                "stopped": "\\{review}Musik gestoppt",
+                "track": "Spiele Musiktitel %d",
+            },
+            "pos": {
+                "help": "Zeigt Laras Position an.",
+            },
+            "save": {
+                "help": "\\{review}Speichert das Spiel im angegebenen Speicherplatz oder im nächsten Schnell-Speicherplatz.",
+            },
+            "screenshot": {
+                "help": "\\{review}Speichert einen Screenshot auf der Festplatte, mit optionalem Pfad.",
+            },
+            "set": {
+                "help": "Aktualisiert oder zeigt die angegebene Konfigurations-Einstellung an.",
+            },
+            "sfx": {
+                "help": "Spielt einen Sound-Effekt mit der angegebenen ID ab.",
+            },
+            "spawn": {
+                "fail": "\\{review}Erzeugen des angeforderten Objekts fehlgeschlagen",
+                "success": "\\{review}Angefordertes Objekt in der Nähe von Lara erzeugt",
+            },
+            "speed": {
+                "help": "Ändert die Geschwindigkeit des Spiels.",
+            },
+            "strings": {
+                "help": "Lädt erneut die aktuellen Sprachdateien von der Festplatte.",
+            },
+            "teleport": {
+                "item": "Teleportiert zu Objekt: %d",
+                "item_fail": "Fehlgeschlagene Teleportation zu Objekt: %d",
+                "object": "Teleportiert zu Objekt: %s",
+                "object_fail": "Fehlgeschlagene Teleportation zu Objekt: %s",
+                "pos": "Teleportiere zu Position: %.3f %.3f %.3f",
+                "pos_fail": "Fehlgeschlagene Teleportation zu Position: %.3f %.3f %.3f",
+                "room": "Teleportiere zu Raum: %d",
+                "room_fail": "Teleportation zu Raum: %d",
+            },
+            "textures": {
+                "help": "\\{review}Schaltet die Texturen ein oder aus.",
+            },
+            "title": {
+                "help": "Bringt sie zurück zum Titel-Bildschirm.",
+            },
+            "tp": {
+                "help": "Teleportiert Lara zu der angegebenen Position oder Raum-Nummer.",
+            },
+            "trigger": {
+                "help": "\\{review}Löst ein Element durch ID, Elementname oder Objektnamen aus oder setzt es zurück.",
+                "invalid_item": "\\{review}Ungültiges Element: %s",
+                "no_match": "\\{review}Unbekanntes Ziel: %s",
+                "not_found": "\\{review}Keine passenden Elemente gefunden für: %s",
+                "triggered": "\\{review}Ausgelöstes Element(e): %s",
+                "untriggered": "\\{review}Nicht ausgelöstes Element(e): %s",
+            },
+            "vsync": {
+                "help": "Vertical Sync. Ein/Aus",
+            },
+            "weather": {
+                "help": "\\{review}Ändert den aktuellen Wettertyp.",
+                "invalid": "\\{review}Ungültiges Wetter: %s (gültig: %s)",
+                "set": "\\{review}Wetter auf %s eingestellt",
+            },
+            "winston": {
+                "dead": "Der Butler ist tot. Du Monster!",
+                "spawn_failed": "Herbeirufen von Winston fehlgeschlagen",
+                "spawned": "Winston herbeigerufen, nahe Lara",
+                "teleported": "Winston herbeigerufen, nahe Lara",
+            },
+            "wireframe": {
+                "help": "Aktiviert und deaktiviert den Gitterrahmen-Render.",
+            }
+        }
+    },
+    "dynamic": {
+        "config_presets": {
+            "tr1_pc": "\\{review}TR1 PC",
+            "tr1_ps1": "\\{review}TR1 PS1",
+            "tr2_pc": "\\{review}TR2 PC",
+            "tr2_ps1": "\\{review}TR2 PS1",
+            "tr3_pc": "\\{review}TR3 PC",
+            "tr3_ps1": "\\{review}TR3 PS1",
+        },
+        "enums": {
+            "bar_look": {
+                "tr1_pc": "TR1 PC",
+                "tr2_pc": "\\{review}TR2 PC",
+                "tr2_ps1": "\\{review}TR2 PS1",
+                "tr3_pc": "\\{review}TR3 PC",
+                "tr3_ps1": "TR3 PS1",
+            },
+            "lara_outfit": {
+                "default": "\\{review}Standard",
+                "golden_sophia": "\\{review}Goldene Sophia",
+                "sophia": "\\{review}Sophia",
+                "tr1_bacon_lara": "\\{review}Bacon-Lara",
+                "tr1_classic": "\\{review}TR1 Klassisch",
+                "tr1_combo": "\\{review}TR1 Kombiniert",
+                "tr1_golden_bacon_lara": "\\{review}Goldene Bacon-Lara",
+                "tr1_golden_lara": "\\{review}TR1 Goldene Lara",
+                "tr1_gym": "\\{review}TR1 Trainingsanzug",
+                "tr1_mauled": "\\{review}TR1 Verletzt",
+                "tr1_ngage": "\\{review}TR1 N-Gage",
+                "tr23_golden_lara": "\\{review}TR2/3 Goldene Lara",
+                "tr2_bomber_jacket": "\\{review}Bomberjacke",
+                "tr2_classic": "\\{review}TR2 Klassisch",
+                "tr2_diving_suit": "\\{review}Tauchanzug 1",
+                "tr2_diving_suit_alpha": "\\{review}Tauchanzug 2",
+                "tr2_gym": "\\{review}TR2 Trainingsanzug",
+                "tr2_robe": "\\{review}Robe",
+                "tr2_vegas": "\\{review}Las Vegas",
+                "tr3_antarctica": "\\{review}Antarktis",
+                "tr3_catsuit": "\\{review}Catsuit",
+                "tr3_classic": "\\{review}TR3 Klassisch",
+                "tr3_gym": "\\{review}TR3 Trainingsanzug",
+                "tr3_nevada": "\\{review}Nevada",
+                "tr3_south_pacific": "\\{review}Südpazifik",
+            }
+        },
+        "mods": {
+            "tr1": {
+                "title": "\\{review}Tomb Raider I",
+            },
+            "tr1-demo-pc": {
+                "title": "\\{review}Tomb Raider I Demo",
+            },
+            "tr1-ub": {
+                "title": "\\{review}Unvollendete Angelegenheiten",
+            },
+            "tr2": {
+                "title": "\\{review}Tomb Raider II",
+            },
+            "tr2-gm": {
+                "title": "\\{review}Die Goldene Maske",
+            },
+            "tr3": {
+                "title": "\\{review}Tomb Raider III",
+            },
+            "tr3-la": {
+                "title": "\\{review}Das Verlorene Artefakt",
+            }
+        }
+    },
+    "enums": {
+        "ALLY_HOSTILITY_POLICY": {
+            "ALLY_HOSTILITY_POLICY_INDIVIDUAL": "\\{review}Individuell",
+            "ALLY_HOSTILITY_POLICY_SHARED": "\\{review}Geteilt",
+        },
+        "ASPECT_MODE": {
+            "ASPECT_MODE_16_10": "16:10",
+            "ASPECT_MODE_16_9": "16:9",
+            "ASPECT_MODE_4_3": "4:3",
+            "ASPECT_MODE_ANY": "\\{review}Auto",
+        },
+        "BACKGROUND_TYPE": {
+            "BK_BLACK": "\\{review}Schwarz",
+            "BK_IMAGE": "\\{review}Bild",
+            "BK_MONOCHROME": "\\{review}Monochrom",
+            "BK_MONOCHROME_COOL": "\\{review}Monochrom (kühl)",
+            "BK_MONOCHROME_WARM": "\\{review}Monochrom (warm)",
+            "BK_NONE": "\\{review}Transparent",
+            "BK_PATTERN_STATIC": "\\{review}Statisch",
+            "BK_PATTERN_WAVE": "\\{review}Welle",
+            "BK_TRANSPARENT_DARK": "\\{review}Sehr dunkel",
+            "BK_TRANSPARENT_MEDIUM": "\\{review}Dunkel",
+        },
+        "BAR_SHOW_MODE": {
+            "BAR_SHOW_MODE_ALWAYS": "Immer",
+            "BAR_SHOW_MODE_BOSS_ONLY": "Nur Boss-Gegner",
+            "BAR_SHOW_MODE_NEVER": "Nie",
+        },
+        "BILLBOARD_LOCK_MODE": {
+            "BILLBOARD_LOCK_NONE": "\\{review}Keine",
+            "BILLBOARD_LOCK_PERSPECTIVE": "\\{review}Perspektive",
+            "BILLBOARD_LOCK_ROLL": "\\{review}Roll",
+            "BILLBOARD_LOCK_ROLL_PITCH": "\\{review}Roll & Neigung",
+        },
+        "CAMERA_MODE": {
+            "CAMERA_MODE_TR1": "TR1",
+            "CAMERA_MODE_TR2": "TR2",
+            "CAMERA_MODE_TR3": "\\{review}TR3",
+        },
+        "INPUT_BACKEND": {
+            "INPUT_BACKEND_CONTROLLER": "\\{review}Controller",
+            "INPUT_BACKEND_KEYBOARD": "\\{review}Tastatur",
+        },
+        "INPUT_ROLE": {
+            "INPUT_ROLE_ACTION": "Aktion",
+            "INPUT_ROLE_CAMERA_BACK": "Kamera zurück",
+            "INPUT_ROLE_CAMERA_DOWN": "Kamera runter",
+            "INPUT_ROLE_CAMERA_FORWARD": "Kamera Vorwärts",
+            "INPUT_ROLE_CAMERA_LEFT": "Kamera Links",
+            "INPUT_ROLE_CAMERA_RESET": "Kamera zurücksetzen",
+            "INPUT_ROLE_CAMERA_RIGHT": "Kamera Rechts",
+            "INPUT_ROLE_CAMERA_UP": "Kamera Hoch",
+            "INPUT_ROLE_CHANGE_OUTFIT": "\\{review}Outfit wechseln",
+            "INPUT_ROLE_CHANGE_TARGET": "Ziel wechseln",
+            "INPUT_ROLE_CROUCH": "\\{review}Ducken",
+            "INPUT_ROLE_CYCLE_LIGHTING_CONTRAST": "Beleuchtungs-Kontrast durchschalten",
+            "INPUT_ROLE_DOWN": "Zurück",
+            "INPUT_ROLE_DRAW_WEAPON": "Waffe ziehen",
+            "INPUT_ROLE_ENTER_CONSOLE": "Entwickler-Konsole",
+            "INPUT_ROLE_EQUIP_AUTOS": "Automatik-Pistolen ausrüsten",
+            "INPUT_ROLE_EQUIP_DESERT_EAGLE": "\\{review}Desert Eagle ausrüsten",
+            "INPUT_ROLE_EQUIP_GRENADE_LAUNCHER": "Granatenwerfer ausrüsten",
+            "INPUT_ROLE_EQUIP_HARPOON": "Harpune ausrüsen",
+            "INPUT_ROLE_EQUIP_M16": "M16-ausrüsten",
+            "INPUT_ROLE_EQUIP_MAGNUMS": "Magnums ausrüsten",
+            "INPUT_ROLE_EQUIP_MP5": "\\{review}MP5 ausrüsten",
+            "INPUT_ROLE_EQUIP_PISTOLS": "Pistolen ausrüsten",
+            "INPUT_ROLE_EQUIP_ROCKET_LAUNCHER": "\\{review}Raketenwerfer ausrüsten",
+            "INPUT_ROLE_EQUIP_SHOTGUN": "Schrotflinte ausrüsten",
+            "INPUT_ROLE_EQUIP_UZIS": "Uzis ausrüsten",
+            "INPUT_ROLE_FLY_CHEAT": "Flug-Cheat",
+            "INPUT_ROLE_FPS": "FPS anzeigen",
+            "INPUT_ROLE_INVENTORY": "Inventar",
+            "INPUT_ROLE_ITEM_CHEAT": "Item Cheat",
+            "INPUT_ROLE_JUMP": "Springen",
+            "INPUT_ROLE_LEFT": "Links",
+            "INPUT_ROLE_LEVEL_SKIP_CHEAT": "Level überspringen",
+            "INPUT_ROLE_LOAD": "\\{review}Laden",
+            "INPUT_ROLE_LOOK": "Umsehen",
+            "INPUT_ROLE_PAUSE": "Pause",
+            "INPUT_ROLE_QUICK_LOAD": "\\{review}Schnellladen",
+            "INPUT_ROLE_QUICK_SAVE": "\\{review}Schnellspeichern",
+            "INPUT_ROLE_RIGHT": "Rechts",
+            "INPUT_ROLE_ROLL": "Rolle",
+            "INPUT_ROLE_SAVE": "\\{review}Speichern",
+            "INPUT_ROLE_SCREENSHOT": "Bildschirmfoto",
+            "INPUT_ROLE_SLOW": "Gehen",
+            "INPUT_ROLE_SPRINT": "\\{review}Sprinten",
+            "INPUT_ROLE_STEP_LEFT": "Seit-Schritt Links",
+            "INPUT_ROLE_STEP_RIGHT": "Seit-Schritt Rechts",
+            "INPUT_ROLE_SWITCH_BORDERS": "Wechsel zwischen Rahmen-Größen",
+            "INPUT_ROLE_SWITCH_UPSCALING": "Wechsel zwischen Upscaling-Faktoren",
+            "INPUT_ROLE_TOGGLE_BILINEAR_FILTER": "Bilinear-Filter Ein/Aus",
+            "INPUT_ROLE_TOGGLE_FULLSCREEN": "Vollbild Ein/Aus",
+            "INPUT_ROLE_TOGGLE_PHOTO_MODE": "Foto-Modus Ein/Aus",
+            "INPUT_ROLE_TOGGLE_TEXTURES": "\\{review}Texturen umschalten",
+            "INPUT_ROLE_TOGGLE_TRAPEZOID_FILTER": "Trapezoid-Filter Ein/Aus",
+            "INPUT_ROLE_TOGGLE_UI": "UI Ein/Aus",
+            "INPUT_ROLE_TOGGLE_WIREFRAME": "Drahtgitter Ein/Aus",
+            "INPUT_ROLE_TURBO_CHEAT": "Turbo Geschwindigkeit",
+            "INPUT_ROLE_UP": "Laufen",
+            "INPUT_ROLE_USE_BIG_MEDI": "Großes Medi-Pack",
+            "INPUT_ROLE_USE_FLARE": "Fackel",
+            "INPUT_ROLE_USE_SMALL_MEDI": "Kleines Medi-Pack",
+        },
+        "JUMP_LOCK_MODE": {
+            "JUMP_LOCK_DISABLED": "Deaktiviert",
+            "JUMP_LOCK_LEGACY": "Original",
+            "JUMP_LOCK_TUNED": "Getuned",
+        },
+        "LIGHTING_CONTRAST": {
+            "LIGHTING_CONTRAST_HIGH": "Hoch",
+            "LIGHTING_CONTRAST_LOW": "Niedrig",
+            "LIGHTING_CONTRAST_MEDIUM": "Mittel",
+        },
+        "LOADING_SCREENS_MODE": {
+            "LOADING_SCREENS_ALWAYS": "\\{review}Immer",
+            "LOADING_SCREENS_DISABLED": "\\{review}Deaktiviert",
+            "LOADING_SCREENS_NEW_GAMES": "\\{review}Neue Spiele",
+        },
+        "LOOK_MODE": {
+            "LOOK_MODE_ENHANCED": "Erweitert",
+            "LOOK_MODE_RESTRICTED": "Beschränkt",
+            "LOOK_MODE_UNRESTRICTED": "Unbeschränkt",
+        },
+        "MUSIC_LOAD_CONDITION": {
+            "MUSIC_LOAD_CONDITION_ALWAYS": "Immer",
+            "MUSIC_LOAD_CONDITION_NEVER": "Nie",
+            "MUSIC_LOAD_CONDITION_NON_AMBIENT": "Nicht-Umgebung",
+        },
+        "PROJECTILE_AREA_DAMAGE": {
+            "PROJECTILE_AREA_DAMAGE_MULTI_SWEEP": "\\{review}Mehrfachfeger",
+            "PROJECTILE_AREA_DAMAGE_SINGLE_SWEEP": "\\{review}Einzelfeger",
+        },
+        "QUICK_GUNS_MODE": {
+            "QUICK_GUNS_MODE_DRAW_AND_HOLSTER": "Ziehen oder wegstecken",
+            "QUICK_GUNS_MODE_DRAW_ONLY": "Nur ziehen",
+        },
+        "SCREENSHOT_FORMAT": {
+            "SCREENSHOT_FORMAT_JPEG": "JPG",
+            "SCREENSHOT_FORMAT_PNG": "PNG",
+        },
+        "SHADOW_TYPE": {
+            "SHADOW_TYPE_CIRCLE": "\\{review}Kreis",
+            "SHADOW_TYPE_OCTAGON": "\\{review}Achteck",
+            "SHADOW_TYPE_SPRITE": "\\{review}Sprite",
+        },
+        "STAT_DETAIL_MODE": {
+            "STAT_DETAIL_MODE_DETAILED": "Detailliert",
+            "STAT_DETAIL_MODE_FULL": "Voll",
+            "STAT_DETAIL_MODE_MINIMAL": "Minimal",
+        },
+        "SUNGLASSES_MODE": {
+            "SUNGLASSES_MODE_OFF": "\\{review}Aus",
+            "SUNGLASSES_MODE_OPAQUE": "\\{review}Undurchsichtig",
+            "SUNGLASSES_MODE_TRANSPARENT": "\\{review}Transparent",
+        },
+        "TARGET_LOCK_MODE": {
+            "TARGET_LOCK_MODE_FULL": "Volles Lock-On",
+            "TARGET_LOCK_MODE_NONE": "Kein Lock-On",
+            "TARGET_LOCK_MODE_SEMI": "Halbes Lock-On",
+        },
+        "TEXTURE_FILTER": {
+            "TEXTURE_FILTER_BILINEAR": "Bilinear",
+            "TEXTURE_FILTER_POINT": "Aus",
+        },
+        "UI_ELEMENT_LOCATION": {
+            "UI_ELEMENT_LOCATION_BOTTOM_CENTER": "Unten Mitte",
+            "UI_ELEMENT_LOCATION_BOTTOM_LEFT": "Unten links",
+            "UI_ELEMENT_LOCATION_BOTTOM_RIGHT": "Unten rechts",
+            "UI_ELEMENT_LOCATION_TOP_CENTER": "Oben Mitte",
+            "UI_ELEMENT_LOCATION_TOP_LEFT": "Oben links",
+            "UI_ELEMENT_LOCATION_TOP_RIGHT": "Oben rechts",
+        },
+        "UI_STYLE": {
+            "UI_STYLE_PC": "PC",
+            "UI_STYLE_PS1": "PS1",
+        },
+        "WALL_GLITCH_MODE": {
+            "WALL_GLITCH_FIXED": "Gefixt",
+            "WALL_GLITCH_TR1": "TR1",
+            "WALL_GLITCH_TR2": "TR2",
+        }
+    },
+    "settings": {
+        "audio.ambient_volume": {
+            "title": "\\{review}Umgebungslautstärke",
+            "description": "\\{review}Passt die Umgebungslautstärke an.",
+        },
+        "audio.cutscene_volume": {
+            "title": "\\{review}Zwischensequenz-Lautstärke",
+            "description": "\\{review}Passt die Lautstärke der Zwischensequenzen im Spiel an.",
+        },
+        "audio.enable_lara_mic": {
+            "title": "Mikrofon nah an Lara",
+            "description": "Setzt das Mikrofon auf Laras Position. Wenn deaktiviert, wird das Mikrofon auf der Position der Kamera gesetzt.",
+        },
+        "audio.enable_music_in_inventory": {
+            "title": "\\{review}Musik im Inventar abspielen",
+            "description": "\\{review}Lässt Spielgeräusche, Umgebungsgeräusche und Musik im Inventarbildschirm weiterlaufen.",
+        },
+        "audio.enable_music_in_menu": {
+            "title": "Hauptmenü-Musik",
+            "description": "Spielt Musik im Hauptmenü ab.",
+        },
+        "audio.enable_pitched_sounds": {
+            "title": "Gepitchte Sounds",
+            "description": "Erlaubt die zufällige Wiedergabe von Sound-Effekten, leicht gepitched, um die Spiel-Sounds zu variieren.",
+        },
+        "audio.enable_ps1_sfx": {
+            "title": "\\{review}PS1 SFX-Ersetzungen",
+            "description": "\\{review}Aktiviert bestimmte Soundeffekt-Ersetzungen mit PS1-Äquivalenten.\n\n- Uzi-Feuer (nur TR1)\n- Laras Barfußgeräusche (nur TR2)",
+        },
+        "audio.enable_underwater_anim_sfx": {
+            "title": "Tauch-Animations Sounds",
+            "description": "Erlaubt Kontrolle über das Abspielen von bestimmten Animationen und Souneffekten - für Objekte, wie zum Beispiel Türen und Falltüren - wenn die Kamera unter Wasser ist.",
+        },
+        "audio.fix_chainblock_secret_sound": {
+            "title": "Fix: Falsch abspielender Sound",
+            "description": "Verhindert, dass der Geheimnis-Ton inkorrekterweise abgespielt wird, wenn man den Goldenen Schlüssel im Grab von Tihocan benutzt.",
+        },
+        "audio.fix_secrets_killing_music": {
+            "title": "Überlagernde Geheimnis-Musik",
+            "description": "Fixt dass der Ton vom Geheimnis-Einsammeln den momentan spielenden Musik-Titel unterbricht.",
+        },
+        "audio.fix_speeches_killing_music": {
+            "title": "Überlagernde Feind-Sprache",
+            "description": "Fixt dass Feinde beim Sprechen den momentan spielenden Musiktitel unterbrechen.",
+        },
+        "audio.fmv_volume": {
+            "title": "\\{review}FMV-Lautstärke",
+            "description": "Passt die Lautstärke der Videosequenzen an.",
+        },
+        "audio.inventory_ambient_volume": {
+            "title": "\\{review}Umgebungslautstärke (Inventar)",
+            "description": "\\{review}Passt die Umgebungslautstärke im Inventarbildschirm an.",
+        },
+        "audio.inventory_music_volume": {
+            "title": "\\{review}Musiklautstärke (Inventar)",
+            "description": "\\{review}Passt die Musiklautstärke im Inventarbildschirm an.",
+        },
+        "audio.load_music_triggers": {
+            "title": "Fix: Trigger für Musik, die nur einmal spielen soll",
+            "description": "Lädt vorher getriggerte Musik, so dass Musik, die nur einmal spielen soll, nicht ein weiteres Mal abgespielt wird.",
+        },
+        "audio.master_volume": {
+            "title": "\\{review}\\{icon music} Hauptlautstärke",
+            "description": "\\{review}Passt die gesamte Spiel-Lautstärke an. Die restlichen Einstellungen sind relativ zu dieser Lautstärke.",
+        },
+        "audio.music_load_condition": {
+            "title": "Musik beim Laden wiederherstellen",
+            "description": "Lädt den Musiktitel der vor dem Speichern des Spiels abgespielt wurde.\n\n- Nie: keine Musik-Titel beim laden wiederherstellen.\n- Nicht-Umgebung: stellt nur Nicht-Umgebungs-Musiktitel beim laden wieder her.\n- Immer: stellt jede Art von Musiktitel beim Laden wieder her.",
+        },
+        "audio.music_volume": {
+            "title": "\\{review}Musiklautstärke",
+            "description": "\\{review}Passt die Musiklautstärke an.",
+        },
+        "audio.mute_out_of_focus": {
+            "title": "Ton stummschalten bei Fokusverlust",
+            "description": "Schaltet alle Musik und Soundeffekte stumm wenn das Fenster des Spiels nicht fokusiert ist.",
+        },
+        "audio.sound_volume": {
+            "title": "\\{icon sound} Sound-Lautstärke",
+            "description": "Soundeffekt-Lautstärke einstellen.",
+        },
+        "audio.underwater_ambient_volume": {
+            "title": "\\{review}Umgebungslautstärke (unter Wasser)",
+            "description": "\\{review}Passt die Umgebungslautstärke unter Wasser an.",
+        },
+        "audio.underwater_music_volume": {
+            "title": "\\{review}Musiklautstärke (unter Wasser)",
+            "description": "\\{review}Passt die Musiklautstärke unter Wasser an.",
+        },
+        "debug.enable_endless_flare_time": {
+            "title": "\\{review}Unendliche Fackelzeit",
+            "description": "\\{review}Verhindert, dass die tragbaren Fackeln jemals erlöschen. Geworfene Fackeln erlöschen jedoch weiterhin wie gewohnt.",
+        },
+        "debug.enable_endless_sprint": {
+            "title": "\\{review}Endloses Sprinten",
+            "description": "\\{review}Verhindert, dass Lara beim Sprinten jemals müde wird. Hindernisse bringen sie jedoch weiterhin zum Stillstand.",
+        },
+        "gameplay.ally_hostility_policy": {
+            "title": "\\{review}Verbündeten-Feindseligkeitspolitik",
+            "description": "\\{review}Steuert, wie freundliche Einheiten reagieren, wenn sie Schaden nehmen.\n\n- Individuell: Jeder Verbündete ändert seine Feindseligkeit eigenständig (TR3-Stil).\n- Geteilt: Alle Verbündeten werden gemeinsam feindlich (TR2-Mönch-Stil).",
+        },
+        "gameplay.camera_speed": {
+            "title": "Kamera-Geschwindigkeit",
+            "description": "Ändert, wie schnell sich die Kamera bewegt.",
+        },
+        "gameplay.change_pierre_spawn": {
+            "title": "Ändere Pierre Spawn-Modus",
+            "description": "Erstellt einen gerade erst ausgelösten (flüchtenden) Pierre und ersetzt einen bereits existierenden (flüchtenden) Pierre.",
+        },
+        "gameplay.disable_extra_guns": {
+            "title": "\\{review}Entferne zusätzliche Waffen",
+            "description": "Entfernt alle Waffen- und Munitions-Pickups aus dem Spiel, außer Pistolen (für Pistolen-Only-Challenge-Läufe).",
+        },
+        "gameplay.disable_healing_between_levels": {
+            "title": "Bleibender Schaden",
+            "description": "Verhindert, dass Lara beim Starten eines neuen Levels geheilt wird (für \"No Heal Challenge\" Runs).",
+        },
+        "gameplay.disable_medpacks": {
+            "title": "Entferne Medi-Packs",
+            "description": "Entfernt alle Medi-Packs aus dem Spiel (für \"No Meds Challenge\" Runs).",
+        },
+        "gameplay.disable_trex_collision": {
+            "title": "Enferne die Kollision des toten T-Rex",
+            "description": "Enfernt jegliche Kollision vom T-Rex sobald er stirbt. Dies ist sehr hilfreich, wenn die Leiche eines T-Rex den Ausgang blockiert.",
+        },
+        "gameplay.enable_ally_targeting": {
+            "title": "Erlaube das ziehlen auf freundliche Einheiten",
+            "description": "Erlaubt Lara, auf freundliche Einheiten zu ziehlen, wie zum Beispiel Mönche. Wenn diese Option deaktiviert ist, sind freundliche Einheiten immun gegen Laras Munition.",
+        },
+        "gameplay.enable_auto_item_selection": {
+            "title": "Vorausgewählte Schlüssel-Items",
+            "description": "Wenn Lara ein Schlüsselloch oder einen Rätsel-Slot verwendet und sie das dazu passende Item in ihrem Inventar hat, wird dieses automatisch ausgewählt.",
+        },
+        "gameplay.enable_back_slope_stumble": {
+            "title": "\\{review}Stolpern an rückwärtiger Schräge",
+            "description": "\\{review}Lässt Lara stolpern, wenn sie rückwärts springt und sich hinter ihr eine Schräge befindet (TR3). Wenn deaktiviert, kommt Lara abrupt an der Schräge zum Stehen (TR1/2).",
+        },
+        "gameplay.enable_boulder_shake": {
+            "title": "\\{review}Felskamerawackeln aktivieren",
+            "description": "\\{review}Wenn aktiviert, wackelt die Kamera, sobald sich ein Fels bewegt.",
+        },
+        "gameplay.enable_bouncy_grenades": {
+            "title": "\\{review}Sprunggranaten",
+            "description": "\\{review}Aktiviert das Granatenverhalten im Stil von TR3: Sie prallen von Wänden und Hängen ab und erzeugen einen größeren Explosionsradius, jedoch auf Kosten einer reduzierten Geschwindigkeit.",
+        },
+        "gameplay.enable_cheats": {
+            "title": "Cheats",
+            "description": "Aktiviert verschiedene Cheats:\n\n- L: Beende das Level sofort.\n- I: eine Erhöhung der Anzahl der Munition und Medipacks; und alle plotrelevanten Items des aktuellen Levels.\n- O: Aktiviere Flug-Cheat (in der Luft schwimmen).\n  - GEHEN-Taste: beende Flug-Modus.\n  - WAFFE ZIEHEN-Taste: öffne die nächstgelegene Tür (funktioniert an ein paar Stellen nicht).",
+        },
+        "gameplay.enable_compass_stats": {
+            "title": "Levelstatistiken im Kompass",
+            "description": "Aktiviert die Anzeige von Levelstatistiken wenn der Kompass ausgewählt wird.",
+        },
+        "gameplay.enable_console": {
+            "title": "Konsole",
+            "description": "Aktiviert die Entwickler-Konsole.",
+        },
+        "gameplay.enable_controlled_drops": {
+            "title": "\\{review}Kontrollierter Fall",
+            "description": "\\{review}Ermöglicht Lara, sich in der Luft zu drehen und den Vorsprung zu greifen, den sie gerade verlassen hat, wenn die Aktionstaste beim Fallen gehalten wird.",
+        },
+        "gameplay.enable_crawl_jump": {
+            "title": "\\{review}Crawl-Absprung",
+            "description": "\\{review}Ermöglicht es Lara, aus Kriechgängen herauszuspringen.",
+        },
+        "gameplay.enable_crawling": {
+            "title": "\\{review}Kriechen",
+            "description": "\\{review}Ermöglicht es Lara, sich zu ducken und zu kriechen.",
+        },
+        "gameplay.enable_credits": {
+            "title": "Credits",
+            "description": "Ermöglicht die Anzeige der Credits nachdem man das Spiel durchgespielt hat. Beeinflusst nicht die Anzeige der Finalen Statistik.",
+        },
+        "gameplay.enable_crouch_roll": {
+            "title": "\\{review}Hockrolle",
+            "description": "\\{review}Erlaubt Lara, aus der Hocke mit der Sprinttaste eine Vorwärtsrolle zu machen.",
+        },
+        "gameplay.enable_cutscenes": {
+            "title": "Zwischensequenzen",
+            "description": "Aktiviert das Abspielen von Zwischensequenzen.",
+        },
+        "gameplay.enable_deaths_counter": {
+            "title": "Laras Tode zählen",
+            "description": "Aktiviert die Aufzählung von Laras Toden im Kompass und in den Level-Statistiken. Die Anzahl der Tode wird im aktuell geladenen Speicherstand aktualisiert, sobald sie stirbt.",
+        },
+        "gameplay.enable_demo": {
+            "title": "Demo-Modus",
+            "description": "Aktiviert die Anzeige von Demos im Hauptmenü.",
+        },
+        "gameplay.enable_enemy_rotation": {
+            "title": "Zufällige Startwinkel für Gegner",
+            "description": "Verwendet einen zusätzlichen zufälligen Startwinkel für ein paar Gegner, sobald sie initialisiert werden.",
+        },
+        "gameplay.enable_enhanced_saves": {
+            "title": "Speichere Effekte",
+            "description": "Erweitert Spielstände so das Grafikeffekte, Wasserfall-Nebel, Flammenerzeuger und mehr gespeichert werden, anstatt beim Laden zu verschwinden.",
+        },
+        "gameplay.enable_fmv": {
+            "title": "FMVs",
+            "description": "Aktiviert das Abspielen von FMVs.",
+        },
+        "gameplay.enable_game_modes": {
+            "title": "Spielmodi-Auswahl",
+            "description": "Erlaubt die Auswahl der 'Neues Spiel Plus'-Optionen im 'Neues Spiel' Ausweis-Menü.\n\n- Neues Spiel+: schaltet alle Waffen mit unendlich Munition frei; Feinde haben verdoppelte Lebenserenergie.\n- Japanisch NS: Waffen verursachen doppelten Schaden und Fackel-Pickups enhalten 8 statt 6 Fackeln.\n- Japanisch NS+: eine Kombination aus Neus Spiel+ und Japanisch NS.",
+        },
+        "gameplay.enable_idle_pose_camera": {
+            "title": "\\{review}Leerlauf-Kamera",
+            "description": "\\{review}Passt die Kamera an, sodass sie während der Posenanimation auf Lara gerichtet ist. Durch Drücken von Schauen wird die Kamera zurückgesetzt.",
+        },
+        "gameplay.enable_inverted_look": {
+            "title": "Invertiertes Umsehen",
+            "description": "Invertiert die Y-Axe von Laras Sichtsteuerung.",
+        },
+        "gameplay.enable_item_examining": {
+            "title": "Item-Untersuchung",
+            "description": "Für benutzergenerierte Level - erlaubt die Anzeige von Item-Beschreibungen im Inventar, wenn der Ersteller des Levels die nötigen Daten zur Verfügung gestellt hat.",
+        },
+        "gameplay.enable_jump_twists": {
+            "title": "Sprungdrehungen",
+            "description": "Aktiviert TR2+-artige Sprungdrehungen und Purzelbäume, das heißt: Drücke Rolle während des Sprungs und Kopfsprung-Animationen.",
+        },
+        "gameplay.enable_killer_pushblocks": {
+            "title": "\\{review}Tödliche Schiebeblöcke aktivieren",
+            "description": "Aktiviert, dass Lara sofort stirbt, wenn ein Schiebeblock von oben auf Lara herab fällt. Andernfalls wird Lara oben auf dem Block hängen bleiben und überleben.",
+        },
+        "gameplay.enable_lean_jumping": {
+            "title": "Schmales Springen",
+            "description": "Erlaubt Lara, sich weiter voran oder rückwärts zu tasten, wenn man eine der Richtungstasten gedrückt hält, während sie einen neutralen Sprung ausführt.",
+        },
+        "gameplay.enable_ledge_jumps": {
+            "title": "\\{review}Vorsprung-Sprünge",
+            "description": "\\{review}Ermöglicht Lara, nach oben oder rückwärts zu springen, während sie an einem Vorsprung hängt, sofern sich eine feste Fläche vor ihr befindet, um sich abzustoßen.",
+        },
+        "gameplay.enable_legal": {
+            "title": "Rechtshinweise",
+            "description": "Aktiviert die Rechtshinweise und die Core Design FMV beim Starten des Spiels.",
+        },
+        "gameplay.enable_manual_camera": {
+            "title": "\\{review}Manuelle Kamera",
+            "description": "\\{review}Aktiviert die Kameratasten (\\{input camera_forward}\\{input camera_back}\\{input camera_left}\\{input camera_right}), die zur Steuerung der Kamera im Fotomodus verwendet werden, um auch die Ingame-Kamera zu drehen.",
+        },
+        "gameplay.enable_neutral_twists": {
+            "title": "\\{review}Neutrale Drehung",
+            "description": "\\{review}Ermöglicht Lara eine Drehung in der Luft bei einem Sprung aus dem Stand. Drücke gleichzeitig die Sprung- und Rollentaste, während du stillstehst.",
+        },
+        "gameplay.enable_pickup_aids": {
+            "title": "Gegenstände hervorheben",
+            "description": "Aktiviert einen periodischen Funkel-Effekt in der Nähe von Items, um ihre Gegenwart sichtbarer zu machen.",
+        },
+        "gameplay.enable_play_previous_levels": {
+            "title": "\\{review}Vorherige Level spielen",
+            "description": "\\{review}Aktiviert die Funktionen \"Vorherige Level spielen\" und \"Bisherige Geschichte...\" im Auswahlbildschirm für Neues Spiel.",
+        },
+        "gameplay.enable_responsive_crawl": {
+            "title": "\\{review}Reaktionsschnelles Kriechen",
+            "description": "\\{review}Aktiviert Verbesserungen gegenüber der ursprünglichen Kriechmechanik.\n\n- Ermöglicht es, nach dem Anhalten schneller wieder mit dem Kriechen zu beginnen.\n- Ermöglicht den Übergang vom Laufen/Sprinten zum Kriechen, ohne zuvor anzuhalten.\n- Ermöglicht den Übergang vom Kriechen zur Kriechrolle (falls aktiviert), ohne sich zuvor manuell zu ducken.\n- Ermöglicht das Drehen im geduckten Zustand.\n- Stellt Laras Kriech-Aufhebanimation wieder her (Fackeln ausgenommen).",
+        },
+        "gameplay.enable_responsive_sprint": {
+            "title": "\\{review}Reaktives Sprinten",
+            "description": "\\{review}Aktiviert einen reaktiveren Sprintzustand für Lara.\n\n- ermöglicht Sprinten, sobald Lara Energie hat, statt nur bei voller Ausdauer.\n- erlaubt Sprinten auf Treppen, ohne von Laras normaler Laufanimation unterbrochen zu werden.",
+        },
+        "gameplay.enable_save_crystals": {
+            "title": "Speicherkristalle",
+            "description": "Beschränkt Speichern auf den Anfang des Levels und Speicherkristalle. Level haben eine limitierte Anzahl von Speicherkristallen. Die Speicherkristalle funktionieren nur einmal, so wie auf der PS1. Eine Änderung dieser Option erfordert einen Neustart.",
+        },
+        "gameplay.enable_slide_to_run": {
+            "title": "\\{review}Rutsch-Lauf-Übergang",
+            "description": "\\{review}Ermöglicht es Lara, sofort loszulaufen, sobald sie nach dem Vorwärtsrutschen auf einer Schräge den Boden erreicht. Halte die Vorwärts-Taste gedrückt, um dies zu aktivieren.",
+        },
+        "gameplay.enable_slow_ledge_swing": {
+            "title": "\\{review}Langsames Schwingen an einer Kante",
+            "description": "\\{review}Ermöglicht es Lara, langsam zu schwingen, wenn sie sich an einer sehr dünnen Kante festhält (TR3-Stil). Ist die Option deaktiviert, schwingt Lara nur kurz und kehrt dann in eine ruhende Hängeposition zurück (TR1/2-Stil).",
+        },
+        "gameplay.enable_smooth_wall_deflect": {
+            "title": "Sanftes Wand-Abprallen",
+            "description": "Erlaubt Lara, sich schneller zu fangen, nachdem sie gegen eine Wand gestoßen ist und eine der Richtungstasten zusammen mit der Vorwärtstaste gedrückt gehalten wird..",
+        },
+        "gameplay.enable_soft_statics": {
+            "title": "\\{review}Weiche Netz-Kollision",
+            "description": "\\{review}Ermöglicht es Lara, sich sanft gegen statische Meshes zu bewegen – ähnlich wie in TR4+ – anstatt abrupt anzuhalten.",
+        },
+        "gameplay.enable_sprint": {
+            "title": "\\{review}Sprinten",
+            "description": "\\{review}Ermöglicht Lara zu sprinten, ähnlich wie in TR3+.",
+        },
+        "gameplay.enable_step_roll_boost": {
+            "title": "Stufen-Roll-Boost",
+            "description": "Erlaubt Lara von einer ein-Click hohen Stufe (standard) geboostet zu werden, wenn nahe der Stufen-Kante Rollen gedrückt wird.",
+        },
+        "gameplay.enable_swing_cancel": {
+            "title": "Schwingen unterbrechen",
+            "description": "Erlaubt, Laras Kanten-Schwinganimation abzubrechen, indem man kurz loslässt und sich schnell wieder festhält.",
+        },
+        "gameplay.enable_target_change": {
+            "title": "Zielwechsel",
+            "description": "Ermöglicht TR4+ artiges wechseln zwischen den Zielen, während man mit den Waffen auf sie zielt. Drücke die Zielwechsel-Taste während des ziehlens, um das anvisierte Ziel zu wechseln.",
+        },
+        "gameplay.enable_timer_in_inventory": {
+            "title": "Timer zählt im Inventar",
+            "description": "Lässt den In-Game-Timer weiterlaufen, selbst wenn während des Spiels das Inventar geöffnet ist.",
+        },
+        "gameplay.enable_toggle_crouch": {
+            "title": "\\{review}Ducken umschalten",
+            "description": "\\{review}Ermöglicht es Lara, nach einmaligem Drücken der Ducken-Taste geduckt zu bleiben. Drücke Ducken erneut, um wieder aufzustehen.",
+        },
+        "gameplay.enable_toggle_sprint": {
+            "title": "\\{review}Sprint umschalten",
+            "description": "\\{review}Ermöglicht es Lara, nach einmaligem Drücken der Sprint-Taste weiterzulaufen. Drücke erneut Sprint, um das Sprinten zu beenden.",
+        },
+        "gameplay.enable_total_stats": {
+            "title": "Finale Statistik-Anzeige",
+            "description": "Aktiviert die Erstellung einer Gesamtstatistik vom ganzen Spiel, die nach dem Abspielen der Credits angezeigt wird.",
+        },
+        "gameplay.enable_tr2_jumping": {
+            "title": "Reaktionsschnelleres Springen",
+            "description": "\\{review}Erlaubt Lara, während des Rennens jederzeit zu springen.",
+        },
+        "gameplay.enable_tr2_swim_cancel": {
+            "title": "Reaktionsschneller Schwimm-Abbruch",
+            "description": "Erlaubt Lara, unter Wasser schneller stoppen zu können, wenn die Springen-Taste losgelassen wird.",
+        },
+        "gameplay.enable_tr2_swimming": {
+            "title": "Flüssiges Schwimmverhalten",
+            "description": "Verpasst Laras Drehgeschwindigkeit unter Wasser eine Beschleunigungskurve für ein runderes Steuerungsverhalten, ähnlich wie in TR2+.",
+        },
+        "gameplay.enable_uw_roll": {
+            "title": "Rolle unter Wasser",
+            "description": "Erlaubt Lara, eine Rolle unter Wasser durchzuführen, ähnlich wie in TR2+.",
+        },
+        "gameplay.enable_wading": {
+            "title": "Durchwaten",
+            "description": "\\{review}Erlaubt Lara, flaches Wasser zu durchwaten, anstatt an der Wasseroberfläche stecken zu bleiben.",
+        },
+        "gameplay.enable_walk_to_items": {
+            "title": "Animierte Interaktionen",
+            "description": " Lässt Lara zu Pickups und Schaltern hingehen, anstatt sie zu ihnen zu teleportieren.",
+        },
+        "gameplay.fix_alligator_ai": {
+            "title": "Fix: Alligator-AI",
+            "description": "Fixt, dass die Alligatoren keinen Schaden machen, wenn Lara sich im Wasser befindet und sich nicht bewegt.",
+        },
+        "gameplay.fix_bear_ai": {
+            "title": "Fix: Bären-AI",
+            "description": "Fixt, dass die aufrecht stehend ausgeführten Prankenhiebe von Bären Lara nicht mehr verfehlen.",
+        },
+        "gameplay.fix_bridge_collision": {
+            "title": "Fix: Brückenkollision",
+            "description": "Fixt, dass Lara nicht in der Lage ist, sich an einigen Teilen von Brücken festzuhalten und unsichtbare Wände an den Kanten. Fixt auch Kollisions-Fehler mit Zugbrücken, Falltüren, und Brücken, wenn sie übereinander gestapelt sind, über Schrägen, und nahe dem Boden.",
+        },
+        "gameplay.fix_descending_glitch": {
+            "title": "Fix: Zerbrechliche Böden-Stürze",
+            "description": "Fixt, dass Seit-Schritte und Vorwärtslaufen auf zerbrechlichen Platten dazu führen, dass Lara sofort herab zur darunter liegenden Platte fällt.",
+        },
+        "gameplay.fix_flare_throw_priority": {
+            "title": "Fix: Fackel-Wurf-Priorität",
+            "description": "Fixt, dass Lara das Wegwerfen einer aufgebrauchten Fackel priorisiert, während sie sich in der Luft befindet. Dies kann manchmal dazu führen, dass sie nicht in der Lage ist, sich an Kanten festzuhalten.",
+        },
+        "gameplay.fix_floor_data_issues": {
+            "title": "Fix: Floor-Data-Fehler",
+            "description": "Fixt originale Fehler mit Boden Daten/Triggern.",
+        },
+        "gameplay.fix_free_flare_glitch": {
+            "title": "Fix: gratis Fackel-Glitch",
+            "description": "Fixt die Möglichkeit, eine gratis Fackel zu erschaffen, wenn man während des Aufhebens eines Gegenstandes die Fackel-Taste drückt.",
+        },
+        "gameplay.fix_item_duplication_glitch": {
+            "title": "Fix: Item-Vervielfältigungs-Glitch",
+            "description": "Fixt die Möglichkeit, Schlüsselgegenstände im Inventar mehrfach nutzen zu können.",
+        },
+        "gameplay.fix_lara_pickup_embed": {
+            "title": "Fix: Pickup-Fehler",
+            "description": "\\{review}Behebt ein Problem, bei dem Lara manchmal in Wände driftet, wenn sie unter Wasser Gegenstände einsammelt, sowie beim Einsammeln von Gegenständen über Wasser unter steil geneigten Decken.",
+        },
+        "gameplay.fix_m16_accuracy": {
+            "title": "\\{review}Fix: M16/MP5-Genauigkeit",
+            "description": "\\{review}Fixt die Genauigkeit des M16/MP5, während Lara rennt.",
+        },
+        "gameplay.fix_monkey_pickup_priority": {
+            "title": "\\{review}Behebe die Priorität beim Aufheben von Affen",
+            "description": "\\{review}Angegriffene Affen werden das Zurückschlagen priorisieren, bevor sie Medi-Packs und Schlüssel aufsammeln.",
+        },
+        "gameplay.fix_pipeman_aim": {
+            "title": "\\{review}Blasrohr-Zielen fixen",
+            "description": "\\{review}Behebt ein Problem, bei dem der Blasrohrschütze Lara manchmal nicht korrekt mit Pfeilen anvisieren kann.",
+        },
+        "gameplay.fix_qwop_glitch": {
+            "title": "Fix: QWOP-Glitch",
+            "description": "Fixt, dass Lara auf kleinen Stufen springt, was manchmal in einer seltsamen Lauf-Animation resultiert, bekannt als QWOP-Zustand.",
+        },
+        "gameplay.fix_step_glitch": {
+            "title": "Fix: Stufen-Glitch",
+            "description": "Fixt, dass Lara manchmal in Wände, die an Treppen angrenzen, gedrückt wird, wenn sie auf eine bestimmte Weise an ihnen entlangläuft.",
+        },
+        "gameplay.fix_wade_wall_hit": {
+            "title": "Fix: Wand-Treffer beim Waten",
+            "description": "Fixt, dass Lara beim waten nicht reagiert, wenn sie eine Wand trifft.",
+        },
+        "gameplay.fix_walk_run_jump": {
+            "title": "Fix: Gehen-Laufen-Sprung",
+            "description": "Fixt, dass Lara manchmal nicht sofort springen kann, direkt nachdem sie von ihrer Gehen-Animation zur Laufen-Animation wechselt.",
+        },
+        "gameplay.fix_water_exit": {
+            "title": "Wasser Ausstieg",
+            "description": "Fixt dass Lara direkt in einen angrenzenden, trockenen Raum oder in einen trockenen Raum unterhalb gelangen kann. Zusätzlich verhindert es, dass Lara aus dem Wasser heraus auf nicht begehbare Schrägen klettern kann.",
+        },
+        "gameplay.harpoon_recoil": {
+            "title": "Harpunenrückstoß",
+            "description": "Legt fest, wie oft Lara die Harpune nachladen muss, basierend auf ihrer momentanen Munitionsanzahl. Zum Beispiel, wenn es auf 3 festgelegt ist, muss sie nach jedem dritten Schuss nachladen. Auf 0 eingestellt, deaktiviert das Nachladen vollständig.",
+        },
+        "gameplay.idle_pose_timeout": {
+            "title": "\\{review}Leerlauf-Zeit",
+            "description": "\\{review}Ermöglicht Lara, nach der angegebenen Anzahl an Sekunden Inaktivität eine Posenanimation zu starten. Auf 0 setzen, um zu deaktivieren.",
+        },
+        "gameplay.jump_lock_mode": {
+            "title": "Sprung-Block Modus",
+            "description": "Erlaubt einzustellen, wie früh es Lara erlaubt ist zu springen, nachdem sie begonnen hat zu laufen.\n\n- Original: entspricht dem originalen TR2 Timing.\n- Getuned: springen ist 2 Frames früher möglich.\n- Deaktiviert: springen ist sofort nachdem die Laufen-Animation begonnen hat möglich.",
+        },
+        "gameplay.loading_screens": {
+            "title": "Ladebildschirme",
+            "description": "\\{review}Steuert Ladebildschirme vor dem Laden eines Levels.\n\n- Deaktiviert: Ladebildschirme nie anzeigen.\n- Immer: Ladebildschirme anzeigen.\n- Neue Spiele: Ladebildschirme beim Laden eines Spielstands überspringen.",
+        },
+        "gameplay.look_mode": {
+            "title": "Umsehen Modus",
+            "description": "Erlaubt einzustellen wann Lara in der Lage ist sich umzusehen.\n\n- Beschränkt: Umsehen ist nur möglich wenn Lara still steht, und nie wenn man unter Wasser ist.\n- Erweitert: Umsehen ist während der meisten Animationen möglich, ausser ein paar Ausnahmen wie das Schieben eines Blockes.\n- Unbeschränkt: Umsehen ist jederzeit während der normalen Steuerung von Lara möglich.",
+        },
+        "gameplay.maximum_quick_save_slots": {
+            "title": "\\{review}Anzahl der Schnellspeicherplätze",
+            "description": "\\{review}Ändert die Anzahl der verfügbaren Schnellspeicherplätze.",
+        },
+        "gameplay.maximum_save_slots": {
+            "title": "Anzahl der Speicher-Slots",
+            "description": "Ändert die Anzahl der verfügbaren Speicher-Slots.",
+        },
+        "gameplay.projectile_area_damage": {
+            "title": "\\{review}Flächenschaden durch Projektile",
+            "description": "\\{review}Steuert, wie der Wirkungsbereich für Raketenwerfer und Granatwerfer sich ausbreitet.\n\n- Einzelfeger: Verhalten von TR1 & TR2.\n- Mehrfachfeger: Verhalten von TR3.\n\nDie Mehrfachfeger-Option führt oft zu doppeltem Schaden bei einzelnen Gegnern.",
+        },
+        "gameplay.remember_gun_status": {
+            "title": "Waffen zwischen den Leveln merken",
+            "description": "Bringt Lara dazu, sich zu erinnern, welche Waffe sie als Letztes im vorherigen Level verwendet hat, wenn ein neues Level beginnt. Bei Deaktivierung wird Lara auf geholsterte Pistolen zurückgreifen.",
+        },
+        "gameplay.restore_ps1_enemies": {
+            "title": "PS1 Feinde wiederherstellen",
+            "description": "\\{review}Fügt die Mumie hinzu, die in der PlayStation-Version von City of Khamoon, Raum 25, erscheint.\nDas Ändern dieser Option erfordert einen Neustart des Spiels.",
+        },
+        "gameplay.start_lara_hitpoints": {
+            "title": "Laras Lebensenergie beim Starten eines Levels",
+            "description": "Legt die Höhe des Gesundheitswertes von Lara für den Start eines jeden Levels fest.",
+        },
+        "gameplay.target_mode": {
+            "title": "Modis für automatische Anvisierung",
+            "description": "Ändert das automatische Anvisierungsverhalten von Laras Waffen gegenüber Zielen.\n\n- Volles Lock-On: Das Ziel immer bleibt anvisiert, selbst wenn sich der Feind außer Sicht ist oder stirbt (OG TR1-3).\n- Halbes Lock-On: Das Ziel bleibt anvisiert wenn der Feind sich außer Sicht bewegt, löst aber die Anvisierung sobald der Gegner stibt.\n- Kein Lock-On: Löse die Anvisierung sobald der Feind sich außer Sicht bewegt oder stibt (TR4+).",
+        },
+        "gameplay.wall_glitch_mode": {
+            "title": "Wand-Glitch Ein/Aus",
+            "description": "Erlaubt, das Wand-Glitchverhalten von TR1 zu nutzen und umgekehrt; gleichermaßen erlaubt es, alle Arten von Wand-Glitches zu fixen.",
+        },
+        "input.enable_buffering_func_keys": {
+            "title": "\\{review}Pufferung (F-Tasten)",
+            "description": "\\{review}Aktiviert F-Tasten (1-Frame) Pufferung, um eine präzise Steuerung von Laras Bewegung zu ermöglichen. Diese Funktion existiert ursprünglich nur im TombATI-Port (TR1).",
+        },
+        "input.enable_buffering_inventory": {
+            "title": "\\{review}Pufferung (Inventar)",
+            "description": "\\{review}Aktiviert die Pufferung des Inventars (2 Frames), um eine präzise Steuerung von Laras Bewegung zu ermöglichen.",
+        },
+        "input.enable_responsive_passport": {
+            "title": "Reaktionsfähiger Ausweis",
+            "description": "Deaktiviert, dass man die Umblättern-Animation des Ausweises abwarten muss, sie können nun so schnell umblättern, wie sie wollen.",
+        },
+        "input.enable_tr3_sidesteps": {
+            "title": "Erweiterte Seit-Schritte",
+            "description": "Aktiviert Seitschritte im Stil von TR3+, e. g. Shift + Richtungspfeile. Deaktiviert die Seitschritt-Tasten.",
+        },
+        "input.quick_guns_mode": {
+            "title": "Schnell-Zieh-Tasten",
+            "description": "Bestimmt das Verhalten der Schnell-Zieh-Tasten.\n\n- Nur ziehen: eine der Tasten zu drücken sorgt dafür, dass Lara die zugewiesene Waffe ausrüstet.\n- Ziehen oder wegstecken: das selbe wie bei 'Nur Ziehen', zusätzlich wird Lara die zugewiesene Waffe, die sie gerade benutzt, wegstecken.",
+        },
+        "language": {
+            "title": "Sprache",
+            "description": "Ändert die Sprache des UI-Textes.",
+        },
+        "rendering.anisotropy_filter": {
+            "title": "Anisotropischer Filter",
+            "description": "Erwiterte Textur-Filterung auf Entfernung.",
+        },
+        "rendering.aspect_mode": {
+            "title": "Seitenverhältnis",
+            "description": "Erzwingt bestimmte Seitenverhältnisse mit Letterbox.",
+        },
+        "rendering.borders": {
+            "title": "Rahmen",
+            "description": "Fügt schwarze Rahmen um das Spiel-Fenster herum hinzu.",
+        },
+        "rendering.enable_trapezoid_filter": {
+            "title": "Trapezoid-Filter",
+            "description": "Korrigiert das Rendern von Vierecken.",
+        },
+        "rendering.enable_vsync": {
+            "title": "VSync",
+            "description": "Schaltet V-Sync an oder aus.",
+        },
+        "rendering.fps": {
+            "title": "FPS",
+            "description": "Stellt Spiel-Frames pro second ein.",
+        },
+        "rendering.lighting_contrast": {
+            "title": "Beleuchtungs-Kontrast",
+            "description": "Erhöht den Kontrast für dynamische Lichtquellen, wie zum Beispiel Fackeln und Mündungsfeuer.",
+        },
+        "rendering.screenshot_format": {
+            "title": "Bildschirmfoto-Format",
+            "description": "Dateiformat des Bildschirmfotos.",
+        },
+        "rendering.sprite_lock_mode": {
+            "title": "\\{review}Sprite-Sperrmodus",
+            "description": "\\{review}Steuert, welche Achsen beim Anzeigen von Sprites auf dem Bildschirm gesperrt werden.\n\n- Keine: Sprites normal anzeigen.\n- Roll: Rollachse sperren – nur im Fotomodus nützlich.\n- Roll & Neigung: Sicherstellen, dass die Sprites aufrecht stehen und nicht auf dem Boden liegen, wenn man sie von oben betrachtet.\n- Perspektive: Roll- und Neigungsachsen sperren und zusätzlich die Sprites leicht zur Bildschirmmitte hin drehen.",
+        },
+        "rendering.texture_filter": {
+            "title": "Textur-Filter",
+            "description": "Wechselt zwischen weichgezeichneten und pixeligen Objekt-Texturen.",
+        },
+        "rendering.ui_filter": {
+            "title": "UI-Filter",
+            "description": "Schaltet zwischen weichgezeichneten und pixeligen UI-Texturen hin und her.",
+        },
+        "rendering.upscaling_factor": {
+            "title": "Upsaling-Faktor",
+            "description": "Skaliert das Spiel um einen festgelegten Wert hoch, erhält dabei die pixelige Optik.",
+        },
+        "rendering.upscaling_filter": {
+            "title": "Upscaling-Filter",
+            "description": "Schaltet zwischen weichgezeichneter oder pixeliger Optik für das gesamte Bild.",
+        },
+        "ui.airbar_color": {
+            "title": "Sauerstoffleistenfarbe",
+            "description": "Farbe der Sauerstoffleiste.",
+        },
+        "ui.airbar_color_ps1": {
+            "title": "Sauerstoffleistenfarbe",
+            "description": "Farbe der Sauerstoffleiste.",
+        },
+        "ui.airbar_location": {
+            "title": "Position der Sauerstoffleiste",
+            "description": "Position, an der die Sauerstoffleiste angezeigt wird.",
+        },
+        "ui.ammo_counter_location": {
+            "title": "\\{review}Munitionszähler-Position",
+            "description": "\\{review}Position, an der der Munitionszähler angezeigt wird.",
+        },
+        "ui.bar_look": {
+            "title": "\\{review}Aussehen der Balken",
+            "description": "\\{review}Steuert das visuelle Erscheinungsbild der UI-Leisten.",
+        },
+        "ui.bar_scale": {
+            "title": "Leisten-Größe",
+            "description": "Ändert die Größe der Gesundheitsleisten, Sauerstoffleisten und Gesundheitsleisten von Feinden.",
+        },
+        "ui.enable_bar_flashing": {
+            "title": "\\{review}Leisten blinken",
+            "description": "\\{review}Lässt Laras Gesundheits- und Sauerstoffanzeigen blinken, wenn eine der Ressourcen knapp wird.",
+        },
+        "ui.enable_smooth_bars": {
+            "title": "Leisten-Farbverläufe",
+            "description": "Sorgt bei Gesundheitsleisten, Sauerstoffleisten und Gesundheitsleisten von Feinden für einen fließenden Farbübergang.",
+        },
+        "ui.enable_stats_level_header": {
+            "title": "Level-Zähler",
+            "description": "Zeigt die aktuelle Level-Nummer ganz oben in den Level-Statistiken an.",
+        },
+        "ui.enable_wraparound": {
+            "title": "Scroll-Schleife",
+            "description": "Ermöglicht die Richtungsnavigation in Menüs in einer Schleife.",
+        },
+        "ui.enemy_healthbar_color": {
+            "title": "Leisten-Farbe der Feinde",
+            "description": "Gesundheitsleisten-Farbe der Feinde",
+        },
+        "ui.enemy_healthbar_color_allies": {
+            "title": "Freundliche Einheiten-Leisten Farbe",
+            "description": "Farbe für die Gusundheitsleisten freundlich gesinnter Einheiten. Wird auf der gleiche Position angezeigt wie die Gesundheitsleisten der Feinde.",
+        },
+        "ui.enemy_healthbar_color_allies_ps1": {
+            "title": "Freundliche Einheiten-Leisten Farbe",
+            "description": "Farbe für die Gusundheitsleisten freundlich gesinnter Einheiten. Wird auf der gleiche Position angezeigt wie die Gesundheitsleisten der Feinde.",
+        },
+        "ui.enemy_healthbar_color_ps1": {
+            "title": "Leisten-Farbe der Feinde",
+            "description": "Gesundheitsleisten-Farbe der Feinde",
+        },
+        "ui.enemy_healthbar_location": {
+            "title": "Position der Gesundheitsleiste der Feinde",
+            "description": "Die Position, an der die feindliche Gesundheitsleiste angezeigt wird.",
+        },
+        "ui.enemy_healthbar_show_mode": {
+            "title": "Gesundheitleiste der Feinde",
+            "description": "Aktiviert die Anzeige einer Gesundheitleiste für aktive Feinde.",
+        },
+        "ui.exposurebar_color": {
+            "title": "\\{review}Farbe der Ausdauerleiste",
+            "description": "\\{review}Farbe der Kaltwasser-Ausdauerleiste.",
+        },
+        "ui.exposurebar_color_ps1": {
+            "title": "\\{review}Farbe der Ausdauerleiste",
+            "description": "\\{review}Farbe der Kaltwasser-Ausdauerleiste.",
+        },
+        "ui.exposurebar_location": {
+            "title": "\\{review}Position der Ausdauerleiste",
+            "description": "\\{review}Position, an der die Kaltwasser-Ausdauerleiste angezeigt wird.",
+        },
+        "ui.healthbar_color": {
+            "title": "Gesundheitsleisten-Farbe",
+            "description": "Farbe der Gesundheitsleiste.",
+        },
+        "ui.healthbar_color_ps1": {
+            "title": "Gesundheitsleisten-Farbe",
+            "description": "Farbe der Gesundheitsleiste.",
+        },
+        "ui.healthbar_location": {
+            "title": "Position der Gesundheitsleiste",
+            "description": "Position, an der die Gesundheitsleiste angezeigt wird.",
+        },
+        "ui.healthbar_poison_color": {
+            "title": "\\{review}Gift Gesundheitsbalken Farbe",
+            "description": "\\{review}Farbe des Gesundheitsbalkens, wenn Lara vergiftet ist.",
+        },
+        "ui.healthbar_poison_color_ps1": {
+            "title": "\\{review}Gift Gesundheitsbalken Farbe",
+            "description": "\\{review}Farbe des Gesundheitsbalkens, wenn Lara vergiftet ist.",
+        },
+        "ui.inventory_background_style": {
+            "title": "\\{review}Inventar-Hintergrund",
+            "description": "\\{review}Ändert die Art und Weise, wie der Hintergrund für den Inventarring angezeigt wird.\n\n- Dunkel: TR1 (PC).\n- Sehr dunkel: TR1 (PS1).\n- Statisch: TR2 (PC).\n- Welle: TR2 (PS1).\n- Monochrom: TR3.",
+        },
+        "ui.inventory_fade_effects": {
+            "title": "\\{review}Inventar-Ausblend-Effekte",
+            "description": "\\{review}Feinabstimmung, ob die Ausblend-Effekte im Inventarring des Spiels aktiviert oder deaktiviert sind. Die Option Ausblend-Effekte muss aktiviert sein, damit dies funktioniert.",
+        },
+        "ui.menu_style": {
+            "title": "Menü-Stil",
+            "description": "Ändert, wie Menüs dargestellt werden.\n\n - PC: UI-Stil gleicht der PC-Version.\n - PS1: UI-Stil gleicht der PS1-Version.",
+        },
+        "ui.pause_background_style": {
+            "title": "\\{review}Pause-Hintergrund",
+            "description": "\\{review}Ändert die Art und Weise, wie der Hintergrund für den Pausenbildschirm angezeigt wird.\n\n- Dunkel: TR1 (PC).\n- Sehr dunkel: TR1 (PS1).\n- Statisch: TR2 (PC).\n- Welle: TR2 (PS1).\n- Monochrom: TR3.",
+        },
+        "ui.pause_fade_effects": {
+            "title": "\\{review}Pause-Ausblend-Effekte",
+            "description": "\\{review}Feinabstimmung, ob die Ausblend-Effekte im Pausenbildschirm aktiviert oder deaktiviert sind. Die Option Ausblend-Effekte muss aktiviert sein, damit dies funktioniert.",
+        },
+        "ui.pickup_scale": {
+            "title": "Pickup-Skala",
+            "description": "\\{review}Ändert die Größe der im UI animierten Gegenstände, wenn Lara etwas aufnimmt.",
+        },
+        "ui.show_bars": {
+            "title": "\\{review}Leisten anzeigen",
+            "description": "\\{review}Deaktiviert alle Ingame-Anzeigen und verdeckt Informationen über Laras Gesundheit und andere Ressourcen (für Herausforderungsdurchläufe).",
+        },
+        "ui.show_pickups_overlay": {
+            "title": "Pickup-Anzeige",
+            "description": "Zeigt Gegenstände unten rechts an, wenn Lara etwas aufnimmt.",
+        },
+        "ui.sprintbar_color": {
+            "title": "\\{review}Farbe der Sprintleiste",
+            "description": "\\{review}Farbe der Sprintleiste",
+        },
+        "ui.sprintbar_color_ps1": {
+            "title": "\\{review}Farbe der Sprintleiste",
+            "description": "\\{review}Farbe der Sprintleiste",
+        },
+        "ui.sprintbar_location": {
+            "title": "\\{review}Position der Sprintanleiste",
+            "description": "\\{review}Position, an der die Sprinleiste angezeigt wird.",
+        },
+        "ui.stat_detail_mode": {
+            "title": "Statistik-Details",
+            "description": "\\{review}Ermöglicht verschiedene Detailstufen der Statistik.\n\n- Minimal: zeigt den ursprünglichen Statistikdialog.\n- Detailliert: zeigt alle Statistiken aus Minimal sowie die maximalen Werte neben jedem Feld.\n- Vollständig: zeigt alle Statistiken aus Detailliert sowie neue Zeilen, die im ursprünglichen Dialog nicht verfügbar sind.",
+        },
+        "ui.stats_background_style": {
+            "title": "\\{review}Statistik-Hintergrund",
+            "description": "\\{review}Ändert die Art und Weise, wie der Hintergrund für die Endlevel-Statistiken angezeigt wird.\n\n- Dunkel: TR1 (PC).\n- Sehr dunkel: TR1 (PS1).\n- Statisch: TR2 (PC).\n- Welle: TR2 (PS1).\n- Monochrom: TR3.",
+        },
+        "ui.stats_fade_effects": {
+            "title": "\\{review}Statistik-Ausblend-Effekte",
+            "description": "\\{review}Feinabstimmung, ob die Ausblend-Effekte im Statistikbildschirm am Ende des Levels aktiviert oder deaktiviert sind. Die Option Ausblend-Effekte muss aktiviert sein, damit dies funktioniert.",
+        },
+        "ui.text_scale": {
+            "title": "Textgröße",
+            "description": "Ändert die Größe des UI-Textes.",
+        },
+        "visuals.camera_mode": {
+            "title": "Kamera-Modus",
+            "description": "Passt das Kameraverhalten während Aktionen, wie dem Benutzen von Schlüsseln, ausegführt werden.",
+        },
+        "visuals.enable_3d_pickups": {
+            "title": "3D-Pickups",
+            "description": "Aktiviert die Darstellung von 3D-Modellen für Pickups anstatt der üblichen Sprites.",
+        },
+        "visuals.enable_braid": {
+            "title": "Laras Zopf",
+            "description": "Aktiviert Laras Zopf.",
+        },
+        "visuals.enable_breeze": {
+            "title": "Brise",
+            "description": "Aktiviert eine Brise, die Laras Zopf in den richtigen Räumen zum Wehen bringt.",
+        },
+        "visuals.enable_exit_fade_effects": {
+            "title": "Abblenden beim Beenden des Spiels",
+            "description": "Aktiviert die Abblend-Effekte wenn man das Spiel vollständig beendet.",
+        },
+        "visuals.enable_fade_effects": {
+            "title": "Überganseffekte",
+            "description": "Aktiviere Abblenden bei Übergängen, zum Beispiel bei Credits-, Grafikeinstellungs-, Inventar- und Pause-Bildübergängen.",
+        },
+        "visuals.enable_fire_lighting": {
+            "title": "Feuer-Beleuchtung",
+            "description": "Ermöglicht die generierung von dynamischen Lichteffekten neben aktiven Flammen.",
+        },
+        "visuals.enable_footprints": {
+            "title": "\\{review}Fußspuren",
+            "description": "\\{review}Ermöglicht das Anzeigen von Laras Fußspuren auf bestimmten Oberflächen in unterstützten Levels.",
+        },
+        "visuals.enable_glide_cameras": {
+            "title": "\\{review}Gleitende Kameras",
+            "description": "\\{review}Ermöglicht bei festen Kameras, die Lara ansehen, eine Gleitbewegung mit einer sanften Geschwindigkeitskurve. Wenn deaktiviert, wechseln diese Kameras sofort zur Ansicht auf Lara.",
+        },
+        "visuals.enable_gun_lighting": {
+            "title": "Dynamisches Licht für Waffen",
+            "description": "Aktiviert die verwendung von dynamischer Beleuchtung für Schüsse und Explosionen.",
+        },
+        "visuals.enable_ps1_crystals": {
+            "title": "PS1-Kristall-Farbton",
+            "description": "Der Speicherkristall bekommt einen lila Farbton, ähnlich wie bei der PS1-Variante.",
+        },
+        "visuals.enable_reflections": {
+            "title": "Reflektionen",
+            "description": "Aktiviert Reflektionen auf bestimmten Objekten.",
+        },
+        "visuals.enable_responsive_mesh_tint": {
+            "title": "\\{review}Reaktionsfähige Mesh-Tönung",
+            "description": "\\{review}Ermöglicht es, Laras einzelne Meshes mit einer Wasserfärbung darzustellen, wenn sie sich selbst unter Wasser befinden (TR3-Stil). Andernfalls werden, wenn Lara im Wasser ist, alle ihre Meshes mit der Tönung dargestellt (TR1/2-Stil).",
+        },
+        "visuals.enable_shotgun_flash": {
+            "title": "Schrotflinten-Mündungsfeuer",
+            "description": "Zeigt Mündungsfeuer an, wenn man mit der Schrotflinte schießt, wie bei anderen Waffen.",
+        },
+        "visuals.enable_skybox": {
+            "title": "Skyboxes",
+            "description": "Aktiviert die Skybox in unterstützten Leveln.",
+        },
+        "visuals.enable_weather": {
+            "title": "\\{review}Wetter",
+            "description": "\\{review}Aktiviert die Darstellung von Wettereffekten in unterstützten Levels.",
+        },
+        "visuals.fix_animated_sprites": {
+            "title": "Fix: Sprite-Animationen",
+            "description": "\\{review}Behebt die ursprünglichen Unterwasser-Pflanzen-Sprites, sodass sie in Wasserbereichen richtig animiert werden.",
+        },
+        "visuals.fix_item_rots": {
+            "title": "Fix: Item-Rotations-Fehler",
+            "description": "Fixt originale Fehler mit einigen falsch rotierenden Pickups, wenn man die 3D-Pickups-Option verwendet.",
+        },
+        "visuals.fix_texture_issues": {
+            "title": "Fix: Textur-Fehler",
+            "description": "Fixt originale Fehler mit fehlenden oder inkorrekten Texturen/Meshes.",
+        },
+        "visuals.fog_color": {
+            "title": "\\{review}Nebel Farbe",
+            "description": "\\{review}Farbe des Nebels.",
+        },
+        "visuals.fog_end": {
+            "title": "Ende des Nebels",
+            "description": "Stellt die Distanz in Kacheln ein, in der der Nebel alles völlig verhüllt.",
+        },
+        "visuals.fog_start": {
+            "title": "Beginn des Nebels",
+            "description": "Stellt die Distanz in Kacheln ein, in der der Nebel zu erscheinen beginnt.",
+        },
+        "visuals.fog_transparency": {
+            "title": "\\{review}Nebel Transparenz",
+            "description": "Bestimmt ob die Überlagerung entfernter Geometrie mit 100% transparenten Flächen aktiviert werden soll.",
+        },
+        "visuals.fov": {
+            "title": "\\{review}Sichtfeld",
+            "description": "\\{review}Blickwinkel in Grad. Größere Werte erweitern das Sichtfeld, kleinere verengen es.",
+        },
+        "visuals.game_brightness": {
+            "title": "Helligkeit",
+            "description": "Ändert die Helligkeit des Spiels.",
+        },
+        "visuals.gamma": {
+            "title": "\\{review}Gamma",
+            "description": "\\{review}Passt die Gammakurve an. Höhere Werte bedeuten hellere Beleuchtung. Der Wert 2,5 entspricht den Standardfarben.",
+        },
+        "visuals.lara_outfit": {
+            "title": "\\{review}Laras Outfit",
+            "description": "\\{review}Ändert Laras Aussehen. Bei Auswahl von Standard werden die regulären Outfit-Wechsel zwischen den Levels beibehalten, andernfalls bleibt das gewählte Outfit aktiv, bis es manuell geändert wird.",
+        },
+        "visuals.shadow_type": {
+            "title": "\\{review}Schattenform",
+            "description": "\\{review}Wählt aus, wie die Schatten von Entitäten dargestellt werden.\n\n- Achteck: alte TR1- und TR2-Schatten\n- Kreis: runde Schatten\n- Sprite: TR3 texturbasierte Schatten",
+        },
+        "visuals.sunglasses_mode": {
+            "title": "\\{review}Laras Sonnenbrille",
+            "description": "\\{review}Ändert den Stil von Laras Sonnenbrille. Hinweis: Die Gläser sind reflektierend, wenn die entsprechende Option aktiviert ist.\n\n- Aus: Lara trägt keine Sonnenbrille.\n- Undurchsichtig: Laras Sonnenbrille hat undurchsichtige Gläser.\n- Transparent: Laras Sonnenbrille hat halbtransparente Gläser.",
+        },
+        "visuals.ui_brightness": {
+            "title": "UI-Helligkeit",
+            "description": "Ändert die Helligkeit der Benutzeroberfläche.",
+        },
+        "visuals.water_color": {
+            "title": "Wasser-Farbe",
+            "description": "Farbe des Wassers.",
+        }
+    },
+    "objects": {
+        "alarm_sound": {
+            "name": "Alarm",
+        },
+        "alligator": {
+            "name": "Alligator",
+        },
+        "alphabet": {
+            "name": "\\{review}Standard Schriftart",
+        },
+        "alphabet_small": {
+            "name": "\\{review}Kleine Schriftart",
+        },
+        "amber_light": {
+            "name": "\\{review}Bernsteinfarbenes Licht",
+        },
+        "animating_1": {
+            "name": "\\{review}Objekt 1 wird animiert",
+        },
+        "animating_2": {
+            "name": "\\{review}Objekt 2 wird animiert",
+        },
+        "animating_3": {
+            "name": "\\{review}Objekt 3 wird animiert",
+        },
+        "animating_4": {
+            "name": "\\{review}Objekt 4 wird animiert",
+        },
+        "animating_5": {
+            "name": "\\{review}Objekt 5 wird animiert",
+        },
+        "animating_6": {
+            "name": "\\{review}Objekt 6 wird animiert",
+        },
+        "ape": {
+            "name": "Affe",
+        },
+        "assault_digits": {
+            "name": "Assault Digits",
+        },
+        "assault_target": {
+            "name": "\\{review}Angriffsziele",
+        },
+        "autos": {
+            "name": "Automatik",
+        },
+        "autos_ammo": {
+            "name": "Automatik-Munition",
+        },
+        "bacon_lara": {
+            "name": "Schinken Lara",
+        },
+        "baldy": {
+            "name": "Glatzkopf",
+        },
+        "bandit_1": {
+            "name": [
+                "Söldner 1",
+                "Masked Goon 1",
+            ]
+        },
+        "bandit_2": {
+            "name": [
+                "Söldner 2",
+                "Maskierter Schläger 2",
+            ]
+        },
+        "bandit_2b": {
+            "name": [
+                "Söldner 3",
+                "Maskierter Schläger 3",
+            ]
+        },
+        "barracuda": {
+            "name": "Barrakuda",
+        },
+        "bartoli": {
+            "name": "Marco Bartoli",
+        },
+        "bat": {
+            "name": "Fledermaus",
+        },
+        "bat_emitter": {
+            "name": "\\{review}Fledermaus-Emitter",
+        },
+        "beacon_light": {
+            "name": "\\{review}Leuchtfeuer",
+        },
+        "bear": {
+            "name": "Bär",
+        },
+        "bell": {
+            "name": "Bell",
+        },
+        "big_bowl": {
+            "name": "Lava-Schüssel",
+        },
+        "big_eel": {
+            "name": "Großer Aal",
+        },
+        "big_pod": {
+            "name": "Big Pod",
+        },
+        "big_spider": {
+            "name": "Riesen-Spider",
+        },
+        "bird_guardian": {
+            "name": "Vogel-Monster",
+        },
+        "bird_tweeter_1": {
+            "name": "Dripping Water",
+        },
+        "bird_tweeter_2": {
+            "name": "Singing Birds",
+        },
+        "blade": {
+            "name": "Wall-mounted Blade",
+        },
+        "blood_1": {
+            "name": "Blut 1",
+        },
+        "blood_2": {
+            "name": "Blut 2",
+        },
+        "blue_light": {
+            "name": "\\{review}Blaues Licht",
+        },
+        "boat": {
+            "name": "Boot",
+        },
+        "boat_bits": {
+            "name": "Boots-Einzelteile",
+        },
+        "body_part": {
+            "name": "Körperteil",
+        },
+        "bridge_flat": {
+            "name": "Brücke Flach",
+        },
+        "bridge_tilt_1": {
+            "name": "Brücke Tilt 1",
+        },
+        "bridge_tilt_2": {
+            "name": "Brücke Tilt 2",
+        },
+        "bubble_1": {
+            "name": "Blase 1",
+        },
+        "bubble_2": {
+            "name": "Blase 2",
+        },
+        "bubble_emitter": {
+            "name": "Blasenerzeuger",
+        },
+        "camera_target": {
+            "name": "Kamera-Ziel",
+        },
+        "carcass": {
+            "name": "\\{review}Kadaver",
+        },
+        "ceiling_spikes": {
+            "name": "Spiky Ceiling",
+        },
+        "centaur": {
+            "name": "Zentaur",
+        },
+        "centaur_statue": {
+            "name": "Statue",
+        },
+        "civilian": {
+            "name": "\\{review}Zivilist",
+        },
+        "clock_chimes": {
+            "name": "Bartoli Hideout clock",
+        },
+        "cog_1": {
+            "name": "Zahnrad 1",
+        },
+        "cog_2": {
+            "name": "Zahnrad 2",
+        },
+        "cog_3": {
+            "name": "Zahnrad 3",
+        },
+        "combat_end": {
+            "name": "Kampf Ende",
+        },
+        "compass": {
+            "name": "Statistiken",
+        },
+        "compy": {
+            "name": "\\{review}Compsognathus",
+        },
+        "controls": {
+            "name": "Steuerung",
+        },
+        "copter": {
+            "name": "Helikopter",
+        },
+        "cowboy": {
+            "name": "Cowboy",
+        },
+        "crocodile": {
+            "name": "Krokodil",
+        },
+        "crow": {
+            "name": "Krähe",
+        },
+        "cult_1": {
+            "name": "Maskierter Schläger 1",
+        },
+        "cult_1a": {
+            "name": "Maskierter Schläger 2",
+        },
+        "cult_1b": {
+            "name": "Maskierter Schläger 3",
+        },
+        "cult_2": {
+            "name": "Messerwerfer",
+        },
+        "cult_3": {
+            "name": "Schrotflinten Schläger",
+        },
+        "cut_shotgun": {
+            "name": "Schrotflinten Dusch Animation",
+        },
+        "damocles_sword": {
+            "name": "Schwert des Damokles",
+        },
+        "dart": {
+            "name": "Pfeil",
+        },
+        "dart_effect": {
+            "name": "Pfeil-Effekt",
+        },
+        "dart_emitter": {
+            "name": "Pfeilerzeuger",
+        },
+        "desert_eagle": {
+            "name": "\\{review}Desert Eagle",
+        },
+        "desert_eagle_ammo": {
+            "name": "\\{review}Magazine der Desert Eagle",
+        },
+        "detonator_box": {
+            "name": "Zünder",
+        },
+        "ding_dong": {
+            "name": "Türklingel",
+        },
+        "dino_mutant": {
+            "name": "Dino Mutant",
+        },
+        "disc": {
+            "name": "Scheibe",
+        },
+        "disc_emitter": {
+            "name": "Scheiben-Erzeuger",
+        },
+        "diver": {
+            "name": "Taucher",
+        },
+        "dog": {
+            "name": [
+                "Hund",
+                "Dobermann",
+            ]
+        },
+        "door_1": {
+            "name": "Tür 1",
+        },
+        "door_2": {
+            "name": "Tür 2",
+        },
+        "door_3": {
+            "name": "Tür 3",
+        },
+        "door_4": {
+            "name": "Tür 4",
+        },
+        "door_5": {
+            "name": "Tür 5",
+        },
+        "door_6": {
+            "name": "Tür 6",
+        },
+        "door_7": {
+            "name": "Tür 7",
+        },
+        "door_8": {
+            "name": "Tür 8",
+        },
+        "dragon_back": {
+            "name": "Drachen Hinterseite",
+        },
+        "dragon_bones_1": {
+            "name": "Platzhalter",
+        },
+        "dragon_bones_2": {
+            "name": "Drachen-Knochen Vorn",
+        },
+        "dragon_bones_3": {
+            "name": "Drachen-Knochen Hinten",
+        },
+        "dragon_front": {
+            "name": "Drache Vorderseite",
+        },
+        "drawbridge": {
+            "name": "Zugbrücke",
+        },
+        "dust": {
+            "name": "Staub",
+        },
+        "dying_monk": {
+            "name": "sterbender Mönch",
+        },
+        "eagle": {
+            "name": "Adler",
+        },
+        "earthquake": {
+            "name": "Erdbeben",
+        },
+        "eel": {
+            "name": "Aal",
+        },
+        "electric_cleaner": {
+            "name": "\\{review}Elektrischer Reiniger",
+        },
+        "electric_fence": {
+            "name": "\\{review}Elektrischer Zaun",
+        },
+        "electrical_light": {
+            "name": "\\{review}Elektrisches Licht",
+        },
+        "ember": {
+            "name": "Glut",
+        },
+        "ember_emitter": {
+            "name": "Gluterzeuger",
+        },
+        "explosion_1": {
+            "name": "Explosion 1",
+        },
+        "explosion_2": {
+            "name": "Explosion 2",
+        },
+        "falling_block_1": {
+            "name": [
+                "Fallender Block 1",
+                "Zerbrechbarer Boden 1",
+                "Zerbrechbare Kacheln 1",
+            ]
+        },
+        "falling_block_2": {
+            "name": [
+                "Fallender Block 2",
+                "Zerbrechbarer Boden 2",
+                "Zerbrechbare Kacheln 2",
+            ]
+        },
+        "falling_block_3": {
+            "name": [
+                "Fallender Block 3",
+                "Zerbrechbarer Boden 3",
+                "Zerbrechbare Kacheln 3",
+                "Lose Bretter",
+            ]
+        },
+        "falling_ceiling_1": {
+            "name": "Falling Ceiling 1",
+        },
+        "falling_ceiling_2": {
+            "name": "Fallende Decke 2",
+        },
+        "fish_mutant": {
+            "name": "Fisch Mutant",
+        },
+        "flame": {
+            "name": [
+                "Flamme",
+                "Feuer",
+            ]
+        },
+        "flame_emitter": {
+            "name": [
+                "Flamenerzeuger",
+                "Feuererzeuger",
+            ]
+        },
+        "flame_emitter_big": {
+            "name": "\\{review}Flammenwerfer (Groß)",
+        },
+        "flame_emitter_jet": {
+            "name": "\\{review}Flammenwerfer (Strahl)",
+        },
+        "flame_emitter_side": {
+            "name": "\\{review}Flammenwerfer (Seite)",
+        },
+        "flame_emitter_small": {
+            "name": "\\{review}Flammenwerfer (Klein)",
+        },
+        "flare": {
+            "name": "Fackel",
+        },
+        "flare_fire": {
+            "name": "Fackel-Funken",
+        },
+        "flares_box": {
+            "name": "Flares Box",
+        },
+        "fuse_box": {
+            "name": "\\{review}Sicherungskasten",
+        },
+        "fx_reserved": {
+            "name": "Gray disk",
+        },
+        "gamma": {
+            "name": "\\{review}Gamma",
+        },
+        "gas_emitter_green": {
+            "name": "\\{review}Gasemitter (Grün)",
+        },
+        "general": {
+            "name": "Mini U-Boot",
+        },
+        "globe": {
+            "name": "\\{review}Globus",
+        },
+        "glow": {
+            "name": "Glühen",
+        },
+        "glow_reserved": {
+            "name": "Karten-Glühen",
+        },
+        "gondola": {
+            "name": "Gondel",
+        },
+        "gong": {
+            "name": "Gong",
+        },
+        "gong_bonger": {
+            "name": "Gong Schlegel",
+        },
+        "graphics": {
+            "name": "Grafikeinstellungen",
+        },
+        "green_light": {
+            "name": "\\{review}Grünes Licht",
+        },
+        "grenade": {
+            "name": "Granate",
+        },
+        "grenade_launcher": {
+            "name": "Granatenwerfer",
+        },
+        "grenade_launcher_ammo": {
+            "name": "Granaten",
+        },
+        "gun_flash": {
+            "name": "Waffen Blitz",
+        },
+        "gun_shell": {
+            "name": "\\{review}Gewehrpatrone",
+        },
+        "harpoon_bolt": {
+            "name": "Harpunen Pfeil",
+        },
+        "harpoon_gun": {
+            "name": "Harpune",
+        },
+        "harpoon_gun_ammo": {
+            "name": "Pfeile",
+        },
+        "hook": {
+            "name": "Hook",
+        },
+        "hot_liquid": {
+            "name": "Extra Feuer",
+        },
+        "huskie": {
+            "name": "\\{review}Hund",
+        },
+        "icicle": {
+            "name": "Icicles",
+        },
+        "inv_background": {
+            "name": "Menü Hintergrund",
+        },
+        "jelly": {
+            "name": "Qualle",
+        },
+        "kayak": {
+            "name": "\\{review}Kajak",
+        },
+        "key_1": {
+            "name": "Key 1",
+        },
+        "key_2": {
+            "name": "Key 2",
+        },
+        "key_3": {
+            "name": "Key 3",
+        },
+        "key_4": {
+            "name": "Key 4",
+        },
+        "key_hole_1": {
+            "name": "Keyhole 1",
+        },
+        "key_hole_2": {
+            "name": "Keyhole 2",
+        },
+        "key_hole_3": {
+            "name": "Keyhole 3",
+        },
+        "key_hole_4": {
+            "name": "Keyhole 4",
+        },
+        "kill_all_triggered": {
+            "name": "\\{review}Alle töten (ausgelöst)",
+        },
+        "killer_statue": {
+            "name": "Statue with Sword",
+        },
+        "lara": {
+            "name": "Lara",
+        },
+        "lara_alarm": {
+            "name": "Alarmglocke",
+        },
+        "lara_autos": {
+            "name": "\\{review}Animation automatischer Pistolen",
+        },
+        "lara_boat": {
+            "name": "Boots-Animation",
+        },
+        "lara_desert_eagle": {
+            "name": "\\{review}Animation der Desert Eagle",
+        },
+        "lara_extra": {
+            "name": "Laras Extra Animation",
+        },
+        "lara_flare": {
+            "name": "Fackel-Animation",
+        },
+        "lara_grenade": {
+            "name": "Grantenwerfer-Animation",
+        },
+        "lara_hair": {
+            "name": "Laras Zopf",
+        },
+        "lara_harpoon": {
+            "name": "Harpunen-Animation",
+        },
+        "lara_m16": {
+            "name": "M16-Animation",
+        },
+        "lara_magnums": {
+            "name": "Magnum-Animation",
+        },
+        "lara_mp5": {
+            "name": "\\{review}MP5-Animation",
+        },
+        "lara_pistols": {
+            "name": "Pistolen-Animation",
+        },
+        "lara_rocket": {
+            "name": "\\{review}Animation des Raketenwerfers",
+        },
+        "lara_shotgun": {
+            "name": "Schrotflinten-Animation",
+        },
+        "lara_skidoo": {
+            "name": "Schneeemobil-Animation",
+        },
+        "lara_uzis": {
+            "name": "Uzi-Animation",
+        },
+        "larson": {
+            "name": "Larson",
+        },
+        "lava_wedge": {
+            "name": "Lava-Keil",
+        },
+        "lead_bar": {
+            "name": "Bleibarren",
+        },
+        "lift": {
+            "name": "Aufzug",
+        },
+        "lightning_emitter": {
+            "name": "Blitzerzeuger",
+        },
+        "lion": {
+            "name": "Löwe",
+        },
+        "lioness": {
+            "name": [
+                "Löwin",
+                "Löwe",
+            ]
+        },
+        "lizard": {
+            "name": "\\{review}Echse",
+        },
+        "m16": {
+            "name": "M16",
+        },
+        "m16_ammo": {
+            "name": "M16-Munition",
+        },
+        "m16_flash": {
+            "name": "M16 Blitz",
+        },
+        "magnums": {
+            "name": "Magnums",
+        },
+        "magnums_ammo": {
+            "name": "Magnum Munition",
+        },
+        "mesh_swap_1": {
+            "name": "Mesh Swap 1",
+        },
+        "mesh_swap_2": {
+            "name": "Mesh Swap 2",
+        },
+        "mesh_swap_3": {
+            "name": "\\{review}Mesh Swap 3",
+        },
+        "midas_touch": {
+            "name": "Hand des Midas",
+        },
+        "mine": {
+            "name": "Wassermine",
+        },
+        "mini_copter": {
+            "name": "Helikopter 2",
+        },
+        "missile_atlantean_bomb": {
+            "name": "\\{review}Geschoss (Atlantische Bombe)",
+        },
+        "missile_atlantean_shard": {
+            "name": "\\{review}Geschoss (Atlantischer Splitter)",
+        },
+        "missile_flame": {
+            "name": "\\{review}Geschoss (Flamme)",
+        },
+        "missile_harpoon": {
+            "name": "\\{review}Geschoss (Harpune)",
+        },
+        "missile_knife": {
+            "name": "\\{review}Geschoss (Messer)",
+        },
+        "missile_poison": {
+            "name": "\\{review}Geschoss (Gift)",
+        },
+        "monk_1": {
+            "name": "Mönch 1",
+        },
+        "monk_2": {
+            "name": "Mönch 2",
+        },
+        "monkey": {
+            "name": "\\{review}Affe",
+        },
+        "mounted_gun": {
+            "name": "\\{review}Montiertes Geschütz",
+        },
+        "mouse": {
+            "name": "Ratte",
+        },
+        "movable_block_1": {
+            "name": [
+                "Drückbarer Block 1",
+                "Bewegbarer Block 1",
+            ]
+        },
+        "movable_block_2": {
+            "name": [
+                "Drückbarer Block 2",
+                "Bewegbarer Block 2",
+            ]
+        },
+        "movable_block_3": {
+            "name": [
+                "Drückbarer Block 3",
+                "Bewegbarer Block 3",
+            ]
+        },
+        "movable_block_4": {
+            "name": [
+                "Drückbarer Block 4",
+                "Bewegbarer Block 4",
+            ]
+        },
+        "moving_bar": {
+            "name": "Moving Bar",
+        },
+        "mp5": {
+            "name": "\\{review}MP5",
+        },
+        "mp5_ammo": {
+            "name": "\\{review}MP5-Munition",
+        },
+        "mp_1": {
+            "name": "\\{review}MP 1",
+        },
+        "mp_2": {
+            "name": "\\{review}MP 2",
+        },
+        "mummy": {
+            "name": "Mumie",
+        },
+        "mutant_1": {
+            "name": "Mutant 1",
+        },
+        "mutant_2": {
+            "name": "Mutant 2",
+        },
+        "mutant_3": {
+            "name": "Mutant 3",
+        },
+        "natla": {
+            "name": "Natla",
+        },
+        "natla_gun": {
+            "name": "\\{review}Natlas Waffe",
+        },
+        "on_off_light": {
+            "name": "\\{review}An/Aus Licht",
+        },
+        "passport": {
+            "name": "Spiel",
+        },
+        "patrol_dog": {
+            "name": "\\{review}Hund",
+        },
+        "pda": {
+            "name": "Gameplay",
+        },
+        "pendulum_1": {
+            "name": "Sandsack",
+        },
+        "pendulum_2": {
+            "name": "Swinging Box",
+        },
+        "photo": {
+            "name": "Laras Haus",
+        },
+        "pickup_1": {
+            "name": "Pickup Item 1",
+        },
+        "pickup_2": {
+            "name": "Pickup Item 2",
+        },
+        "pickup_aid": {
+            "name": "Pickup-Hilfe",
+        },
+        "pierre": {
+            "name": "Pierre",
+        },
+        "pirahnas": {
+            "name": "\\{review}Piranhas",
+        },
+        "pistols": {
+            "name": "Pistolen",
+        },
+        "pistols_ammo": {
+            "name": "Pistolen Munition",
+        },
+        "player_1": {
+            "name": "Zwischensequenz-Schauspieler 1",
+        },
+        "player_10": {
+            "name": "Zwischensequenz-Schauspieler 10",
+        },
+        "player_2": {
+            "name": "Zwischensequenz-Schauspieler 2",
+        },
+        "player_3": {
+            "name": "Zwischensequenz-Schauspieler 3",
+        },
+        "player_4": {
+            "name": "Zwischensequenz-Schauspieler 4",
+        },
+        "player_5": {
+            "name": "Zwischensequenz-Schauspieler 5",
+        },
+        "player_6": {
+            "name": "Zwischensequenz-Schauspieler 6",
+        },
+        "player_7": {
+            "name": "Zwischensequenz-Schauspieler 7",
+        },
+        "player_8": {
+            "name": "Zwischensequenz-Schauspieler 8",
+        },
+        "player_9": {
+            "name": "Zwischensequenz-Schauspieler 9",
+        },
+        "pods": {
+            "name": "Pod",
+        },
+        "poison_dart": {
+            "name": "\\{review}Giftpfeil",
+        },
+        "poison_dart_emitter": {
+            "name": "\\{review}Giftpfeilwerfer",
+        },
+        "portacabin": {
+            "name": "Portable Cabin",
+        },
+        "power_saw": {
+            "name": "Power Saw",
+        },
+        "prisoner": {
+            "name": "\\{review}Gefangener",
+        },
+        "propeller_1": {
+            "name": "Airplane Propeller",
+        },
+        "propeller_2": {
+            "name": "Underwater Propeller",
+        },
+        "propeller_3": {
+            "name": "Air Fan",
+        },
+        "pulse_light": {
+            "name": "\\{review}Pulsierendes Licht",
+        },
+        "puma": {
+            "name": "Puma",
+        },
+        "punk_1": {
+            "name": "\\{review}Punk 1",
+        },
+        "punk_2": {
+            "name": "\\{review}Punk 2",
+        },
+        "puzzle_1": {
+            "name": "Puzzle Item 1",
+        },
+        "puzzle_2": {
+            "name": "Puzzle Item 2",
+        },
+        "puzzle_3": {
+            "name": "Puzzle Item 3",
+        },
+        "puzzle_4": {
+            "name": "Puzzle Item 4",
+        },
+        "puzzle_done_1": {
+            "name": "Puzzle Hole 1 (Done)",
+        },
+        "puzzle_done_2": {
+            "name": "Puzzle Hole 2 (Done)",
+        },
+        "puzzle_done_3": {
+            "name": "Puzzle Hole 3 (Done)",
+        },
+        "puzzle_done_4": {
+            "name": "Puzzle Hole 4 (Done)",
+        },
+        "puzzle_hole_1": {
+            "name": "Puzzle Hole 1 (Empty)",
+        },
+        "puzzle_hole_2": {
+            "name": "Puzzle Hole 2 (Empty)",
+        },
+        "puzzle_hole_3": {
+            "name": "Puzzle Hole 3 (Empty)",
+        },
+        "puzzle_hole_4": {
+            "name": "Puzzle Hole 4 (Empty)",
+        },
+        "quad_bike": {
+            "name": "\\{review}Quad",
+        },
+        "quest_1": {
+            "name": "\\{review}Quest-Gegenstand 1",
+        },
+        "quest_2": {
+            "name": "\\{review}Quest-Gegenstand 2",
+        },
+        "quest_3": {
+            "name": "\\{review}Quest-Gegenstand 3",
+        },
+        "quest_4": {
+            "name": "\\{review}Quest-Gegenstand 4",
+        },
+        "raptor": {
+            "name": "Raptor",
+        },
+        "raptor_emitter": {
+            "name": "\\{review}Raptor-Emitter",
+        },
+        "rat": {
+            "name": [
+                "Ratte",
+                "Landratte",
+            ]
+        },
+        "red_light": {
+            "name": "\\{review}Rotes Licht",
+        },
+        "ricochet": {
+            "name": "Querschläger",
+        },
+        "rocket": {
+            "name": "\\{review}Rakete",
+        },
+        "rocket_launcher": {
+            "name": "\\{review}Raketenwerfer",
+        },
+        "rocket_launcher_ammo": {
+            "name": "\\{review}Raketen",
+        },
+        "rolling_ball_1": {
+            "name": [
+                "Fels 1",
+                "Rollender Ball",
+            ]
+        },
+        "rolling_ball_2": {
+            "name": [
+                "Boulder 2",
+                "Rolling Ball 2",
+            ]
+        },
+        "rolling_ball_3": {
+            "name": [
+                "Boulder 3",
+                "Rolling Ball 3",
+            ]
+        },
+        "rolling_ball_4": {
+            "name": [
+                "Boulder 4",
+                "Rolling Ball 4",
+            ]
+        },
+        "save_crystal": {
+            "name": "Speicherkristall",
+        },
+        "scion": {
+            "name": "Scion",
+        },
+        "scion_holder": {
+            "name": "Scion-Halter",
+        },
+        "secret_1": {
+            "name": "Geheimnis 1",
+        },
+        "secret_2": {
+            "name": "Geheimnis 2",
+        },
+        "secret_3": {
+            "name": "Geheimnis 3",
+        },
+        "security_guard": {
+            "name": "\\{review}Sicherheitsmann",
+        },
+        "security_laser_alarm": {
+            "name": "\\{review}Sicherheitslaser (Alarm)",
+        },
+        "security_laser_deadly": {
+            "name": "\\{review}Sicherheitslaser (Tödlich)",
+        },
+        "security_laser_killer": {
+            "name": "\\{review}Sicherheitslaser (Killer)",
+        },
+        "sentry_gun": {
+            "name": "\\{review}Roboter-Wachgeschütz",
+        },
+        "shadow": {
+            "name": "\\{review}Schatten",
+        },
+        "shark": {
+            "name": "Hai",
+        },
+        "shiva": {
+            "name": "\\{review}Shiva",
+        },
+        "shotgun": {
+            "name": "Schrotflinte",
+        },
+        "shotgun_ammo": {
+            "name": "Schrot-Munition",
+        },
+        "shotgun_shell": {
+            "name": "\\{review}Schrotpatrone",
+        },
+        "skate_kid": {
+            "name": "Skate Kid",
+        },
+        "skateboard": {
+            "name": "Skateboard",
+        },
+        "skidoo_armed": {
+            "name": "Schwarzes Schneemobil",
+        },
+        "skidoo_driver": {
+            "name": "Fahrer schwarzes Schneemobil",
+        },
+        "skidoo_fast": {
+            "name": "Rotes Schneemobil",
+        },
+        "skidoo_track": {
+            "name": "Snowmobile Track",
+        },
+        "skybox": {
+            "name": "Skybox",
+        },
+        "sliding_pillar": {
+            "name": "Sliding Pillar",
+        },
+        "smashable_1": {
+            "name": "Breakable Window 1",
+        },
+        "smashable_2": {
+            "name": "Breakable Window 2",
+        },
+        "smashable_3": {
+            "name": "Breakable Window 3",
+        },
+        "smashable_4": {
+            "name": "Breakable Window 4",
+        },
+        "smoke_emitter_black": {
+            "name": "\\{review}Rauchgenerator (Schwarz)",
+        },
+        "smoke_emitter_white": {
+            "name": "\\{review}Rauchgenerator (Weiß)",
+        },
+        "snake": {
+            "name": "\\{review}Schlange",
+        },
+        "snow_sprite": {
+            "name": "Snowmobile Wake",
+        },
+        "sophia": {
+            "name": "\\{review}Sophia",
+        },
+        "sound": {
+            "name": "Sound",
+        },
+        "sphere_of_doom_1": {
+            "name": "Dragon Explosion 1",
+        },
+        "sphere_of_doom_2": {
+            "name": "Dragon Explosion 2",
+        },
+        "sphere_of_doom_3": {
+            "name": "Dragon Explosion 3",
+        },
+        "spider": {
+            "name": "Spinne",
+        },
+        "spike_wall": {
+            "name": "Spike Wall",
+        },
+        "spikes": {
+            "name": "Stacheln",
+        },
+        "spinning_blade": {
+            "name": "Spinning Blade",
+        },
+        "splash_1": {
+            "name": "Wasserkräuselungen 1",
+        },
+        "splash_2": {
+            "name": "Water-Kräuseln 2",
+        },
+        "springboard": {
+            "name": "Springboard",
+        },
+        "steam_emitter": {
+            "name": "\\{review}Dampfgenerator",
+        },
+        "sthpac_mercenary": {
+            "name": "\\{review}Südsee-Söldner",
+        },
+        "stopwatch": {
+            "name": "\\{review}Statistiken",
+        },
+        "strobe_light": {
+            "name": "\\{review}Stroboskoplicht",
+        },
+        "swat_1": {
+            "name": "\\{review}SWAT 1",
+        },
+        "swat_2": {
+            "name": "\\{review}SWAT 2",
+        },
+        "swat_3": {
+            "name": "\\{review}SWAT 3",
+        },
+        "swinging_axe": {
+            "name": "\\{review}Schwingende Axt",
+        },
+        "switch_type_airlock": {
+            "name": "Airlock Switch",
+        },
+        "switch_type_button": {
+            "name": [
+                "Button",
+                "Push Button",
+                "Switch",
+            ]
+        },
+        "switch_type_normal": {
+            "name": [
+                "Lever",
+                "Switch",
+            ]
+        },
+        "switch_type_small": {
+            "name": "Small Switch",
+        },
+        "switch_type_uw": {
+            "name": [
+                "Underwater Lever",
+                "Underwater Switch",
+            ]
+        },
+        "switch_type_wheel": {
+            "name": "\\{review}Radswitch",
+        },
+        "teeth_trap": {
+            "name": "Zahn-Falle",
+        },
+        "text_box": {
+            "name": "UI Frame",
+        },
+        "thors_handle": {
+            "name": "Thors Hammer Griff",
+        },
+        "thors_head": {
+            "name": "Thors Hammer",
+        },
+        "tiger": {
+            "name": "Tiger",
+        },
+        "tony": {
+            "name": "\\{review}Tony",
+        },
+        "torso": {
+            "name": [
+                "Torso",
+                "Adam",
+                "Riesenmutant",
+            ]
+        },
+        "train": {
+            "name": "\\{review}Zug",
+        },
+        "trapdoor_1": {
+            "name": "Falltür 1",
+        },
+        "trapdoor_2": {
+            "name": "Falltür 2",
+        },
+        "trapdoor_3": {
+            "name": "Falltür 3",
+        },
+        "trex": {
+            "name": "T-Rex",
+        },
+        "trex_alpha": {
+            "name": "\\{review}T-Rex-Alpha",
+        },
+        "tribe_axeman": {
+            "name": "\\{review}Stammesaxtkämpfer",
+        },
+        "tribe_boss": {
+            "name": "\\{review}Stammesanführer",
+        },
+        "tribe_pipeman": {
+            "name": "\\{review}Stammes-Blasrohrbenutzer",
+        },
+        "tropical_fish": {
+            "name": "\\{review}Tropischer Fisch",
+        },
+        "twinkle": {
+            "name": "Funken",
+        },
+        "upv": {
+            "name": "\\{review}Mini-U-Boot",
+        },
+        "uzis": {
+            "name": "Uzis",
+        },
+        "uzis_ammo": {
+            "name": "Uzi-Munition",
+        },
+        "vole": {
+            "name": [
+                "Wühlmaus",
+                "Wasserratte",
+            ]
+        },
+        "vulture": {
+            "name": "\\{review}Geier",
+        },
+        "water_sprite": {
+            "name": "Boat Wake",
+        },
+        "waterfall": {
+            "name": "Wasserfall Nebel",
+        },
+        "white_light": {
+            "name": "\\{review}Weißes Licht",
+        },
+        "winston": {
+            "name": "Winston",
+        },
+        "winston_army": {
+            "name": "\\{review}Winston (Armee)",
+        },
+        "wolf": {
+            "name": "Wolf",
+        },
+        "worker_1": {
+            "name": "Schläger Schütze 1",
+        },
+        "worker_2": {
+            "name": "Schläger Schütze 2",
+        },
+        "worker_3": {
+            "name": "Schlagstock schwingender Schläger 1",
+        },
+        "worker_4": {
+            "name": "Schlagstock schwingender Schläger 2",
+        },
+        "worker_5": {
+            "name": "Typ mit Flammenwerfer",
+        },
+        "xian_knight": {
+            "name": "Xian Ritter",
+        },
+        "xian_knight_statue": {
+            "name": "Xian Ritter Statue",
+        },
+        "xian_spearman": {
+            "name": "Xian Speerträger",
+        },
+        "xian_spearman_statue": {
+            "name": "Xian Speerträger Statue",
+        },
+        "yeti": {
+            "name": "Yeti",
+        },
+        "zipline_handle": {
+            "name": "Zipline Handle",
+        }
+    }
+}

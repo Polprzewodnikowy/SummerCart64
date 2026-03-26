@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\const.json" />
+    <None Remove="Resources\Lang\en.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\styles.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Resource>
+    <EmbeddedResource Include="Resources\const.json" />
+    <EmbeddedResource Include="Resources\Lang\en.json" />
+  </ItemGroup>
+</Project>

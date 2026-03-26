@@ -1,0 +1,4 @@
+#pragma once
+
+#define SHELL_HEADLESS_WIDTH 1280
+#define SHELL_HEADLESS_HEIGHT 720

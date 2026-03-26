@@ -1,0 +1,314 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "globe_select": {
+            "area_1": "India",
+            "area_2": "South Pacific Islands",
+            "area_3": "Nevada",
+            "area_4": "",
+            "area_5": "London",
+            "area_6": "Antarctica",
+        },
+        "inventory_ring": {
+            "heading_fmt": "\\{color 5}%s",
+            "item_count_fmt": "\\{color 3}%s",
+            "object_name_fmt": "\\{color 5}%s",
+        },
+        "overlay": {
+            "item_count_fmt_pc": "%s",
+            "item_count_fmt_ps1": "\\{color 3}%s",
+        },
+        "pause": {
+            "paused": "\\{color 5}Paused",
+        },
+        "stats": {
+            "assault_other_times_fmt": "\\{color 2}%s",
+            "gym_assault_course": "\\{color 5}Assault Course",
+            "gym_racetrack_course": "\\{color 5}Race Track Course",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Large Medi Pack",
+        },
+        "quest_1": {
+            "description": "",
+            "name": "Infada Stone",
+        },
+        "quest_2": {
+            "description": "",
+            "name": "Element 115",
+        },
+        "quest_3": {
+            "description": "",
+            "name": "Eye of Isis",
+        },
+        "quest_4": {
+            "description": "",
+            "name": "Ora Dagger",
+        },
+        "small_medipack": {
+            "name": "Small Medi Pack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Cutscene 1",
+        },
+        {
+            "title": "Cutscene 2",
+        },
+        {
+            "title": "Cutscene 3",
+        },
+        {
+            "title": "Cutscene 4",
+        },
+        {
+            "title": "Cutscene 5",
+        },
+        {
+            "title": "Cutscene 6",
+        },
+        {
+            "title": "Cutscene 7",
+        },
+        {
+            "title": "Cutscene 8",
+        },
+        {
+            "title": "Cutscene 9",
+        },
+        {
+            "title": "Cutscene 10",
+        },
+        {
+            "title": "Cutscene 11",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Lara's Home",
+            "objects": {
+                "key_1": {
+                    "name": "Racetrack Key",
+                }
+            }
+        },
+        {
+            "title": "Jungle",
+            "objects": {
+                "key_4": {
+                    "name": "Indra Key",
+                }
+            }
+        },
+        {
+            "title": "Temple Ruins",
+            "objects": {
+                "key_1": {
+                    "name": "Key of Ganesha",
+                },
+                "puzzle_1": {
+                    "name": "Scimitar",
+                },
+                "puzzle_2": {
+                    "name": "Scimitar",
+                }
+            }
+        },
+        {
+            "title": "The River Ganges",
+            "objects": {
+                "key_1": {
+                    "name": "Gate Key",
+                }
+            }
+        },
+        {
+            "title": "Caves of Kaliya",
+        },
+        {
+            "title": "Coastal Village",
+            "objects": {
+                "key_1": {
+                    "name": "Smuggler's Key",
+                },
+                "puzzle_1": {
+                    "name": "Serpent Stone",
+                }
+            }
+        },
+        {
+            "title": "Crash Site",
+            "objects": {
+                "key_1": {
+                    "name": "Commander Bishop's Key",
+                },
+                "key_2": {
+                    "name": "Lt. Tuckerman's Key",
+                },
+                "pickup_1": {
+                    "name": "Swamp Map",
+                    "description": "",
+                }
+            }
+        },
+        {
+            "title": "Madubu Gorge",
+        },
+        {
+            "title": "Temple of Puna",
+        },
+        {
+            "title": "Thames Wharf",
+            "objects": {
+                "key_1": {
+                    "name": "Flue Room Key",
+                },
+                "key_2": {
+                    "name": "Cathedral Key",
+                }
+            }
+        },
+        {
+            "title": "Aldwych",
+            "objects": {
+                "key_1": {
+                    "name": "Maintenance Key",
+                },
+                "key_2": {
+                    "name": "Solomon's Key",
+                },
+                "key_3": {
+                    "name": "Solomon's Key",
+                },
+                "puzzle_1": {
+                    "name": "Old Penny",
+                },
+                "puzzle_2": {
+                    "name": "Ticket",
+                },
+                "puzzle_3": {
+                    "name": "Masonic Mallet",
+                },
+                "puzzle_4": {
+                    "name": "Ornate Star",
+                }
+            }
+        },
+        {
+            "title": "Lud's Gate",
+            "objects": {
+                "key_1": {
+                    "name": "Boiler Room Key",
+                },
+                "puzzle_1": {
+                    "name": "Embalming Fluid",
+                }
+            }
+        },
+        {
+            "title": "City",
+        },
+        {
+            "title": "Nevada Desert",
+            "objects": {
+                "key_1": {
+                    "name": "Generator Access",
+                },
+                "key_2": {
+                    "name": "Detonator Switch",
+                }
+            }
+        },
+        {
+            "title": "High Security Compound",
+            "objects": {
+                "key_1": {
+                    "name": "Keycard Type A",
+                },
+                "key_2": {
+                    "name": "Keycard Type B",
+                },
+                "puzzle_1": {
+                    "name": "Blue Security Pass",
+                },
+                "puzzle_2": {
+                    "name": "Yellow Security Pass",
+                }
+            }
+        },
+        {
+            "title": "Area 51",
+            "objects": {
+                "key_1": {
+                    "name": "Launch Code Pass",
+                },
+                "puzzle_1": {
+                    "name": "Tower Access Key",
+                },
+                "puzzle_2": {
+                    "name": "Code Clearance Disk",
+                },
+                "puzzle_3": {
+                    "name": "Code Clearance Disk",
+                },
+                "puzzle_4": {
+                    "name": "Hanger Access Key",
+                }
+            }
+        },
+        {
+            "title": "Antarctica",
+            "objects": {
+                "key_1": {
+                    "name": "Hut Key",
+                },
+                "puzzle_1": {
+                    "name": "Crowbar",
+                },
+                "puzzle_2": {
+                    "name": "Gate Control Key",
+                }
+            }
+        },
+        {
+            "title": "RX-Tech Mines",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Crowbar",
+                },
+                "puzzle_2": {
+                    "name": "Lead Acid Battery",
+                },
+                "puzzle_3": {
+                    "name": "Winch Starter",
+                }
+            }
+        },
+        {
+            "title": "Lost City of Tinnos",
+            "objects": {
+                "key_1": {
+                    "name": "Uli Key",
+                },
+                "puzzle_1": {
+                    "name": "Oceanic Mask",
+                }
+            }
+        },
+        {
+            "title": "Meteorite Cavern",
+        },
+        {
+            "title": "All Hallows",
+            "objects": {
+                "key_1": {
+                    "name": "Vault Key",
+                }
+            }
+        }
+    ]
+}

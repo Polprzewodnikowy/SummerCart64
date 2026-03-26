@@ -1,0 +1,92 @@
+name: Create a new release
+
+on:
+  workflow_call:
+    inputs:
+      draft:
+        type: boolean
+        description: "Draft"
+        required: true
+        default: false
+      prerelease:
+        type: boolean
+        description: "Prerelease"
+        required: true
+        default: false
+      tag_name:
+        type: string
+        description: "Tag name"
+        required: false
+        default: github.ref_name
+
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Install dependencies"
+        uses: taiki-e/install-action@just
+
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: "Prepare release data"
+        id: prepare_release_data
+        run: |
+          if [ "${{ inputs.prerelease }}" = "1" ] || [ "${{ inputs.prerelease }}" = "true" ]; then
+            echo "release_name=Development snapshot" >> $GITHUB_OUTPUT
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            just output-current-changelog >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo -n "release_name=" >> $GITHUB_OUTPUT
+            just output-release-name >> $GITHUB_OUTPUT
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            just output-current-changelog --stable >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Download built assets"
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: "Get information on the latest pre-release"
+        if: ${{ inputs.prerelease == true || inputs.prerelease == 'true' }}
+        id: last_release
+        uses: InsonusK/get-latest-release@v1.0.1
+        with:
+          myToken: ${{ github.token }}
+          exclude_types: "draft|release"
+
+      - name: 'Mark the pre-release as latest'
+        if: ${{ inputs.prerelease == true || inputs.prerelease == 'true' }}
+        uses: EndBug/latest-tag@latest
+
+      - name: "Delete old pre-release assets"
+        if: ${{ inputs.prerelease == true || inputs.prerelease == 'true' }}
+        uses: mknejp/delete-release-assets@v1
+        continue-on-error: true
+        with:
+          token: ${{ github.token }}
+          tag: ${{ steps.last_release.outputs.tag_name }}
+          assets: "*.*"
+
+      - name: "Publish a release"
+        uses: softprops/action-gh-release@v2.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ inputs.tag_name }}
+          name: ${{ steps.prepare_release_data.outputs.release_name }}
+          body: ${{ steps.prepare_release_data.outputs.changelog }}
+          draft: ${{ inputs.draft == true || inputs.draft == 'true' }}
+          prerelease: ${{ inputs.prerelease == true || inputs.prerelease == 'true' }}
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*

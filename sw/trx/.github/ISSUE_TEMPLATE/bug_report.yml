@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a reproducible problem in TRX
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please open one issue per bug.
+        Before submitting, read the bug reporting guide:
+        https://github.com/LostArtefacts/TRX/blob/develop/BUG_REPORTING.md
+
+  - type: dropdown
+    id: game_type
+    attributes:
+      label: Game type
+      description: What does this affect?
+      options:
+        - Original game
+        - Custom level
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - All games
+        - TR1
+        - TR2
+        - TR3
+        - Other
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        If your report is about TR3, please note that current support is limited to Lara's Home, India, and South Pacific.
+        Reports for other TR3 areas are still out of scope while that work is in progress, so those issues are not being accepted yet.
+
+  - type: input
+    id: trx_version
+    attributes:
+      label: TRX version
+      description: Use the exact version. It can be found in the main menu, or .exe properties.
+      placeholder: 1.2.3
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: NVIDIA GeForce RTX 4070
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: Describe the bug in plain terms, and write the shortest steps that reproduce it.
+      placeholder: |
+        Lara falls through the bridge after loading a save near the switch room.
+        1. Load the attached save.
+        2. Walk onto the bridge.
+        3. Pull the switch.
+        4. Observe Lara falling through the floor.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: What did you expect instead?
+      placeholder: Lara should stay on the bridge and the switch should work normally.
+    validations:
+      required: true
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Attach `TRX.log`, saves, screenshots, videos, and custom level files here if they help reproduce the issue.
+      placeholder: Drag and drop `TRX.log`, save files, screenshots, videos, or custom level files here.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I included enough detail to reproduce this.
+          required: true
+        - label: I attached `TRX.log` and any saves, media, or custom level files needed to reproduce this.
+          required: true
+        - label: This issue covers one bug.
+          required: true

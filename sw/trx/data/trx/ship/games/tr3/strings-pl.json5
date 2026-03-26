@@ -1,0 +1,306 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "globe_select": {
+            "area_1": "Indie",
+            "area_2": "Wyspy Południowego Pacyfiku",
+            "area_3": "Pustynia Nevada",
+            "area_4": " ",
+            "area_5": "Londyn",
+            "area_6": "\\{Antarktyda",
+        },
+        "inventory_ring": {
+            "heading_fmt": "\\{color 5}%s",
+            "item_count_fmt": "\\{color 3}%s",
+            "object_name_fmt": "\\{color 5}%s",
+        },
+        "overlay": {
+            "item_count_fmt_pc": "%s",
+            "item_count_fmt_ps1": "\\{color 3}%s",
+        },
+        "pause": {
+            "paused": "\\{color 5}Pauza",
+        },
+        "stats": {
+            "assault_other_times_fmt": "\\{color 2}%s",
+            "gym_assault_course": "\\{color 5}Tor Przeszkód",
+            "gym_racetrack_course": "\\{color 5}Tor Wyścigowy",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Scena Przerywnikowa 1",
+        },
+        {
+            "title": "Scena Przerywnikowa 2",
+        },
+        {
+            "title": "Scena Przerywnikowa 3",
+        },
+        {
+            "title": "Scena Przerywnikowa 4",
+        },
+        {
+            "title": "Scena Przerywnikowa 5",
+        },
+        {
+            "title": "Scena Przerywnikowa 6",
+        },
+        {
+            "title": "Scena Przerywnikowa 7",
+        },
+        {
+            "title": "Scena Przerywnikowa 8",
+        },
+        {
+            "title": "Scena Przerywnikowa 9",
+        },
+        {
+            "title": "Scena Przerywnikowa 10",
+        },
+        {
+            "title": "Scena Przerywnikowa 11",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Dom Lary",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do toru wyścigowego",
+                }
+            }
+        },
+        {
+            "title": "Dżungla",
+            "objects": {
+                "key_4": {
+                    "name": "Klucz Indry",
+                }
+            }
+        },
+        {
+            "title": "Ruiny Świątyni",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz Ganeszy",
+                },
+                "puzzle_1": {
+                    "name": "Szabla",
+                },
+                "puzzle_2": {
+                    "name": "Szabla",
+                }
+            }
+        },
+        {
+            "title": "Rzeka Ganges",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do bramy",
+                }
+            }
+        },
+        {
+            "title": "Jaskinie Kaliyi",
+        },
+        {
+            "title": "Wioska Nadbrzeżna",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz przemytnika",
+                },
+                "puzzle_1": {
+                    "name": "Kamień węża",
+                }
+            }
+        },
+        {
+            "title": "Miejsce Katastrofy",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz komandora Bishopa",
+                },
+                "key_2": {
+                    "name": "Klucz porucznika Tuckermana",
+                },
+                "pickup_1": {
+                    "name": "Mapa bagna",
+                    "description": "",
+                }
+            }
+        },
+        {
+            "title": "Wąwóz Madubu",
+        },
+        {
+            "title": "Świątynia Puny",
+        },
+        {
+            "title": "Nabrzeże Tamizy",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do kotłowni",
+                },
+                "key_2": {
+                    "name": "Klucz do katedry",
+                }
+            }
+        },
+        {
+            "title": "Aldwych",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz konserwacyjny",
+                },
+                "key_2": {
+                    "name": "Klucz Salomona",
+                },
+                "key_3": {
+                    "name": "Klucz Salomona",
+                },
+                "puzzle_1": {
+                    "name": "Stara moneta",
+                },
+                "puzzle_2": {
+                    "name": "Bilet",
+                },
+                "puzzle_3": {
+                    "name": "Masoński młotek",
+                },
+                "puzzle_4": {
+                    "name": "Ozdobna gwiazda",
+                }
+            }
+        },
+        {
+            "title": "Brama Lud'a",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do kotłowni",
+                },
+                "puzzle_1": {
+                    "name": "Płyn balsamujący",
+                }
+            }
+        },
+        {
+            "title": "Miasto",
+        },
+        {
+            "title": "Pustynia Nevady",
+            "objects": {
+                "key_1": {
+                    "name": "Dostęp do generatora",
+                },
+                "key_2": {
+                    "name": "Przełącznik detonatora",
+                }
+            }
+        },
+        {
+            "title": "Ściśle Strzeżona Baza",
+            "objects": {
+                "key_1": {
+                    "name": "Karta dostępu typu A",
+                },
+                "key_2": {
+                    "name": "Karta dostępu typu B",
+                },
+                "puzzle_1": {
+                    "name": "Niebieska przepustka bezpieczeństwa",
+                },
+                "puzzle_2": {
+                    "name": "Żółta przepustka bezpieczeństwa",
+                }
+            }
+        },
+        {
+            "title": "Strefa 51",
+            "objects": {
+                "key_1": {
+                    "name": "Przepustka z kodem startowym",
+                },
+                "puzzle_1": {
+                    "name": "Klucz dostępu do wieży",
+                },
+                "puzzle_2": {
+                    "name": "Dysk z kodem dostępu",
+                },
+                "puzzle_3": {
+                    "name": "Dysk z kodem dostępu",
+                },
+                "puzzle_4": {
+                    "name": "Klucz dostępu do hangaru",
+                }
+            }
+        },
+        {
+            "title": "Antarktyda",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz do chaty",
+                },
+                "puzzle_1": {
+                    "name": "Łom",
+                },
+                "puzzle_2": {
+                    "name": "Klucz do bramy",
+                }
+            }
+        },
+        {
+            "title": "Kopalnie RX-Tech",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Łom",
+                },
+                "puzzle_2": {
+                    "name": "Akumulator",
+                },
+                "puzzle_3": {
+                    "name": "Rozrusznik wyciągarki",
+                }
+            }
+        },
+        {
+            "title": "Zaginione Miasto Tinnos",
+            "objects": {
+                "key_1": {
+                    "name": "Klucz Uli",
+                },
+                "puzzle_1": {
+                    "name": "Maska",
+                }
+            }
+        },
+        {
+            "title": "Jaskinia Meteorytowa",
+        },
+        {
+            "title": "Wszystkich Świętych",
+            "objects": {
+                "quest_1": {
+                    "name": "Kamień Infada",
+                    "description": "",
+                },
+                "quest_2": {
+                    "name": "Pierwiastek 115",
+                    "description": "",
+                },
+                "quest_3": {
+                    "name": "Oko Izydy",
+                    "description": "",
+                },
+                "quest_4": {
+                    "name": "Sztylet Ora",
+                    "description": "",
+                },
+                "key_1": {
+                    "name": "Klucz do skarbca",
+                }
+            }
+        }
+    ]
+}

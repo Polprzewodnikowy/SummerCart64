@@ -1,0 +1,314 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "globe_select": {
+            "area_1": "\\{review}Indien",
+            "area_2": "\\{review}Südseeinseln",
+            "area_3": "\\{review}Nevada-Wüste",
+            "area_4": "\\{review}",
+            "area_5": "\\{review}London",
+            "area_6": "\\{review}Antarktis",
+        },
+        "inventory_ring": {
+            "heading_fmt": "\\{color 5}%s",
+            "item_count_fmt": "\\{color 3}%s",
+            "object_name_fmt": "\\{color 5}%s",
+        },
+        "overlay": {
+            "item_count_fmt_pc": "%s",
+            "item_count_fmt_ps1": "\\{color 3}%s",
+        },
+        "pause": {
+            "paused": "\\{color 5}Pause",
+        },
+        "stats": {
+            "assault_other_times_fmt": "\\{review}\\{color 2}%s",
+            "gym_assault_course": "\\{review}\\{color 5}Angriffskurs",
+            "gym_racetrack_course": "\\{review}\\{color 5}Rennstrecke",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Großes Medi-Pack",
+        },
+        "quest_1": {
+            "description": "",
+            "name": "\\{review}Infada-Stein",
+        },
+        "quest_2": {
+            "description": "",
+            "name": "\\{review}Element 115",
+        },
+        "quest_3": {
+            "description": "",
+            "name": "\\{review}Auge des Isis",
+        },
+        "quest_4": {
+            "description": "",
+            "name": "\\{review}Ora-Dolch",
+        },
+        "small_medipack": {
+            "name": "Kleines Medi-Pack",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Zwischensequenz 1",
+        },
+        {
+            "title": "Zwischensequenz 2",
+        },
+        {
+            "title": "Zwischensequenz 3",
+        },
+        {
+            "title": "Zwischensequenz 4",
+        },
+        {
+            "title": "Zwischensequenz 5",
+        },
+        {
+            "title": "Zwischensequenz 6",
+        },
+        {
+            "title": "Zwischensequenz 7",
+        },
+        {
+            "title": "Zwischensequenz 8",
+        },
+        {
+            "title": "Zwischensequenz 9",
+        },
+        {
+            "title": "Zwischensequenz 10",
+        },
+        {
+            "title": "Zwischensequenz 11",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Laras Anwesen",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zur Rennstrecke",
+                }
+            }
+        },
+        {
+            "title": "Dschungel",
+            "objects": {
+                "key_4": {
+                    "name": "Indra-Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Templeruine",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel des Ganesha",
+                },
+                "puzzle_1": {
+                    "name": "Säbel",
+                },
+                "puzzle_2": {
+                    "name": "Säbel",
+                }
+            }
+        },
+        {
+            "title": "Der Ganges",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zum Tor",
+                }
+            }
+        },
+        {
+            "title": "Kaliya Höhlen",
+        },
+        {
+            "title": "Küstendorf",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel des Schmugglers",
+                },
+                "puzzle_1": {
+                    "name": "Schlangenstein",
+                }
+            }
+        },
+        {
+            "title": "Absturzstelle",
+            "objects": {
+                "key_1": {
+                    "name": "Commander Bishop's Schlüssel",
+                },
+                "key_2": {
+                    "name": "Lt. Tuckerman's Schlüssel",
+                },
+                "pickup_1": {
+                    "name": "Sumpfkarte",
+                    "description": "",
+                }
+            }
+        },
+        {
+            "title": "Madubu Schlucht",
+        },
+        {
+            "title": "Punatempel",
+        },
+        {
+            "title": "Kai an der Themse",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zum Belüftungsraum",
+                },
+                "key_2": {
+                    "name": "Schlüssel zur Kathedrale",
+                }
+            }
+        },
+        {
+            "title": "Aldwych",
+            "objects": {
+                "key_1": {
+                    "name": "Wartungsraumschlüssel",
+                },
+                "key_2": {
+                    "name": "Solomon's Schlüssel",
+                },
+                "key_3": {
+                    "name": "Solomon's Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Alter Penny",
+                },
+                "puzzle_2": {
+                    "name": "Ticket",
+                },
+                "puzzle_3": {
+                    "name": "Steinmetzhammer",
+                },
+                "puzzle_4": {
+                    "name": "Verzierter Stern",
+                }
+            }
+        },
+        {
+            "title": "Lud's Gate",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zum Heizraum",
+                },
+                "puzzle_1": {
+                    "name": "Balsamierungs Öl",
+                }
+            }
+        },
+        {
+            "title": "Innenstadt",
+        },
+        {
+            "title": "Wüste von Nevada",
+            "objects": {
+                "key_1": {
+                    "name": "Zugangskarte zum Generator",
+                },
+                "key_2": {
+                    "name": "Zündschlüssel",
+                }
+            }
+        },
+        {
+            "title": "Hochsicherheitstrakt",
+            "objects": {
+                "key_1": {
+                    "name": "Codekarte Typ A",
+                },
+                "key_2": {
+                    "name": "Codekarte Typ B",
+                },
+                "puzzle_1": {
+                    "name": "Blauer Sicherheitsstecker",
+                },
+                "puzzle_2": {
+                    "name": "Gelber Sicherheitsstecker",
+                }
+            }
+        },
+        {
+            "title": "Area 51",
+            "objects": {
+                "key_1": {
+                    "name": "Abschusscode",
+                },
+                "puzzle_1": {
+                    "name": "Zugangsstecker Turm",
+                },
+                "puzzle_2": {
+                    "name": "CD zur Codefreigabe",
+                },
+                "puzzle_3": {
+                    "name": "CD zur Codefreigabe",
+                },
+                "puzzle_4": {
+                    "name": "Zugangsstecker Hangar",
+                }
+            }
+        },
+        {
+            "title": "Antarktis",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zur Hütte",
+                },
+                "puzzle_1": {
+                    "name": "Brechstange",
+                },
+                "puzzle_2": {
+                    "name": "Torschlüssel",
+                }
+            }
+        },
+        {
+            "title": "RX-Techs Bergwerk",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Brechstange",
+                },
+                "puzzle_2": {
+                    "name": "Bleisäurebattarie",
+                },
+                "puzzle_3": {
+                    "name": "Anlasser für die Winch",
+                }
+            }
+        },
+        {
+            "title": "Die vergessene Stadt Tinnos",
+            "objects": {
+                "key_1": {
+                    "name": "Uli-Schlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Ozeanische Maske",
+                }
+            }
+        },
+        {
+            "title": "Höhle des Meteoriten",
+        },
+        {
+            "title": "All Hallows",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüssel zum Gewölbe",
+                }
+            }
+        }
+    ]
+}

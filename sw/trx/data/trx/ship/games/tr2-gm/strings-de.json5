@@ -1,0 +1,79 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "levels": [
+        {
+            "title": "Laras Haus",
+        },
+        {
+            "title": "Der kalte Krieg",
+            "objects": {
+                "tiger": {
+                    "name": "Schneeleopard",
+                },
+                "key_1": {
+                    "name": "Wachraum-Schlüssel",
+                },
+                "key_2": {
+                    "name": "Schacht'B' Schlüssel",
+                }
+            }
+        },
+        {
+            "title": "Das Gold des Narren",
+            "objects": {
+                "key_1": {
+                    "name": "Schlüsselkarte 1",
+                },
+                "key_4": {
+                    "name": "Schlüsselkarte 2",
+                },
+                "puzzle_1": {
+                    "name": "Platine",
+                }
+            }
+        },
+        {
+            "title": "Hochofen der Götter",
+            "objects": {
+                "big_spider": {
+                    "name": "Eisbär",
+                },
+                "spider": {
+                    "name": "Wolf",
+                },
+                "puzzle_1": {
+                    "name": "Maske des Tornarsuk",
+                },
+                "puzzle_2": {
+                    "name": "Goldklumpen",
+                }
+            }
+        },
+        {
+            "title": "Königreich",
+            "objects": {
+                "tiger": {
+                    "name": "Schneeleopard",
+                },
+                "puzzle_1": {
+                    "name": "Maske des Tornarsuk",
+                }
+            }
+        },
+        {
+            "title": "Alptraum in Vegas",
+            "objects": {
+                "key_1": {
+                    "name": "Hotelschlüssel",
+                },
+                "puzzle_1": {
+                    "name": "Fahrstulteil",
+                },
+                "puzzle_2": {
+                    "name": "Türstromkreis",
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,16 @@
+# --------------------------------------------------
+# Small text
+# --------------------------------------------------
+U+0030:0 1 T grid_sprite("buttons.png", 0, 0)
+U+0031:1 1 T grid_sprite("buttons.png", 1, 0)
+U+0032:2 1 T grid_sprite("buttons.png", 2, 0)
+U+0033:3 1 T grid_sprite("buttons.png", 3, 0)
+U+0034:4 1 T grid_sprite("buttons.png", 4, 0)
+U+0035:5 1 T grid_sprite("buttons.png", 5, 0)
+U+0036:6 1 T grid_sprite("buttons.png", 6, 0)
+U+0037:7 1 T grid_sprite("buttons.png", 7, 0)
+U+0038:8 1 T grid_sprite("buttons.png", 8, 0)
+U+0039:9 1 T grid_sprite("buttons.png", 9, 0)
+U+002D:- 1 T grid_sprite("buttons.png", 4, 1)
+U+002C:, 1 T grid_sprite("buttons.png", 5, 1)
+U+00B0:° 1 T grid_sprite("buttons.png", 6, 1)

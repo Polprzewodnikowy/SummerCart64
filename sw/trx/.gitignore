@@ -1,0 +1,57 @@
+*.cache.json
+TR1X.dll
+TR1X.exe
+TR1X.log
+TR2X.dll
+TR2X.exe
+TR2X.log
+
+# Docker builds garbage
+/build
+/.secrets
+/.local
+/workflow
+/TR1X*.zip
+/TR1X*.exe
+/TR2X*.zip
+/TR2X*.exe
+__pycache__/
+
+# VS garbage
+v15/
+v16/
+*.suo
+*.o
+*.obj
+*.pdb
+*.lib
+*.exp
+Debug/
+Release/
+*.user
+*.ipch
+.vs/
+*.vcxproj
+*.filters
+.dotnet/
+
+# MacOS garbage
+.DS_Store
+
+# libtrx artefacts
+**/subprojects/packagecache/
+**/subprojects/dwarfstack-*/
+data/tr1/ship/data/images/
+data/tr2/ship/data/images/
+data/tr2/ship/data/level1.tr2
+data/tr2/ship/data/level2.tr2
+data/tr2/ship/data/level3.tr2
+data/tr2/ship/data/level4.tr2
+data/tr2/ship/data/level5.tr2
+data/tr2/ship/data/main_gm.sfx
+data/tr2/ship/data/title_gm.tr2
+data/tr2/ship/music/
+data/tr3/ship/data/images/
+
+tools/installer/TR1X_Installer/Resources/release.zip
+tools/installer/TR2X_Installer/Resources/release.zip

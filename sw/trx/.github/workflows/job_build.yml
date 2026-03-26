@@ -1,0 +1,118 @@
+name: Build TRX and the installer
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        type: string
+        description: "Platform to build for"
+        required: true
+      target:
+        type: string
+        description: "Target to build for"
+        required: true
+      zip:
+        type: boolean
+        description: "Pack the artifacts into zip"
+        required: true
+
+jobs:
+  build:
+    name: Build release assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        uses: taiki-e/install-action@just
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - id: vars
+        name: Prepare variables
+        run: |
+          echo "version=$(just output-current-version)" >> $GITHUB_OUTPUT
+          echo "tr1_dir=build/artifacts/tr1/" >> $GITHUB_OUTPUT
+          echo "tr2_dir=build/artifacts/tr2/" >> $GITHUB_OUTPUT
+          echo "tr3_dir=build/artifacts/tr3/" >> $GITHUB_OUTPUT
+          echo "trx_dir=build/artifacts/trx/" >> $GITHUB_OUTPUT
+          echo "tr1_asset=$(just output-package-name --game 1 --platform ${{ inputs.platform }})" >> $GITHUB_OUTPUT
+          echo "tr2_asset=$(just output-package-name --game 2 --platform ${{ inputs.platform }})" >> $GITHUB_OUTPUT
+          echo "tr3_asset=$(just output-package-name --game 3 --platform ${{ inputs.platform }})" >> $GITHUB_OUTPUT
+          echo "trx_asset=$(just output-package-name --platform ${{ inputs.platform }})" >> $GITHUB_OUTPUT
+
+      - name: Download large assets
+        if: ${{ inputs.target == 'release' }}
+        run: |
+          just download-assets 1
+          just download-assets 2
+          just download-assets 3
+
+      - name: Restore ccache
+        if: ${{ inputs.platform == 'linux' || inputs.platform == 'win' }}
+        uses: actions/cache@v4
+        with:
+          path: .cache/ccache
+          key: ccache-v1-${{ runner.os }}-${{ inputs.platform }}-${{ inputs.target }}-${{ hashFiles('justfile', 'tools/shared/docker/game-linux/Dockerfile', 'tools/shared/docker/game-win/Dockerfile', 'tools/shared/docker/game-win/meson_linux_mingw32.txt') }}
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ inputs.platform }}-${{ inputs.target }}-
+            ccache-v1-${{ runner.os }}-${{ inputs.platform }}-
+
+      - name: Package asset (${{ inputs.platform }})
+        env:
+          CCACHE_DIR: /app/.cache/ccache/${{ inputs.platform }}-${{ inputs.target }}
+          CCACHE_BASEDIR: /app
+          CCACHE_COMPILERCHECK: content
+          CCACHE_MAXSIZE: 1G
+        run: |
+          if [ "${{ inputs.platform }}" = "linux" ] || [ "${{ inputs.platform }}" = "win" ]; then
+            mkdir -p ".cache/ccache/${{ inputs.platform }}-${{ inputs.target }}"
+            if [ "${{ inputs.zip }}" = "1" ] || [ "${{ inputs.zip }}" = "true" ]; then
+              just trx-package-${{ inputs.platform }} "${{ inputs.target }}" -o "build/artifacts/"
+            else
+              just trx-package-${{ inputs.platform }} "${{ inputs.target }}" -o "build/artifacts/" --no-zip
+            fi
+          else
+            if [ "${{ inputs.zip }}" = "1" ] || [ "${{ inputs.zip }}" = "true" ]; then
+              just tr1-package-${{ inputs.platform }} "${{ inputs.target }}" -o "${{ steps.vars.outputs.tr1_dir }}"
+              just tr2-package-${{ inputs.platform }} "${{ inputs.target }}" -o "${{ steps.vars.outputs.tr2_dir }}"
+            else
+              just tr1-package-${{ inputs.platform }} "${{ inputs.target }}" -o "${{ steps.vars.outputs.tr1_dir }}" --no-zip
+              just tr2-package-${{ inputs.platform }} "${{ inputs.target }}" -o "${{ steps.vars.outputs.tr2_dir }}" --no-zip
+            fi
+            echo "Skipping TR3 win-installer build (temporarily disabled)"
+          fi
+
+      - name: Upload artifacts (tr1)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.tr1_asset }}
+          path: ${{ steps.vars.outputs.tr1_dir }}
+          compression-level: 0
+
+      - name: Upload artifacts (tr2)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.tr2_asset }}
+          path: ${{ steps.vars.outputs.tr2_dir }}
+          compression-level: 0
+
+      - name: Upload artifacts (tr3)
+        if: ${{ inputs.platform != 'win-installer' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.tr3_asset }}
+          path: ${{ steps.vars.outputs.tr3_dir }}
+          compression-level: 0
+
+      - name: Upload artifacts (combined)
+        if: ${{ inputs.platform != 'win-installer' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.trx_asset }}
+          path: ${{ steps.vars.outputs.trx_dir }}
+          compression-level: 0

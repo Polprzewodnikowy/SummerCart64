@@ -1,0 +1,11 @@
+#pragma once
+
+typedef enum {
+    JSON_TYPE_STRING,
+    JSON_TYPE_NUMBER,
+    JSON_TYPE_OBJECT,
+    JSON_TYPE_ARRAY,
+    JSON_TYPE_TRUE,
+    JSON_TYPE_FALSE,
+    JSON_TYPE_NULL
+} JSON_TYPE;

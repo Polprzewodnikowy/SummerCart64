@@ -1,0 +1,107 @@
+﻿<Window
+    x:Class="TRX_InstallerLib.Controls.TRXInstallWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="clr-namespace:TRX_InstallerLib.Controls"
+    xmlns:models="clr-namespace:TRX_InstallerLib.Models"
+    xmlns:utils="clr-namespace:TRX_InstallerLib.Utils"
+    d:DataContext="{d:DesignInstance Type=models:MainWindowViewModel}"
+    mc:Ignorable="d"
+    Title="{Binding ViewText[window_title_main]}"
+    MinWidth="480"
+    MinHeight="360"
+    Width="{Binding WindowWidth, Mode=OneWayToSource, UpdateSourceTrigger=PropertyChanged, FallbackValue=640}"
+    Height="500"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/TRX_InstallerLib;component/Resources/styles.xaml" />
+                <ResourceDictionary>
+                    <utils:BoolToVisibilityConverter
+                        x:Key="BoolToHiddenConverter"
+                        FalseValue="Visible"
+                        TrueValue="Collapsed" />
+                    <utils:BoolToVisibilityConverter
+                        x:Key="BoolToVisibleConverter"
+                        FalseValue="Collapsed"
+                        TrueValue="Visible" />
+                </ResourceDictionary>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Image
+            Grid.Row="0"
+            Grid.Column="0"
+            Source="{Binding CurrentStep.SidebarImage}"
+            Visibility="{Binding IsSidebarVisible, Converter={StaticResource BoolToVisibleConverter}}" />
+
+        <Border Grid.Row="0" Grid.Column="1">
+            <ContentControl Content="{Binding CurrentStep}" Margin="12,0,12,12">
+                <ContentControl.Resources>
+                    <DataTemplate DataType="{x:Type models:SourceStep}">
+                        <controls:SourceStepControl />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type models:InstallSettingsStep}">
+                        <controls:InstallSettingsStepControl />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type models:InstallStep}">
+                        <controls:InstallStepControl />
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type models:FinishStep}">
+                        <controls:FinishStepControl />
+                    </DataTemplate>
+                </ContentControl.Resources>
+            </ContentControl>
+        </Border>
+
+        <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.Resources>
+                <Style TargetType="{x:Type Button}" BasedOn="{StaticResource ButtonStyle}">
+                    <Setter Property="Margin" Value="12,0,0,0" />
+                </Style>
+            </Grid.Resources>
+
+            <Grid Margin="12" Grid.Column="1" Grid.IsSharedSizeScope="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="SSG"/>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="SSG"/>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="SSG"/>
+                </Grid.ColumnDefinitions>
+                <Button
+                    Command="{Binding GoToPreviousStepCommand}"
+                    Visibility="{Binding IsFinalStep, Converter={StaticResource BoolToHiddenConverter}}"
+                    Content="{Binding ViewText[command_back]}" />
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding GoToNextStepCommand}"
+                    Visibility="{Binding IsFinalStep, Converter={StaticResource BoolToHiddenConverter}}"
+                    Content="{Binding ViewText[command_next]}" />
+                <Button
+                    Grid.Column="2"
+                    Command="{Binding CloseWindowCommand}"
+                    CommandParameter="{Binding RelativeSource={RelativeSource AncestorType=Window}}"
+                    Content="{Binding IsFinalStep, Converter={utils:ConditionalViewTextConverter TrueValue='command_close', FalseValue='command_cancel'}}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,713 @@
+{
+    // NOTE: bad changes to this file may result in crashes.
+    // Lines starting with double slashes are comments and are ignored.
+
+    "engine": 3,
+
+    "main_menu_picture": "title_eu.webp",
+    "savegame_file_fmt": "save_tr3_%02d.dat",
+
+    "enable_tr2_item_drops": true,
+    "convert_dropped_guns": true,
+
+    "title": {
+        "path": "title.tr2",
+        "music_track": 5,
+        "sequence": [
+            {"type": "display_picture", "path": "legal_eu.webp", "legal": true},
+            {"type": "play_fmv", "fmv_id": 0},
+            {"type": "play_fmv", "fmv_id": 1},
+            {"type": "exit_to_title"},
+        ],
+    },
+
+    "ambient_tracks": [
+        26, 27, 28, 29, 30, 31, 32, 33, 34,
+        35, 36, 73, 74, 75, 76, 77, 78,
+    ],
+
+    "sfx_path": "main.sfx",
+    "injections": [
+        "font.bin",
+        "lara_animations.bin",
+        "pda_model.bin",
+        "lara_extra.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "globe_select_entries": [
+        {"rot": [-1536, -7936, 1536], "start_level_ordinal": 1,  "completion_level_ordinal": 4,  "prereq_zones": [], "mesh_idx": 2},
+        {"rot": [1024, -512, -256],   "start_level_ordinal": 5,  "completion_level_ordinal": 8,  "prereq_zones": [0], "mesh_idx": 5},
+        {"rot": [2560, 21248, -4096], "start_level_ordinal": 13, "completion_level_ordinal": 15, "prereq_zones": [0], "mesh_idx": 4},
+        {"rot": [-3328, 29440, 1024], "start_level_ordinal": -1, "completion_level_ordinal": -1, "prereq_zones": [], "mesh_idx": 3},
+        {"rot": [3072, -20992, 6400], "start_level_ordinal": 9,  "completion_level_ordinal": 12, "prereq_zones": [0], "mesh_idx": 1},
+        {"rot": [-5120, -15360, -18688], "start_level_ordinal": 16, "completion_level_ordinal": 19, "prereq_zones": [0, 1, 2, 4], "mesh_idx": 6},
+    ],
+
+    "levels": [
+        // 0. Lara's Home
+        {
+            "type": "gym",
+            "path": "house.tr2",
+            "music_track": -1,
+            "lara_outfit": "tr3_gym",
+            "sequence": [
+                {"type": "loading_screen", "path": "house.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+            ],
+            "injections": [
+                "gym_sky.bin",
+                "lara_gym_guns.bin",
+            ],
+        },
+
+        // 1. Jungle
+        {
+            "path": "jungle.tr2",
+            "script": "jungle.lua",
+            "music_track": 34,
+            "lara_outfit": "tr3_classic",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loading_screen", "path": "india.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "small_medipack"},
+                {"type": "give_item", "object_id": "large_medipack"},
+                {"type": "give_item", "object_id": "flare", "quantity": 2},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 0},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "india_sky.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 2. Temple Ruins
+        {
+            "path": "temple.tr2",
+            "music_track": 34,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "india.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 1},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "india_sky.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 3. The River Ganges
+        {
+            "path": "quadchas.tr2",
+            "music_track": 34,
+            "lara_outfit": "tr3_classic",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loading_screen", "path": "india.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "india_sky.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 4. Caves of Kaliya
+        {
+            "path": "tonyboss.tr2",
+            "music_track": 30,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loading_screen", "path": "india.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_fmv", "fmv_id": 2},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "globe_select", "image": "india.webp"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "globe_model.bin",
+            ],
+        },
+
+        // 5. Coastal Village
+        {
+            "path": "shore.tr2",
+            "music_track": 32,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loading_screen", "path": "southpac.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 2},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "coastal_airlock.bin",
+                "coastal_sky.bin",
+                "coastal_animating_bounds.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 6. Crash Site
+        {
+            "path": "crash.tr2",
+            "script": "crash.lua",
+            "music_track": 33,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loading_screen", "path": "southpac.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "pickup_1", "quantity": 1},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 3},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "crash_sky.bin",
+                "crash_pickup_meshes.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 7. Madubu Gorge
+        {
+            "path": "rapids.tr2",
+            "music_track": 36,
+            "death_tile": "rapids",
+            "water_particles": true,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loading_screen", "path": "southpac.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "rapids_sky.bin",
+            ],
+        },
+
+        // 8. Temple of Puna
+        {
+            "path": "triboss.tr2",
+            "music_track": 30,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loading_screen", "path": "southpac.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "globe_select", "image": "southpac.webp"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "ora_dagger.bin",
+                "globe_model.bin",
+            ],
+        },
+
+        // 9. Thames Wharf
+        {
+            "path": "roofs.tr2",
+            "music_track": 73,
+            "lara_outfit": "tr3_catsuit",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loading_screen", "path": "london.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "disable_floor", "height": 1792},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 4},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+            ],
+        },
+
+        // 10. Aldwych
+        {
+            "path": "sewer.tr2",
+            "music_track": 74,
+            "water_particles": true,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loading_screen", "path": "london.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 5},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "aldwych_fd.bin",
+                "aldwych_pickup_meshes.bin",
+            ],
+        },
+
+        // 11. Lud's Gate
+        {
+            "path": "tower.tr2",
+            "script": "tower.lua",
+            "music_track": 31,
+            "water_particles": true,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loading_screen", "path": "london.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 6},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "luds_diver_animation.bin",
+            ],
+        },
+
+        // 12. City
+        {
+            "path": "office.tr2",
+            "music_track": 78,
+            "lara_outfit": "tr3_catsuit",
+            "weather_type": "rain",
+            "death_tile": "electric",
+            "sequence": [
+                {"type": "loading_screen", "path": "london.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "disable_floor", "height": 5120},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "globe_select", "image": "london.webp"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "globe_model.bin",
+                "city_textures.bin",
+            ],
+        },
+
+        // 13. Nevada Desert
+        {
+            "path": "nevada.tr2",
+            "music_track": 33,
+            "death_tile": "electric",
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loading_screen", "path": "nevada.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 7},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "nevada_sky.bin",
+            ],
+        },
+
+        // 14. High Security Compound
+        {
+            "path": "compound.tr2",
+            "script": "compound.lua",
+            "music_track": 27,
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loading_screen", "path": "nevada.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "set_lara_start_anim", "anim": 20},
+                {"type": "remove_weapons"},
+                {"type": "remove_ammo"},
+                {"type": "remove_medipacks"},
+                {"type": "remove_flares"},
+                {"type": "give_item", "object_id": "small_medipack", "quantity": 1},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 8},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "area51_sky.bin",
+                "lara_guns.bin",
+                "compound_cine.bin",
+            ],
+        },
+
+        // 15. Area 51
+        {
+            "path": "area51.tr2",
+            "script": "area51.lua",
+            "music_track": 27,
+            "death_tile": "electric",
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loading_screen", "path": "nevada.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "give_item", "object_id": "pistols", "quantity": 1},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "globe_select", "image": "nevada.webp"},
+            ],
+            "injections": [
+                "area51_sky.bin",
+                "lara_guns.bin",
+                "globe_model.bin",
+            ],
+        },
+
+        // 16. Antarctica
+        {
+            "path": "antarc.tr2",
+            "music_track": 28,
+            "lara_outfit": "tr3_antarctica",
+            "cold_water": true,
+            "weather_type": "snow",
+            "sequence": [
+                {"type": "play_fmv", "fmv_id": 3},
+                {"type": "loading_screen", "path": "antarc.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 9},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "antarc_airlock.bin",
+                "antarc_sky.bin",
+                "lara_guns.bin",
+            ],
+        },
+
+        // 17. RX-Tech Mines
+        {
+            "path": "mines.tr2",
+            "music_track": 30,
+            "lara_outfit": "tr3_antarctica",
+            "cold_water": true,
+            "sequence": [
+                {"type": "loading_screen", "path": "antarc.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "remove_scions"},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+            ],
+        },
+
+        // 18. Lost City of Tinnos
+        {
+            "path": "city.tr2",
+            "music_track": 26,
+            "lara_outfit": "tr3_antarctica",
+            "sequence": [
+                {"type": "loading_screen", "path": "antarc.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_cutscene", "cutscene_id": 10},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "tinnos_cameras.bin",
+                "tinnos_flames.bin",
+            ],
+        },
+
+        // 19. Meteorite Cavern
+        {
+            "path": "chamber.tr2",
+            "music_track": 26,
+            "lara_outfit": "tr3_antarctica",
+            "weather_type": "snow",
+            "sequence": [
+                {"type": "loading_screen", "path": "antarc.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "play_fmv", "fmv_id": 4},
+                {"type": "play_music", "music_track": 121},
+                {"type": "display_picture", "credit": true, "path": "theend2.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit01.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit02.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit03.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit04.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit05.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit06.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit07.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit08.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "display_picture", "credit": true, "path": "credit09.webp", "display_time": 5, "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "total_stats", "background_path": "theend2.webp"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "cavern_sky.bin",
+                "lara_guns.bin",
+                "ora_dagger.bin",
+            ],
+        },
+
+        // 20. All Hallows
+        {
+            "type": "bonus",
+            "path": "stpaul.tr2",
+            "music_track": 30,
+            "lara_outfit": "tr3_catsuit",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loading_screen", "path": "london.webp", "fade_in_time": 1.0, "fade_out_time": 1.0},
+                {"type": "disable_floor", "height": 10000},
+                {"type": "loop_game"},
+                {"type": "play_music", "music_track": 14},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [
+                "lara_guns.bin",
+                "stpaul_animating_bounds.bin",
+                "stpaul_textures.bin",
+            ],
+            "unobtainable_pickups": 9,
+        },
+    ],
+
+    "cutscenes": [
+        // Cutscene 1
+        {
+            "path": "cut6.tr2",
+            "music_track": 64,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut6_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 2
+        {
+            "path": "cut9.tr2",
+            "music_track": 69,
+            "lara_outfit": "tr3_classic",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut9_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "india_sky.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 3
+        {
+            "path": "cut1.tr2",
+            "music_track": 68,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut1_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "crash_sky.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 4
+        {
+            "path": "cut4.tr2",
+            "music_track": 65,
+            "lara_outfit": "tr3_south_pacific",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut4_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 5
+        {
+            "path": "cut2.tr2",
+            "music_track": 67,
+            "lara_outfit": "tr3_catsuit",
+            "weather_type": "rain",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut2_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "london_sky.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 6
+        {
+            "path": "cut5.tr2",
+            "music_track": 63,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut5_setup.bin",
+                "cut5_textures.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 7
+        {
+            "path": "cut11.tr2",
+            "music_track": 71,
+            "lara_outfit": "tr3_catsuit",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut11_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "london_sky.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 8
+        {
+            "path": "cut7.tr2",
+            "music_track": 72,
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut7_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "nevada_sky.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 9
+        {
+            "path": "cut8.tr2",
+            "script": "cut8.lua",
+            "music_track": 70,
+            "lara_outfit": "tr3_nevada",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut8_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 10
+        {
+            "path": "cut3.tr2",
+            "music_track": 62,
+            "lara_outfit": "tr3_antarctica",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "antarc_sky.bin",
+                "cut3_setup.bin",
+                "cut3_shell.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+        // Cutscene 11
+        {
+            "path": "cut12.tr2",
+            "music_track": 66,
+            "lara_outfit": "tr3_antarctica",
+            "sequence": [
+                {"type": "loop_game"},
+            ],
+            "inherit_injections": false,
+            "injections": [
+                "cut12_setup.bin",
+                "misc_sprites.bin",
+                "font.bin",
+                "lara_outfits.bin",
+            ],
+        },
+    ],
+
+    "fmvs": [
+        {"path": "logo.rpl", "legal": true},
+        {"path": "intr_eng.rpl"},
+        {"path": "sail_eng.rpl"},
+        {"path": "crsh_eng.rpl"},
+        {"path": "endgame.rpl"},
+    ],
+
+    "hidden_config": [
+        "enable_3d_pickups", // TR3 has no sprite pickups
+        "enable_item_examining",
+        "disable_trex_collision",
+        "fix_bear_ai",
+        "enable_save_crystals",
+        "enable_ps1_crystals",
+        "fix_chainblock_secret_sound",
+        "enable_compass_stats",
+        "enable_crawling",
+        "enable_wading",
+        "restore_ps1_enemies",
+        "change_pierre_spawn",
+        "fix_speeches_killing_music",
+    ],
+}

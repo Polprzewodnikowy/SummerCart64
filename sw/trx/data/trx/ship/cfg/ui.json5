@@ -1,0 +1,194 @@
+{
+  "bars": {
+    "tr1_pc": {
+      "name_gs": "dynamic/enums/bar_look/tr1_pc",
+      "scale": 1,
+      "style": "pc",
+      "border_light": "#353535",
+      "border_dark": "#353535",
+      "colors": {
+        "red":    ["#A0281C", "#B82C20", "#A0281C", "#7C2020", "#541420"],
+        "blue":   ["#3d717b", "#65929a", "#3d717b", "#1f5d6b", "#004a5b"],
+        "grey":   ["#586458", "#748474", "#586458", "#4C504C", "#303030"],
+        "brown":  ["#7c5e25", "#a1823c", "#7c5e25", "#644613", "#4c2e02"],
+        "silver": ["#969696", "#E6E6E6", "#C8C8C8", "#8C8C8C", "#646464"],
+        "teal":   ["#14be6e", "#1ee682", "#14be6e", "#0f964b", "#0a6e28"],
+        "yellow": ["#b9b723", "#d6d629", "#b9b723", "#9b981e", "#7e7218"],
+        "cyan":   ["#20b3bc", "#25d1da", "#20b3bc", "#1b949e", "#166f80"],
+        "pink":   ["#DC8CAA", "#FF96C8", "#D282A0", "#A56478", "#783C46"],
+        "purple": ["#562484", "#682d9f", "#562484", "#492070", "#3c195c"],
+        "green":  ["#239117", "#33b020", "#239117", "#217210", "#23540b"],
+        "iron":   ["#475e76", "#5a748a", "#475e76", "#374e60", "#29414b"],
+        "orange": ["#a86015", "#c66b1e", "#a86015", "#88440f", "#6a260a"]
+      }
+    },
+    "tr2_pc": {
+      "name_gs": "dynamic/enums/bar_look/tr2_pc",
+      "scale": 0.75,
+      "style": "pc",
+      "border_light": "#FFFFFF",
+      "border_dark": "#404040",
+      "colors": {
+        "red":    ["#e40c10", "#e86c04", "#e40c10", "#e40c10", "#e40c10"],
+        "blue":   ["#1c10f4", "#fcfcfc", "#1c10f4", "#1c10f4", "#1c10f4"],
+        "grey":   ["#4C504C", "#A0A0A0", "#4C504C", "#4C504C", "#4C504C"],
+        "brown":  ["#80481c", "#a88044", "#80481c", "#80481c", "#80481c"],
+        "silver": ["#969696", "#E6E6E6", "#969696", "#969696", "#969696"],
+        "teal":   ["#00a05d", "#1ee62f", "#00a05d", "#00a05d", "#00a05d"],
+        "yellow": ["#b5a000", "#ffff1f", "#b5a000", "#b5a000", "#b5a000"],
+        "cyan":   ["#00d6dc", "#00fbff", "#00b1b9", "#00b1b9", "#00b1b9"],
+        "pink":   ["#db649c", "#ecaab0", "#db649c", "#db649c", "#db649c"],
+        "purple": ["#461E6B", "#8040ff", "#461E6B", "#461E6B", "#461E6B"],
+        "green":  ["#37aa0b", "#08e713", "#37aa0b", "#37aa0b", "#37aa0b"],
+        "iron":   ["#607088", "#fcfcfc", "#607088", "#607088", "#607088"],
+        "orange": ["#cc580b", "#cf8f04", "#cc580b", "#cc580b", "#cc580b"]
+      }
+    },
+    "tr3_pc": {
+      "name_gs": "dynamic/enums/bar_look/tr3_pc",
+      "scale": 0.75,
+      "style": "pc",
+      "border_light": "#FFFFFF",
+      "border_dark": "#404040",
+      "colors": {
+        "red":    ["#4F0000", "#FF0000", "#7F0000", "#7F0000", "#4F0000"],
+        "blue":   ["#00004F", "#0000FF", "#00007F", "#00007F", "#00004F"],
+        "grey":   ["#4F4F4F", "#7F7F7F", "#5F5F5F", "#5F5F5F", "#4F4F4F"],
+        "brown":  ["#3f2710", "#cb7d34", "#653e1a", "#653e1a", "#3f2710"],
+        "silver": ["#4F4F4F", "#BFBFBF", "#7F7F7F", "#7F7F7F", "#4F4F4F"],
+        "teal":   ["#004F2F", "#00FF7F", "#007F4F", "#007F4F", "#004F2F"],
+        "yellow": ["#4F4F00", "#FFFF00", "#7F7F00", "#7F7F00", "#4F4F00"],
+        "cyan":   ["#004F4F", "#00FFFF", "#007F7F", "#007F7F", "#004F4F"],
+        "pink":   ["#4F003F", "#FF7FBF", "#7F3F5F", "#7F3F5F", "#4F003F"],
+        "purple": ["#2F004F", "#7F00FF", "#4F007F", "#4F007F", "#2F004F"],
+        "green":  ["#004F00", "#00FF00", "#007F00", "#007F00", "#004F00"],
+        "iron":   ["#3d5164", "#93a9bd", "#4f6981", "#4f6981", "#3d5164"],
+        "orange": ["#783600", "#ff8929", "#a84c00", "#a84c00", "#783600"]
+      }
+    },
+    "tr2_ps1": {
+      "name_gs": "dynamic/enums/bar_look/tr2_ps1",
+      "scale": 1,
+      "style": "ps1",
+      "border_tl": "#508282",
+      "border_tr": "#9F9F9F",
+      "border_bl": "#294141",
+      "border_br": "#4F4F4F",
+      "colors": {
+        "red-green":       [["#B60100", "#EA0100", "#B60100", "#870000", "#6D0000"], ["#01B900", "#03FA00", "#01B900", "#018800", "#015A00"]],
+        "dark-red-purple": [["#400000", "#4C0000", "#580000", "#640000", "#7C0000"], ["#400080", "#4C0099", "#5800B2", "#6400CB", "#7C00FD"]],
+        "teal-green":      [["#00717A", "#009298", "#00717A", "#005D6A", "#004A5A"], ["#007101", "#009201", "#007101", "#005D01", "#004A00"]],
+        "red-yellow":      [["#C00100", "#F00100", "#C00100", "#900000", "#600000"], ["#C0B900", "#F0E800", "#C0B900", "#908A00", "#605A00"]],
+        "dark-blue-red":   [["#000170", "#090091", "#000170", "#000053", "#00003E"], ["#C00100", "#F00100", "#C00100", "#900000", "#600000"]],
+        "orange-red":      [["#B64C00", "#ED6400", "#B64C00", "#843700", "#6D2D00"], ["#C00100", "#F00100", "#C00100", "#900000", "#600000"]],
+        "yellow-green":    [["#B78900", "#EEB300", "#B78900", "#846300", "#6D5200"], ["#01B900", "#03FA00", "#01B900", "#018800", "#015A00"]],
+        "purple-teal":     [["#2F0030", "#5F0060", "#7E007F", "#5F0060", "#2F0030"], ["#002E30", "#015D60", "#017C7F", "#015D60", "#002E30"]]
+      }
+    },
+    "tr3_ps1": {
+      "name_gs": "dynamic/enums/bar_look/tr3_ps1",
+      "scale": 1,
+      "style": "ps1",
+      "border_tl": "#508282",
+      "border_tr": "#9F9F9F",
+      "border_bl": "#294141",
+      "border_br": "#4F4F4F",
+      "colors": {
+        "red-green":       [["#3f0000", "#5f0000", "#7f0000", "#5f0000", "#3f0000"], ["#007e00", "#00bc00", "#00fb00", "#00bc00", "#007e00"]],
+        "dark-red-purple": [["#400000", "#4C0000", "#580000", "#640000", "#7C0000"], ["#400080", "#4C0099", "#5800B2", "#6400CB", "#7C00FD"]],
+        "teal-green":      [["#00717a", "#009299", "#00717a", "#005d6a", "#004a5a"], ["#007100", "#009202", "#007100", "#005d00", "#004a00"]],
+        "red-yellow":      [["#900000", "#c00000", "#f00000", "#c00000", "#900000"], ["#908a00", "#c0b900", "#f0e800", "#c0b900", "#908a00"]],
+        "dark-blue-red":   [["#00005f", "#00007f", "#00009f", "#00007f", "#00005f"], ["#5c0002", "#7c0002", "#9a0004", "#7c0002", "#5c0002"]],
+        "orange-red":      [["#B64C00", "#ED6400", "#B64C00", "#843700", "#6D2D00"], ["#C00100", "#F00100", "#C00100", "#900000", "#600000"]],
+        "yellow-green":    [["#B78900", "#EEB300", "#B78900", "#846300", "#6D5200"], ["#01B900", "#03FA00", "#01B900", "#018800", "#015A00"]],
+        "purple-teal":     [["#2f0030", "#5f0060", "#7e007f", "#4f0050", "#1f0020"], ["#002e30", "#005e60", "#007d7f", "#004e50", "#001e20"]]
+      }
+    }
+  },
+
+  "ui": {
+    // Menu appearance colors per TR version × UI style (pc/ps1).
+    // Selected at runtime by g_TRVersion and g_Config.ui.menu_style.
+    "tr1": {
+      "pc": {
+        // TS_BACKGROUND gradient: top color, bottom color
+        "background":       ["#00000080", "#00000080"],
+        // TS_BACKGROUND_HEAVY gradient: top color, bottom color
+        "background_heavy": ["#000000E0", "#000000E0"],
+        "outline_light":    "#E8C070FF",
+        "outline_dark":     "#8C7038FF"
+      },
+      "ps1": {
+        "background_edge":          "#00000080",
+        "background_center":        "#00004080",
+        "background_heavy_edge":    "#000000E0",
+        "background_heavy_center":  "#000000E0",
+        "heading_edge":             "#00000080",
+        "heading_center":           "#80381080",
+        "requested_edge":           "#00000080",
+        "requested_center":         "#8038DC80",
+        "requested_outline_ch":     "#C8C8C8FF",
+        "requested_outline_cv":     "#C8C8C8FF",
+        "requested_outline_edge":   "#282828FF",
+        "outline_tl":               "#606060FF",
+        "outline_tr":               "#202020FF",
+        "outline_bl":               "#404040FF",
+        "outline_br":               "#000000FF",
+        "heading_outline":          "#000000FF",
+      }
+    },
+    "tr2": {
+      "pc": {
+        // Note: TR2 uses O_TEXT_BOX for the outlines.
+        "background":       ["#00000080", "#00000080"],
+        "background_heavy": ["#000000E0", "#000000E0"],
+        "outline_light":    "#FFFFFFFF",
+        "outline_dark":     "#404040FF"
+      },
+      "ps1": {
+        "background_edge":          "#00200080",
+        "background_center":        "#00600080",
+        "background_heavy_edge":    "#000000E0",
+        "background_heavy_center":  "#002000E0",
+        "heading_edge":             "#00000080",
+        "heading_center":           "#10803880",
+        "requested_edge":           "#00000080",
+        "requested_center":         "#38F08080",
+        "requested_outline_ch":     "#FFFFFFFF",
+        "requested_outline_cv":     "#38F080FF",
+        "requested_outline_edge":   "#000000FF",
+        "outline_tl":               "#606060FF",
+        "outline_tr":               "#202020FF",
+        "outline_bl":               "#404040FF",
+        "outline_br":               "#000000FF",
+        "heading_outline":          "#000000FF",
+      }
+    },
+    "tr3": {
+      "pc": {
+        "background":       ["#003FFF50", "#003F1F50"],
+        "background_heavy": ["#001020E0", "#000000E0"],
+        "outline_light":    "#4080C0FF",
+        "outline_dark":     "#001040FF"
+      },
+      "ps1": {
+        "background_edge":          "#30200080",
+        "background_center":        "#00600080",
+        "background_heavy_edge":    "#000000E0",
+        "background_heavy_center":  "#002000E0",
+        "heading_edge":             "#00000080",
+        "heading_center":           "#10803880",
+        "requested_edge":           "#00000080",
+        "requested_center":         "#38F08080",
+        "requested_outline_ch":     "#FFFFFFFF",
+        "requested_outline_cv":     "#38F080FF",
+        "requested_outline_edge":   "#000000FF",
+        "outline_tl":               "#606060FF",
+        "outline_tr":               "#202020FF",
+        "outline_bl":               "#404040FF",
+        "outline_br":               "#000000FF",
+        "heading_outline":          "#000000FF",
+      }
+    }
+  }
+}

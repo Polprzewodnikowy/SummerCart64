@@ -1,0 +1,71 @@
+name: Run code linters
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  lint:
+    name: Run code linters
+    runs-on: ubuntu-latest
+    env:
+      PREK_HOME: ${{ github.workspace }}/.cache/prek
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/lostartefacts/trx-lint:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Configure git safe directory
+        working-directory: ${{ github.workspace }}
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Ensure prek cache dir exists
+        run: mkdir -p "${PREK_HOME}"
+
+      - name: Restore prek cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/prek
+          key: prek-v1-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            prek-v1-${{ runner.os }}-
+
+      - name: Check formatted code differences
+        working-directory: ${{ github.workspace }}
+        run: |
+          set +e
+          just lint-format
+          lint_format_status=$?
+          set -e
+          if ! git diff --quiet; then
+            echo 'Formatting diffs detected in:'
+            git diff --exit-code || (
+              clang-format --version
+              echo 'Please run `just lint` and commit the changes.'
+              exit 1
+            )
+          fi
+          if [ "${lint_format_status}" -ne 0 ]; then
+            clang-format --version
+            echo 'just lint-format failed.'
+            exit "${lint_format_status}"
+          fi
+
+      - name: Check imports
+        working-directory: ${{ github.workspace }}
+        run: |
+          git add -u
+          just lint-imports
+          git diff --exit-code || (
+            include-what-you-use --version
+            echo 'Please run `just lint` and commit the changes.'
+            exit 1
+          )

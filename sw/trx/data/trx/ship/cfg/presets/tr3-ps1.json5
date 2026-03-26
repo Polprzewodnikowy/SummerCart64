@@ -1,0 +1,12 @@
+{
+    "name_gs": "dynamic/config_presets/tr3_ps1",
+    "config": {
+        "ui.menu_style": "ps1",
+        "ui.enable_smooth_bars": false,
+        "ui.bar_look": "tr3_ps1",
+        "ui.ammo_counter_location": "bottom-right",
+        "audio.enable_ps1_sfx": true,
+        "gameplay.restore_ps1_enemies": true,
+        "gameplay.enable_save_crystals": true,
+    },
+}

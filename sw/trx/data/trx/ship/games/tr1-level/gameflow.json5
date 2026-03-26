@@ -1,0 +1,44 @@
+{
+    // This file is used to enable the -l argument support.
+
+    "engine": 1,
+    "extends": "tr1",
+
+    "main_menu_picture": "title.webp",
+    "savegame_file_fmt": "save_tmp_%02d.dat",
+
+    "injections": [
+        "braid.bin",
+        "bubbles.bin",
+        "gun_glow.bin",
+        "lara_animations.bin",
+        "lara_extra.bin",
+        "lara_guns.bin",
+        "uzi_sfx.bin",
+        "explosion.bin",
+        "pickup_aid.bin",
+        "sprite_alignment.bin",
+        "pda_model.bin",
+        "font.bin",
+        "winston_model.bin",
+        "misc_sprites.bin",
+        "lara_outfits.bin",
+    ],
+
+    "enable_tr2_item_drops": false,
+    "convert_dropped_guns": false,
+
+    "levels": [
+        {
+            "path": "%direct_level%",
+            "music_track": 0,
+            "lara_outfit": "tr1_classic",
+            "sequence": [
+                {"type": "loop_game"},
+                {"type": "level_stats"},
+                {"type": "level_complete"},
+            ],
+            "injections": [],
+        },
+    ],
+}

@@ -1,0 +1,339 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "settings": {
+        "gameplay.fix_bear_ai": {
+            "description": "Càraichidh ionnsaigh a' mhathain anns a' Mhasg Òir gus nach caill e Lara.",
+        },
+        "visuals.fix_animated_sprites": {
+            "description": "Càraichidh bugan ann an 40 Famhair, Long-bhriste na Maria Doria agus An Deic far nach gluais planntrais anns an uisge.",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Pasgan Mòr Slàinte",
+        },
+        "small_medipack": {
+            "name": "Pasgan Beag Slàinte",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Sealladh-film 1",
+        },
+        {
+            "title": "Sealladh-film 2",
+        },
+        {
+            "title": "Sealladh-film 3",
+        },
+        {
+            "title": "Sealladh-film 4",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Dachaigh Lara",
+        },
+        {
+            "title": "Am Balla Mòr",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Gheàrd-taighe",
+                },
+                "key_2": {
+                    "name": "Iuchair Meirgeach",
+                }
+            }
+        },
+        {
+            "title": "Venise",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Taigh-bàta",
+                },
+                "key_2": {
+                    "name": "Iuchair Stàilinn",
+                },
+                "key_3": {
+                    "name": "Iuchair Iarainn",
+                }
+            }
+        },
+        {
+            "title": "Taigh-falaich Bartoli",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Leabharlainn",
+                },
+                "key_2": {
+                    "name": "Iuchair an Spreadhaichear",
+                }
+            }
+        },
+        {
+            "title": "Taigh na h-Opera",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair Grinn",
+                },
+                "puzzle_1": {
+                    "name": "Bogsa-iomlaid",
+                },
+                "puzzle_2": {
+                    "name": "Bòrd-chuairt",
+                }
+            }
+        },
+        {
+            "title": "Inneal-ola Farraige",
+            "objects": {
+                "key_1": {
+                    "name": "Cairt-pasa Dearg",
+                },
+                "key_2": {
+                    "name": "Cairt-pasa Buidhe",
+                },
+                "key_3": {
+                    "name": "Cairt-pasa Uaine",
+                }
+            }
+        },
+        {
+            "title": "Roinn Dàibheadh",
+            "objects": {
+                "key_1": {
+                    "name": "Cairt-pasa Dearg",
+                },
+                "key_4": {
+                    "name": "Cairt-pasa Gorm",
+                },
+                "puzzle_1": {
+                    "name": "Sgealb",
+                }
+            }
+        },
+        {
+            "title": "40 Famhair",
+        },
+        {
+            "title": "Long-bhriste na Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an t-Seòmair Fois",
+                },
+                "key_2": {
+                    "name": "Iuchair Meirgeach",
+                },
+                "key_3": {
+                    "name": "Iuchair a' Chaibine",
+                },
+                "puzzle_1": {
+                    "name": "Briseadair-cuairt",
+                }
+            }
+        },
+        {
+            "title": "Na Còmhnaidhean",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Taigh-cluiche",
+                },
+                "key_2": {
+                    "name": "Iuchair Meirgeach",
+                }
+            }
+        },
+        {
+            "title": "An Deic",
+            "objects": {
+                "key_2": {
+                    "name": "Iuchair an Stìùir",
+                },
+                "key_3": {
+                    "name": "Iuchair an Stòrais",
+                },
+                "key_4": {
+                    "name": "Iuchair a' Chaibine",
+                },
+                "puzzle_4": {
+                    "name": "An t-Seraph",
+                }
+            }
+        },
+        {
+            "title": "Bràighean Tìbeata",
+            "objects": {
+                "tiger": {
+                    "name": "Lìopaird-shneachda",
+                },
+                "key_1": {
+                    "name": "Iuchair an Drochaid-tarraing",
+                },
+                "key_2": {
+                    "name": "Iuchair na Bothain",
+                },
+                "puzzle_4": {
+                    "name": "An t-Seraph",
+                }
+            }
+        },
+        {
+            "title": "Manachainn Barkhang",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an t-Seòmair Làidir",
+                },
+                "key_2": {
+                    "name": "Iuchair an Làr-lùbte",
+                },
+                "key_3": {
+                    "name": "Iuchair nam Mullaichean",
+                },
+                "key_4": {
+                    "name": "Iuchair na Prìomh Thalla",
+                },
+                "puzzle_1": {
+                    "name": "Cuibhlichean-ùrnaigh",
+                },
+                "puzzle_2": {
+                    "name": "Clachan-luaidh",
+                },
+                "puzzle_4": {
+                    "name": "An t-Seraph",
+                }
+            }
+        },
+        {
+            "title": "Uaimhean an Talion",
+            "objects": {
+                "tiger": {
+                    "name": "Lìopaird-shneachda",
+                },
+                "pickup_1": {
+                    "name": "Òrd a' Ghong",
+                },
+                "puzzle_1": {
+                    "name": "Masg Tìbeata",
+                }
+            }
+        },
+        {
+            "title": "Lùchairt Deighe",
+            "objects": {
+                "tiger": {
+                    "name": "Tìgear Geal",
+                },
+                "key_2": {
+                    "name": "Òrd a' Ghong",
+                },
+                "pickup_2": {
+                    "name": "An Talion",
+                },
+                "puzzle_1": {
+                    "name": "Masg Tìbeata",
+                }
+            }
+        },
+        {
+            "title": "Teampall Xian",
+            "objects": {
+                "key_2": {
+                    "name": "Iuchair Òir",
+                },
+                "key_3": {
+                    "name": "Iuchair Airgid",
+                },
+                "key_4": {
+                    "name": "Iuchair na Prìomh Sheòmair",
+                },
+                "puzzle_1": {
+                    "name": "Ròn an Dràgon",
+                }
+            }
+        },
+        {
+            "title": "Eileanan Fleòdraidh",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Plaic Dhìomhair",
+                },
+                "puzzle_2": {
+                    "name": "Plaic Dhìomhair",
+                }
+            }
+        },
+        {
+            "title": "Uaimh an Dràgon",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Plaic Dhìomhair",
+                },
+                "puzzle_2": {
+                    "name": "Biodag Xian",
+                }
+            }
+        },
+        {
+            "title": "Dachaigh, mo Ghràdh",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Clòsaid-armachd",
+                },
+                "puzzle_1": {
+                    "name": "Biodag Xian",
+                }
+            }
+        }
+    ],
+    "demos": [
+        {
+            "title": "Venise",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an Taigh-bàta",
+                },
+                "key_2": {
+                    "name": "Iuchair Stàilinn",
+                },
+                "key_3": {
+                    "name": "Iuchair Iarainn",
+                }
+            }
+        },
+        {
+            "title": "Long-bhriste na Maria Doria",
+            "objects": {
+                "key_1": {
+                    "name": "Iuchair an t-Seòmair Fois",
+                },
+                "key_2": {
+                    "name": "Iuchair Meirgeach",
+                },
+                "key_3": {
+                    "name": "Iuchair a' Chaibine",
+                },
+                "puzzle_1": {
+                    "name": "Briseadair-cuairt",
+                }
+            }
+        },
+        {
+            "title": "Bràighean Tìbeata",
+            "objects": {
+                "tiger": {
+                    "name": "Lìopaird-shneachda",
+                },
+                "key_1": {
+                    "name": "Iuchair an Drochaid-tarraing",
+                },
+                "key_2": {
+                    "name": "Iuchair na Bothain",
+                },
+                "puzzle_4": {
+                    "name": "An t-Seraph",
+                }
+            }
+        }
+    ]
+}

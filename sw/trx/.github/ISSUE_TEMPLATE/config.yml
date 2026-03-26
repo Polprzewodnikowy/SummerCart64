@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Bug reporting guidelines
+    url: https://github.com/LostArtefacts/TRX/blob/develop/BUG_REPORTING.md
+    about: Read this before opening a bug report, especially for logs, savegames, and custom levels.

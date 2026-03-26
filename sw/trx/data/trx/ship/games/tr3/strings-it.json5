@@ -1,0 +1,314 @@
+{
+    // For usage, refer to the documentation here:
+    // https://lostartefacts.dev/trx/docs/stable/game_strings
+    "general": {
+        "globe_select": {
+            "area_1": "India",
+            "area_2": "Isole del Sud Pacifico",
+            "area_3": "Nevada",
+            "area_4": " ",
+            "area_5": "Londra",
+            "area_6": "Antartide",
+        },
+        "inventory_ring": {
+            "heading_fmt": "\\{color 5}%s",
+            "item_count_fmt": "\\{color 3}%s",
+            "object_name_fmt": "\\{color 5}%s",
+        },
+        "overlay": {
+            "item_count_fmt_pc": "%s",
+            "item_count_fmt_ps1": "\\{color 3}%s",
+        },
+        "pause": {
+            "paused": "\\{color 5}Pausa",
+        },
+        "stats": {
+            "assault_other_times_fmt": "\\{color 2}%s",
+            "gym_assault_course": "\\{color 5}Corso d'Addestramento",
+            "gym_racetrack_course": "\\{color 5}Corso di Guida",
+        }
+    },
+    "objects": {
+        "large_medipack": {
+            "name": "Kit Medico Grande",
+        },
+        "quest_1": {
+            "description": "",
+            "name": "Pietra Infada",
+        },
+        "quest_2": {
+            "description": "",
+            "name": "Elemento 115",
+        },
+        "quest_3": {
+            "description": "",
+            "name": "Occhio di Iside",
+        },
+        "quest_4": {
+            "description": "",
+            "name": "Pugnale Ora",
+        },
+        "small_medipack": {
+            "name": "Kit Medico Piccolo",
+        }
+    },
+    "cutscenes": [
+        {
+            "title": "Intermezzo 1",
+        },
+        {
+            "title": "Intermezzo 2",
+        },
+        {
+            "title": "Intermezzo 3",
+        },
+        {
+            "title": "Intermezzo 4",
+        },
+        {
+            "title": "Intermezzo 5",
+        },
+        {
+            "title": "Intermezzo 6",
+        },
+        {
+            "title": "Intermezzo 7",
+        },
+        {
+            "title": "Intermezzo 8",
+        },
+        {
+            "title": "Intermezzo 9",
+        },
+        {
+            "title": "Intermezzo 10",
+        },
+        {
+            "title": "Intermezzo 11",
+        }
+    ],
+    "levels": [
+        {
+            "title": "Casa di Lara",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave del Circuito",
+                }
+            }
+        },
+        {
+            "title": "Giungla",
+            "objects": {
+                "key_4": {
+                    "name": "Chiave di Indra",
+                }
+            }
+        },
+        {
+            "title": "Rovine del Tempio",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave di Ganesha",
+                },
+                "puzzle_1": {
+                    "name": "Scimitarra",
+                },
+                "puzzle_2": {
+                    "name": "Scimitarra",
+                }
+            }
+        },
+        {
+            "title": "Il Fiume Gange",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave del Cancello",
+                }
+            }
+        },
+        {
+            "title": "Caverne di Kaliya",
+        },
+        {
+            "title": "Villaggio Costiero",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave del Contrabbandiere",
+                },
+                "puzzle_1": {
+                    "name": "Pietra del Serpente",
+                }
+            }
+        },
+        {
+            "title": "Luogo dello Schianto",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave del Comandante Bishop",
+                },
+                "key_2": {
+                    "name": "Chiave del Tenente Tuckerman",
+                },
+                "pickup_1": {
+                    "name": "Mappa della Palude",
+                    "description": "",
+                }
+            }
+        },
+        {
+            "title": "Gola di Madubu",
+        },
+        {
+            "title": "Tempio di Puna",
+        },
+        {
+            "title": "Molo sul Tamigi",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave della Canna Fumaria",
+                },
+                "key_2": {
+                    "name": "Chiave della Cattedrale",
+                }
+            }
+        },
+        {
+            "title": "Aldwych",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave di Manutenzione",
+                },
+                "key_2": {
+                    "name": "Chiave di Salomone",
+                },
+                "key_3": {
+                    "name": "Chiave di Salomone",
+                },
+                "puzzle_1": {
+                    "name": "Vecchio Penny",
+                },
+                "puzzle_2": {
+                    "name": "Biglietto",
+                },
+                "puzzle_3": {
+                    "name": "Martello Massonico",
+                },
+                "puzzle_4": {
+                    "name": "Stella Ornata",
+                }
+            }
+        },
+        {
+            "title": "Porta di Lud",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave della Caldaia",
+                },
+                "puzzle_1": {
+                    "name": "Fluido di Imbalsamazione",
+                }
+            }
+        },
+        {
+            "title": "Città di Londra",
+        },
+        {
+            "title": "Deserto del Nevada",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave d'Accesso al Generatore",
+                },
+                "key_2": {
+                    "name": "Chiave del Detonatore",
+                }
+            }
+        },
+        {
+            "title": "Reparto di Massima Sicurezza",
+            "objects": {
+                "key_1": {
+                    "name": "Scheda Elettronica di Tipo A",
+                },
+                "key_2": {
+                    "name": "Scheda Elettronica di Tipo B",
+                },
+                "puzzle_1": {
+                    "name": "Chiave di Sicurezza Elettronica Blu",
+                },
+                "puzzle_2": {
+                    "name": "Chiave di Sicurezza Elettronica Gialla",
+                }
+            }
+        },
+        {
+            "title": "Area 51",
+            "objects": {
+                "key_1": {
+                    "name": "Scheda Codice di Lancio",
+                },
+                "puzzle_1": {
+                    "name": "Chiave di Accesso alla Torre",
+                },
+                "puzzle_2": {
+                    "name": "Disco del Codice d'Accesso",
+                },
+                "puzzle_3": {
+                    "name": "Disco del Codice d'Accesso",
+                },
+                "puzzle_4": {
+                    "name": "Chiave di Accesso all'Hangar",
+                }
+            }
+        },
+        {
+            "title": "Antartide",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave della Capanna",
+                },
+                "puzzle_1": {
+                    "name": "Piede di Porco",
+                },
+                "puzzle_2": {
+                    "name": "Chiave di Controllo del Cancello",
+                }
+            }
+        },
+        {
+            "title": "Miniere della RX-Tech",
+            "objects": {
+                "puzzle_1": {
+                    "name": "Piede di Porco",
+                },
+                "puzzle_2": {
+                    "name": "Batteria al Piombo",
+                },
+                "puzzle_3": {
+                    "name": "Avviamento dell'Argano",
+                }
+            }
+        },
+        {
+            "title": "Città Perduta di Tinnos",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave Uli",
+                },
+                "puzzle_1": {
+                    "name": "Maschera Oceaniana",
+                }
+            }
+        },
+        {
+            "title": "Caverna del Meteorite",
+        },
+        {
+            "title": "All Hallows",
+            "objects": {
+                "key_1": {
+                    "name": "Chiave della Cripta",
+                }
+            }
+        }
+    ]
+}
