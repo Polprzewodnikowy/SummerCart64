@@ -653,8 +653,11 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
     r_skip(&r, num_boxes * 20);  /* TR1: 20 bytes per box */
     int32_t num_overlaps = r_s32(&r);
     r_skip(&r, num_overlaps * 2);
-    /* Zone data: 2 flip states × (4 ground zones + 1 fly zone) × num_boxes × 2 bytes */
-    r_skip(&r, 2 * 5 * num_boxes * 2);
+    /* Zone data: 2 flip states × (2 ground zones + 1 fly zone) × num_boxes × 2 bytes
+     * TR1 has 2 ground zones (from TRX: Box_GetZoneCount() returns 2 for TR1).
+     * Total per flip: (2 + 1) × num_boxes × sizeof(int16_t)
+     * Total: 2 × 3 × num_boxes × 2 = 12 × num_boxes bytes */
+    r_skip(&r, 2 * 3 * num_boxes * 2);
 
     /* Animated texture ranges (skip for now) */
     int32_t anim_tex_size = r_s32(&r);

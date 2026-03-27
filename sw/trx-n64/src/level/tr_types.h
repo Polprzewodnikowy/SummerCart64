@@ -339,7 +339,7 @@ typedef struct {
  * ------------------------------------------------------------------- */
 
 #define TR_MAX_ROOMS            256
-#define TR_MAX_ITEMS            256
+#define TR_MAX_ITEMS            512
 #define TR_MAX_MESHES           512
 #define TR_MAX_OBJECT_TEXTURES  4096
 #define TR_MAX_SPRITE_TEXTURES  512
