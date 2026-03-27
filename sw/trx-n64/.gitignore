@@ -1,1 +1,6 @@
+data/levels/
+tests/test_real_levels
+tests/debug_parse
+tests/TEST.PHD
+tests/test_level_parse
 build/
