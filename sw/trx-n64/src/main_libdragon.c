@@ -244,17 +244,75 @@ int main(void) {
         printf("  Build with: cat trx-n64.z64 padding assets > full.z64\n");
     }
 
-    /* If we have assets, try to load level 1 */
+    /* If we have assets in ROM, load level 1 via PI DMA */
     if (g_has_assets) {
         printf("\nLoading LEVEL1 (Caves)...\n");
 
-        uint32_t level_size = 0;
-        /* Note: asset_load is renamed to sc64_asset_load via -D flag
-         * to avoid collision with libdragon's asset_load */
-        void *level_data = asset_load_with_size(&g_asset_mgr, 1, &level_size);
+        /* Parse archive index to find asset 1 */
+        uint32_t index_sector = header_buf[12] | (header_buf[13]<<8) |
+                                (header_buf[14]<<16) | (header_buf[15]<<24);
+        uint32_t asset_count_val = header_buf[8] | (header_buf[9]<<8) |
+                                   (header_buf[10]<<16) | (header_buf[11]<<24);
 
-        if (level_data && level_size > 0) {
-            printf("  Loaded %u KB from SD card.\n", level_size / 1024);
+        /* Read index from ROM */
+        uint32_t index_bytes = asset_count_val * 20;
+        if (index_bytes > 4096) index_bytes = 4096;
+        static uint8_t index_buf[4096] __attribute__((aligned(16)));
+        data_cache_hit_invalidate(index_buf, index_bytes);
+        pi_wait();
+        *(volatile uint32_t *)(0xA4600000 + 0x00) = (uint32_t)index_buf & 0x1FFFFFFF;
+        *(volatile uint32_t *)(0xA4600000 + 0x04) = ASSET_CART_ADDR + index_sector * 512;
+        *(volatile uint32_t *)(0xA4600000 + 0x0C) = ((index_bytes + 511) & ~511) - 1;
+        pi_wait();
+        data_cache_hit_invalidate(index_buf, index_bytes);
+
+        /* Find asset ID 1 in index */
+        uint32_t level_sector = 0;
+        uint32_t level_size = 0;
+        uint32_t level_compressed = 0;
+        uint16_t level_flags = 0;
+        for (uint32_t i = 0; i < asset_count_val && i * 20 < index_bytes; i++) {
+            uint8_t *e = &index_buf[i * 20];
+            uint32_t aid = e[0]|(e[1]<<8)|(e[2]<<16)|(e[3]<<24);
+            if (aid == 1) {
+                level_sector = e[4]|(e[5]<<8)|(e[6]<<16)|(e[7]<<24);
+                level_flags = e[10]|(e[11]<<8);
+                level_compressed = e[12]|(e[13]<<8)|(e[14]<<16)|(e[15]<<24);
+                level_size = e[16]|(e[17]<<8)|(e[18]<<16)|(e[19]<<24);
+                break;
+            }
+        }
+
+        printf("  Found: sector=%u, size=%u, compressed=%u, flags=0x%x\n",
+               level_sector, level_size, level_compressed, level_flags);
+
+        /* Read level data from ROM via PI DMA */
+        uint32_t read_size = level_compressed ? level_compressed : level_size;
+        if (read_size == 0) read_size = level_size;
+        uint32_t read_bytes = (read_size + 511) & ~511;
+
+        n64_mem_init();
+        uint8_t *level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+
+        if (level_data && level_sector > 0) {
+            uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
+            uint32_t offset = 0;
+            while (offset < read_bytes) {
+                uint32_t chunk = read_bytes - offset;
+                if (chunk > 32768) chunk = 32768;
+                data_cache_hit_invalidate(level_data + offset, chunk);
+                pi_wait();
+                *(volatile uint32_t *)(0xA4600000) = ((uint32_t)(level_data + offset)) & 0x1FFFFFFF;
+                *(volatile uint32_t *)(0xA4600004) = cart_addr + offset;
+                *(volatile uint32_t *)(0xA460000C) = chunk - 1;
+                pi_wait();
+                offset += chunk;
+            }
+            data_cache_hit_invalidate(level_data, read_bytes);
+
+            printf("  Loaded %u KB from ROM.\n", read_bytes / 1024);
+            printf("  First bytes: %02x %02x %02x %02x\n",
+                   level_data[0], level_data[1], level_data[2], level_data[3]);
 
             /* Parse the .PHD level */
             printf("  Parsing .PHD format...\n");
