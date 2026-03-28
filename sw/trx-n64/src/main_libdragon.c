@@ -26,7 +26,7 @@
  * Bump allocator
  * ------------------------------------------------------------------- */
 
-#define GAME_HEAP_SIZE  (2 * 1024 * 1024)
+#define GAME_HEAP_SIZE  (4 * 1024 * 1024)
 static uint8_t game_heap[GAME_HEAP_SIZE] __attribute__((aligned(16)));
 static uint32_t heap_offset = 0;
 
@@ -285,6 +285,13 @@ int main(void) {
 
         n64_mem_init();
         uint8_t *level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+
+        printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
+        if (!level_data) {
+            printf("FAILED (heap full)\n");
+        } else if (level_sector == 0) {
+            printf("asset not found in index\n");
+        }
 
         if (level_data && level_sector > 0) {
             uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
