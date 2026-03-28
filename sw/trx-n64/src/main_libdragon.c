@@ -654,7 +654,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 300) max_faces = 300;  /* Cap per room */
+                        if (max_faces > 600) max_faces = 600;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
