@@ -1,17 +1,61 @@
 #!/usr/bin/env python3
 """
-Create a proper N64 .z64 ROM from a raw binary.
+Create a proper N64 .z64 ROM with valid CRC checksums.
 
-Uses libdragon's open-source IPL3 (production, CIC-6102 signed)
-for real hardware compatibility. The IPL3 initializes RDRAM and
-copies the ROM payload to the entry point.
+Uses libdragon's open-source IPL3 (CIC-6102 signed).
+Computes correct CRC1/CRC2 using the standard N64 checksum algorithm
+so the boot chip validates the ROM and allows execution.
 
-IPL3 source: https://github.com/DragonMinded/libdragon/tree/trunk/boot
+CRC algorithm: https://n64brew.dev/wiki/ROM_Header#Checksum
 """
 
 import struct
 import sys
 import os
+
+
+def n64_crc(rom_data):
+    """
+    Compute N64 ROM CRC1 and CRC2.
+
+    The CRC is computed over bytes 0x1000 to 0x101000 (the first 1MB
+    after the IPL3). The algorithm depends on the CIC seed byte at
+    ROM offset 0x3F.
+
+    For CIC-6102 (most common, used by libdragon IPL3):
+      seed = 0xF8CA4DDC
+    """
+    CIC_6102_SEED = 0xF8CA4DDC
+
+    # Ensure we have at least 1MB + 0x1000 of data
+    data = rom_data
+    while len(data) < 0x101000:
+        data += b'\x00'
+
+    t1 = t2 = t3 = t4 = t5 = t6 = CIC_6102_SEED
+
+    for i in range(0x1000, 0x101000, 4):
+        d = struct.unpack(">I", data[i:i+4])[0]
+
+        if (t6 + d) & 0xFFFFFFFF < t6:
+            t4 = (t4 + 1) & 0xFFFFFFFF
+
+        t6 = (t6 + d) & 0xFFFFFFFF
+        t3 ^= d
+        shift = d & 0x1F
+        r = ((d << shift) | (d >> (32 - shift))) & 0xFFFFFFFF
+        t5 = (t5 + r) & 0xFFFFFFFF
+
+        if t2 > d:
+            t2 ^= r
+        else:
+            t2 ^= t6 ^ d
+
+        t1 = (t1 + (d ^ t5)) & 0xFFFFFFFF
+
+    crc1 = (t6 ^ t4 ^ t3) & 0xFFFFFFFF
+    crc2 = (t5 ^ t2 ^ t1) & 0xFFFFFFFF
+    return crc1, crc2
 
 
 def make_z64(bin_path, z64_path, rom_name="N64 GAME"):
@@ -22,11 +66,10 @@ def make_z64(bin_path, z64_path, rom_name="N64 GAME"):
     while len(rom_data) % 4:
         rom_data += b'\x00'
 
-    # Try to find libdragon's prebuilt IPL3
+    # Find libdragon's prebuilt IPL3
     ipl3_paths = [
         os.path.join(os.path.dirname(__file__), "ipl3_prod.z64"),
         "/tmp/ipl3_prod.z64",
-        os.path.join(os.path.dirname(__file__), "..", "boot", "ipl3_prod.z64"),
     ]
 
     ipl3_rom = None
@@ -37,54 +80,43 @@ def make_z64(bin_path, z64_path, rom_name="N64 GAME"):
             print(f"  Using IPL3 from: {p}")
             break
 
-    if ipl3_rom and len(ipl3_rom) >= 0x1000:
-        # The ipl3_prod.z64 is a complete ROM header (64B + 4032B IPL3 + padding)
-        # Extract the header and IPL3 from it
-        header = bytearray(ipl3_rom[:64])
-        ipl3_code = ipl3_rom[64:0x1000]
-
-        # Patch the header with our ROM name and entry point
-        struct.pack_into(">I", header, 0x08, 0x80000400)  # Entry point
-
-        # ROM name (20 bytes, space-padded)
-        name = rom_name.encode('ascii')[:20].ljust(20)
-        header[0x20:0x34] = name
-
-    else:
-        print("  WARNING: No libdragon IPL3 found, using minimal stub")
-        print("  ROM may not boot on real hardware!")
+    if not ipl3_rom or len(ipl3_rom) < 0x1000:
+        print("  ERROR: No valid IPL3 found!")
         print("  Download: curl -L -o tools/ipl3_prod.z64 \\")
         print("    https://raw.githubusercontent.com/DragonMinded/libdragon/trunk/boot/bin/ipl3_prod.z64")
+        sys.exit(1)
 
-        # Fallback: minimal header + stub IPL3
-        header = bytearray(64)
-        struct.pack_into(">I", header, 0x00, 0x80371240)
-        struct.pack_into(">I", header, 0x04, 0x0000000F)
-        struct.pack_into(">I", header, 0x08, 0x80000400)
-        struct.pack_into(">I", header, 0x0C, 0x00001444)
-        name = rom_name.encode('ascii')[:20].ljust(20)
-        header[0x20:0x34] = name
-        header[0x38] = 0x4E  # 'N' = cartridge
-        header[0x3C] = ord('E')  # USA
+    # Use IPL3's header as base (has correct PI config, CIC seed, etc.)
+    header = bytearray(ipl3_rom[:64])
 
-        # Minimal IPL3 stub
-        ipl3_code = bytearray(0x1000 - 64)
+    # Patch entry point
+    struct.pack_into(">I", header, 0x08, 0x80000400)
+
+    # Patch ROM name
+    name = rom_name.encode('ascii')[:20].ljust(20)
+    header[0x20:0x34] = name
+
+    # CRC placeholders (will compute below)
+    struct.pack_into(">I", header, 0x10, 0)
+    struct.pack_into(">I", header, 0x14, 0)
+
+    # Extract IPL3 boot code (bytes 64 to 0x1000)
+    ipl3_code = ipl3_rom[64:0x1000]
+    # Pad if needed
+    while len(ipl3_code) < (0x1000 - 64):
+        ipl3_code += b'\x00'
 
     # Assemble ROM: header (64B) + IPL3 (to 0x1000) + ROM data
-    rom = bytearray(header)
-    rom += ipl3_code
-    while len(rom) < 0x1000:
-        rom += b'\x00'
-    rom += rom_data
+    rom = bytearray(header) + bytearray(ipl3_code) + bytearray(rom_data)
 
-    # Pad total ROM to at least 1 MB
-    min_size = 1024 * 1024
-    while len(rom) < min_size:
+    # Pad to at least 1 MB
+    while len(rom) < 1024 * 1024:
         rom += b'\xFF'
 
-    # The libdragon IPL3 handles CRC itself — but we should update
-    # the CRC in the header for compatibility with other loaders
-    # For now, the IPL3's embedded CRC validation handles this
+    # Compute and patch CRC
+    crc1, crc2 = n64_crc(bytes(rom))
+    struct.pack_into(">I", rom, 0x10, crc1)
+    struct.pack_into(">I", rom, 0x14, crc2)
 
     with open(z64_path, "wb") as f:
         f.write(rom)
@@ -92,6 +124,7 @@ def make_z64(bin_path, z64_path, rom_name="N64 GAME"):
     print(f"Created {z64_path}")
     print(f"  ROM data: {len(rom_data):,d} bytes ({len(rom_data)/1024:.1f} KB)")
     print(f"  Total Z64: {len(rom):,d} bytes ({len(rom)/1024:.1f} KB)")
+    print(f"  CRC1: {crc1:08X}  CRC2: {crc2:08X}")
     print(f"  Entry: 0x80000400")
     print(f"  Name: {rom_name}")
 
