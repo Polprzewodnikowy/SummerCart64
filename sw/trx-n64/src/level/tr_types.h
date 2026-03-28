@@ -333,6 +333,15 @@ typedef struct {
 
     /* Light map (32 × 256 lookup table) */
     uint8_t             light_map[32 * 256];
+
+    /* Sound data */
+    int16_t             sound_map[256];      /* Effect ID → sample info index */
+    int16_t            *sound_details;       /* Sample info entries */
+    int32_t             sound_detail_count;
+    int32_t            *sample_indices;       /* Byte offsets into sample data */
+    int32_t             sample_index_count;
+    uint8_t            *sample_data;          /* Raw PCM sample data */
+    int32_t             sample_data_size;
 } tr_level_t;
 
 /* -------------------------------------------------------------------

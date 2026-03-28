@@ -679,8 +679,41 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
     uint16_t demo_size = r_u16(&r);
     r_skip(&r, demo_size);
 
-    /* Samples (skip for now — audio is a later milestone) */
-    /* ... */
+    /* Sound map: 256 entries mapping effect ID → sample info index */
+    for (int i = 0; i < 256; i++)
+        level->sound_map[i] = r_s16(&r);
+
+    /* Sound details (sample info entries): 8 bytes each */
+    level->sound_detail_count = r_s32(&r);
+    level->sound_details = alloc(level->sound_detail_count * 8);
+    if (level->sound_details) {
+        for (int i = 0; i < level->sound_detail_count * 4; i++)
+            ((int16_t *)level->sound_details)[i] = r_s16(&r);
+    } else {
+        r_skip(&r, level->sound_detail_count * 8);
+    }
+
+    /* Sample indices: byte offsets into sample data blob */
+    level->sample_index_count = r_s32(&r);
+    level->sample_indices = alloc(level->sample_index_count * 4);
+    if (level->sample_indices) {
+        for (int i = 0; i < level->sample_index_count; i++)
+            level->sample_indices[i] = r_s32(&r);
+    } else {
+        r_skip(&r, level->sample_index_count * 4);
+    }
+
+    /* Sample data: raw PCM blob (rest of file before texture pages) */
+    /* TR1 embeds samples as concatenated RIFF/WAV chunks */
+    level->sample_data_size = level_size - r.pos;
+    if (level->sample_data_size > 0 && level->sample_data_size < 2*1024*1024) {
+        level->sample_data = alloc(level->sample_data_size);
+        if (level->sample_data)
+            r_read(&r, level->sample_data, level->sample_data_size);
+    } else {
+        level->sample_data = NULL;
+        level->sample_data_size = 0;
+    }
 
     /* Now go back and read texture pages */
     tr_reader_t tex_r = {

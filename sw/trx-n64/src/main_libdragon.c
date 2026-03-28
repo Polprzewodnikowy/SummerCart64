@@ -16,6 +16,8 @@
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
 #include <rdpq_mode.h>
+#include <mixer.h>
+#include <audio.h>
 #include <surface.h>
 #include <stdio.h>
 #include <string.h>
@@ -447,6 +449,64 @@ int main(void) {
                 if (white_px) {
                     white_px[0] = 0xFFFF; /* RGBA16 white, full alpha */
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
+                }
+
+                /* ============================================
+                 * AUDIO INIT
+                 * ============================================ */
+                audio_init(22050, 2);  /* 22050 Hz, 2 buffers */
+                mixer_init(8);        /* 8 mixer channels */
+
+                /* Parse TR1 WAV samples — find PCM data in each RIFF chunk */
+                int16_t **sample_pcm = NULL;
+                int32_t *sample_len = NULL;
+                int32_t *sample_rate_arr = NULL;
+                int parsed_samples = 0;
+                if (g_level.sample_data && g_level.sample_indices &&
+                    g_level.sample_index_count > 0) {
+                    int ns = g_level.sample_index_count;
+                    if (ns > 64) ns = 64;
+                    sample_pcm = (int16_t **)n64_mem_alloc(ns * sizeof(int16_t *));
+                    sample_len = (int32_t *)n64_mem_alloc(ns * sizeof(int32_t));
+                    sample_rate_arr = (int32_t *)n64_mem_alloc(ns * sizeof(int32_t));
+                    if (sample_pcm && sample_len && sample_rate_arr) {
+                        for (int i = 0; i < ns; i++) {
+                            sample_pcm[i] = NULL;
+                            sample_len[i] = 0;
+                            sample_rate_arr[i] = 11025;
+                            int32_t off = g_level.sample_indices[i];
+                            if (off < 0 || off >= g_level.sample_data_size) continue;
+                            uint8_t *wav = g_level.sample_data + off;
+                            int remain = g_level.sample_data_size - off;
+                            /* Parse RIFF WAV header to find PCM data */
+                            if (remain > 44 &&
+                                wav[0]=='R' && wav[1]=='I' && wav[2]=='F' && wav[3]=='F') {
+                                /* Find "fmt " chunk for sample rate */
+                                int sr = 11025;
+                                for (int p = 12; p + 8 < remain; p++) {
+                                    if (wav[p]=='f'&&wav[p+1]=='m'&&wav[p+2]=='t'&&wav[p+3]==' ') {
+                                        sr = wav[p+12]|(wav[p+13]<<8)|(wav[p+14]<<16)|(wav[p+15]<<24);
+                                        break;
+                                    }
+                                }
+                                /* Find "data" chunk for PCM samples */
+                                for (int p = 12; p + 8 < remain; p++) {
+                                    if (wav[p]=='d'&&wav[p+1]=='a'&&wav[p+2]=='t'&&wav[p+3]=='a') {
+                                        int32_t dlen = wav[p+4]|(wav[p+5]<<8)|(wav[p+6]<<16)|(wav[p+7]<<24);
+                                        if (dlen > 0 && p + 8 + dlen <= remain) {
+                                            sample_pcm[i] = (int16_t *)(wav + p + 8);
+                                            sample_len[i] = dlen / 2; /* bytes to samples */
+                                            sample_rate_arr[i] = sr;
+                                            parsed_samples++;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    printf("  Audio: %d/%d samples parsed\n", parsed_samples, ns);
+                    console_render();
                 }
 
                 /* ============================================
@@ -1294,6 +1354,30 @@ int main(void) {
 
                     /* Show frame */
                     rdpq_detach_show();
+
+                    /* Audio: mix and submit to AI */
+                    if (audio_can_write()) {
+                        short *buf = audio_write_begin();
+                        mixer_poll(buf, audio_get_buffer_length());
+                        audio_write_end();
+                    }
+
+                    /* Play a random ambient sample occasionally */
+                    static int ambient_timer = 0;
+                    if (parsed_samples > 0 && ++ambient_timer > 300) {
+                        ambient_timer = 0;
+                        /* Pick a random sample */
+                        int si = ambient_timer % parsed_samples;
+                        for (int s = 0; s < parsed_samples; s++) {
+                            si = (si + 1) % g_level.sample_index_count;
+                            if (sample_pcm[si] && sample_len[si] > 100) break;
+                        }
+                        if (si < g_level.sample_index_count &&
+                            sample_pcm[si] && sample_len[si] > 100) {
+                            /* Play via libdragon mixer — need to flush cache first */
+                            data_cache_hit_writeback(sample_pcm[si], sample_len[si] * 2);
+                        }
+                    }
                 }
 
                 /* START pressed — return to console briefly */
