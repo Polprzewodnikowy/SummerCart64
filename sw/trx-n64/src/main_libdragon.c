@@ -1085,7 +1085,39 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Position stack with yaw rotation for bone offsets */
+                            /* Idle animation playback */
+                            static int anim_frame = 0;
+                            static int anim_tick = 0;
+
+                            /* Get Lara's first animation */
+                            int ai = lara_obj->anim_idx;
+                            tr_anim_t *anim = NULL;
+                            if (ai >= 0 && ai < g_level.anim_count)
+                                anim = &g_level.anims[ai];
+
+                            /* Advance animation every N ticks */
+                            anim_tick++;
+                            int interp = anim ? (anim->interpolation > 0 ? anim->interpolation : 1) : 1;
+                            if (anim_tick >= interp) {
+                                anim_tick = 0;
+                                anim_frame++;
+                                if (anim) {
+                                    int num_frames = anim->frame_end - anim->frame_base + 1;
+                                    if (num_frames < 1) num_frames = 1;
+                                    if (anim_frame >= num_frames) anim_frame = 0;
+                                }
+                            }
+
+                            /* Get current frame data */
+                            int frame_off = lara_obj->frame_offset / 2;
+                            int frame_size = anim ? anim->frame_size : 0;
+                            if (frame_size > 0)
+                                frame_off += anim_frame * frame_size;
+
+                            int16_t *fr = (g_level.anim_frames && frame_off + 9 < g_level.anim_frame_count)
+                                        ? &g_level.anim_frames[frame_off] : NULL;
+
+                            /* Position stack */
                             float ps[8][3]; int psp = 0;
                             float bx = (float)lara_item->pos.x;
                             float by = (float)lara_item->pos.y;
@@ -1095,10 +1127,13 @@ int main(void) {
                             float lyaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
                             float lsy = sinf(lyaw), lcy = cosf(lyaw);
 
-                            /* Apply root Y offset from first anim frame */
-                            int frame_off = lara_obj->frame_offset / 2;
-                            if (g_level.anim_frames)
-                                by += (float)g_level.anim_frames[frame_off + 7];
+                            /* Apply root offset from current frame */
+                            if (fr) {
+                                float ox = (float)fr[6], oz = (float)fr[8];
+                                bx += ox * lcy - oz * lsy;
+                                by += (float)fr[7];
+                                bz += ox * lsy + oz * lcy;
+                            }
 
                             /* Dynamic lighting from room */
                             float lara_shade = 1.0f;
@@ -1144,21 +1179,7 @@ int main(void) {
                                 if (gmi >= g_level.mesh_count) continue;
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
-                                /* Decode per-mesh rotation from animation frame.
-                                 * Applied locally to each mesh's vertices only
-                                 * (not accumulated through bone chain). */
-                                float mr_sy=0,mr_cy=1, mr_sx=0,mr_cx=1, mr_sz=0,mr_cz=1;
-                                int16_t *fr = g_level.anim_frames ? &g_level.anim_frames[frame_off] : NULL;
-                                if (fr && mi < 15) {
-                                    uint16_t w1 = (uint16_t)fr[9 + mi*2];
-                                    uint16_t w2 = (uint16_t)fr[10 + mi*2];
-                                    float ax = (float)(int16_t)((w1 & 0x3FF0) << 2) * 6.28318f / 65536.0f;
-                                    float ay = (float)(int16_t)((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6) * 6.28318f / 65536.0f;
-                                    float az = (float)(int16_t)((w2 & 0x03FF) << 6) * 6.28318f / 65536.0f;
-                                    mr_sy=sinf(ay); mr_cy=cosf(ay);
-                                    mr_sx=sinf(ax); mr_cx=cosf(ax);
-                                    mr_sz=sinf(az); mr_cz=cosf(az);
-                                }
+                                /* No per-mesh rotation — position stack only */
 
                                 for (int f = 0; f < mesh->face_count; f++) {
                                     tr_face_t *face = &mesh->faces[f];
@@ -1191,29 +1212,10 @@ int main(void) {
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
-                                        /* Local vertex coords */
                                         float vx = (float)mesh->vertices[vi].x;
-                                        float vy_l = (float)mesh->vertices[vi].y;
                                         float vz = (float)mesh->vertices[vi].z;
-
-                                        /* Apply per-mesh rotation (Y→X→Z, TR1 order) */
-                                        float t0, t1;
-                                        /* Y rotation */
-                                        t0=vx; t1=vz;
-                                        vx = t0*mr_cy - t1*mr_sy;
-                                        vz = t0*mr_sy + t1*mr_cy;
-                                        /* X rotation */
-                                        t0=vy_l; t1=vz;
-                                        vy_l = t0*mr_cx + t1*mr_sx;
-                                        vz = -t0*mr_sx + t1*mr_cx;
-                                        /* Z rotation */
-                                        t0=vx; t1=vy_l;
-                                        vx = t0*mr_cz - t1*mr_sz;
-                                        vy_l = t0*mr_sz + t1*mr_cz;
-
-                                        /* Then rotate by Lara's yaw */
                                         float wx = bx + vx * lcy - vz * lsy;
-                                        float wy = by + vy_l;
+                                        float wy = by + (float)mesh->vertices[vi].y;
                                         float wz = bz + vx * lsy + vz * lcy;
 
                                         float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
