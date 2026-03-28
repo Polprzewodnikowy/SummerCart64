@@ -715,11 +715,15 @@ int main(void) {
                                 sv[v][2] = rz / 32768.0f;
                                 if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
 
+                                /* Distance fog: darken with distance */
+                                float fog = 1.0f - rz / 16384.0f;
+                                if (fog < 0.0f) fog = 0.0f;
+
                                 int16_t light = rv->light;
                                 float bright = 1.0f - ((float)light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
-                                bright = 0.4f + bright * 0.6f;
+                                bright = (0.4f + bright * 0.6f) * fog;
                                 sv[v][3] = bright;
                                 sv[v][4] = bright;
                                 sv[v][5] = bright;
@@ -747,6 +751,114 @@ int main(void) {
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
                                 rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                        }
+                    }
+
+                    /* ===== DRAW STATIC OBJECTS ===== */
+                    for (int ri = 0; ri < num_draw; ri++) {
+                        int room_idx = rooms_to_draw[ri];
+                        if (room_idx < 0 || room_idx >= g_level.room_count) continue;
+                        tr_room_t *room = &g_level.rooms[room_idx];
+
+                        for (int si = 0; si < room->static_mesh_count; si++) {
+                            tr_room_static_mesh_t *sm = &room->static_meshes[si];
+
+                            /* Find the static object definition to get mesh_idx */
+                            int mesh_idx = -1;
+                            for (int oi = 0; oi < g_level.static_object_count; oi++) {
+                                if (g_level.static_objects[oi].object_id == sm->static_mesh_id) {
+                                    if (!(g_level.static_objects[oi].flags & 2)) break; /* not visible */
+                                    mesh_idx = g_level.static_objects[oi].mesh_idx;
+                                    break;
+                                }
+                            }
+                            if (mesh_idx < 0 || mesh_idx >= g_level.mesh_count) continue;
+                            tr_object_mesh_t *mesh = &g_level.meshes[mesh_idx];
+
+                            /* Static mesh shade */
+                            float sm_bright = 1.0f - (float)sm->shade / 8191.0f;
+                            if (sm_bright < 0.1f) sm_bright = 0.1f;
+                            if (sm_bright > 1.0f) sm_bright = 1.0f;
+
+                            /* Y rotation for static mesh */
+                            float sm_yaw = (float)sm->rotation * 3.14159f / 32768.0f;
+                            float sm_sy = sinf(sm_yaw), sm_cy = cosf(sm_yaw);
+
+                            for (int f = 0; f < mesh->face_count && f < 100; f++) {
+                                tr_face_t *face = &mesh->faces[f];
+                                if (face->vertex_count < 3) continue;
+
+                                bool is_flat = (face->texture & 0x8000) != 0;
+                                uint16_t tex_idx = face->texture & 0x7FFF;
+                                tr_object_texture_t *otex = NULL;
+                                float fr_r = sm_bright, fr_g = sm_bright, fr_b = sm_bright;
+
+                                if (is_flat) {
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    fr_r = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
+                                    fr_g = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
+                                    fr_b = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
+                                    if (white_px && last_tex_idx != -2) {
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                        last_tex_idx = -2;
+                                    }
+                                } else if (tex_idx < num_otex) {
+                                    otex = &g_level.object_textures[tex_idx];
+                                    if ((int)tex_idx != last_tex_idx) {
+                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        last_tex_idx = (int)tex_idx;
+                                    }
+                                } else continue;
+
+                                float sv[4][10];
+                                bool visible = true;
+                                for (int v = 0; v < face->vertex_count; v++) {
+                                    uint16_t vi = face->vertices[v];
+                                    if (vi >= mesh->vertex_count) { visible = false; break; }
+
+                                    /* Rotate vertex by static mesh yaw */
+                                    float lx = (float)mesh->vertices[vi].x;
+                                    float lz = (float)mesh->vertices[vi].z;
+                                    float wx = (float)sm->pos.x + lx * sm_cy - lz * sm_sy;
+                                    float wy = (float)sm->pos.y + (float)mesh->vertices[vi].y;
+                                    float wz = (float)sm->pos.z + lx * sm_sy + lz * sm_cy;
+
+                                    float cx = wx - cam_x;
+                                    float cy_val = wy - cam_y;
+                                    float cz = wz - cam_z;
+                                    float rx = cx * cy - cz * sy;
+                                    float rz_yaw = cx * sy + cz * cy;
+                                    float ry = cy_val * cp - rz_yaw * sp;
+                                    float rz = cy_val * sp + rz_yaw * cp;
+                                    if (rz < 1.0f) { visible = false; break; }
+
+                                    float inv_z = 256.0f / rz;
+                                    float fog = 1.0f - rz / 16384.0f;
+                                    if (fog < 0) fog = 0;
+                                    sv[v][0] = 160.0f + rx * inv_z;
+                                    sv[v][1] = 120.0f + ry * inv_z;
+                                    sv[v][2] = rz / 32768.0f;
+                                    if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
+
+                                    if (is_flat) {
+                                        sv[v][3] = fr_r * fog; sv[v][4] = fr_g * fog;
+                                        sv[v][5] = fr_b * fog; sv[v][6] = 1.0f;
+                                        sv[v][7] = 0; sv[v][8] = 0;
+                                    } else {
+                                        sv[v][3] = sm_bright * fog; sv[v][4] = sm_bright * fog;
+                                        sv[v][5] = sm_bright * fog; sv[v][6] = 1.0f;
+                                        float tu = (float)(otex->uv[v].u >> 8);
+                                        float tv = (float)(otex->uv[v].v >> 8);
+                                        sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    }
+                                    sv[v][9] = 1.0f / rz;
+                                }
+                                if (!visible) continue;
+                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                                if (face->vertex_count == 4)
+                                    rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            }
                         }
                     }
 
