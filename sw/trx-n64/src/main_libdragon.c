@@ -614,7 +614,6 @@ int main(void) {
                 console_init();
                 console_set_render_mode(RENDER_MANUAL);
                 printf("Paused. Press START for 3D.\n");
-                printf("Rooms rendered: %d\n", num_draw);
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
                 console_render();
 
