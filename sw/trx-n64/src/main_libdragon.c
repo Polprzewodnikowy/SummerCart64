@@ -574,9 +574,9 @@ int main(void) {
                                 }
                             }
 
-                            /* Place camera at eye height above floor */
-                            float eye_height = 768.0f;  /* Lara's eye level */
-                            cam_y = (float)floor_y - eye_height;
+                            /* Clamp camera to stay above floor (don't force-set Y) */
+                            float floor_limit = (float)floor_y - 768.0f;
+                            if (cam_y > floor_limit) cam_y = floor_limit;
 
                             /* Update lara_room for portal traversal */
                             lara_room = cam_room;
@@ -609,7 +609,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 8;  /* Limit visible rooms for FPS */
+                    int max_rooms = 6;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
