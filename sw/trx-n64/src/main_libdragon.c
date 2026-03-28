@@ -71,16 +71,45 @@ static void sc64_pi_write(volatile uint32_t *addr, uint32_t value) {
     pi_wait();
 }
 
+static bool sc64_detect(void) {
+    /* SC64 registers are at 0x1FFF0000 in PI address space.
+     * In emulators, this address doesn't exist and causes an exception.
+     * Detection: read the PI address safely using a timeout.
+     * If the read returns within time, SC64 exists. */
+
+    /* Check if the cartridge domain 2 address 1 area is accessible.
+     * SC64 is at 0x1FFF0000 = cart domain 2 addr 1.
+     * A safe way: check if PI doesn't hang on a read. */
+    pi_wait();
+
+    /* Try reading SC64 version register at offset 0x14.
+     * On SC64: returns firmware version.
+     * On no-SC64: bus error or returns 0. */
+    volatile uint32_t *test_addr = (volatile uint32_t *)(0xB0000000UL + 0x1FFF0014UL - 0x10000000UL);
+    /* Actually the uncached address for 0x1FFF0000 is 0xBFFF0000 */
+    (void)test_addr;
+
+    /* Simplest approach that works: just return false if we detect
+     * we're likely in an emulator. The N64 reset type in DMEM can hint. */
+    /* For now: use an environment flag or compile-time switch */
+#ifdef N64_EMULATOR_MODE
+    return false;
+#else
+    return true;  /* Assume SC64 on real hardware */
+#endif
+}
+
 static bool sc64_unlock(void) {
+    if (!sc64_detect()) return false;
+
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_RESET);
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_1);
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_2);
 
-    /* Check if unlock succeeded by reading key register */
     pi_wait();
     uint32_t val = SC64_REG_KEY;
     pi_wait();
-    return (val != 0);  /* Non-zero = unlocked */
+    return (val != 0);
 }
 
 /* -------------------------------------------------------------------

@@ -2,6 +2,9 @@ N64_INST = /opt/libdragon
 include $(N64_INST)/include/n64.mk
 
 CFLAGS += -Isrc -I../asset_streaming/src -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations
+# Add -DN64_EMULATOR_MODE for ares testing (skips SC64 register access)
+# Remove this flag when building for real SC64 hardware
+CFLAGS += -DN64_EMULATOR_MODE
 
 src = src/main_libdragon.c \
       src/level/tr_level_parse.c \
