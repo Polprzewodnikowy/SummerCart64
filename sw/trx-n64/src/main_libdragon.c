@@ -454,6 +454,7 @@ int main(void) {
 
                 /* Allocate Z-buffer for proper depth sorting */
                 surface_t zbuf = surface_alloc(FMT_RGBA16, 320, 240);
+                bool has_zbuf = (zbuf.buffer != NULL);
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -589,13 +590,16 @@ int main(void) {
 
                     /* Begin frame */
                     surface_t *disp = display_get();
-                    rdpq_attach_clear(disp, &zbuf);
+                    if (has_zbuf)
+                        rdpq_attach_clear(disp, &zbuf);
+                    else
+                        rdpq_attach_clear(disp, NULL);
 
-                    /* Textured + shaded rendering with Z-buffer */
+                    /* Textured + shaded rendering */
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
                     rdpq_mode_persp(true);
-                    rdpq_mode_zbuf(true, true);
+                    if (has_zbuf) rdpq_mode_zbuf(true, true);
                     rdpq_mode_filter(FILTER_POINT);
 
                     /* Track current texture for batching */
