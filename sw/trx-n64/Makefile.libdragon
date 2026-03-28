@@ -1,0 +1,11 @@
+N64_INST = /opt/libdragon
+include $(N64_INST)/include/n64.mk
+
+CFLAGS += -Isrc -DN64_TARGET -Wno-unused-variable
+
+src = src/main_libdragon.c
+
+all: trx-n64.z64
+.PHONY: all
+
+$(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)
