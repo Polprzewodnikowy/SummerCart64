@@ -474,10 +474,10 @@ int main(void) {
                 for (int i = 0; i < g_level.item_count; i++) {
                     if (g_level.items[i].object_id == 0) {
                         cam_rot_y = (float)g_level.items[i].rotation * 3.14159f / 32768.0f;
-                        /* Start camera behind Lara (offset 1500 units back) */
-                        cam_x = (float)g_level.items[i].pos.x - 1500.0f * sinf(cam_rot_y);
-                        cam_y = (float)g_level.items[i].pos.y - 512;
-                        cam_z = (float)g_level.items[i].pos.z - 1500.0f * cosf(cam_rot_y);
+                        /* Start camera slightly behind Lara */
+                        cam_x = (float)g_level.items[i].pos.x - 600.0f * sinf(cam_rot_y);
+                        cam_y = (float)g_level.items[i].pos.y - 768;
+                        cam_z = (float)g_level.items[i].pos.z - 600.0f * cosf(cam_rot_y);
                         break;
                     }
                 }
