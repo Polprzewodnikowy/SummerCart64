@@ -440,6 +440,15 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
+                /* Create a 1x1 solid white texture for flat-colored faces.
+                 * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
+                uint16_t *white_px = (uint16_t *)malloc_uncached_aligned(64, 8);
+                surface_t white_surf = {0};
+                if (white_px) {
+                    white_px[0] = 0xFFFF; /* RGBA16 white, full alpha */
+                    white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
+                }
+
                 /* ============================================
                  * 3D RENDERING LOOP
                  * ============================================
@@ -810,11 +819,16 @@ int main(void) {
                                     float flat_r = 0.8f, flat_g = 0.6f, flat_b = 0.5f;
 
                                     if (is_flat) {
-                                        /* Flat face: use palette color */
+                                        /* Flat face: upload white texture so
+                                         * TEX0*SHADE = SHADE = palette color */
                                         uint8_t ci = tex_idx & 0xFF;
                                         flat_r = (float)g_level.palette[ci*3+0] / 63.0f;
                                         flat_g = (float)g_level.palette[ci*3+1] / 63.0f;
                                         flat_b = (float)g_level.palette[ci*3+2] / 63.0f;
+                                        if (white_px && last_tex_idx != -2) {
+                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                            last_tex_idx = -2;
+                                        }
                                     } else if (tex_idx < num_otex) {
                                         otex = &g_level.object_textures[tex_idx];
                                         has_tex = true;
