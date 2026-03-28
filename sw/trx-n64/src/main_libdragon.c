@@ -514,15 +514,14 @@ int main(void) {
                     if (input.btn.c_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
                     if (input.btn.c_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
 
-                    /* ===== FLOOR COLLISION =====
-                     * Find the sector under the camera and snap Y to floor.
-                     * A button toggles between walk mode and fly mode. */
-                    static bool walk_mode = false;  /* Start in fly mode */
+                    /* ===== ROOM TRACKING + FLOOR COLLISION =====
+                     * Always track which room the camera is in (for BFS).
+                     * A button toggles walk mode (floor clamping). */
+                    static bool walk_mode = false;
                     if (pressed.a) walk_mode = !walk_mode;
 
-                    if (walk_mode) {
-                        /* Find which room the camera is in by checking
-                         * current room + its portal neighbors */
+                    {
+                        /* Find which room the camera is in */
                         int cam_room = lara_room;
                         int32_t icx = (int32_t)cam_x;
                         int32_t icz = (int32_t)cam_z;
@@ -548,38 +547,38 @@ int main(void) {
                             }
                         }
 
-                        /* Get sector at camera position */
-                        tr_room_t *room = &g_level.rooms[cam_room];
-                        int32_t sx = (icx - room->x) >> 10;
-                        int32_t sz = (icz - room->z) >> 10;
-                        if (sx < 0) sx = 0;
-                        if (sx >= room->sectors_x) sx = room->sectors_x - 1;
-                        if (sz < 0) sz = 0;
-                        if (sz >= room->sectors_z) sz = room->sectors_z - 1;
+                        /* Always update current room for BFS traversal */
+                        lara_room = cam_room;
 
-                        if (room->sectors) {
-                            tr_sector_t *sector = &room->sectors[sz * room->sectors_x + sx];
-                            int32_t floor_y = sector->floor * -256;
+                        /* Floor clamping (walk mode only) */
+                        if (walk_mode) {
+                            tr_room_t *room = &g_level.rooms[cam_room];
+                            int32_t sx = (icx - room->x) >> 10;
+                            int32_t sz = (icz - room->z) >> 10;
+                            if (sx < 0) sx = 0;
+                            if (sx >= room->sectors_x) sx = room->sectors_x - 1;
+                            if (sz < 0) sz = 0;
+                            if (sz >= room->sectors_z) sz = room->sectors_z - 1;
 
-                            /* Follow pit room portals for deeper floors */
-                            if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
-                                tr_room_t *below = &g_level.rooms[sector->pit_room];
-                                int32_t bx = (icx - below->x) >> 10;
-                                int32_t bz = (icz - below->z) >> 10;
-                                if (bx >= 0 && bx < below->sectors_x &&
-                                    bz >= 0 && bz < below->sectors_z && below->sectors) {
-                                    tr_sector_t *bs = &below->sectors[bz * below->sectors_x + bx];
-                                    int32_t bf = bs->floor * -256;
-                                    if (bf > floor_y) floor_y = bf;
+                            if (room->sectors) {
+                                tr_sector_t *sector = &room->sectors[sz * room->sectors_x + sx];
+                                int32_t floor_y = sector->floor * -256;
+
+                                if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
+                                    tr_room_t *below = &g_level.rooms[sector->pit_room];
+                                    int32_t bx = (icx - below->x) >> 10;
+                                    int32_t bz = (icz - below->z) >> 10;
+                                    if (bx >= 0 && bx < below->sectors_x &&
+                                        bz >= 0 && bz < below->sectors_z && below->sectors) {
+                                        tr_sector_t *bs = &below->sectors[bz * below->sectors_x + bx];
+                                        int32_t bf = bs->floor * -256;
+                                        if (bf > floor_y) floor_y = bf;
+                                    }
                                 }
+
+                                float floor_limit = (float)floor_y - 768.0f;
+                                if (cam_y > floor_limit) cam_y = floor_limit;
                             }
-
-                            /* Clamp camera to stay above floor (don't force-set Y) */
-                            float floor_limit = (float)floor_y - 768.0f;
-                            if (cam_y > floor_limit) cam_y = floor_limit;
-
-                            /* Update lara_room for portal traversal */
-                            lara_room = cam_room;
                         }
                     }
 
