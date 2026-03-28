@@ -7,6 +7,11 @@
  * Uses our own .PHD parser for level loading.
  */
 
+/* Include our asset manager FIRST, then block libdragon's asset.h
+ * which has a conflicting asset_load() declaration */
+#include "asset_manager.h"
+#define __LIBDRAGON_ASSET_H  /* Prevent libdragon's asset.h from loading */
+
 #include <libdragon.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,9 +21,6 @@
 /* Our game code */
 #include "level/tr_types.h"
 #include "level/tr_level_parse.h"
-
-/* Asset streaming system */
-#include "asset_manager.h"
 
 /* -------------------------------------------------------------------
  * Bump allocator
