@@ -1145,31 +1145,7 @@ int main(void) {
                                         bz += ox*lsy + oz*lcy;
                                     }
                                 }
-                                /* Per-mesh rotation: build 3x3 from frame, apply to vertices directly */
-                                float R[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
-                                if (fr && mi < 15) {
-                                    uint16_t w1 = (uint16_t)fr[9 + mi*2];
-                                    uint16_t w2 = (uint16_t)fr[10 + mi*2];
-                                    int16_t iax = (int16_t)((w1 & 0x3FF0) << 2);
-                                    int16_t iay = (int16_t)((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6);
-                                    int16_t iaz = (int16_t)((w2 & 0x03FF) << 6);
-
-                                    /* Build combined rotation matrix Y*X*Z */
-                                    float say=sinf((float)iay*9.587e-5f), cay=cosf((float)iay*9.587e-5f);
-                                    float sax=sinf((float)iax*9.587e-5f), cax=cosf((float)iax*9.587e-5f);
-                                    float saz=sinf((float)iaz*9.587e-5f), caz=cosf((float)iaz*9.587e-5f);
-
-                                    /* Ry * Rx * Rz combined */
-                                    R[0][0] = cay*caz + say*sax*saz;
-                                    R[0][1] = -cay*saz + say*sax*caz;
-                                    R[0][2] = say*cax;
-                                    R[1][0] = cax*saz;
-                                    R[1][1] = cax*caz;
-                                    R[1][2] = -sax;
-                                    R[2][0] = -say*caz + cay*sax*saz;
-                                    R[2][1] = say*saz + cay*sax*caz;
-                                    R[2][2] = cay*cax;
-                                }
+                                /* Position-only rendering (no per-mesh rotation) */
 
                                 int gmi = lara_obj->mesh_idx + mi;
                                 if (gmi >= g_level.mesh_count) continue;
@@ -1206,17 +1182,11 @@ int main(void) {
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
-                                        float lx=(float)mesh->vertices[vi].x;
-                                        float ly=(float)mesh->vertices[vi].y;
-                                        float lz=(float)mesh->vertices[vi].z;
-                                        /* Apply per-mesh rotation R to local vertex */
-                                        float rx_v = R[0][0]*lx + R[0][1]*ly + R[0][2]*lz;
-                                        float ry_v = R[1][0]*lx + R[1][1]*ly + R[1][2]*lz;
-                                        float rz_v = R[2][0]*lx + R[2][1]*ly + R[2][2]*lz;
-                                        /* Apply Lara yaw then add bone position */
-                                        float wx = bx + rx_v*lcy - rz_v*lsy;
-                                        float wy = by + ry_v;
-                                        float wz = bz + rx_v*lsy + rz_v*lcy;
+                                        float vx = (float)mesh->vertices[vi].x;
+                                        float vz = (float)mesh->vertices[vi].z;
+                                        float wx = bx + vx*lcy - vz*lsy;
+                                        float wy = by + (float)mesh->vertices[vi].y;
+                                        float wz = bz + vx*lsy + vz*lcy;
 
                                         float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
