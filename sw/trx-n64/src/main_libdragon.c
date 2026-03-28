@@ -485,9 +485,24 @@ int main(void) {
                 /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
 
+                /* FPS counter */
+                int fps_frames = 0;
+                uint32_t fps_last = TICKS_READ();
+                int fps_display = 0;
+
                 /* Render loop */
                 render_loop:
                 while (1) {
+                    /* Update FPS every 30 frames */
+                    fps_frames++;
+                    if (fps_frames >= 30) {
+                        uint32_t now = TICKS_READ();
+                        uint32_t delta = TICKS_DISTANCE(fps_last, now);
+                        float secs = (float)delta / (float)TICKS_PER_SECOND;
+                        fps_display = (int)(30.0f / secs + 0.5f);
+                        fps_last = now;
+                        fps_frames = 0;
+                    }
                     joypad_poll();
                     joypad_inputs_t input = joypad_get_inputs(JOYPAD_PORT_1);
                     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
@@ -959,7 +974,7 @@ int main(void) {
                     }
 
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
-                    for (int ii = 0; ii < g_level.item_count && ii < 50; ii++) {
+                    for (int ii = 0; ii < g_level.item_count && ii < 100; ii++) {
                         tr_item_t *item = &g_level.items[ii];
                         if (item->object_id == 0) continue; /* Skip Lara */
                         /* Only draw if item is in a visible room */
@@ -1213,45 +1228,62 @@ int main(void) {
                         float sx_pos = (float)lara_item->pos.x;
                         float sy_pos = (float)lara_item->pos.y + 10.0f; /* Slightly above floor */
                         float sz_pos = (float)lara_item->pos.z;
-                        float srad = 160.0f; /* Shadow radius */
+                        float srad = 140.0f;
 
-                        /* Diamond shape (4 triangles from center) approximates circle */
                         if (white_px && last_tex_idx != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                             last_tex_idx = -2;
                         }
 
-                        /* 4 diamond points: N, E, S, W */
-                        float dpts[4][2] = {{0,-srad},{srad,0},{0,srad},{-srad,0}};
-                        float sv[4][10];
+                        /* 8-point octagon for rounder shadow */
+                        float k = srad * 0.707f; /* cos(45°) */
+                        float oct[8][2] = {
+                            {0,-srad},{k,-k},{srad,0},{k,k},
+                            {0,srad},{-k,k},{-srad,0},{-k,-k}
+                        };
+                        float sv_s[8][10];
                         bool vis = true;
-                        for (int v = 0; v < 4; v++) {
-                            float wx = sx_pos + dpts[v][0];
+                        for (int v = 0; v < 8; v++) {
+                            float wx = sx_pos + oct[v][0];
                             float wy = sy_pos;
-                            float wz = sz_pos + dpts[v][1];
-                            float cx_v = wx - cam_x, cy_v = wy - cam_y, cz_v = wz - cam_z;
-                            float rx = cx_v * cy - cz_v * sy;
-                            float rz_y = cx_v * sy + cz_v * cy;
-                            float ry = cy_v * cp - rz_y * sp;
-                            float rz = cy_v * sp + rz_y * cp;
+                            float wz = sz_pos + oct[v][1];
+                            float cx_v = wx-cam_x, cy_v = wy-cam_y, cz_v = wz-cam_z;
+                            float rx = cx_v*cy - cz_v*sy;
+                            float rz_y = cx_v*sy + cz_v*cy;
+                            float ry = cy_v*cp - rz_y*sp;
+                            float rz = cy_v*sp + rz_y*cp;
                             if (rz < 1.0f) { vis = false; break; }
                             float inv_z = 256.0f / rz;
-                            sv[v][0] = 160.0f + rx * inv_z;
-                            sv[v][1] = 120.0f + ry * inv_z;
-                            sv[v][2] = rz / 32768.0f - 0.001f; /* Slightly in front of floor */
-                            if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-                            if (sv[v][2] < 0.0f) sv[v][2] = 0.0f;
-                            sv[v][3] = 0.12f; sv[v][4] = 0.10f;
-                            sv[v][5] = 0.08f; sv[v][6] = 1.0f;
-                            sv[v][7] = 0; sv[v][8] = 0;
-                            sv[v][9] = 1.0f / rz;
+                            sv_s[v][0] = 160.0f + rx*inv_z;
+                            sv_s[v][1] = 120.0f + ry*inv_z;
+                            sv_s[v][2] = rz/32768.0f - 0.001f;
+                            if (sv_s[v][2] > 1) sv_s[v][2] = 1;
+                            if (sv_s[v][2] < 0) sv_s[v][2] = 0;
+                            sv_s[v][3]=0.08f; sv_s[v][4]=0.07f;
+                            sv_s[v][5]=0.06f; sv_s[v][6]=1.0f;
+                            sv_s[v][7]=0; sv_s[v][8]=0;
+                            sv_s[v][9]=1.0f/rz;
                         }
                         if (vis) {
-                            /* Two triangles forming diamond */
-                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
-                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            /* 6 triangles as fan from point 0 */
+                            for (int t = 1; t < 7; t++)
+                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX,
+                                    sv_s[0], sv_s[t], sv_s[t+1]);
                         }
                     }}
+
+                    /* FPS display: draw as colored rectangles for digits */
+                    {
+                        /* Simple digit renderer using fill rectangles */
+                        rdpq_set_mode_fill(RGBA32(0xFF, 0xFF, 0x00, 0xFF));
+                        int tens = fps_display / 10;
+                        int ones = fps_display % 10;
+                        /* Draw bar-graph style: each unit = 3px wide block */
+                        for (int d = 0; d < fps_display && d < 30; d++)
+                            rdpq_fill_rectangle(4 + d * 4, 4, 4 + d * 4 + 3, 8);
+                        /* Restore render mode for next frame */
+                    }
+                    (void)0; /* Suppress empty statement warning */
 
                     /* Show frame */
                     rdpq_detach_show();
