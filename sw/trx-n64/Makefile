@@ -184,9 +184,9 @@ $(BUILD)/trx-n64.elf: $(ALL_OBJS) $(LDSCRIPT)
 	@echo ""
 	@$(SIZE) -B -d $@
 
-# Libdragon's IPL3 expects ELF at ROM offset 0x1000 — copy ELF directly
+# Convert ELF to flat binary for ROM payload
 $(BUILD)/trx-n64.bin: $(BUILD)/trx-n64.elf
-	@cp $< $@
+	@python3 tools/elf2bin.py $< $@
 	@echo ""
 	@echo "ROM: $@ ($$(stat -c%s $@ 2>/dev/null || stat -f%z $@ 2>/dev/null) bytes)"
 
