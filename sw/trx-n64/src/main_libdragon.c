@@ -748,16 +748,34 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Simple Lara: render ALL meshes at her world position.
-                             * Vertices are in mesh-local coords, placed at item pos. */
-                            float lx = (float)lara_item->pos.x;
-                            float ly = (float)lara_item->pos.y;
-                            float lz = (float)lara_item->pos.z;
+                            /* Bone tree with simple position stack (no rotations).
+                             * Each bone has push/pop flags + xyz offset. */
+                            float pos_stack[8][3];
+                            int psp = 0;
+                            float bx = (float)lara_item->pos.x;
+                            float by = (float)lara_item->pos.y;
+                            float bz = (float)lara_item->pos.z;
 
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
                             for (int mi = 0; mi < mc; mi++) {
+                                if (mi > 0) {
+                                    int bi = lara_obj->bone_idx + (mi - 1);
+                                    if (bi >= 0 && bi < g_level.anim_bone_count) {
+                                        tr_anim_bone_t *bone = &g_level.anim_bones[bi];
+                                        if (bone->flags & 1) { /* pop */
+                                            if (psp > 0) { psp--; bx=pos_stack[psp][0]; by=pos_stack[psp][1]; bz=pos_stack[psp][2]; }
+                                        }
+                                        if (bone->flags & 2) { /* push */
+                                            if (psp < 7) { pos_stack[psp][0]=bx; pos_stack[psp][1]=by; pos_stack[psp][2]=bz; psp++; }
+                                        }
+                                        bx += (float)bone->x;
+                                        by += (float)bone->y;
+                                        bz += (float)bone->z;
+                                    }
+                                }
+
                                 int gmi = lara_obj->mesh_idx + mi;
                                 if (gmi >= g_level.mesh_count) continue;
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
@@ -780,10 +798,9 @@ int main(void) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
 
-                                        /* Mesh-local vertex + Lara's world pos */
-                                        float wx = lx + (float)mesh->vertices[vi].x;
-                                        float wy = ly + (float)mesh->vertices[vi].y;
-                                        float wz = lz + (float)mesh->vertices[vi].z;
+                                        float wx = bx + (float)mesh->vertices[vi].x;
+                                        float wy = by + (float)mesh->vertices[vi].y;
+                                        float wz = bz + (float)mesh->vertices[vi].z;
 
                                         float cx = wx - cam_x;
                                         float cy_val = wy - cam_y;
