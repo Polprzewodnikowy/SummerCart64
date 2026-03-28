@@ -463,7 +463,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 12;  /* Limit visible rooms for FPS */
+                    int max_rooms = 6;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -482,7 +482,9 @@ int main(void) {
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
 
-                        for (int f = 0; f < room->mesh.face_count; f++) {
+                        int max_faces = room->mesh.face_count;
+                        if (max_faces > 400) max_faces = 400;  /* Cap per room */
+                        for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
@@ -518,8 +520,8 @@ int main(void) {
 
                                 /* Per-vertex lighting — color from face texture/palette */
                                 int16_t light = rv->light;
-                                float bright = 1.0f - ((float)light / 8191.0f);
-                                if (bright < 0.05f) bright = 0.05f;
+                                float bright = 1.0f - ((float)light / 16384.0f);
+                                if (bright < 0.15f) bright = 0.15f;
                                 if (bright > 1.0f) bright = 1.0f;
 
                                 /* Get color from texture for a color hint */
