@@ -1179,7 +1179,48 @@ int main(void) {
                                 if (gmi >= g_level.mesh_count) continue;
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
-                                /* No per-mesh rotation — position stack only */
+                                /* Per-mesh rotation from current animation frame.
+                                 * Uses float reimplementation of tr_anim.c's exact
+                                 * fixed-point rotation (verified sign conventions).
+                                 * Rotation applied to LOCAL vertices only. */
+                                float mr[3][3] = {{1,0,0},{0,1,0},{0,0,1}}; /* identity */
+                                if (fr && mi < 15 && (frame_off + 9 + mi*2 + 1) < g_level.anim_frame_count) {
+                                    uint16_t w1 = (uint16_t)fr[9 + mi*2];
+                                    uint16_t w2 = (uint16_t)fr[10 + mi*2];
+                                    /* Decode 10-bit packed angles to 16-bit range */
+                                    int16_t ax = (int16_t)((w1 & 0x3FF0) << 2);
+                                    int16_t ay = (int16_t)((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6);
+                                    int16_t az = (int16_t)((w2 & 0x03FF) << 6);
+                                    /* Convert to radians */
+                                    float ary = (float)ay * 6.28318f / 65536.0f;
+                                    float arx = (float)ax * 6.28318f / 65536.0f;
+                                    float arz = (float)az * 6.28318f / 65536.0f;
+
+                                    /* Build rotation matrix: Y then X then Z
+                                     * matching tr_anim.c exactly */
+                                    float t0, t1;
+                                    /* Y rotation */
+                                    if (ay) {
+                                        float s=sinf(ary), c=cosf(ary);
+                                        t0=mr[0][0]; t1=mr[0][2]; mr[0][0]=t0*c-t1*s; mr[0][2]=t0*s+t1*c;
+                                        t0=mr[1][0]; t1=mr[1][2]; mr[1][0]=t0*c-t1*s; mr[1][2]=t0*s+t1*c;
+                                        t0=mr[2][0]; t1=mr[2][2]; mr[2][0]=t0*c-t1*s; mr[2][2]=t0*s+t1*c;
+                                    }
+                                    /* X rotation */
+                                    if (ax) {
+                                        float s=sinf(arx), c=cosf(arx);
+                                        t0=mr[0][1]; t1=mr[0][2]; mr[0][1]=t0*c+t1*s; mr[0][2]=-t0*s+t1*c;
+                                        t0=mr[1][1]; t1=mr[1][2]; mr[1][1]=t0*c+t1*s; mr[1][2]=-t0*s+t1*c;
+                                        t0=mr[2][1]; t1=mr[2][2]; mr[2][1]=t0*c+t1*s; mr[2][2]=-t0*s+t1*c;
+                                    }
+                                    /* Z rotation */
+                                    if (az) {
+                                        float s=sinf(arz), c=cosf(arz);
+                                        t0=mr[0][0]; t1=mr[0][1]; mr[0][0]=t0*c+t1*s; mr[0][1]=-t0*s+t1*c;
+                                        t0=mr[1][0]; t1=mr[1][1]; mr[1][0]=t0*c+t1*s; mr[1][1]=-t0*s+t1*c;
+                                        t0=mr[2][0]; t1=mr[2][1]; mr[2][0]=t0*c+t1*s; mr[2][1]=-t0*s+t1*c;
+                                    }
+                                }
 
                                 for (int f = 0; f < mesh->face_count; f++) {
                                     tr_face_t *face = &mesh->faces[f];
@@ -1212,11 +1253,18 @@ int main(void) {
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
-                                        float vx = (float)mesh->vertices[vi].x;
-                                        float vz = (float)mesh->vertices[vi].z;
-                                        float wx = bx + vx * lcy - vz * lsy;
-                                        float wy = by + (float)mesh->vertices[vi].y;
-                                        float wz = bz + vx * lsy + vz * lcy;
+                                        /* Apply per-mesh rotation then Lara yaw */
+                                        float vx0 = (float)mesh->vertices[vi].x;
+                                        float vy0 = (float)mesh->vertices[vi].y;
+                                        float vz0 = (float)mesh->vertices[vi].z;
+                                        /* Rotate by mesh bone rotation */
+                                        float vx = mr[0][0]*vx0 + mr[0][1]*vy0 + mr[0][2]*vz0;
+                                        float vy_r = mr[1][0]*vx0 + mr[1][1]*vy0 + mr[1][2]*vz0;
+                                        float vz_r = mr[2][0]*vx0 + mr[2][1]*vy0 + mr[2][2]*vz0;
+                                        /* Rotate by Lara's yaw then offset */
+                                        float wx = bx + vx * lcy - vz_r * lsy;
+                                        float wy = by + vy_r;
+                                        float wz = bz + vx * lsy + vz_r * lcy;
 
                                         float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
@@ -1333,6 +1381,30 @@ int main(void) {
                 console_set_render_mode(RENDER_MANUAL);
                 printf("Paused. Press START for 3D.\n");
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
+                printf("FPS: %d\n", fps_display);
+                /* Debug: Lara animation info */
+                {
+                    tr_object_def_t *dbg_obj = NULL;
+                    for (int i = 0; i < g_level.object_count; i++)
+                        if (g_level.objects[i].object_id == 0) { dbg_obj = &g_level.objects[i]; break; }
+                    if (dbg_obj) {
+                        int ai = dbg_obj->anim_idx;
+                        printf("Lara: meshes=%d anim_idx=%d\n", dbg_obj->mesh_count, ai);
+                        printf("  frame_off=%u bone_idx=%d\n", dbg_obj->frame_offset, dbg_obj->bone_idx);
+                        if (ai >= 0 && ai < g_level.anim_count) {
+                            tr_anim_t *a = &g_level.anims[ai];
+                            printf("  anim: frames=%d-%d size=%d interp=%d\n",
+                                   a->frame_base, a->frame_end, a->frame_size, a->interpolation);
+                            /* Show first frame rotation data for mesh 0 */
+                            int fo = dbg_obj->frame_offset / 2;
+                            if (g_level.anim_frames && fo + 11 < g_level.anim_frame_count) {
+                                int16_t *f = &g_level.anim_frames[fo];
+                                printf("  fr0: off=%d,%d,%d rot0=%04x,%04x\n",
+                                       f[6], f[7], f[8], (uint16_t)f[9], (uint16_t)f[10]);
+                            }
+                        }
+                    }
+                }
                 console_render();
 
                 /* Wait for START to re-enter 3D */
