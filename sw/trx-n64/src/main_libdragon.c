@@ -306,9 +306,12 @@ int main(void) {
             printf("  First bytes: %02x %02x %02x %02x\n",
                    level_data[0], level_data[1], level_data[2], level_data[3]);
 
-            /* Parse the .PHD level */
+            /* Parse the .PHD level.
+             * DO NOT reset the heap here! level_data is at heap offset 0.
+             * The parser allocates from the heap too — if we reset, its
+             * allocations overwrite level_data (including texture pages
+             * which are at the BEGINNING of .PHD files). */
             printf("  Parsing .PHD format...\n");
-            n64_mem_init();  /* Reset heap for level data */
             tr_parse_result_t res = tr_level_parse(
                 (const uint8_t *)level_data, level_size, &g_level);
 
@@ -431,24 +434,6 @@ int main(void) {
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
-                /* Create a diagnostic texture: colored rows (red/green/blue/white).
-                 * This is a separate surface for testing with rdpq_texture_rectangle. */
-                uint16_t *diag_buf = (uint16_t *)malloc_uncached_aligned(64, TEX_TILE_BYTES);
-                surface_t diag_surf = {0};
-                if (diag_buf) {
-                    uint16_t row_colors[16] = {
-                        0xF801, 0x07C1, 0x003F, 0xFFFF,
-                        0xF801, 0x07C1, 0x003F, 0xFFFF,
-                        0xF801, 0x07C1, 0x003F, 0xFFFF,
-                        0xF801, 0x07C1, 0x003F, 0xFFFF,
-                    };
-                    for (int y = 0; y < TEX_TILE_DIM; y++)
-                        for (int x = 0; x < TEX_TILE_DIM; x++)
-                            diag_buf[y * TEX_TILE_DIM + x] = row_colors[y];
-                    diag_surf = surface_make_linear(diag_buf, FMT_RGBA16,
-                                                     TEX_TILE_DIM, TEX_TILE_DIM);
-                }
-
                 printf("  %d textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
@@ -524,23 +509,10 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* === DIAGNOSTIC: textured rectangle at top of screen ===
-                     * Uses rect rasterizer (not triangle). If this shows correct
-                     * colored stripes without black lines, the issue is in
-                     * rdpq_triangle, not the texture/tile setup. */
-                    if (diag_buf) {
-                        rdpq_set_mode_standard();
-                        rdpq_mode_filter(FILTER_POINT);
-                        rdpq_tex_upload(TILE0, &diag_surf, NULL);
-                        rdpq_texture_rectangle(TILE0,
-                            0, 0, 64, 32,     /* screen rect: 64x32 at top-left */
-                            0, 0);             /* tex coords: start at (0,0) */
-                    }
-
                     /* Textured + shaded rendering: RGBA16 (no TLUT) */
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
-                    rdpq_mode_persp(true);  /* Enable perspective correction for INV_W */
+                    rdpq_mode_persp(true);
                     rdpq_mode_filter(FILTER_BILINEAR);
 
                     /* Track current texture for batching */
