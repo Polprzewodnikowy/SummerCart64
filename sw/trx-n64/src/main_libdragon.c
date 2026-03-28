@@ -1108,32 +1108,67 @@ int main(void) {
                                 }
                             }
 
-                            /* Get current frame data */
+                            /* Get current frame data.
+                             * TR1's frame_size field is 0 — compute it:
+                             * 9 header words + 2 rotation words per mesh */
                             int frame_off = lara_obj->frame_offset / 2;
-                            int frame_size = anim ? anim->frame_size : 0;
-                            if (frame_size > 0)
-                                frame_off += anim_frame * frame_size;
+                            int mc = lara_obj->mesh_count;
+                            if (mc > 15) mc = 15;
+                            int frame_size = 9 + mc * 2;
+                            frame_off += anim_frame * frame_size;
 
-                            int16_t *fr = (g_level.anim_frames && frame_off + 9 < g_level.anim_frame_count)
+                            int16_t *fr = (g_level.anim_frames && frame_off + frame_size <= g_level.anim_frame_count)
                                         ? &g_level.anim_frames[frame_off] : NULL;
 
-                            /* Position stack */
-                            float ps[8][3]; int psp = 0;
-                            float bx = (float)lara_item->pos.x;
-                            float by = (float)lara_item->pos.y;
-                            float bz = (float)lara_item->pos.z;
+                            /* 3x4 float matrix stack [R00 R01 R02 Tx ...] */
+                            float ms[8][12]; int msp = 0;
+                            #define MI(m) do{memset(m,0,48);(m)[0]=(m)[4]=(m)[8]=1.0f;}while(0)
+                            #define MPUSH() do{if(msp<7){memcpy(ms[msp+1],ms[msp],48);msp++;}}while(0)
+                            #define MPOP()  do{if(msp>0)msp--;}while(0)
+                            #define MC ms[msp]
+                            #define MTR(m,dx,dy,dz) do{ \
+                                (m)[3]+=(m)[0]*(dx)+(m)[1]*(dy)+(m)[2]*(dz); \
+                                (m)[7]+=(m)[4]*(dx)+(m)[5]*(dy)+(m)[6]*(dz); \
+                                (m)[11]+=(m)[8]*(dx)+(m)[9]*(dy)+(m)[10]*(dz); \
+                            }while(0)
 
-                            /* Lara's facing direction */
+                            /* Rotation macros matching tr_anim.c exactly */
+                            #define MRY(m,s,c) do{ float _t; \
+                                _t=(m)[0];(m)[0]=_t*(c)-(m)[2]*(s);(m)[2]=_t*(s)+(m)[2]*(c); \
+                                _t=(m)[4];(m)[4]=_t*(c)-(m)[6]*(s);(m)[6]=_t*(s)+(m)[6]*(c); \
+                                _t=(m)[8];(m)[8]=_t*(c)-(m)[10]*(s);(m)[10]=_t*(s)+(m)[10]*(c); \
+                            }while(0)
+                            #define MRX(m,s,c) do{ float _t; \
+                                _t=(m)[1];(m)[1]=_t*(c)+(m)[2]*(s);(m)[2]=-_t*(s)+(m)[2]*(c); \
+                                _t=(m)[5];(m)[5]=_t*(c)+(m)[6]*(s);(m)[6]=-_t*(s)+(m)[6]*(c); \
+                                _t=(m)[9];(m)[9]=_t*(c)+(m)[10]*(s);(m)[10]=-_t*(s)+(m)[10]*(c); \
+                            }while(0)
+                            #define MRZ(m,s,c) do{ float _t; \
+                                _t=(m)[0];(m)[0]=_t*(c)+(m)[1]*(s);(m)[1]=-_t*(s)+(m)[1]*(c); \
+                                _t=(m)[4];(m)[4]=_t*(c)+(m)[5]*(s);(m)[5]=-_t*(s)+(m)[5]*(c); \
+                                _t=(m)[8];(m)[8]=_t*(c)+(m)[9]*(s);(m)[9]=-_t*(s)+(m)[9]*(c); \
+                            }while(0)
+
+                            /* Decode + apply TR1 packed rotation */
+                            #define APPLY_ROT(m, w1, w2) do { \
+                                int16_t _ax=(int16_t)(((w1)&0x3FF0)<<2); \
+                                int16_t _ay=(int16_t)(((((w1)&0xF)<<6)|(((w2)&0xFC00)>>10))<<6); \
+                                int16_t _az=(int16_t)(((w2)&0x3FF)<<6); \
+                                float _a; \
+                                if(_ay){_a=(float)_ay*9.58738e-5f;MRY(m,sinf(_a),cosf(_a));} \
+                                if(_ax){_a=(float)_ax*9.58738e-5f;MRX(m,sinf(_a),cosf(_a));} \
+                                if(_az){_a=(float)_az*9.58738e-5f;MRZ(m,sinf(_a),cosf(_a));} \
+                            }while(0)
+                            /* 9.58738e-5 = 2π/65536 */
+
+                            /* Init matrix at Lara's world position + yaw */
+                            MI(MC);
+                            MC[3]=(float)lara_item->pos.x; MC[7]=(float)lara_item->pos.y; MC[11]=(float)lara_item->pos.z;
                             float lyaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
-                            float lsy = sinf(lyaw), lcy = cosf(lyaw);
+                            MRY(MC, sinf(lyaw), cosf(lyaw));
 
-                            /* Apply root offset from current frame */
-                            if (fr) {
-                                float ox = (float)fr[6], oz = (float)fr[8];
-                                bx += ox * lcy - oz * lsy;
-                                by += (float)fr[7];
-                                bz += ox * lsy + oz * lcy;
-                            }
+                            /* Root offset from frame */
+                            if (fr) MTR(MC, (float)fr[6], (float)fr[7], (float)fr[8]);
 
                             /* Dynamic lighting from room */
                             float lara_shade = 1.0f;
@@ -1144,9 +1179,9 @@ int main(void) {
                                 if (amb > 1) amb = 1;
                                 float light_add = 0;
                                 for (int li = 0; li < rm->light_count; li++) {
-                                    float dx = bx - (float)rm->lights[li].pos.x;
-                                    float dy = by - (float)rm->lights[li].pos.y;
-                                    float dz = bz - (float)rm->lights[li].pos.z;
+                                    float dx = MC[3] - (float)rm->lights[li].pos.x;
+                                    float dy = MC[7] - (float)rm->lights[li].pos.y;
+                                    float dz = MC[11] - (float)rm->lights[li].pos.z;
                                     float dist = sqrtf(dx*dx + dy*dy + dz*dz);
                                     float falloff = (float)rm->lights[li].falloff;
                                     if (falloff > 0 && dist < falloff)
@@ -1157,29 +1192,29 @@ int main(void) {
                                 if (lara_shade < 0.1f) lara_shade = 0.1f;
                             }
 
-                            int mc = lara_obj->mesh_count;
-                            if (mc > 15) mc = 15;
-
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi > 0) {
+                                if (mi == 0) {
+                                    /* Root mesh: apply frame rotation */
+                                    if (fr) {
+                                        APPLY_ROT(MC, (uint16_t)fr[9], (uint16_t)fr[10]);
+                                    }
+                                } else {
                                     int bi = lara_obj->bone_idx + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
-                                        if (bone->flags & 1) { if (psp > 0) { psp--; bx=ps[psp][0]; by=ps[psp][1]; bz=ps[psp][2]; } }
-                                        if (bone->flags & 2) { if (psp < 7) { ps[psp][0]=bx; ps[psp][1]=by; ps[psp][2]=bz; psp++; } }
-                                        /* Rotate bone offset by Lara's yaw */
-                                        float ox = (float)bone->x, oz = (float)bone->z;
-                                        bx += ox * lcy - oz * lsy;
-                                        by += (float)bone->y;
-                                        bz += ox * lsy + oz * lcy;
+                                        if (bone->flags & 1) MPOP();
+                                        if (bone->flags & 2) MPUSH();
+                                        MTR(MC, (float)bone->x, (float)bone->y, (float)bone->z);
+                                    }
+                                    /* Apply accumulated rotation from frame */
+                                    if (fr && (9 + mi*2 + 1) < frame_size) {
+                                        APPLY_ROT(MC, (uint16_t)fr[9+mi*2], (uint16_t)fr[10+mi*2]);
                                     }
                                 }
 
                                 int gmi = lara_obj->mesh_idx + mi;
                                 if (gmi >= g_level.mesh_count) continue;
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
-
-                                /* Position-only (rotations disabled — need debug data) */
 
                                 for (int f = 0; f < mesh->face_count; f++) {
                                     tr_face_t *face = &mesh->faces[f];
@@ -1212,12 +1247,12 @@ int main(void) {
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
-                                        float vx = (float)mesh->vertices[vi].x;
-                                        float vy_r = (float)mesh->vertices[vi].y;
-                                        float vz_r = (float)mesh->vertices[vi].z;
-                                        float wx = bx + vx * lcy - vz_r * lsy;
-                                        float wy = by + vy_r;
-                                        float wz = bz + vx * lsy + vz_r * lcy;
+                                        float lx=(float)mesh->vertices[vi].x;
+                                        float ly=(float)mesh->vertices[vi].y;
+                                        float lz=(float)mesh->vertices[vi].z;
+                                        float wx=MC[0]*lx+MC[1]*ly+MC[2]*lz+MC[3];
+                                        float wy=MC[4]*lx+MC[5]*ly+MC[6]*lz+MC[7];
+                                        float wz=MC[8]*lx+MC[9]*ly+MC[10]*lz+MC[11];
 
                                         float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
