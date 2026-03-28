@@ -184,9 +184,9 @@ $(BUILD)/trx-n64.elf: $(ALL_OBJS) $(LDSCRIPT)
 	@echo ""
 	@$(SIZE) -B -d $@
 
-# Convert to N64 ROM (raw binary from ELF, no n64tool dependency)
+# Libdragon's IPL3 expects ELF at ROM offset 0x1000 — copy ELF directly
 $(BUILD)/trx-n64.bin: $(BUILD)/trx-n64.elf
-	@$(OBJCOPY) -O binary $< $@
+	@cp $< $@
 	@echo ""
 	@echo "ROM: $@ ($$(stat -c%s $@ 2>/dev/null || stat -f%z $@ 2>/dev/null) bytes)"
 
