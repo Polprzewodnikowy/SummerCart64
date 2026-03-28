@@ -526,23 +526,32 @@ int main(void) {
                         int32_t icx = (int32_t)cam_x;
                         int32_t icz = (int32_t)cam_z;
 
-                        /* Check current room first */
+                        /* Check current room, then portals, then 2nd-level portals */
                         tr_room_t *cur = &g_level.rooms[lara_room];
                         int32_t rx = icx - cur->x;
                         int32_t rz = icz - cur->z;
-                        if (rx < 0 || rx >= cur->sectors_x * 1024 ||
-                            rz < 0 || rz >= cur->sectors_z * 1024) {
-                            /* Camera left current room — check portal neighbors */
-                            for (int p = 0; p < cur->portal_count; p++) {
-                                int dest = cur->portals[p].room;
-                                if (dest < 0 || dest >= g_level.room_count) continue;
-                                tr_room_t *rm = &g_level.rooms[dest];
-                                rx = icx - rm->x;
-                                rz = icz - rm->z;
+                        bool found = (rx >= 0 && rx < cur->sectors_x * 1024 &&
+                                      rz >= 0 && rz < cur->sectors_z * 1024);
+                        if (!found) {
+                            for (int p = 0; p < cur->portal_count && !found; p++) {
+                                int d1 = cur->portals[p].room;
+                                if (d1 < 0 || d1 >= g_level.room_count) continue;
+                                tr_room_t *rm = &g_level.rooms[d1];
+                                rx = icx - rm->x; rz = icz - rm->z;
                                 if (rx >= 0 && rx < rm->sectors_x * 1024 &&
                                     rz >= 0 && rz < rm->sectors_z * 1024) {
-                                    cam_room = dest;
-                                    break;
+                                    cam_room = d1; found = true; break;
+                                }
+                                /* Check 2nd-level portals */
+                                for (int q = 0; q < rm->portal_count && !found; q++) {
+                                    int d2 = rm->portals[q].room;
+                                    if (d2 < 0 || d2 >= g_level.room_count) continue;
+                                    tr_room_t *rm2 = &g_level.rooms[d2];
+                                    rx = icx - rm2->x; rz = icz - rm2->z;
+                                    if (rx >= 0 && rx < rm2->sectors_x * 1024 &&
+                                        rz >= 0 && rz < rm2->sectors_z * 1024) {
+                                        cam_room = d2; found = true;
+                                    }
                                 }
                             }
                         }
@@ -608,7 +617,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 4;  /* Limit visible rooms for FPS */
+                    int max_rooms = 5;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -665,7 +674,7 @@ int main(void) {
                                 float rx = wx * cy - wz * sy;
                                 float rz = wx * sy + wz * cy;
 
-                                if (rz < 4.0f) { visible = false; break; }
+                                if (rz < 1.0f) { visible = false; break; }
 
                                 float inv_z = 256.0f / rz;
                                 float screen_x = 160.0f + rx * inv_z;
@@ -873,7 +882,7 @@ int main(void) {
                                         float rx = cx * cy - cz * sy;
                                         float rz = cx * sy + cz * cy;
 
-                                        if (rz < 4.0f) { visible = false; break; }
+                                        if (rz < 1.0f) { visible = false; break; }
                                         float inv_z = 256.0f / rz;
                                         float screen_x = 160.0f + rx * inv_z;
                                         float screen_y = 120.0f + cy_val * inv_z;
