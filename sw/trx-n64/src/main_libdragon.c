@@ -367,8 +367,13 @@ int main(void) {
                 int num_otex = g_level.object_texture_count;
                 if (num_otex > 2048) num_otex = 2048;
 
-                /* Allocate tile buffer array from heap */
-                uint16_t *tex_tiles = (uint16_t *)n64_mem_alloc(num_otex * TEX_TILE_BYTES);
+                /* Allocate texture pixel data in UNCACHED memory with 64-byte
+                 * alignment — this matches what surface_alloc() does internally.
+                 * The RDP reads directly from RDRAM (bypassing CPU cache), so
+                 * uncached memory eliminates all cache coherency issues.
+                 * Surface structs and UV map stay on the bump allocator (CPU only). */
+                uint16_t *tex_tiles = (uint16_t *)malloc_uncached_aligned(
+                    64, num_otex * TEX_TILE_BYTES);
                 surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
                 /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
                 float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
@@ -401,7 +406,8 @@ int main(void) {
                         tex_uv_map[i*4+2] = (float)TEX_TILE_DIM / (float)tw;
                         tex_uv_map[i*4+3] = (float)TEX_TILE_DIM / (float)th;
 
-                        /* Convert CI8 tile to RGBA16, subsample to 16x16 */
+                        /* Convert CI8 tile to RGBA16, subsample to 16x16.
+                         * Writing through uncached pointer — goes straight to RDRAM. */
                         if (otex->tex_page < num_tex_pages) {
                             uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
                             for (int y = 0; y < TEX_TILE_DIM; y++) {
@@ -419,8 +425,8 @@ int main(void) {
                                 tile[p] = 0x8421;
                         }
 
-                        /* Flush cache and create surface */
-                        data_cache_hit_writeback(tile, TEX_TILE_BYTES);
+                        /* No cache flush needed — tile is in uncached memory.
+                         * Create surface pointing to the uncached buffer. */
                         tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
@@ -552,9 +558,7 @@ int main(void) {
                                 otex = &g_level.object_textures[tex_idx];
                                 has_tex = true;
                                 if ((int)tex_idx != last_tex_idx) {
-                                    /* Use upload_sub to force LoadTile (avoids TMEM interleave bug) */
-                                    rdpq_tex_upload_sub(TILE0, &tex_surfs[tex_idx], NULL,
-                                                        0, 0, TEX_TILE_DIM, TEX_TILE_DIM);
+                                    rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                     last_tex_idx = (int)tex_idx;
                                 }
                             }
