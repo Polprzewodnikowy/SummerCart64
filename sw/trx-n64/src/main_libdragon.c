@@ -513,7 +513,7 @@ int main(void) {
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
                     rdpq_mode_persp(true);
-                    rdpq_mode_filter(FILTER_BILINEAR);
+                    rdpq_mode_filter(FILTER_POINT);  /* Faster than bilinear */
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
@@ -590,8 +590,11 @@ int main(void) {
                                 float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + wy * inv_z;
 
-                                if (screen_x < -200 || screen_x > 520 ||
-                                    screen_y < -200 || screen_y > 440)
+                                /* Only cull if vertex is WAY off-screen.
+                                 * RDP handles clipping for partially visible faces.
+                                 * RDP uses s12.2 coords, so stay within ~1024. */
+                                if (screen_x < -1024 || screen_x > 1344 ||
+                                    screen_y < -1024 || screen_y > 1264)
                                     { visible = false; break; }
 
                                 sv[v][0] = screen_x;
