@@ -1196,9 +1196,7 @@ int main(void) {
                             int base_bone = lara_obj->bone_idx / 4;
 
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi == 0) {
-                                    /* Root mesh: skip rotation for now (debug) */
-                                } else {
+                                if (mi > 0) {
                                     int bi = base_bone + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
@@ -1206,10 +1204,13 @@ int main(void) {
                                         if (bone->flags & 2) MPUSH();
                                         MTR(MC, (float)bone->x, (float)bone->y, (float)bone->z);
                                     }
-                                    /* Apply accumulated rotation from frame */
-                                    if (fr && (9 + mi*2 + 1) < frame_size) {
-                                        APPLY_ROT(MC, (uint16_t)fr[9+mi*2], (uint16_t)fr[10+mi*2]);
-                                    }
+                                }
+                                /* Save matrix, apply rotation for THIS mesh only,
+                                 * then restore after rendering (non-accumulated) */
+                                float saved[12];
+                                memcpy(saved, MC, 48);
+                                if (fr && mi < 15 && (9 + mi*2 + 1) < frame_size) {
+                                    APPLY_ROT(MC, (uint16_t)fr[9+mi*2], (uint16_t)fr[10+mi*2]);
                                 }
 
                                 int gmi = lara_obj->mesh_idx + mi;
@@ -1285,6 +1286,8 @@ int main(void) {
                                     if (face->vertex_count == 4)
                                         rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 }
+                                /* Restore matrix (undo rotation for this mesh) */
+                                memcpy(MC, saved, 48);
                             }
                         }
                     }
