@@ -191,18 +191,35 @@ int main(void) {
      */
     printf("Loading assets from SD card...\n");
 
-    /* Try to open the asset file from the filesystem */
-    FILE *asset_file = fopen("rom:/tr1_assets.bin", "rb");
-    if (!asset_file) {
-        asset_file = fopen("sd:/tr1_assets.bin", "rb");
-    }
-    if (!asset_file) {
-        /* Try DFS (DragonFS) */
-        asset_file = fopen("/tr1_assets.bin", "rb");
+    /* Initialize libdragon's SD filesystem */
+    bool dfs_ok = (dfs_init(DFS_DEFAULT_LOCATION) == DFS_ESUCCESS);
+    printf("  DFS init: %s\n", dfs_ok ? "OK" : "no DFS");
+
+    /* Try various paths to find the asset file */
+    const char *paths[] = {
+        "sd:/tr1_assets.bin",
+        "/sd/tr1_assets.bin",
+        "rom:/tr1_assets.bin",
+        "/tr1_assets.bin",
+        "tr1_assets.bin",
+        NULL
+    };
+
+    FILE *asset_file = NULL;
+    const char *found_path = NULL;
+    for (int i = 0; paths[i]; i++) {
+        printf("  Trying: %s... ", paths[i]);
+        asset_file = fopen(paths[i], "rb");
+        if (asset_file) {
+            printf("YES!\n");
+            found_path = paths[i];
+            break;
+        }
+        printf("no\n");
     }
 
     if (asset_file) {
-        printf("  Asset file opened!\n");
+        printf("  Asset file opened at: %s\n", found_path);
 
         /* Read the entire file into memory */
         fseek(asset_file, 0, SEEK_END);
