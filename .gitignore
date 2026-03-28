@@ -5,3 +5,12 @@
 **/*.zip
 
 !**/.vscode/tasks.json
+
+# Build artifacts
+**/*.o
+**/*.d
+**/*.elf
+**/*.elf.stripped
+**/*.elf.sym
+**/*.map
+**/*.z64
