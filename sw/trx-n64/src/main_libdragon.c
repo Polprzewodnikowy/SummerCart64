@@ -346,36 +346,88 @@ int main(void) {
                 printf("LEVEL LOADED! Preparing textures...\n");
                 console_render();
 
-                /* Convert TR1 palette to RGBA16 for N64 TLUT.
-                 * TR1 palette: 256 entries × RGB, 6-bit per channel (0-63).
-                 * N64 TLUT: RGBA5551 (16-bit). */
-                static uint16_t palette16[256] __attribute__((aligned(16)));
+                /* Pre-convert all object textures to 16x16 RGBA16 at load time.
+                 * Each tile gets its own permanent buffer — no per-frame conversion,
+                 * no buffer reuse, no CI8/TLUT TMEM issues. */
+                int num_tex_pages = g_level.tex_page_count;
+                if (num_tex_pages > 16) num_tex_pages = 16;
+
+                /* Build RGBA16 palette lookup */
+                uint16_t pal16[256];
                 for (int i = 0; i < 256; i++) {
                     uint8_t r = g_level.palette[i*3+0];
                     uint8_t g = g_level.palette[i*3+1];
                     uint8_t b = g_level.palette[i*3+2];
-                    uint8_t r5 = r >> 1;
-                    uint8_t g5 = g >> 1;
-                    uint8_t b5 = b >> 1;
-                    palette16[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1;
-                    if (i == 0) palette16[i] = 0;
+                    pal16[i] = ((r >> 1) << 11) | ((g >> 1) << 6) | ((b >> 1) << 1) | 1;
+                    if (i == 0) pal16[i] = 0;
                 }
-                data_cache_hit_writeback(palette16, sizeof(palette16));
 
-                int num_tex_pages = g_level.tex_page_count;
-                if (num_tex_pages > 16) num_tex_pages = 16;
+                #define TEX_TILE_DIM 16
+                #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
+                int num_otex = g_level.object_texture_count;
+                if (num_otex > 2048) num_otex = 2048;
 
-                /* Ring buffer of 32x32 CI8 tile slots.
-                 * Each slot is its own correctly-sized surface,
-                 * avoiding stride mismatch from sub-rect uploads. */
-                #define TILE_POOL_SIZE 64
-                #define TILE_DIM 32
-                static uint8_t tile_pool[TILE_POOL_SIZE][TILE_DIM * TILE_DIM]
-                    __attribute__((aligned(16)));
-                int tile_pool_idx = 0;
+                /* Allocate tile buffer array from heap */
+                uint16_t *tex_tiles = (uint16_t *)n64_mem_alloc(num_otex * TEX_TILE_BYTES);
+                surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
+                float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
 
-                printf("  %d texture pages, %d tile slots ready.\n",
-                       num_tex_pages, TILE_POOL_SIZE);
+                if (tex_tiles && tex_surfs && tex_uv_map) {
+                    printf("  Converting %d textures to 16x16 RGBA16...\n", num_otex);
+                    console_render();
+                    for (int i = 0; i < num_otex; i++) {
+                        tr_object_texture_t *otex = &g_level.object_textures[i];
+                        uint16_t *tile = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+
+                        /* Compute UV bounding box */
+                        int u0 = 255, v0 = 255, u1 = 0, v1 = 0;
+                        for (int k = 0; k < 4; k++) {
+                            int u = otex->uv[k].u >> 8;
+                            int v = otex->uv[k].v >> 8;
+                            if (u < u0) u0 = u;
+                            if (v < v0) v0 = v;
+                            if (u > u1) u1 = u;
+                            if (v > v1) v1 = v;
+                        }
+                        int tw = u1 - u0 + 1;
+                        int th = v1 - v0 + 1;
+                        if (tw < 1) tw = 1;
+                        if (th < 1) th = 1;
+
+                        /* Store UV mapping */
+                        tex_uv_map[i*4+0] = (float)u0;
+                        tex_uv_map[i*4+1] = (float)v0;
+                        tex_uv_map[i*4+2] = (float)TEX_TILE_DIM / (float)tw;
+                        tex_uv_map[i*4+3] = (float)TEX_TILE_DIM / (float)th;
+
+                        /* Convert CI8 tile to RGBA16, subsample to 16x16 */
+                        if (otex->tex_page < num_tex_pages) {
+                            uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
+                            for (int y = 0; y < TEX_TILE_DIM; y++) {
+                                int sy = v0 + y * th / TEX_TILE_DIM;
+                                if (sy > 255) sy = 255;
+                                for (int x = 0; x < TEX_TILE_DIM; x++) {
+                                    int sx = u0 + x * tw / TEX_TILE_DIM;
+                                    if (sx > 255) sx = 255;
+                                    tile[y * TEX_TILE_DIM + x] = pal16[page[sy * 256 + sx]];
+                                }
+                            }
+                        } else {
+                            /* Invalid tex page — fill with gray */
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
+                                tile[p] = 0x8421;
+                        }
+
+                        /* Flush cache and create surface */
+                        data_cache_hit_writeback(tile, TEX_TILE_BYTES);
+                        tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
+                                                           TEX_TILE_DIM, TEX_TILE_DIM);
+                    }
+                }
+                printf("  %d textures ready (%d KB). Heap: %u KB left.\n",
+                       num_otex, num_otex * TEX_TILE_BYTES / 1024,
+                       n64_mem_available() / 1024);
 
                 /* ============================================
                  * 3D RENDERING LOOP
@@ -448,19 +500,13 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* Textured + shaded rendering: CI8 with TLUT */
+                    /* Textured + shaded rendering: RGBA16 (no TLUT) */
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
-                    rdpq_mode_tlut(TLUT_RGBA16);
-                    rdpq_mode_filter(FILTER_POINT);
-
-                    /* Upload palette to TMEM once per frame */
-                    rdpq_tex_upload_tlut(palette16, 0, 256);
+                    rdpq_mode_filter(FILTER_BILINEAR);
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
-                    float cur_tile_u0 = 0, cur_tile_v0 = 0;
-                    float cur_tile_su = 1, cur_tile_sv = 1;
 
                     /* Build visible room list via portal traversal.
                      * Start from Lara's room, follow portals up to depth 4. */
@@ -498,56 +544,16 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Upload texture tile (extract into ring buffer slot) */
+                            /* Upload pre-converted RGBA16 texture tile */
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool has_tex = false;
                             tr_object_texture_t *otex = NULL;
-                            if (tex_idx < g_level.object_texture_count) {
+                            if (tex_idx < num_otex && tex_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
-                                if (otex->tex_page < num_tex_pages) {
-                                    has_tex = true;
-                                    if ((int)tex_idx != last_tex_idx) {
-                                        /* Compute UV bounding box */
-                                        int u0 = 255, v0 = 255, u1 = 0, v1 = 0;
-                                        for (int k = 0; k < face->vertex_count; k++) {
-                                            int u = otex->uv[k].u >> 8;
-                                            int v = otex->uv[k].v >> 8;
-                                            if (u < u0) u0 = u;
-                                            if (v < v0) v0 = v;
-                                            if (u > u1) u1 = u;
-                                            if (v > v1) v1 = v;
-                                        }
-                                        int tw = u1 - u0 + 1;
-                                        int th = v1 - v0 + 1;
-                                        if (tw < 1) tw = 1;
-                                        if (th < 1) th = 1;
-
-                                        /* Extract tile into ring buffer slot (32x32 CI8) */
-                                        int slot = tile_pool_idx % TILE_POOL_SIZE;
-                                        tile_pool_idx++;
-                                        uint8_t *tile = tile_pool[slot];
-                                        uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
-                                        for (int y = 0; y < TILE_DIM; y++) {
-                                            int sy = v0 + y * th / TILE_DIM;
-                                            if (sy > 255) sy = 255;
-                                            for (int x = 0; x < TILE_DIM; x++) {
-                                                int sx = u0 + x * tw / TILE_DIM;
-                                                if (sx > 255) sx = 255;
-                                                tile[y * TILE_DIM + x] = page[sy * 256 + sx];
-                                            }
-                                        }
-                                        data_cache_hit_writeback(tile, TILE_DIM * TILE_DIM);
-
-                                        surface_t tile_surf = surface_make_linear(
-                                            tile, FMT_CI8, TILE_DIM, TILE_DIM);
-                                        rdpq_tex_upload(TILE0, &tile_surf, NULL);
-
-                                        cur_tile_u0 = (float)u0;
-                                        cur_tile_v0 = (float)v0;
-                                        cur_tile_su = (float)TILE_DIM / (float)tw;
-                                        cur_tile_sv = (float)TILE_DIM / (float)th;
-                                        last_tex_idx = (int)tex_idx;
-                                    }
+                                has_tex = true;
+                                if ((int)tex_idx != last_tex_idx) {
+                                    rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                    last_tex_idx = (int)tex_idx;
                                 }
                             }
 
@@ -591,12 +597,12 @@ int main(void) {
                                 sv[v][4] = bright;
                                 sv[v][5] = 1.0f;
 
-                                /* Texture coords mapped to 32x32 tile space */
-                                if (has_tex) {
+                                /* Texture coords mapped to 16x16 tile space */
+                                if (has_tex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    sv[v][6] = (tu - cur_tile_u0) * cur_tile_su;
-                                    sv[v][7] = (tv - cur_tile_v0) * cur_tile_sv;
+                                    sv[v][6] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    sv[v][7] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                 } else {
                                     sv[v][6] = 0.0f;
                                     sv[v][7] = 0.0f;
