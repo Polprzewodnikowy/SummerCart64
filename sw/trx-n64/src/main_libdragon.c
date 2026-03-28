@@ -519,7 +519,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 4;  /* Limit visible rooms for FPS */
+                    int max_rooms = 8;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -539,7 +539,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 200) max_faces = 200;  /* Cap per room */
+                        if (max_faces > 400) max_faces = 400;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -587,11 +587,13 @@ int main(void) {
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
 
-                                /* Per-vertex lighting (white shade, texture has color) */
+                                /* Per-vertex lighting (TR1: 0=bright, 8191=dark) */
                                 int16_t light = rv->light;
                                 float bright = 1.0f - ((float)light / 8191.0f);
-                                if (bright < 0.3f) bright = 0.3f;
+                                /* Gamma-like boost: sqrt makes darks brighter */
+                                if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
+                                bright = 0.4f + bright * 0.6f;  /* Remap to [0.4, 1.0] */
                                 sv[v][2] = bright;
                                 sv[v][3] = bright;
                                 sv[v][4] = bright;
