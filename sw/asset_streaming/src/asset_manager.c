@@ -30,7 +30,12 @@ static uint32_t sd_read_dispatch(asset_manager_t *mgr, void *dest,
 
 typedef volatile uint32_t io32_t;
 
-#define SC64_REGS_BASE      (0x1FFF0000UL)
+/* All hardware registers must be accessed via KSEG1 uncached addresses.
+ * Physical address | 0xA0000000 = KSEG1 uncached virtual address.
+ * Without this, accesses cause TLB miss exceptions. */
+#define UNCACHED(addr)      ((addr) | 0xA0000000UL)
+
+#define SC64_REGS_BASE      UNCACHED(0x1FFF0000UL)
 #define SC64_REG_SCR        (*(io32_t *)(SC64_REGS_BASE + 0x00))
 #define SC64_REG_DATA0      (*(io32_t *)(SC64_REGS_BASE + 0x04))
 #define SC64_REG_DATA1      (*(io32_t *)(SC64_REGS_BASE + 0x08))
@@ -39,7 +44,7 @@ typedef volatile uint32_t io32_t;
 #define SC64_SCR_CPU_BUSY   (1U << 31)
 #define SC64_SCR_CMD_ERROR  (1U << 30)
 
-#define PI_BASE             (0x04600000UL)
+#define PI_BASE             UNCACHED(0x04600000UL)
 #define PI_REG_SR           (*(io32_t *)(PI_BASE + 0x10))
 #define PI_SR_DMA_BUSY      (1 << 0)
 #define PI_SR_IO_BUSY       (1 << 1)
