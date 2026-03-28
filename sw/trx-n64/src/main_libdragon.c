@@ -1095,9 +1095,9 @@ int main(void) {
                             if (ai >= 0 && ai < g_level.anim_count)
                                 anim = &g_level.anims[ai];
 
-                            /* Advance animation every N ticks */
+                            /* Advance animation slowly (every 4 render frames) */
                             anim_tick++;
-                            int interp = anim ? (anim->interpolation > 0 ? anim->interpolation : 1) : 1;
+                            int interp = anim ? (anim->interpolation > 0 ? anim->interpolation * 4 : 4) : 4;
                             if (anim_tick >= interp) {
                                 anim_tick = 0;
                                 anim_frame++;
@@ -1108,17 +1108,19 @@ int main(void) {
                                 }
                             }
 
-                            /* Get current frame data.
-                             * TR1's frame_size field is 0 — compute it:
-                             * 9 header words + 2 rotation words per mesh */
-                            int frame_off = lara_obj->frame_offset / 2;
+                            /* Frame data: frame 0 for root offset, current frame for rotations */
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
                             int frame_size = 9 + mc * 2;
-                            frame_off += anim_frame * frame_size;
+                            int base_off = lara_obj->frame_offset / 2;
 
-                            int16_t *fr = (g_level.anim_frames && frame_off + frame_size <= g_level.anim_frame_count)
-                                        ? &g_level.anim_frames[frame_off] : NULL;
+                            /* Frame 0 for stable root position */
+                            int16_t *fr0 = (g_level.anim_frames && base_off + frame_size <= g_level.anim_frame_count)
+                                         ? &g_level.anim_frames[base_off] : NULL;
+                            /* Current frame for rotations */
+                            int cur_off = base_off + anim_frame * frame_size;
+                            int16_t *fr = (g_level.anim_frames && cur_off + frame_size <= g_level.anim_frame_count)
+                                        ? &g_level.anim_frames[cur_off] : fr0;
 
                             /* Position stack (proven working) + per-mesh R matrix */
                             float ps[8][3]; int psp = 0;
@@ -1128,11 +1130,11 @@ int main(void) {
                             float lyaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
                             float lsy = sinf(lyaw), lcy = cosf(lyaw);
 
-                            /* Root offset from frame (rotated by yaw) */
-                            if (fr) {
-                                float ox = (float)fr[6], oz = (float)fr[8];
+                            /* Root offset from frame 0 (stable position) */
+                            if (fr0) {
+                                float ox = (float)fr0[6], oz = (float)fr0[8];
                                 bx += ox * lcy - oz * lsy;
-                                by += (float)fr[7];
+                                by += (float)fr0[7];
                                 bz += ox * lsy + oz * lcy;
                             }
 
