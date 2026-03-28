@@ -538,8 +538,10 @@ int main(void) {
                                         }
                                         int cu = su / nc;
                                         int cv = sv2 / nc;
-                                        if (cu < 0) cu = 0; if (cu > 255) cu = 255;
-                                        if (cv < 0) cv = 0; if (cv > 255) cv = 255;
+                                        if (cu < 0) cu = 0;
+                                        if (cu > 255) cu = 255;
+                                        if (cv < 0) cv = 0;
+                                        if (cv > 255) cv = 255;
                                         uint8_t ci = g_level.tex_pages[otex->tex_page * 256*256 + cv*256 + cu];
                                         uint8_t pr = g_level.palette[ci*3+0];
                                         uint8_t pg = g_level.palette[ci*3+1];
