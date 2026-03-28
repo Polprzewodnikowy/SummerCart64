@@ -1161,21 +1161,22 @@ int main(void) {
                         float sx_pos = (float)lara_item->pos.x;
                         float sy_pos = (float)lara_item->pos.y + 10.0f; /* Slightly above floor */
                         float sz_pos = (float)lara_item->pos.z;
-                        float srad = 128.0f; /* Shadow radius */
+                        float srad = 160.0f; /* Shadow radius */
 
-                        /* Upload white texture for shadow */
+                        /* Diamond shape (4 triangles from center) approximates circle */
                         if (white_px && last_tex_idx != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                             last_tex_idx = -2;
                         }
 
+                        /* 4 diamond points: N, E, S, W */
+                        float dpts[4][2] = {{0,-srad},{srad,0},{0,srad},{-srad,0}};
                         float sv[4][10];
                         bool vis = true;
-                        float corners[4][2] = {{-srad,-srad},{srad,-srad},{srad,srad},{-srad,srad}};
                         for (int v = 0; v < 4; v++) {
-                            float wx = sx_pos + corners[v][0];
+                            float wx = sx_pos + dpts[v][0];
                             float wy = sy_pos;
-                            float wz = sz_pos + corners[v][1];
+                            float wz = sz_pos + dpts[v][1];
                             float cx_v = wx - cam_x, cy_v = wy - cam_y, cz_v = wz - cam_z;
                             float rx = cx_v * cy - cz_v * sy;
                             float rz_y = cx_v * sy + cz_v * cy;
@@ -1185,14 +1186,16 @@ int main(void) {
                             float inv_z = 256.0f / rz;
                             sv[v][0] = 160.0f + rx * inv_z;
                             sv[v][1] = 120.0f + ry * inv_z;
-                            sv[v][2] = rz / 32768.0f;
+                            sv[v][2] = rz / 32768.0f - 0.001f; /* Slightly in front of floor */
                             if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-                            sv[v][3] = 0.0f; sv[v][4] = 0.0f;
-                            sv[v][5] = 0.0f; sv[v][6] = 0.5f; /* Semi-transparent black */
+                            if (sv[v][2] < 0.0f) sv[v][2] = 0.0f;
+                            sv[v][3] = 0.12f; sv[v][4] = 0.10f;
+                            sv[v][5] = 0.08f; sv[v][6] = 1.0f;
                             sv[v][7] = 0; sv[v][8] = 0;
                             sv[v][9] = 1.0f / rz;
                         }
                         if (vis) {
+                            /* Two triangles forming diamond */
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
