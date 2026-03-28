@@ -439,27 +439,6 @@ int main(void) {
                        num_otex, num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
-                /* Pre-sort room faces by texture index for batched uploads.
-                 * This avoids redundant TMEM DMAs — consecutive faces with
-                 * the same texture skip the upload entirely. */
-                printf("  Sorting faces by texture...\n");
-                console_render();
-                for (int r = 0; r < g_level.room_count; r++) {
-                    tr_face_t *faces = g_level.rooms[r].mesh.faces;
-                    int fc = g_level.rooms[r].mesh.face_count;
-                    /* Simple insertion sort by texture index (small N) */
-                    for (int i = 1; i < fc; i++) {
-                        tr_face_t tmp = faces[i];
-                        uint16_t key = tmp.texture & 0x7FFF;
-                        int j = i - 1;
-                        while (j >= 0 && (faces[j].texture & 0x7FFF) > key) {
-                            faces[j + 1] = faces[j];
-                            j--;
-                        }
-                        faces[j + 1] = tmp;
-                    }
-                }
-
                 /* ============================================
                  * 3D RENDERING LOOP
                  * ============================================
@@ -652,7 +631,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 150) max_faces = 150;  /* Cap per room */
+                        if (max_faces > 300) max_faces = 300;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
