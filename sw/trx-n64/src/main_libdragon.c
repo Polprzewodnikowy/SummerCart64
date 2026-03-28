@@ -1085,42 +1085,14 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Idle animation playback */
-                            static int anim_frame = 0;
-                            static int anim_tick = 0;
-
-                            /* Get Lara's first animation */
-                            int ai = lara_obj->anim_idx;
-                            tr_anim_t *anim = NULL;
-                            if (ai >= 0 && ai < g_level.anim_count)
-                                anim = &g_level.anims[ai];
-
-                            /* Advance animation slowly (every 4 render frames) */
-                            anim_tick++;
-                            int interp = anim ? (anim->interpolation > 0 ? anim->interpolation * 4 : 4) : 4;
-                            if (anim_tick >= interp) {
-                                anim_tick = 0;
-                                anim_frame++;
-                                if (anim) {
-                                    int num_frames = anim->frame_end - anim->frame_base + 1;
-                                    if (num_frames < 1) num_frames = 1;
-                                    if (anim_frame >= num_frames) anim_frame = 0;
-                                }
-                            }
-
-                            /* Frame data: frame 0 for root offset, current frame for rotations */
+                            /* Static frame 0 pose (animation needs accumulated
+                             * rotations to look right, which we don't have yet) */
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
                             int frame_size = 9 + mc * 2;
                             int base_off = lara_obj->frame_offset / 2;
-
-                            /* Frame 0 for stable root position */
-                            int16_t *fr0 = (g_level.anim_frames && base_off + frame_size <= g_level.anim_frame_count)
-                                         ? &g_level.anim_frames[base_off] : NULL;
-                            /* Current frame for rotations */
-                            int cur_off = base_off + anim_frame * frame_size;
-                            int16_t *fr = (g_level.anim_frames && cur_off + frame_size <= g_level.anim_frame_count)
-                                        ? &g_level.anim_frames[cur_off] : fr0;
+                            int16_t *fr = (g_level.anim_frames && base_off + frame_size <= g_level.anim_frame_count)
+                                        ? &g_level.anim_frames[base_off] : NULL;
 
                             /* Position stack (proven working) + per-mesh R matrix */
                             float ps[8][3]; int psp = 0;
@@ -1130,11 +1102,11 @@ int main(void) {
                             float lyaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
                             float lsy = sinf(lyaw), lcy = cosf(lyaw);
 
-                            /* Root offset from frame 0 (stable position) */
-                            if (fr0) {
-                                float ox = (float)fr0[6], oz = (float)fr0[8];
+                            /* Root offset from frame */
+                            if (fr) {
+                                float ox = (float)fr[6], oz = (float)fr[8];
                                 bx += ox * lcy - oz * lsy;
-                                by += (float)fr0[7];
+                                by += (float)fr[7];
                                 bz += ox * lsy + oz * lcy;
                             }
 
