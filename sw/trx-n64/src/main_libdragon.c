@@ -14,6 +14,9 @@
 
 #include <libdragon.h>
 #include <rdpq_tri.h>
+#include <rdpq_tex.h>
+#include <rdpq_mode.h>
+#include <surface.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -340,8 +343,36 @@ int main(void) {
                 printf("  Heap:     %u KB used\n\n",
                        (GAME_HEAP_SIZE - n64_mem_available()) / 1024);
 
-                printf("LEVEL LOADED! Rendering...\n");
+                printf("LEVEL LOADED! Preparing textures...\n");
                 console_render();
+
+                /* Convert TR1 palette to RGBA16 for N64 TLUT.
+                 * TR1 palette: 256 entries × RGB, 6-bit per channel (0-63).
+                 * N64 TLUT: 256 entries × RGBA5551 (16-bit). */
+                static uint16_t tlut[256] __attribute__((aligned(16)));
+                for (int i = 0; i < 256; i++) {
+                    uint8_t r = g_level.palette[i*3+0];
+                    uint8_t g = g_level.palette[i*3+1];
+                    uint8_t b = g_level.palette[i*3+2];
+                    /* Scale 6-bit (0-63) to 5-bit (0-31) */
+                    uint8_t r5 = r >> 1;
+                    uint8_t g5 = g >> 1;
+                    uint8_t b5 = b >> 1;
+                    tlut[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1;
+                    if (i == 0) tlut[i] = 0;  /* Index 0 = transparent */
+                }
+
+                /* Create surface_t wrappers for each texture page.
+                 * Each page: 256×256 CI8 (8-bit indexed). */
+                surface_t tex_pages[16];
+                int num_tex_pages = g_level.tex_page_count;
+                if (num_tex_pages > 16) num_tex_pages = 16;
+                for (int p = 0; p < num_tex_pages; p++) {
+                    tex_pages[p] = surface_make_linear(
+                        g_level.tex_pages + p * 256 * 256,
+                        FMT_CI8, 256, 256);
+                }
+                printf("  %d texture pages ready.\n", num_tex_pages);
 
                 /* ============================================
                  * 3D RENDERING LOOP
@@ -414,9 +445,17 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* Set up for shade triangle rendering (per-vertex color) */
+                    /* Set up for textured + shaded rendering */
                     rdpq_set_mode_standard();
-                    rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+
+                    /* Upload palette (TLUT) — shared across all texture pages */
+                    rdpq_tex_upload_tlut(tlut, 0, 256);
+
+                    /* Track which texture tile is currently loaded in TMEM */
+                    int cur_tex_page = -1;
+                    int cur_tex_s0 = -1, cur_tex_t0 = -1;
+                    int cur_tex_s1 = -1, cur_tex_t1 = -1;
 
                     /* Build visible room list via portal traversal.
                      * Start from Lara's room, follow portals up to depth 4. */
@@ -451,9 +490,47 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Transform vertices: world → screen with per-vertex color */
-                            /* TRIFMT_SHADE: {X, Y, R, G, B, A} per vertex */
-                            float sv[4][6];
+                            /* Look up texture for this face */
+                            uint16_t tex_idx = face->texture & 0x7FFF;
+                            bool has_texture = (tex_idx < g_level.object_texture_count);
+                            tr_object_texture_t *otex = has_texture ?
+                                &g_level.object_textures[tex_idx] : NULL;
+
+                            /* If texture available, compute UV bounding box for TMEM load */
+                            if (has_texture && otex->tex_page < num_tex_pages) {
+                                int tp = otex->tex_page;
+                                /* UV bounding box (pixel coords from 8.8 fixed) */
+                                int s0 = 255, t0 = 255, s1 = 0, t1 = 0;
+                                for (int v = 0; v < face->vertex_count; v++) {
+                                    int u_px = otex->uv[v].u >> 8;
+                                    int v_px = otex->uv[v].v >> 8;
+                                    if (u_px < s0) s0 = u_px;
+                                    if (v_px < t0) t0 = v_px;
+                                    if (u_px > s1) s1 = u_px;
+                                    if (v_px > t1) t1 = v_px;
+                                }
+                                s1++; t1++;  /* Inclusive → exclusive */
+                                if (s1 > 256) s1 = 256;
+                                if (t1 > 256) t1 = 256;
+
+                                /* Clamp tile size to fit TMEM (max ~64x64 for CI8) */
+                                if ((s1-s0) > 64) s1 = s0 + 64;
+                                if ((t1-t0) > 64) t1 = t0 + 64;
+
+                                /* Upload tile to TMEM if not already loaded */
+                                if (tp != cur_tex_page || s0 != cur_tex_s0 ||
+                                    t0 != cur_tex_t0 || s1 != cur_tex_s1 || t1 != cur_tex_t1) {
+                                    rdpq_tex_upload_sub(TILE0, &tex_pages[tp], NULL,
+                                                        s0, t0, s1, t1);
+                                    cur_tex_page = tp;
+                                    cur_tex_s0 = s0; cur_tex_t0 = t0;
+                                    cur_tex_s1 = s1; cur_tex_t1 = t1;
+                                }
+                            }
+
+                            /* Transform vertices: world → screen */
+                            /* TRIFMT_SHADE_TEX: {X, Y, R, G, B, A, S, T, INV_W} */
+                            float sv[4][9];
                             bool visible = true;
 
                             for (int v = 0; v < face->vertex_count; v++) {
@@ -476,35 +553,53 @@ int main(void) {
 
                                 /* Perspective projection */
                                 float inv_z = 256.0f / rz;
-                                float sx = 160.0f + rx * inv_z;
+                                float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + wy * inv_z;
 
                                 /* Cull if way off screen */
-                                if (sx < -200 || sx > 520 || screen_y < -200 || screen_y > 440)
+                                if (screen_x < -200 || screen_x > 520 ||
+                                    screen_y < -200 || screen_y > 440)
                                     { visible = false; break; }
 
-                                sv[v][0] = sx;
+                                sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
 
-                                /* Per-vertex lighting from TR1 light value.
-                                 * 0 = brightest, 0x1FFF = darkest */
+                                /* Per-vertex lighting */
                                 int16_t light = rv->light;
                                 float bright = 1.0f - ((float)light / 8191.0f);
                                 if (bright < 0.05f) bright = 0.05f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 sv[v][2] = bright;         /* R */
                                 sv[v][3] = bright;         /* G */
-                                sv[v][4] = bright * 0.9f;  /* B (slight warm tint) */
+                                sv[v][4] = bright * 0.9f;  /* B */
                                 sv[v][5] = 1.0f;           /* A */
+
+                                /* Texture coordinates */
+                                if (has_texture && otex) {
+                                    /* UV in pixel coords, tile-relative */
+                                    sv[v][6] = (float)(otex->uv[v].u >> 8);  /* S */
+                                    sv[v][7] = (float)(otex->uv[v].v >> 8);  /* T */
+                                } else {
+                                    sv[v][6] = 0;
+                                    sv[v][7] = 0;
+                                }
+                                sv[v][8] = inv_z;  /* INV_W for perspective correction */
                             }
 
                             if (!visible) continue;
 
-                            /* Draw shaded triangle(s) */
-                            rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[1], sv[2]);
-
-                            if (face->vertex_count == 4) {
-                                rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[2], sv[3]);
+                            /* Draw textured+shaded triangle(s) */
+                            if (has_texture) {
+                                rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                                if (face->vertex_count == 4)
+                                    rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            } else {
+                                /* Flat colored face — use shade only */
+                                rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                                rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[1], sv[2]);
+                                if (face->vertex_count == 4)
+                                    rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[2], sv[3]);
+                                rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
                             }
                         }
                     }
