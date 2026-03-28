@@ -621,7 +621,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 7;  /* Z-buffer handles depth, can show more */
+                    int max_rooms = 5;  /* Balance FPS vs draw distance */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -642,7 +642,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 500) max_faces = 500;  /* Cap per room */
+                        if (max_faces > 300) max_faces = 300;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -735,184 +735,77 @@ int main(void) {
 
                     /* ===== DRAW LARA ===== */
                     {
-                        /* Find Lara's object definition */
-                        tr_object_def_t *lara_obj = NULL;
-                        for (int i = 0; i < g_level.object_count; i++) {
-                            if (g_level.objects[i].object_id == 0) {
-                                lara_obj = &g_level.objects[i];
-                                break;
-                            }
-                        }
-
-                        /* Find Lara's item for position */
-                        tr_item_t *lara_item = NULL;
-                        for (int i = 0; i < g_level.item_count; i++) {
-                            if (g_level.items[i].object_id == 0) {
-                                lara_item = &g_level.items[i];
-                                break;
-                            }
+                        /* Find Lara's object + item (cached after first frame) */
+                        static tr_object_def_t *lara_obj = NULL;
+                        static tr_item_t *lara_item = NULL;
+                        static bool lara_found = false;
+                        if (!lara_found) {
+                            for (int i = 0; i < g_level.object_count; i++)
+                                if (g_level.objects[i].object_id == 0) { lara_obj = &g_level.objects[i]; break; }
+                            for (int i = 0; i < g_level.item_count; i++)
+                                if (g_level.items[i].object_id == 0) { lara_item = &g_level.items[i]; break; }
+                            lara_found = true;
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Decode first animation frame for T-pose */
-                            int frame_off = lara_obj->frame_offset / 2; /* byte→word offset */
-                            int16_t *fr = &g_level.anim_frames[frame_off];
-                            /* fr[0..5] = bounding box, fr[6..8] = root offset */
-                            float root_dx = (float)fr[6];
-                            float root_dy = (float)fr[7];
-                            float root_dz = (float)fr[8];
+                            /* Simple Lara: render ALL meshes at her world position.
+                             * Vertices are in mesh-local coords, placed at item pos. */
+                            float lx = (float)lara_item->pos.x;
+                            float ly = (float)lara_item->pos.y;
+                            float lz = (float)lara_item->pos.z;
 
-                            /* 3x4 matrix stack for bone hierarchy (max 8 deep) */
-                            float ms[8][12]; /* each: [R00 R01 R02 Tx R10 R11 R12 Ty R20 R21 R22 Tz] */
-                            int msp = 0;
-
-                            /* Helper macros for 3x4 matrix */
-                            #define M_IDT(m) do { memset(m,0,48); (m)[0]=(m)[4]=(m)[8]=1.0f; } while(0)
-                            #define M_TX(m) (m)[3]
-                            #define M_TY(m) (m)[7]
-                            #define M_TZ(m) (m)[11]
-                            #define M_PUSH() do { if(msp<7){memcpy(ms[msp+1],ms[msp],48);msp++;} } while(0)
-                            #define M_POP()  do { if(msp>0) msp--; } while(0)
-                            #define M_CUR    ms[msp]
-
-                            /* Translate: T += R * (dx,dy,dz) */
-                            #define M_TRANS(m,dx,dy,dz) do { \
-                                (m)[3]+=(m)[0]*(dx)+(m)[1]*(dy)+(m)[2]*(dz); \
-                                (m)[7]+=(m)[4]*(dx)+(m)[5]*(dy)+(m)[6]*(dz); \
-                                (m)[11]+=(m)[8]*(dx)+(m)[9]*(dy)+(m)[10]*(dz); \
-                            } while(0)
-
-                            /* Rotate around Y: apply Ry to R columns */
-                            #define M_ROTY(m,a) do { \
-                                float _s=sinf(a),_c=cosf(a); \
-                                float _t0,_t1; \
-                                _t0=(m)[0];_t1=(m)[2]; (m)[0]=_t0*_c+_t1*_s; (m)[2]=-_t0*_s+_t1*_c; \
-                                _t0=(m)[4];_t1=(m)[6]; (m)[4]=_t0*_c+_t1*_s; (m)[6]=-_t0*_s+_t1*_c; \
-                                _t0=(m)[8];_t1=(m)[10];(m)[8]=_t0*_c+_t1*_s;(m)[10]=-_t0*_s+_t1*_c; \
-                            } while(0)
-
-                            /* Rotate around X */
-                            #define M_ROTX(m,a) do { \
-                                float _s=sinf(a),_c=cosf(a); \
-                                float _t0,_t1; \
-                                _t0=(m)[1];_t1=(m)[2]; (m)[1]=_t0*_c-_t1*_s; (m)[2]=_t0*_s+_t1*_c; \
-                                _t0=(m)[5];_t1=(m)[6]; (m)[5]=_t0*_c-_t1*_s; (m)[6]=_t0*_s+_t1*_c; \
-                                _t0=(m)[9];_t1=(m)[10];(m)[9]=_t0*_c-_t1*_s;(m)[10]=_t0*_s+_t1*_c; \
-                            } while(0)
-
-                            /* Rotate around Z */
-                            #define M_ROTZ(m,a) do { \
-                                float _s=sinf(a),_c=cosf(a); \
-                                float _t0,_t1; \
-                                _t0=(m)[0];_t1=(m)[1]; (m)[0]=_t0*_c-_t1*_s; (m)[1]=_t0*_s+_t1*_c; \
-                                _t0=(m)[4];_t1=(m)[5]; (m)[4]=_t0*_c-_t1*_s; (m)[5]=_t0*_s+_t1*_c; \
-                                _t0=(m)[8];_t1=(m)[9]; (m)[8]=_t0*_c-_t1*_s; (m)[9]=_t0*_s+_t1*_c; \
-                            } while(0)
-
-                            /* Decode TR1 packed rotation (2 words → 3 angles) */
-                            #define TR_ANG(v) ((float)(v) * 6.28318f / 65536.0f)
-
-                            /* Initialize matrix at Lara's world position */
-                            M_IDT(M_CUR);
-                            M_TX(M_CUR) = (float)lara_item->pos.x;
-                            M_TY(M_CUR) = (float)lara_item->pos.y;
-                            M_TZ(M_CUR) = (float)lara_item->pos.z;
-
-                            /* Apply Lara's facing direction */
-                            float lara_yaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
-                            M_ROTY(M_CUR, lara_yaw);
-
-                            /* Apply root offset from animation frame */
-                            M_TRANS(M_CUR, root_dx, root_dy, root_dz);
-
-                            /* Draw each mesh in Lara's model.
-                             * Skip per-mesh rotations for now — just use bone
-                             * offsets so we can verify the skeleton structure. */
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi > 0) {
-                                    /* Child mesh: apply bone push/pop + offset */
-                                    int bi = lara_obj->bone_idx + (mi - 1);
-                                    if (bi < g_level.anim_bone_count) {
-                                        tr_anim_bone_t *bone = &g_level.anim_bones[bi];
-                                        if (bone->flags & 1) M_POP();
-                                        if (bone->flags & 2) M_PUSH();
-                                        M_TRANS(M_CUR, (float)bone->x, (float)bone->y, (float)bone->z);
-                                    }
-                                }
-
-                                /* Get the mesh */
                                 int gmi = lara_obj->mesh_idx + mi;
                                 if (gmi >= g_level.mesh_count) continue;
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
-                                /* Draw each face of this mesh */
                                 for (int f = 0; f < mesh->face_count; f++) {
                                     tr_face_t *face = &mesh->faces[f];
                                     if (face->vertex_count < 3) continue;
 
-                                    /* Upload texture (same path as rooms) */
                                     uint16_t tex_idx = face->texture & 0x7FFF;
-                                    bool has_tex = false;
-                                    tr_object_texture_t *otex = NULL;
-                                    if (tex_idx < num_otex && tex_surfs) {
-                                        otex = &g_level.object_textures[tex_idx];
-                                        has_tex = true;
-                                        if ((int)tex_idx != last_tex_idx) {
-                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                            last_tex_idx = (int)tex_idx;
-                                        }
+                                    if (tex_idx >= num_otex) continue;
+                                    tr_object_texture_t *otex = &g_level.object_textures[tex_idx];
+                                    if ((int)tex_idx != last_tex_idx) {
+                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        last_tex_idx = (int)tex_idx;
                                     }
 
                                     float sv[4][10];
                                     bool visible = true;
-
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
 
-                                        float lx = (float)mesh->vertices[vi].x;
-                                        float ly = (float)mesh->vertices[vi].y;
-                                        float lz = (float)mesh->vertices[vi].z;
-                                        float wx = M_CUR[0]*lx + M_CUR[1]*ly + M_CUR[2]*lz + M_CUR[3];
-                                        float wy = M_CUR[4]*lx + M_CUR[5]*ly + M_CUR[6]*lz + M_CUR[7];
-                                        float wz = M_CUR[8]*lx + M_CUR[9]*ly + M_CUR[10]*lz + M_CUR[11];
+                                        /* Mesh-local vertex + Lara's world pos */
+                                        float wx = lx + (float)mesh->vertices[vi].x;
+                                        float wy = ly + (float)mesh->vertices[vi].y;
+                                        float wz = lz + (float)mesh->vertices[vi].z;
 
                                         float cx = wx - cam_x;
                                         float cy_val = wy - cam_y;
                                         float cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
                                         float rz = cx * sy + cz * cy;
-
                                         if (rz < 1.0f) { visible = false; break; }
+
                                         float inv_z = 256.0f / rz;
-                                        float screen_x = 160.0f + rx * inv_z;
-                                        float screen_y = 120.0f + cy_val * inv_z;
-
-                                        if (screen_x < -1024 || screen_x > 1344 ||
-                                            screen_y < -1024 || screen_y > 1264)
-                                            { visible = false; break; }
-
-                                        sv[v][0] = screen_x;
-                                        sv[v][1] = screen_y;
+                                        sv[v][0] = 160.0f + rx * inv_z;
+                                        sv[v][1] = 120.0f + cy_val * inv_z;
                                         sv[v][2] = rz / 32768.0f;
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-                                        sv[v][3] = 1.0f; sv[v][4] = 1.0f;
-                                        sv[v][5] = 1.0f; sv[v][6] = 1.0f;
+                                        sv[v][3] = 1.0f; sv[v][4] = 0.8f;
+                                        sv[v][5] = 0.6f; sv[v][6] = 1.0f;
 
-                                        if (has_tex && tex_uv_map) {
-                                            float tu = (float)(otex->uv[v].u >> 8);
-                                            float tv = (float)(otex->uv[v].v >> 8);
-                                            sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                            sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                        } else {
-                                            sv[v][7] = 0; sv[v][8] = 0;
-                                        }
+                                        float tu = (float)(otex->uv[v].u >> 8);
+                                        float tv = (float)(otex->uv[v].v >> 8);
+                                        sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                         sv[v][9] = 1.0f / rz;
                                     }
-
                                     if (!visible) continue;
                                     rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                                     if (face->vertex_count == 4)
