@@ -346,32 +346,26 @@ int main(void) {
                 printf("LEVEL LOADED! Preparing textures...\n");
                 console_render();
 
-                /* Convert TR1 palette to RGBA16 for N64 TLUT.
+                /* Convert TR1 palette to RGBA16 for N64.
                  * TR1 palette: 256 entries × RGB, 6-bit per channel (0-63).
-                 * N64 TLUT: 256 entries × RGBA5551 (16-bit). */
-                static uint16_t tlut[256] __attribute__((aligned(16)));
+                 * N64: RGBA5551 (16-bit). */
+                static uint16_t palette16[256] __attribute__((aligned(16)));
                 for (int i = 0; i < 256; i++) {
                     uint8_t r = g_level.palette[i*3+0];
                     uint8_t g = g_level.palette[i*3+1];
                     uint8_t b = g_level.palette[i*3+2];
-                    /* Scale 6-bit (0-63) to 5-bit (0-31) */
                     uint8_t r5 = r >> 1;
                     uint8_t g5 = g >> 1;
                     uint8_t b5 = b >> 1;
-                    tlut[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1;
-                    if (i == 0) tlut[i] = 0;  /* Index 0 = transparent */
+                    palette16[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1;
+                    if (i == 0) palette16[i] = 0;
                 }
 
-                /* Create surface_t wrappers for each texture page.
-                 * Each page: 256×256 CI8 (8-bit indexed). */
-                surface_t tex_pages[16];
+                /* Static buffer for RGBA16 texture tiles (max 32x32) */
+                static uint16_t tile_rgba[32 * 32] __attribute__((aligned(16)));
+
                 int num_tex_pages = g_level.tex_page_count;
                 if (num_tex_pages > 16) num_tex_pages = 16;
-                for (int p = 0; p < num_tex_pages; p++) {
-                    tex_pages[p] = surface_make_linear(
-                        g_level.tex_pages + p * 256 * 256,
-                        FMT_CI8, 256, 256);
-                }
                 printf("  %d texture pages ready.\n", num_tex_pages);
 
                 /* ============================================
@@ -445,12 +439,14 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* Start with shaded rendering — textures need more work */
+                    /* Textured + shaded rendering mode */
                     rdpq_set_mode_standard();
-                    rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                    rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
+                    rdpq_mode_filter(FILTER_POINT);
 
                     /* Track current texture for batching */
-                    int cur_tex_page = -1;
+                    int last_tex_idx = -1;
+                    float tile_u0 = 0, tile_v0 = 0, tile_su = 1, tile_sv = 1;
 
                     /* Build visible room list via portal traversal.
                      * Start from Lara's room, follow portals up to depth 4. */
@@ -488,8 +484,60 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Transform vertices */
-                            float sv[4][6]; /* {X, Y, R, G, B, A} */
+                            /* Upload texture tile if changed */
+                            uint16_t tex_idx = face->texture & 0x7FFF;
+                            bool has_tex = false;
+                            tr_object_texture_t *otex = NULL;
+                            if (tex_idx < g_level.object_texture_count) {
+                                otex = &g_level.object_textures[tex_idx];
+                                if (otex->tex_page < num_tex_pages) {
+                                    has_tex = true;
+                                    if ((int)tex_idx != last_tex_idx) {
+                                        /* Compute UV bounding box */
+                                        int u0 = 255, v0 = 255, u1 = 0, v1 = 0;
+                                        for (int k = 0; k < face->vertex_count; k++) {
+                                            int u = otex->uv[k].u >> 8;
+                                            int v = otex->uv[k].v >> 8;
+                                            if (u < u0) u0 = u;
+                                            if (v < v0) v0 = v;
+                                            if (u > u1) u1 = u;
+                                            if (v > v1) v1 = v;
+                                        }
+                                        int tw = u1 - u0 + 1;
+                                        int th = v1 - v0 + 1;
+                                        if (tw < 1) tw = 1;
+                                        if (th < 1) th = 1;
+                                        int ow = tw > 32 ? 32 : tw;
+                                        int oh = th > 32 ? 32 : th;
+
+                                        /* Convert CI8 tile to RGBA16 (subsample if > 32) */
+                                        uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
+                                        for (int y = 0; y < oh; y++) {
+                                            int src_v = v0 + y * th / oh;
+                                            if (src_v > 255) src_v = 255;
+                                            for (int x = 0; x < ow; x++) {
+                                                int src_u = u0 + x * tw / ow;
+                                                if (src_u > 255) src_u = 255;
+                                                uint8_t ci = page[src_v * 256 + src_u];
+                                                tile_rgba[y * ow + x] = palette16[ci];
+                                            }
+                                        }
+
+                                        surface_t tile_surf = surface_make_linear(
+                                            tile_rgba, FMT_RGBA16, ow, oh);
+                                        rdpq_tex_upload(TILE0, &tile_surf, NULL);
+
+                                        tile_u0 = (float)u0;
+                                        tile_v0 = (float)v0;
+                                        tile_su = (float)ow / (float)tw;
+                                        tile_sv = (float)oh / (float)th;
+                                        last_tex_idx = (int)tex_idx;
+                                    }
+                                }
+                            }
+
+                            /* Transform vertices: {X, Y, R, G, B, A, S, T, INV_W} */
+                            float sv[4][9];
                             bool visible = true;
 
                             for (int v = 0; v < face->vertex_count; v++) {
@@ -518,71 +566,35 @@ int main(void) {
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
 
-                                /* Per-vertex lighting (TR1: 0=bright, 8191=dark) */
+                                /* Per-vertex lighting (white shade, texture has color) */
                                 int16_t light = rv->light;
                                 float bright = 1.0f - ((float)light / 8191.0f);
                                 if (bright < 0.3f) bright = 0.3f;
                                 if (bright > 1.0f) bright = 1.0f;
-
-                                /* Get color from texture center for face color */
-                                uint16_t tex_idx = face->texture & 0x7FFF;
-                                if (tex_idx < g_level.object_texture_count) {
-                                    tr_object_texture_t *otex = &g_level.object_textures[tex_idx];
-                                    if (otex->tex_page < num_tex_pages) {
-                                        /* Sample CENTER of texture tile (avg of UV corners) */
-                                        int nc = (face->vertex_count >= 4) ? 4 : 3;
-                                        int su = 0, sv2 = 0;
-                                        for (int k = 0; k < nc; k++) {
-                                            su += otex->uv[k].u >> 8;
-                                            sv2 += otex->uv[k].v >> 8;
-                                        }
-                                        int cu = su / nc;
-                                        int cv = sv2 / nc;
-                                        if (cu < 0) cu = 0;
-                                        if (cu > 255) cu = 255;
-                                        if (cv < 0) cv = 0;
-                                        if (cv > 255) cv = 255;
-                                        uint8_t ci = g_level.tex_pages[otex->tex_page * 256*256 + cv*256 + cu];
-                                        uint8_t pr = g_level.palette[ci*3+0];
-                                        uint8_t pg = g_level.palette[ci*3+1];
-                                        uint8_t pb = g_level.palette[ci*3+2];
-                                        /* If sampled color is black, try first corner */
-                                        if (pr == 0 && pg == 0 && pb == 0) {
-                                            cu = otex->uv[0].u >> 8;
-                                            cv = otex->uv[0].v >> 8;
-                                            if (cu > 255) cu = 255;
-                                            if (cv > 255) cv = 255;
-                                            ci = g_level.tex_pages[otex->tex_page * 256*256 + cv*256 + cu];
-                                            pr = g_level.palette[ci*3+0];
-                                            pg = g_level.palette[ci*3+1];
-                                            pb = g_level.palette[ci*3+2];
-                                        }
-                                        /* If still black, use neutral gray */
-                                        if (pr == 0 && pg == 0 && pb == 0) {
-                                            pr = pg = pb = 40;
-                                        }
-                                        /* Scale 6-bit to float (0-1) and multiply by lighting */
-                                        sv[v][2] = (pr / 63.0f) * bright;
-                                        sv[v][3] = (pg / 63.0f) * bright;
-                                        sv[v][4] = (pb / 63.0f) * bright;
-                                    } else {
-                                        sv[v][2] = bright;
-                                        sv[v][3] = bright;
-                                        sv[v][4] = bright * 0.9f;
-                                    }
-                                } else {
-                                    sv[v][2] = bright;
-                                    sv[v][3] = bright;
-                                    sv[v][4] = bright * 0.9f;
-                                }
+                                sv[v][2] = bright;
+                                sv[v][3] = bright;
+                                sv[v][4] = bright;
                                 sv[v][5] = 1.0f;
+
+                                /* Texture coordinates */
+                                if (has_tex) {
+                                    float tu = ((float)(otex->uv[v].u >> 8) - tile_u0) * tile_su;
+                                    float tv = ((float)(otex->uv[v].v >> 8) - tile_v0) * tile_sv;
+                                    sv[v][6] = tu;
+                                    sv[v][7] = tv;
+                                    sv[v][8] = 1.0f / rz;
+                                } else {
+                                    sv[v][6] = 0.0f;
+                                    sv[v][7] = 0.0f;
+                                    sv[v][8] = 1.0f / rz;
+                                }
                             }
 
                             if (!visible) continue;
 
-                            rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[1], sv[2]);
+                            rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
-                                rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[2], sv[3]);
+                                rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
                     }
 
