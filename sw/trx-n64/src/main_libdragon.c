@@ -209,15 +209,9 @@ int main(void) {
     printf("Loading assets from ROM...\n");
     printf("  ROM offset: 0x%X\n", ASSET_ROM_OFFSET);
 
-    /* Read archive header from ROM via PI DMA */
+    /* Read archive header from ROM via libdragon's dma_read */
     static uint8_t header_buf[512] __attribute__((aligned(16)));
-    data_cache_hit_invalidate(header_buf, 512);
-    pi_wait();
-    *(volatile uint32_t *)(0xA4600000 + 0x00) = (uint32_t)header_buf & 0x1FFFFFFF;  /* PI_DRAM_ADDR */
-    *(volatile uint32_t *)(0xA4600000 + 0x04) = ASSET_CART_ADDR;                     /* PI_CART_ADDR */
-    *(volatile uint32_t *)(0xA4600000 + 0x0C) = 512 - 1;                             /* PI_WR_LEN */
-    pi_wait();
-    data_cache_hit_invalidate(header_buf, 512);
+    dma_read(header_buf, ASSET_CART_ADDR, 512);
 
     printf("  Magic: %c%c%c%c (0x%02x%02x%02x%02x)\n",
            header_buf[0], header_buf[1], header_buf[2], header_buf[3],
@@ -254,17 +248,12 @@ int main(void) {
         uint32_t asset_count_val = header_buf[8] | (header_buf[9]<<8) |
                                    (header_buf[10]<<16) | (header_buf[11]<<24);
 
-        /* Read index from ROM */
+        /* Read index from ROM via dma_read (libdragon handles alignment) */
         uint32_t index_bytes = asset_count_val * 20;
         if (index_bytes > 4096) index_bytes = 4096;
         static uint8_t index_buf[4096] __attribute__((aligned(16)));
-        data_cache_hit_invalidate(index_buf, index_bytes);
-        pi_wait();
-        *(volatile uint32_t *)(0xA4600000 + 0x00) = (uint32_t)index_buf & 0x1FFFFFFF;
-        *(volatile uint32_t *)(0xA4600000 + 0x04) = ASSET_CART_ADDR + index_sector * 512;
-        *(volatile uint32_t *)(0xA4600000 + 0x0C) = ((index_bytes + 511) & ~511) - 1;
-        pi_wait();
-        data_cache_hit_invalidate(index_buf, index_bytes);
+        uint32_t dma_len = (index_bytes + 15) & ~15;  /* Round up to 16 */
+        dma_read(index_buf, ASSET_CART_ADDR + index_sector * 512, dma_len);
 
         /* Find asset ID 1 in index */
         uint32_t level_sector = 0;
@@ -291,24 +280,16 @@ int main(void) {
         if (read_size == 0) read_size = level_size;
         uint32_t read_bytes = (read_size + 511) & ~511;
 
+        /* Align read size to 16 bytes for DMA */
+        read_bytes = (read_bytes + 15) & ~15;
+
         n64_mem_init();
         uint8_t *level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
 
         if (level_data && level_sector > 0) {
             uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
-            uint32_t offset = 0;
-            while (offset < read_bytes) {
-                uint32_t chunk = read_bytes - offset;
-                if (chunk > 32768) chunk = 32768;
-                data_cache_hit_invalidate(level_data + offset, chunk);
-                pi_wait();
-                *(volatile uint32_t *)(0xA4600000) = ((uint32_t)(level_data + offset)) & 0x1FFFFFFF;
-                *(volatile uint32_t *)(0xA4600004) = cart_addr + offset;
-                *(volatile uint32_t *)(0xA460000C) = chunk - 1;
-                pi_wait();
-                offset += chunk;
-            }
-            data_cache_hit_invalidate(level_data, read_bytes);
+            /* Use libdragon's dma_read which handles alignment */
+            dma_read(level_data, cart_addr, read_bytes);
 
             printf("  Loaded %u KB from ROM.\n", read_bytes / 1024);
             printf("  First bytes: %02x %02x %02x %02x\n",
