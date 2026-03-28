@@ -147,23 +147,28 @@ static uint32_t sc64_sd_read_sectors(void *dest, uint32_t sector, uint32_t count
         uint32_t max_sectors = SC64_BUFFER_SIZE / 512;
         if (chunk > max_sectors) chunk = max_sectors;
 
-        /* Step 1: SD → SC64 SDRAM buffer (pass physical PI address) */
+        /* Step 1: SD → SC64 SDRAM buffer
+         * The SD_READ command takes the destination as a PI bus address.
+         * SC64 SDRAM buffer is at PI address 0x1FFE0000. */
         err = sc64_cmd(CMD_SD_SECTOR_SET, current_sector, 0, NULL, NULL);
         if (err) return err;
         err = sc64_cmd(CMD_SD_READ, SC64_BUFFER_BASE, chunk, NULL, NULL);
         if (err) return err;
 
         /* Step 2: PI DMA from SC64 SDRAM → RDRAM
-         * PI_DRAM_ADDR = physical RDRAM address (strip KSEG bits)
-         * PI_CART_ADDR = PI bus address of SC64 buffer (0x1FFE0000)
-         * PI_WR_LEN = bytes - 1 (triggers cart→RDRAM DMA) */
+         * Use uncached access to SC64 buffer to read via PI.
+         * Manual DMA: MADDR=RDRAM, PADDR=cart, WDMA=len-1 */
         uint32_t bytes = chunk * 512;
-        data_cache_hit_invalidate(dst, bytes);
-        pi_wait();
-        PI_REG_DRAM_ADDR = (uint32_t)dst & 0x1FFFFFFF;
-        PI_REG_CART_ADDR = SC64_BUFFER_BASE;
-        PI_REG_WR_LEN = bytes - 1;
-        pi_wait();
+        uint32_t uncached_buf = SC64_BUFFER_BASE | 0xA0000000UL;
+
+        /* Simple approach: just memcpy from uncached PI address.
+         * This is slower than DMA but guaranteed to work. */
+        volatile uint32_t *src32 = (volatile uint32_t *)uncached_buf;
+        uint32_t *dst32 = (uint32_t *)dst;
+        for (uint32_t w = 0; w < bytes / 4; w++) {
+            pi_wait();
+            dst32[w] = src32[w];
+        }
 
         dst += bytes;
         current_sector += chunk;
