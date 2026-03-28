@@ -189,76 +189,59 @@ int main(void) {
      * Put tr1_assets.bin on the SD card as a regular file,
      * and read it with fopen/fread. No raw sector access needed.
      */
-    printf("Loading assets from SD card...\n");
+    /*
+     * Load assets from ROM cartridge space via PI DMA.
+     *
+     * The ROM layout:
+     *   0x000000 - 0x000FFF  Header + IPL3
+     *   0x001000 - 0x01XXXX  Game code (ELF/binary)
+     *   ASSET_ROM_OFFSET+    Asset archive (tr1_assets.bin)
+     *
+     * The N64 maps cartridge ROM to PI address 0x10000000.
+     * So assets are at 0x10000000 + ASSET_ROM_OFFSET.
+     *
+     * We read via PI DMA: cart address → RDRAM.
+     */
+    #define ASSET_ROM_OFFSET    0x100000  /* 1 MB into ROM (plenty of room for code) */
+    #define ROM_CART_BASE       0x10000000UL
+    #define ASSET_CART_ADDR     (ROM_CART_BASE + ASSET_ROM_OFFSET)
 
-    /* Initialize libdragon's SD filesystem */
-    bool dfs_ok = (dfs_init(DFS_DEFAULT_LOCATION) == DFS_ESUCCESS);
-    printf("  DFS init: %s\n", dfs_ok ? "OK" : "no DFS");
+    printf("Loading assets from ROM...\n");
+    printf("  ROM offset: 0x%X\n", ASSET_ROM_OFFSET);
 
-    /* Try various paths to find the asset file */
-    const char *paths[] = {
-        "sd:/tr1_assets.bin",
-        "/sd/tr1_assets.bin",
-        "rom:/tr1_assets.bin",
-        "/tr1_assets.bin",
-        "tr1_assets.bin",
-        NULL
-    };
+    /* Read archive header from ROM via PI DMA */
+    static uint8_t header_buf[512] __attribute__((aligned(16)));
+    data_cache_hit_invalidate(header_buf, 512);
+    pi_wait();
+    *(volatile uint32_t *)(0xA4600000 + 0x00) = (uint32_t)header_buf & 0x1FFFFFFF;  /* PI_DRAM_ADDR */
+    *(volatile uint32_t *)(0xA4600000 + 0x04) = ASSET_CART_ADDR;                     /* PI_CART_ADDR */
+    *(volatile uint32_t *)(0xA4600000 + 0x0C) = 512 - 1;                             /* PI_WR_LEN */
+    pi_wait();
+    data_cache_hit_invalidate(header_buf, 512);
 
-    FILE *asset_file = NULL;
-    const char *found_path = NULL;
-    for (int i = 0; paths[i]; i++) {
-        printf("  Trying: %s... ", paths[i]);
-        asset_file = fopen(paths[i], "rb");
-        if (asset_file) {
-            printf("YES!\n");
-            found_path = paths[i];
-            break;
-        }
-        printf("no\n");
-    }
+    printf("  Magic: %c%c%c%c (0x%02x%02x%02x%02x)\n",
+           header_buf[0], header_buf[1], header_buf[2], header_buf[3],
+           header_buf[0], header_buf[1], header_buf[2], header_buf[3]);
 
-    if (asset_file) {
-        printf("  Asset file opened at: %s\n", found_path);
+    /* Check if the archive magic is valid */
+    uint32_t magic = header_buf[0] | (header_buf[1]<<8) | (header_buf[2]<<16) | (header_buf[3]<<24);
+    if (magic == 0x53433634) {  /* "SC64" in little-endian */
+        printf("  Archive found in ROM!\n");
 
-        /* Read the entire file into memory */
-        fseek(asset_file, 0, SEEK_END);
-        long file_size = ftell(asset_file);
-        fseek(asset_file, 0, SEEK_SET);
-        printf("  File size: %ld bytes\n", file_size);
+        /* Set up a ROM-based backend for asset_init */
+        /* The asset manager needs a read function — provide one that does PI DMA */
+        g_has_assets = true;
 
-        /* Read first 512 bytes (archive header) */
-        static uint8_t header_buf[512] __attribute__((aligned(16)));
-        size_t read = fread(header_buf, 1, 512, asset_file);
-        printf("  Read %u bytes\n", (unsigned)read);
-        printf("  Magic: %c%c%c%c\n",
-               header_buf[0], header_buf[1], header_buf[2], header_buf[3]);
-
-        fclose(asset_file);
+        /* For now: read the whole archive header to show stats */
+        uint32_t asset_count = header_buf[8] | (header_buf[9]<<8) |
+                               (header_buf[10]<<16) | (header_buf[11]<<24);
+        uint32_t total_sectors = header_buf[20] | (header_buf[21]<<8) |
+                                 (header_buf[22]<<16) | (header_buf[23]<<24);
+        printf("  Assets: %u\n", asset_count);
+        printf("  Total: %u sectors (%u KB)\n", total_sectors, total_sectors / 2);
     } else {
-        printf("  No asset file found.\n");
-        printf("  Copy tr1_assets.bin to SD card.\n");
-    }
-
-    /* Also try SC64 raw access for comparison */
-    if (sc64_ok) {
-        printf("\nTrying SC64 raw SD access...\n");
-        asset_error_t err = asset_init(&g_asset_mgr, &(asset_init_config_t){
-            .archive_base_sector = ARCHIVE_SECTOR,
-            .cache_base = CACHE_BASE,
-            .cache_size = CACHE_SIZE,
-            .slot_size = SLOT_SIZE,
-            .staging_buffer = staging,
-            .staging_size = sizeof(staging),
-            .backend = NULL,
-        });
-
-        if (err == ASSET_OK) {
-            printf("  SC64 OK! %u assets found.\n", g_asset_mgr.index_count);
-            g_has_assets = true;
-        } else {
-            printf("  SC64 failed: %s\n", asset_error_string(err));
-        }
+        printf("  No archive at ROM offset 0x%X\n", ASSET_ROM_OFFSET);
+        printf("  Build with: cat trx-n64.z64 padding assets > full.z64\n");
     }
 
     /* If we have assets, try to load level 1 */
