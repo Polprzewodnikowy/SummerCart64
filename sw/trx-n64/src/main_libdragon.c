@@ -513,17 +513,17 @@ int main(void) {
                     float sy = sinf(cam_rot_y);
                     float cy = cosf(cam_rot_y);
 
-                    /* D-pad: move forward/back + strafe */
-                    if (input.btn.d_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
-                    if (input.btn.d_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
-                    if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
-                    if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
-
                     /* C buttons: move forward/back + strafe */
                     if (input.btn.c_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
                     if (input.btn.c_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
                     if (input.btn.c_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
                     if (input.btn.c_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+
+                    /* D-pad: up/down = fly, left/right = strafe */
+                    if (input.btn.d_up) cam_y -= move_speed;
+                    if (input.btn.d_down) cam_y += move_speed;
+                    if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
+                    if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
 
                     /* ===== ROOM TRACKING + FLOOR COLLISION =====
                      * Always track which room the camera is in (for BFS).
