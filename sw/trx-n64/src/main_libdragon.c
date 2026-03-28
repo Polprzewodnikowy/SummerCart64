@@ -652,6 +652,7 @@ int main(void) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
+                        bool is_water = (room->flags & 1) != 0;
 
                         int max_faces = room->mesh.face_count;
                         if (max_faces > 600) max_faces = 600;  /* Cap per room */
@@ -724,9 +725,10 @@ int main(void) {
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 bright = (0.4f + bright * 0.6f) * fog;
-                                sv[v][3] = bright;
-                                sv[v][4] = bright;
-                                sv[v][5] = bright;
+                                /* Water rooms get blue tint */
+                                sv[v][3] = is_water ? bright * 0.4f : bright;
+                                sv[v][4] = is_water ? bright * 0.6f : bright;
+                                sv[v][5] = is_water ? bright * 1.0f : bright;
                                 sv[v][6] = 1.0f;
 
                                 if (has_tex && tex_uv_map) {
@@ -751,6 +753,72 @@ int main(void) {
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
                                 rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                        }
+
+                        /* ===== ROOM SPRITES (billboarded quads) ===== */
+                        for (int si = 0; si < room->mesh.sprite_count && si < 20; si++) {
+                            uint16_t svi = room->mesh.sprite_vertices[si];
+                            uint16_t sti = room->mesh.sprite_textures[si];
+                            if (svi >= room->mesh.vertex_count) continue;
+                            if (sti >= g_level.sprite_texture_count) continue;
+
+                            tr_room_vertex_t *rv = &room->mesh.vertices[svi];
+                            tr_sprite_texture_t *spt = &g_level.sprite_textures[sti];
+
+                            /* World position */
+                            float wx = room->x + rv->x;
+                            float wy = (float)rv->y;
+                            float wz = room->z + rv->z;
+
+                            /* Camera transform */
+                            float cx_s = wx - cam_x, cy_s = wy - cam_y, cz_s = wz - cam_z;
+                            float rx_s = cx_s * cy - cz_s * sy;
+                            float rz_y = cx_s * sy + cz_s * cy;
+                            float ry_s = cy_s * cp - rz_y * sp;
+                            float rz_s = cy_s * sp + rz_y * cp;
+                            if (rz_s < 4.0f) continue;
+
+                            float inv_z = 256.0f / rz_s;
+                            float scx = 160.0f + rx_s * inv_z;
+                            float scy = 120.0f + ry_s * inv_z;
+
+                            /* Sprite size in screen pixels */
+                            float sw = (float)spt->width * inv_z * 0.5f;
+                            float sh = (float)spt->height * inv_z * 0.5f;
+                            if (sw < 0.5f || sh < 0.5f) continue;
+
+                            /* Sprite texture from texture page */
+                            uint16_t sp_page = spt->tex_page;
+                            uint8_t sp_x = spt->offset & 0xFF;
+                            uint8_t sp_y = (spt->offset >> 8) & 0xFF;
+
+                            /* Find a matching object texture for this sprite region */
+                            /* For now, render as a lit colored quad (sprite tex lookup is complex) */
+                            float spr_bright = 1.0f - (float)rv->light / 8191.0f;
+                            if (spr_bright < 0) spr_bright = 0;
+                            if (spr_bright > 1) spr_bright = 1;
+                            spr_bright *= (1.0f - rz_s / 16384.0f);
+                            if (spr_bright < 0) spr_bright = 0;
+
+                            if (white_px && last_tex_idx != -2) {
+                                rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                last_tex_idx = -2;
+                            }
+
+                            float sv[4][10];
+                            float zn = rz_s / 32768.0f;
+                            if (zn > 1.0f) zn = 1.0f;
+                            sv[0][0]=scx-sw; sv[0][1]=scy-sh; sv[0][2]=zn;
+                            sv[1][0]=scx+sw; sv[1][1]=scy-sh; sv[1][2]=zn;
+                            sv[2][0]=scx+sw; sv[2][1]=scy+sh; sv[2][2]=zn;
+                            sv[3][0]=scx-sw; sv[3][1]=scy+sh; sv[3][2]=zn;
+                            for (int v = 0; v < 4; v++) {
+                                sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
+                                sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
+                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=1.0f/rz_s;
+                            }
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
                     }
 
@@ -859,6 +927,87 @@ int main(void) {
                                 if (face->vertex_count == 4)
                                     rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                             }
+                        }
+                    }
+
+                    /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
+                    for (int ii = 0; ii < g_level.item_count && ii < 50; ii++) {
+                        tr_item_t *item = &g_level.items[ii];
+                        if (item->object_id == 0) continue; /* Skip Lara */
+                        /* Only draw if item is in a visible room */
+                        bool item_vis = false;
+                        for (int ri = 0; ri < num_draw; ri++)
+                            if (rooms_to_draw[ri] == item->room) { item_vis = true; break; }
+                        if (!item_vis) continue;
+
+                        /* Find object definition for this item */
+                        tr_object_def_t *iobj = NULL;
+                        for (int oi = 0; oi < g_level.object_count; oi++)
+                            if (g_level.objects[oi].object_id == item->object_id) { iobj = &g_level.objects[oi]; break; }
+                        if (!iobj || iobj->mesh_count < 1) continue;
+
+                        /* Render first mesh only (no bone tree for items) */
+                        int gmi = iobj->mesh_idx;
+                        if (gmi >= g_level.mesh_count) continue;
+                        tr_object_mesh_t *mesh = &g_level.meshes[gmi];
+
+                        float item_shade = 1.0f - (float)item->shade / 8191.0f;
+                        if (item_shade < 0.1f) item_shade = 0.1f;
+                        if (item_shade > 1.0f) item_shade = 1.0f;
+                        float iyaw = (float)item->rotation * 3.14159f / 32768.0f;
+                        float isy = sinf(iyaw), icy = cosf(iyaw);
+
+                        for (int f = 0; f < mesh->face_count && f < 50; f++) {
+                            tr_face_t *face = &mesh->faces[f];
+                            if (face->vertex_count < 3) continue;
+                            bool is_flat = (face->texture & 0x8000) != 0;
+                            uint16_t tex_idx = face->texture & 0x7FFF;
+                            tr_object_texture_t *otex = NULL;
+                            float ifr = item_shade, ifg = item_shade, ifb = item_shade;
+
+                            if (is_flat) {
+                                uint8_t ci = tex_idx & 0xFF;
+                                ifr = (float)g_level.palette[ci*3+0]/63.0f*item_shade;
+                                ifg = (float)g_level.palette[ci*3+1]/63.0f*item_shade;
+                                ifb = (float)g_level.palette[ci*3+2]/63.0f*item_shade;
+                                if (white_px && last_tex_idx != -2) { rdpq_tex_upload(TILE0, &white_surf, NULL); last_tex_idx = -2; }
+                            } else if (tex_idx < num_otex) {
+                                otex = &g_level.object_textures[tex_idx];
+                                if ((int)tex_idx != last_tex_idx) { rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL); last_tex_idx = (int)tex_idx; }
+                            } else continue;
+
+                            float sv[4][10]; bool vis = true;
+                            for (int v = 0; v < face->vertex_count; v++) {
+                                uint16_t vi = face->vertices[v];
+                                if (vi >= mesh->vertex_count) { vis = false; break; }
+                                float lx = (float)mesh->vertices[vi].x, lz_v = (float)mesh->vertices[vi].z;
+                                float wx = (float)item->pos.x + lx*icy - lz_v*isy;
+                                float wy = (float)item->pos.y + (float)mesh->vertices[vi].y;
+                                float wz = (float)item->pos.z + lx*isy + lz_v*icy;
+                                float cx_v = wx-cam_x, cy_v = wy-cam_y, cz_v = wz-cam_z;
+                                float rx = cx_v*cy - cz_v*sy;
+                                float rz_y = cx_v*sy + cz_v*cy;
+                                float ry = cy_v*cp - rz_y*sp;
+                                float rz = cy_v*sp + rz_y*cp;
+                                if (rz < 1.0f) { vis = false; break; }
+                                float inv_z = 256.0f / rz;
+                                float fog = 1.0f - rz/16384.0f; if (fog < 0) fog = 0;
+                                sv[v][0] = 160.0f + rx*inv_z; sv[v][1] = 120.0f + ry*inv_z;
+                                sv[v][2] = rz/32768.0f; if (sv[v][2]>1) sv[v][2]=1;
+                                if (is_flat) { sv[v][3]=ifr*fog; sv[v][4]=ifg*fog; sv[v][5]=ifb*fog; }
+                                else { sv[v][3]=item_shade*fog; sv[v][4]=item_shade*fog; sv[v][5]=item_shade*fog; }
+                                sv[v][6]=1.0f;
+                                if (!is_flat && otex) {
+                                    float tu=(float)(otex->uv[v].u>>8), tv=(float)(otex->uv[v].v>>8);
+                                    sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
+                                    sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
+                                } else { sv[v][7]=0; sv[v][8]=0; }
+                                sv[v][9] = 1.0f/rz;
+                            }
+                            if (!vis) continue;
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            if (face->vertex_count == 4)
+                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
                     }
 
@@ -999,6 +1148,55 @@ int main(void) {
                             }
                         }
                     }
+
+                    /* ===== SHADOW CIRCLE under Lara ===== */
+                    {
+                        /* Find Lara item for shadow position */
+                        tr_item_t *shadow_item = NULL;
+                        for (int i = 0; i < g_level.item_count; i++)
+                            if (g_level.items[i].object_id == 0) { shadow_item = &g_level.items[i]; break; }
+                    if (shadow_item) {
+                        tr_item_t *lara_item = shadow_item;
+                        /* Dark circle on floor: 4 vertices forming a flat quad */
+                        float sx_pos = (float)lara_item->pos.x;
+                        float sy_pos = (float)lara_item->pos.y + 10.0f; /* Slightly above floor */
+                        float sz_pos = (float)lara_item->pos.z;
+                        float srad = 128.0f; /* Shadow radius */
+
+                        /* Upload white texture for shadow */
+                        if (white_px && last_tex_idx != -2) {
+                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                            last_tex_idx = -2;
+                        }
+
+                        float sv[4][10];
+                        bool vis = true;
+                        float corners[4][2] = {{-srad,-srad},{srad,-srad},{srad,srad},{-srad,srad}};
+                        for (int v = 0; v < 4; v++) {
+                            float wx = sx_pos + corners[v][0];
+                            float wy = sy_pos;
+                            float wz = sz_pos + corners[v][1];
+                            float cx_v = wx - cam_x, cy_v = wy - cam_y, cz_v = wz - cam_z;
+                            float rx = cx_v * cy - cz_v * sy;
+                            float rz_y = cx_v * sy + cz_v * cy;
+                            float ry = cy_v * cp - rz_y * sp;
+                            float rz = cy_v * sp + rz_y * cp;
+                            if (rz < 1.0f) { vis = false; break; }
+                            float inv_z = 256.0f / rz;
+                            sv[v][0] = 160.0f + rx * inv_z;
+                            sv[v][1] = 120.0f + ry * inv_z;
+                            sv[v][2] = rz / 32768.0f;
+                            if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
+                            sv[v][3] = 0.0f; sv[v][4] = 0.0f;
+                            sv[v][5] = 0.0f; sv[v][6] = 0.5f; /* Semi-transparent black */
+                            sv[v][7] = 0; sv[v][8] = 0;
+                            sv[v][9] = 1.0f / rz;
+                        }
+                        if (vis) {
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                        }
+                    }}
 
                     /* Show frame */
                     rdpq_detach_show();
