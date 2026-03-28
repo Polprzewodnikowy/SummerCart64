@@ -346,9 +346,9 @@ int main(void) {
                 printf("LEVEL LOADED! Preparing textures...\n");
                 console_render();
 
-                /* Convert TR1 palette to RGBA16 for N64.
+                /* Convert TR1 palette to RGBA16 for N64 TLUT.
                  * TR1 palette: 256 entries × RGB, 6-bit per channel (0-63).
-                 * N64: RGBA5551 (16-bit). */
+                 * N64 TLUT: RGBA5551 (16-bit). */
                 static uint16_t palette16[256] __attribute__((aligned(16)));
                 for (int i = 0; i < 256; i++) {
                     uint8_t r = g_level.palette[i*3+0];
@@ -360,12 +360,17 @@ int main(void) {
                     palette16[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1;
                     if (i == 0) palette16[i] = 0;
                 }
+                data_cache_hit_writeback(palette16, sizeof(palette16));
 
-                /* Static buffer for RGBA16 texture tiles (max 32x32) */
-                static uint16_t tile_rgba[32 * 32] __attribute__((aligned(16)));
-
+                /* Create CI8 surface wrappers for each texture page (256×256) */
+                surface_t tex_pages[16];
                 int num_tex_pages = g_level.tex_page_count;
                 if (num_tex_pages > 16) num_tex_pages = 16;
+                for (int p = 0; p < num_tex_pages; p++) {
+                    uint8_t *page_data = g_level.tex_pages + p * 256 * 256;
+                    data_cache_hit_writeback(page_data, 256 * 256);
+                    tex_pages[p] = surface_make_linear(page_data, FMT_CI8, 256, 256);
+                }
                 printf("  %d texture pages ready.\n", num_tex_pages);
 
                 /* ============================================
@@ -439,14 +444,17 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* Textured + shaded rendering mode */
+                    /* Textured + shaded rendering: CI8 with TLUT */
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
+                    rdpq_mode_tlut(TLUT_RGBA16);
                     rdpq_mode_filter(FILTER_POINT);
+
+                    /* Upload palette to TMEM once per frame */
+                    rdpq_tex_upload_tlut(palette16, 0, 256);
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
-                    float tile_u0 = 0, tile_v0 = 0, tile_su = 1, tile_sv = 1;
 
                     /* Build visible room list via portal traversal.
                      * Start from Lara's room, follow portals up to depth 4. */
@@ -484,7 +492,7 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Upload texture tile if changed */
+                            /* Upload texture tile directly from CI8 page via TLUT */
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool has_tex = false;
                             tr_object_texture_t *otex = NULL;
@@ -503,35 +511,23 @@ int main(void) {
                                             if (u > u1) u1 = u;
                                             if (v > v1) v1 = v;
                                         }
-                                        int tw = u1 - u0 + 1;
+                                        /* Align to 8-pixel boundary for CI8 */
+                                        u0 &= ~7;
+                                        u1 = ((u1 + 8) & ~7);
+                                        if (u1 > 256) u1 = 256;
+                                        int tw = u1 - u0;
                                         int th = v1 - v0 + 1;
-                                        if (tw < 1) tw = 1;
+                                        /* Clamp to CI8 TMEM limit (2048 bytes) */
+                                        if (tw * th > 2048) {
+                                            th = 2048 / tw;
+                                        }
                                         if (th < 1) th = 1;
 
-                                        /* Always scale to 32x32 (power-of-2, aligned TMEM stride) */
-                                        uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
-                                        for (int y = 0; y < 32; y++) {
-                                            int src_v = v0 + y * th / 32;
-                                            if (src_v > 255) src_v = 255;
-                                            for (int x = 0; x < 32; x++) {
-                                                int src_u = u0 + x * tw / 32;
-                                                if (src_u > 255) src_u = 255;
-                                                uint8_t ci = page[src_v * 256 + src_u];
-                                                tile_rgba[y * 32 + x] = palette16[ci];
-                                            }
-                                        }
+                                        /* Upload sub-rect directly from CI8 page */
+                                        rdpq_tex_upload_sub(
+                                            TILE0, &tex_pages[otex->tex_page], NULL,
+                                            u0, v0, u1, v0 + th);
 
-                                        /* Flush CPU cache so RDP DMA reads correct data */
-                                        data_cache_hit_writeback(tile_rgba, sizeof(uint16_t) * 32 * 32);
-
-                                        surface_t tile_surf = surface_make_linear(
-                                            tile_rgba, FMT_RGBA16, 32, 32);
-                                        rdpq_tex_upload(TILE0, &tile_surf, NULL);
-
-                                        tile_u0 = (float)u0;
-                                        tile_v0 = (float)v0;
-                                        tile_su = 32.0f / (float)tw;
-                                        tile_sv = 32.0f / (float)th;
                                         last_tex_idx = (int)tex_idx;
                                     }
                                 }
@@ -577,18 +573,15 @@ int main(void) {
                                 sv[v][4] = bright;
                                 sv[v][5] = 1.0f;
 
-                                /* Texture coordinates */
+                                /* Texture coordinates (original tex page coords) */
                                 if (has_tex) {
-                                    float tu = ((float)(otex->uv[v].u >> 8) - tile_u0) * tile_su;
-                                    float tv = ((float)(otex->uv[v].v >> 8) - tile_v0) * tile_sv;
-                                    sv[v][6] = tu;
-                                    sv[v][7] = tv;
-                                    sv[v][8] = 1.0f / rz;
+                                    sv[v][6] = (float)(otex->uv[v].u >> 8);
+                                    sv[v][7] = (float)(otex->uv[v].v >> 8);
                                 } else {
                                     sv[v][6] = 0.0f;
                                     sv[v][7] = 0.0f;
-                                    sv[v][8] = 1.0f / rz;
                                 }
+                                sv[v][8] = 1.0f / rz;
                             }
 
                             if (!visible) continue;
