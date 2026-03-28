@@ -30,7 +30,7 @@
  * Bump allocator
  * ------------------------------------------------------------------- */
 
-#define GAME_HEAP_SIZE  (4 * 1024 * 1024)
+#define GAME_HEAP_SIZE  (3 * 1024 * 1024)  /* 3MB heap; rest of RDRAM for uncached tex */
 static uint8_t game_heap[GAME_HEAP_SIZE] __attribute__((aligned(16)));
 static uint32_t heap_offset = 0;
 
@@ -365,10 +365,10 @@ int main(void) {
                     if (i == 0) pal16[i] = 0;
                 }
 
-                #define TEX_TILE_DIM 16
+                #define TEX_TILE_DIM 32
                 #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
-                if (num_otex > 2048) num_otex = 2048;
+                if (num_otex > 512) num_otex = 512;  /* 512 × 2KB = 1MB uncached */
 
                 /* Allocate texture pixel data in UNCACHED memory with 64-byte
                  * alignment — this matches what surface_alloc() does internally.
@@ -543,7 +543,9 @@ int main(void) {
                         }
                     }
 
-                    for (int ri = 0; ri < num_draw; ri++) {
+                    /* Draw far rooms first (reverse BFS order) for
+                     * rough back-to-front sorting without Z-buffer */
+                    for (int ri = num_draw - 1; ri >= 0; ri--) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
@@ -584,7 +586,7 @@ int main(void) {
                                 float rx = wx * cy - wz * sy;
                                 float rz = wx * sy + wz * cy;
 
-                                if (rz < 32.0f) { visible = false; break; }
+                                if (rz < 4.0f) { visible = false; break; }
 
                                 float inv_z = 256.0f / rz;
                                 float screen_x = 160.0f + rx * inv_z;
