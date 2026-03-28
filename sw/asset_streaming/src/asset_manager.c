@@ -119,19 +119,55 @@ static uint32_t sc64_sd_deinit(void) {
     return sc64_cmd(CMD_SD_CARD_OP, 0, SD_OP_DEINIT, NULL, NULL);
 }
 
+/*
+ * SC64 SD read: two-step process (from bootloader's diskio.c):
+ *   1. SD card → SC64 SDRAM buffer (via SC64 command)
+ *   2. SC64 SDRAM buffer → RDRAM (via PI DMA)
+ *
+ * The SC64 SD read command reads into SC64's own SDRAM at 0x1FFE0000,
+ * NOT directly into RDRAM. We then PI DMA from that buffer into our
+ * destination.
+ */
+#define SC64_BUFFER_BASE    UNCACHED(0x1FFE0000UL)
+#define SC64_BUFFER_SIZE    (0x10000)  /* 64 KB buffer */
+
+#define PI_REG_DRAM_ADDR    (*(io32_t *)(UNCACHED(0x04600000UL) + 0x00))
+#define PI_REG_CART_ADDR    (*(io32_t *)(UNCACHED(0x04600000UL) + 0x04))
+#define PI_REG_WR_LEN       (*(io32_t *)(UNCACHED(0x04600000UL) + 0x0C))
+
 static uint32_t sc64_sd_read_sectors(void *dest, uint32_t sector, uint32_t count) {
     uint32_t err;
-    /* SC64 firmware expects the buffer address as passed by the CPU.
-     * The bootloader passes raw KSEG0 pointers (0x80xxxxxx). */
-    err = sc64_cmd(CMD_SD_SECTOR_SET, sector, 0, NULL, NULL);
-    if (err) return err;
-    /* Writeback cache before DMA (ensure no stale writes) */
-    data_cache_hit_writeback(dest, count * 512);
-    err = sc64_cmd(CMD_SD_READ, (uint32_t)dest, count, NULL, NULL);
-    if (err) return err;
-    /* Invalidate cache so CPU sees DMA'd data */
-    data_cache_hit_invalidate(dest, count * 512);
-    return err;
+    uint8_t *dst = (uint8_t *)dest;
+    uint32_t remaining = count;
+    uint32_t current_sector = sector;
+
+    while (remaining > 0) {
+        /* Read up to buffer-size sectors at a time */
+        uint32_t chunk = remaining;
+        uint32_t max_sectors = SC64_BUFFER_SIZE / 512;
+        if (chunk > max_sectors) chunk = max_sectors;
+
+        /* Step 1: SD → SC64 SDRAM buffer */
+        err = sc64_cmd(CMD_SD_SECTOR_SET, current_sector, 0, NULL, NULL);
+        if (err) return err;
+        err = sc64_cmd(CMD_SD_READ, SC64_BUFFER_BASE & 0x1FFFFFFF, chunk, NULL, NULL);
+        if (err) return err;
+
+        /* Step 2: PI DMA from SC64 SDRAM buffer → RDRAM */
+        uint32_t bytes = chunk * 512;
+        data_cache_hit_invalidate(dst, bytes);
+        pi_wait();
+        PI_REG_DRAM_ADDR = (uint32_t)dst & 0x1FFFFFFF;
+        PI_REG_CART_ADDR = SC64_BUFFER_BASE & 0x1FFFFFFF;
+        PI_REG_WR_LEN = bytes - 1;
+        pi_wait();
+
+        dst += bytes;
+        current_sector += chunk;
+        remaining -= chunk;
+    }
+
+    return 0;
 }
 
 #endif /* !ASSET_HOST_BUILD */
