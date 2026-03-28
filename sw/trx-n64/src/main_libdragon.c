@@ -518,27 +518,47 @@ int main(void) {
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
 
-                                /* Per-vertex lighting — color from face texture/palette */
+                                /* Per-vertex lighting (TR1: 0=bright, 8191=dark) */
                                 int16_t light = rv->light;
-                                float bright = 1.0f - ((float)light / 16384.0f);
-                                if (bright < 0.15f) bright = 0.15f;
+                                float bright = 1.0f - ((float)light / 8191.0f);
+                                if (bright < 0.3f) bright = 0.3f;
                                 if (bright > 1.0f) bright = 1.0f;
 
-                                /* Get color from texture for a color hint */
+                                /* Get color from texture center for face color */
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 if (tex_idx < g_level.object_texture_count) {
                                     tr_object_texture_t *otex = &g_level.object_textures[tex_idx];
                                     if (otex->tex_page < num_tex_pages) {
-                                        /* Sample center pixel of face texture for color */
-                                        int cu = otex->uv[0].u >> 8;
-                                        int cv = otex->uv[0].v >> 8;
-                                        if (cu > 255) cu = 255;
-                                        if (cv > 255) cv = 255;
+                                        /* Sample CENTER of texture tile (avg of UV corners) */
+                                        int nc = (face->vertex_count >= 4) ? 4 : 3;
+                                        int su = 0, sv2 = 0;
+                                        for (int k = 0; k < nc; k++) {
+                                            su += otex->uv[k].u >> 8;
+                                            sv2 += otex->uv[k].v >> 8;
+                                        }
+                                        int cu = su / nc;
+                                        int cv = sv2 / nc;
+                                        if (cu < 0) cu = 0; if (cu > 255) cu = 255;
+                                        if (cv < 0) cv = 0; if (cv > 255) cv = 255;
                                         uint8_t ci = g_level.tex_pages[otex->tex_page * 256*256 + cv*256 + cu];
-                                        /* Look up palette color */
                                         uint8_t pr = g_level.palette[ci*3+0];
                                         uint8_t pg = g_level.palette[ci*3+1];
                                         uint8_t pb = g_level.palette[ci*3+2];
+                                        /* If sampled color is black, try first corner */
+                                        if (pr == 0 && pg == 0 && pb == 0) {
+                                            cu = otex->uv[0].u >> 8;
+                                            cv = otex->uv[0].v >> 8;
+                                            if (cu > 255) cu = 255;
+                                            if (cv > 255) cv = 255;
+                                            ci = g_level.tex_pages[otex->tex_page * 256*256 + cv*256 + cu];
+                                            pr = g_level.palette[ci*3+0];
+                                            pg = g_level.palette[ci*3+1];
+                                            pb = g_level.palette[ci*3+2];
+                                        }
+                                        /* If still black, use neutral gray */
+                                        if (pr == 0 && pg == 0 && pb == 0) {
+                                            pr = pg = pb = 40;
+                                        }
                                         /* Scale 6-bit to float (0-1) and multiply by lighting */
                                         sv[v][2] = (pr / 63.0f) * bright;
                                         sv[v][3] = (pg / 63.0f) * bright;
