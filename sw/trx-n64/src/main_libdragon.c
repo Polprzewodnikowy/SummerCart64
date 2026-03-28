@@ -377,6 +377,7 @@ int main(void) {
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
 
                 /* Render loop */
+                render_loop:
                 while (1) {
                     joypad_poll();
                     joypad_inputs_t input = joypad_get_inputs(JOYPAD_PORT_1);
@@ -413,14 +414,33 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach_clear(disp, NULL);
 
-                    /* Set up for flat-shaded triangle rendering */
+                    /* Set up for shade triangle rendering (per-vertex color) */
                     rdpq_set_mode_standard();
-                    rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
+                    rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
 
-                    /* Render rooms: transform vertices and draw triangles */
-                    /* For now: render Lara's starting room (room 0) */
-                    int rooms_to_draw[] = {lara_room};
-                    int num_draw = 1;
+                    /* Build visible room list via portal traversal.
+                     * Start from Lara's room, follow portals up to depth 4. */
+                    int rooms_to_draw[64];
+                    int num_draw = 0;
+                    bool room_drawn[256];
+                    memset(room_drawn, 0, sizeof(room_drawn));
+
+                    /* BFS portal traversal */
+                    rooms_to_draw[num_draw++] = lara_room;
+                    room_drawn[lara_room] = true;
+                    int queue_head = 0;
+                    while (queue_head < num_draw && num_draw < 60) {
+                        int ri = rooms_to_draw[queue_head++];
+                        if (ri < 0 || ri >= g_level.room_count) continue;
+                        tr_room_t *room = &g_level.rooms[ri];
+                        for (int p = 0; p < room->portal_count && num_draw < 60; p++) {
+                            int dest = room->portals[p].room;
+                            if (dest >= 0 && dest < g_level.room_count && !room_drawn[dest]) {
+                                room_drawn[dest] = true;
+                                rooms_to_draw[num_draw++] = dest;
+                            }
+                        }
+                    }
 
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -431,8 +451,9 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Transform vertices: world → screen */
-                            float sv[4][2];  /* Screen coords for up to 4 verts */
+                            /* Transform vertices: world → screen with per-vertex color */
+                            /* TRIFMT_SHADE: {X, Y, R, G, B, A} per vertex */
+                            float sv[4][6];
                             bool visible = true;
 
                             for (int v = 0; v < face->vertex_count; v++) {
@@ -441,7 +462,7 @@ int main(void) {
 
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                /* World position */
+                                /* World position relative to camera */
                                 float wx = room->x + rv->x - cam_x;
                                 float wy = rv->y - cam_y;
                                 float wz = room->z + rv->z - cam_z;
@@ -451,37 +472,39 @@ int main(void) {
                                 float rz = wx * sy + wz * cy;
 
                                 /* Skip if behind camera */
-                                if (rz < 16.0f) { visible = false; break; }
+                                if (rz < 32.0f) { visible = false; break; }
 
                                 /* Perspective projection */
                                 float inv_z = 256.0f / rz;
                                 float sx = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + wy * inv_z;
 
-                                /* Clamp to screen */
-                                if (sx < -100 || sx > 420 || screen_y < -100 || screen_y > 340)
+                                /* Cull if way off screen */
+                                if (sx < -200 || sx > 520 || screen_y < -200 || screen_y > 440)
                                     { visible = false; break; }
 
                                 sv[v][0] = sx;
                                 sv[v][1] = screen_y;
+
+                                /* Per-vertex lighting from TR1 light value.
+                                 * 0 = brightest, 0x1FFF = darkest */
+                                int16_t light = rv->light;
+                                float bright = 1.0f - ((float)light / 8191.0f);
+                                if (bright < 0.05f) bright = 0.05f;
+                                if (bright > 1.0f) bright = 1.0f;
+                                sv[v][2] = bright;         /* R */
+                                sv[v][3] = bright;         /* G */
+                                sv[v][4] = bright * 0.9f;  /* B (slight warm tint) */
+                                sv[v][5] = 1.0f;           /* A */
                             }
 
                             if (!visible) continue;
 
-                            /* Color from vertex lighting */
-                            uint16_t vi0 = face->vertices[0];
-                            int16_t light = room->mesh.vertices[vi0].light;
-                            int bright = 255 - ((light * 255) >> 13);
-                            if (bright < 20) bright = 20;
-                            if (bright > 255) bright = 255;
-
-                            rdpq_set_prim_color(RGBA32(bright, bright, bright*9/10, 255));
-
-                            /* Draw triangle(s) */
-                            rdpq_triangle(&TRIFMT_FILL, sv[0], sv[1], sv[2]);
+                            /* Draw shaded triangle(s) */
+                            rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[1], sv[2]);
 
                             if (face->vertex_count == 4) {
-                                rdpq_triangle(&TRIFMT_FILL, sv[0], sv[2], sv[3]);
+                                rdpq_triangle(&TRIFMT_SHADE, sv[0], sv[2], sv[3]);
                             }
                         }
                     }
@@ -490,22 +513,28 @@ int main(void) {
                     rdpq_detach_show();
                 }
 
-                /* Return to console on START */
+                /* START pressed — return to console briefly */
                 rdpq_close();
                 display_close();
                 console_init();
                 console_set_render_mode(RENDER_MANUAL);
-                printf("Returned to console.\n");
-                printf("Press START for 3D again.\n");
+                printf("Paused. Press START for 3D.\n");
+                printf("Rooms rendered: %d\n", num_draw);
+                printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
                 console_render();
 
-                /* Wait for another START press to re-enter 3D */
+                /* Wait for START to re-enter 3D */
                 while (1) {
                     joypad_poll();
                     joypad_buttons_t p2 = joypad_get_buttons_pressed(JOYPAD_PORT_1);
                     if (p2.start) break;
                 }
-                /* Loop back to render (would need goto or restructure) */
+
+                /* Re-init display and rdpq for 3D */
+                console_close();
+                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
+                rdpq_init();
+                goto render_loop;
 
             } else {
                 printf("  Parse FAILED: %s\n", tr_parse_error_string(res));
