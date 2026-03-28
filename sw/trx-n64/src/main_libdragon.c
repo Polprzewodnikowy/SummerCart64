@@ -362,16 +362,20 @@ int main(void) {
                 }
                 data_cache_hit_writeback(palette16, sizeof(palette16));
 
-                /* Create CI8 surface wrappers for each texture page (256×256) */
-                surface_t tex_pages[16];
                 int num_tex_pages = g_level.tex_page_count;
                 if (num_tex_pages > 16) num_tex_pages = 16;
-                for (int p = 0; p < num_tex_pages; p++) {
-                    uint8_t *page_data = g_level.tex_pages + p * 256 * 256;
-                    data_cache_hit_writeback(page_data, 256 * 256);
-                    tex_pages[p] = surface_make_linear(page_data, FMT_CI8, 256, 256);
-                }
-                printf("  %d texture pages ready.\n", num_tex_pages);
+
+                /* Ring buffer of 32x32 CI8 tile slots.
+                 * Each slot is its own correctly-sized surface,
+                 * avoiding stride mismatch from sub-rect uploads. */
+                #define TILE_POOL_SIZE 64
+                #define TILE_DIM 32
+                static uint8_t tile_pool[TILE_POOL_SIZE][TILE_DIM * TILE_DIM]
+                    __attribute__((aligned(16)));
+                int tile_pool_idx = 0;
+
+                printf("  %d texture pages, %d tile slots ready.\n",
+                       num_tex_pages, TILE_POOL_SIZE);
 
                 /* ============================================
                  * 3D RENDERING LOOP
@@ -455,6 +459,8 @@ int main(void) {
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
+                    float cur_tile_u0 = 0, cur_tile_v0 = 0;
+                    float cur_tile_su = 1, cur_tile_sv = 1;
 
                     /* Build visible room list via portal traversal.
                      * Start from Lara's room, follow portals up to depth 4. */
@@ -492,7 +498,7 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Upload texture tile directly from CI8 page via TLUT */
+                            /* Upload texture tile (extract into ring buffer slot) */
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool has_tex = false;
                             tr_object_texture_t *otex = NULL;
@@ -511,23 +517,35 @@ int main(void) {
                                             if (u > u1) u1 = u;
                                             if (v > v1) v1 = v;
                                         }
-                                        /* Align to 8-pixel boundary for CI8 */
-                                        u0 &= ~7;
-                                        u1 = ((u1 + 8) & ~7);
-                                        if (u1 > 256) u1 = 256;
-                                        int tw = u1 - u0;
+                                        int tw = u1 - u0 + 1;
                                         int th = v1 - v0 + 1;
-                                        /* Clamp to CI8 TMEM limit (2048 bytes) */
-                                        if (tw * th > 2048) {
-                                            th = 2048 / tw;
-                                        }
+                                        if (tw < 1) tw = 1;
                                         if (th < 1) th = 1;
 
-                                        /* Upload sub-rect directly from CI8 page */
-                                        rdpq_tex_upload_sub(
-                                            TILE0, &tex_pages[otex->tex_page], NULL,
-                                            u0, v0, u1, v0 + th);
+                                        /* Extract tile into ring buffer slot (32x32 CI8) */
+                                        int slot = tile_pool_idx % TILE_POOL_SIZE;
+                                        tile_pool_idx++;
+                                        uint8_t *tile = tile_pool[slot];
+                                        uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
+                                        for (int y = 0; y < TILE_DIM; y++) {
+                                            int sy = v0 + y * th / TILE_DIM;
+                                            if (sy > 255) sy = 255;
+                                            for (int x = 0; x < TILE_DIM; x++) {
+                                                int sx = u0 + x * tw / TILE_DIM;
+                                                if (sx > 255) sx = 255;
+                                                tile[y * TILE_DIM + x] = page[sy * 256 + sx];
+                                            }
+                                        }
+                                        data_cache_hit_writeback(tile, TILE_DIM * TILE_DIM);
 
+                                        surface_t tile_surf = surface_make_linear(
+                                            tile, FMT_CI8, TILE_DIM, TILE_DIM);
+                                        rdpq_tex_upload(TILE0, &tile_surf, NULL);
+
+                                        cur_tile_u0 = (float)u0;
+                                        cur_tile_v0 = (float)v0;
+                                        cur_tile_su = (float)TILE_DIM / (float)tw;
+                                        cur_tile_sv = (float)TILE_DIM / (float)th;
                                         last_tex_idx = (int)tex_idx;
                                     }
                                 }
@@ -573,10 +591,12 @@ int main(void) {
                                 sv[v][4] = bright;
                                 sv[v][5] = 1.0f;
 
-                                /* Texture coordinates (original tex page coords) */
+                                /* Texture coords mapped to 32x32 tile space */
                                 if (has_tex) {
-                                    sv[v][6] = (float)(otex->uv[v].u >> 8);
-                                    sv[v][7] = (float)(otex->uv[v].v >> 8);
+                                    float tu = (float)(otex->uv[v].u >> 8);
+                                    float tv = (float)(otex->uv[v].v >> 8);
+                                    sv[v][6] = (tu - cur_tile_u0) * cur_tile_su;
+                                    sv[v][7] = (tv - cur_tile_v0) * cur_tile_sv;
                                 } else {
                                     sv[v][6] = 0.0f;
                                     sv[v][7] = 0.0f;
