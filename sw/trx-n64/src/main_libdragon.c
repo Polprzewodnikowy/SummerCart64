@@ -50,16 +50,27 @@ uint32_t n64_mem_available(void) { return GAME_HEAP_SIZE - heap_offset; }
  * the magic key sequence. This is independent of libdragon.
  * ------------------------------------------------------------------- */
 
-#define SC64_REGS_BASE  0x1FFF0000UL
+/* SC64 registers mapped via PI at physical 0x1FFF0000.
+ * Access via KSEG1 uncached: 0xA0000000 + 0x1FFF0000 = 0xBFFF0000
+ * But PI peripherals use 0x10000000 base, so cart space is:
+ * 0xB0000000 + offset. SC64 is at cart addr 0x1FFF0000,
+ * which in KSEG1 is 0x1FFF0000 | 0xA0000000 = 0xBFFF0000 */
+#define SC64_REGS_BASE  0xBFFF0000UL
 #define SC64_REG_KEY    (*(volatile uint32_t *)(SC64_REGS_BASE + 0x10))
 #define SC64_KEY_RESET  0x00000000UL
 #define SC64_KEY_LOCK   0xFFFFFFFFUL
 #define SC64_KEY_UNL_1  0x5F554E4CUL  /* "_UNL" */
 #define SC64_KEY_UNL_2  0x4F434B5FUL  /* "OCK_" */
 
-/* PI interface for register access */
+/* PI interface for register access (KSEG1 uncached) */
 #define PI_BASE_REG     0xA4600000UL
 #define PI_STATUS_REG   (*(volatile uint32_t *)(PI_BASE_REG + 0x10))
+
+/* PI domain config for SC64 address range */
+#define PI_BSD_DOM2_LAT (*(volatile uint32_t *)(PI_BASE_REG + 0x24))
+#define PI_BSD_DOM2_PWD (*(volatile uint32_t *)(PI_BASE_REG + 0x28))
+#define PI_BSD_DOM2_PGS (*(volatile uint32_t *)(PI_BASE_REG + 0x2C))
+#define PI_BSD_DOM2_RLS (*(volatile uint32_t *)(PI_BASE_REG + 0x30))
 
 static void pi_wait(void) {
     while (PI_STATUS_REG & 3) {}
@@ -101,6 +112,14 @@ static bool sc64_detect(void) {
 
 static bool sc64_unlock(void) {
     if (!sc64_detect()) return false;
+
+    /* Configure PI domain 2 timing for SC64 register access */
+    pi_wait();
+    PI_BSD_DOM2_LAT = 0x05;
+    PI_BSD_DOM2_PWD = 0x0C;
+    PI_BSD_DOM2_PGS = 0x0D;
+    PI_BSD_DOM2_RLS = 0x02;
+    pi_wait();
 
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_RESET);
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_1);
