@@ -483,30 +483,30 @@ int main(void) {
                     if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
                     float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
                     float move_speed = speed_mult[speed_level];
-                    float turn_speed = 0.05f;
+                    float turn_speed = 0.08f;
 
                     /* Z button = temporary boost (hold for turbo) */
                     if (input.btn.z) move_speed *= 4.0f;
 
-                    /* Analog stick: move/turn */
+                    /* Joystick: look around */
                     if (input.stick_x > 20 || input.stick_x < -20)
                         cam_rot_y += input.stick_x * turn_speed * 0.01f;
                     cam_rot_y = WRAP_ANGLE(cam_rot_y);
 
-                    float forward = 0;
-                    if (input.stick_y > 20) forward = move_speed;
-                    if (input.stick_y < -20) forward = -move_speed;
-                    if (input.btn.d_up) forward = move_speed;
-                    if (input.btn.d_down) forward = -move_speed;
-                    if (input.btn.d_left) cam_rot_y -= turn_speed;
-                    if (input.btn.d_right) cam_rot_y += turn_speed;
-
                     float sy = sinf(cam_rot_y);
                     float cy = cosf(cam_rot_y);
-                    cam_x += forward * sy;
-                    cam_z += forward * cy;
-                    if (input.btn.c_up) cam_y -= move_speed;
-                    if (input.btn.c_down) cam_y += move_speed;
+
+                    /* D-pad: strafe all directions */
+                    if (input.btn.d_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
+                    if (input.btn.d_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
+                    if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
+                    if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+
+                    /* C buttons: move forward/back + up/down */
+                    if (input.btn.c_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
+                    if (input.btn.c_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
+                    if (input.btn.c_left) cam_y += move_speed;
+                    if (input.btn.c_right) cam_y -= move_speed;
 
                     /* Start button: return to console */
                     if (pressed.start) break;
@@ -738,23 +738,15 @@ int main(void) {
                             /* Apply root offset from animation frame */
                             M_TRANS(M_CUR, root_dx, root_dy, root_dz);
 
-                            /* Draw each mesh in Lara's model */
+                            /* Draw each mesh in Lara's model.
+                             * Skip per-mesh rotations for now — just use bone
+                             * offsets so we can verify the skeleton structure. */
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi == 0) {
-                                    /* Root mesh: apply first rotation */
-                                    int16_t w1 = fr[9 + 0];
-                                    int16_t w2 = fr[9 + 1];
-                                    float rx = TR_ANG((int16_t)((w1 & 0x3FF0) << 2));
-                                    float ry = TR_ANG((int16_t)((((w1 & 0xF) << 6) | ((w2 >> 10) & 0x3F)) << 6));
-                                    float rz = TR_ANG((int16_t)((w2 & 0x3FF) << 6));
-                                    M_ROTY(M_CUR, ry);
-                                    M_ROTX(M_CUR, rx);
-                                    M_ROTZ(M_CUR, rz);
-                                } else {
-                                    /* Child mesh: apply bone push/pop + offset + rotation */
+                                if (mi > 0) {
+                                    /* Child mesh: apply bone push/pop + offset */
                                     int bi = lara_obj->bone_idx + (mi - 1);
                                     if (bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
@@ -762,15 +754,6 @@ int main(void) {
                                         if (bone->flags & 2) M_PUSH();
                                         M_TRANS(M_CUR, (float)bone->x, (float)bone->y, (float)bone->z);
                                     }
-                                    /* Apply mesh rotation from frame */
-                                    int16_t w1 = fr[9 + mi * 2];
-                                    int16_t w2 = fr[9 + mi * 2 + 1];
-                                    float rx = TR_ANG((int16_t)((w1 & 0x3FF0) << 2));
-                                    float ry = TR_ANG((int16_t)((((w1 & 0xF) << 6) | ((w2 >> 10) & 0x3F)) << 6));
-                                    float rz = TR_ANG((int16_t)((w2 & 0x3FF) << 6));
-                                    M_ROTY(M_CUR, ry);
-                                    M_ROTX(M_CUR, rx);
-                                    M_ROTZ(M_CUR, rz);
                                 }
 
                                 /* Get the mesh */
