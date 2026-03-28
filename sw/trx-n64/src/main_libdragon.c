@@ -30,7 +30,7 @@
  * Bump allocator
  * ------------------------------------------------------------------- */
 
-#define GAME_HEAP_SIZE  (3 * 1024 * 1024)  /* 3MB heap; rest of RDRAM for uncached tex */
+#define GAME_HEAP_SIZE  (4 * 1024 * 1024)
 static uint8_t game_heap[GAME_HEAP_SIZE] __attribute__((aligned(16)));
 static uint32_t heap_offset = 0;
 
@@ -368,15 +368,13 @@ int main(void) {
                 #define TEX_TILE_DIM 32
                 #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
-                if (num_otex > 512) num_otex = 512;  /* 512 × 2KB = 1MB uncached */
+                if (num_otex > 1024) num_otex = 1024;  /* 1024 × 2KB = 2MB */
 
-                /* Allocate texture pixel data in UNCACHED memory with 64-byte
-                 * alignment — this matches what surface_alloc() does internally.
-                 * The RDP reads directly from RDRAM (bypassing CPU cache), so
-                 * uncached memory eliminates all cache coherency issues.
-                 * Surface structs and UV map stay on the bump allocator (CPU only). */
-                uint16_t *tex_tiles = (uint16_t *)malloc_uncached_aligned(
-                    64, num_otex * TEX_TILE_BYTES);
+                /* Allocate texture pixel data from bump allocator.
+                 * The alternating-lines bug was caused by heap overlap (texture
+                 * pages overwritten by parser), not cache coherency. With that
+                 * fixed, cached memory + writeback works fine. */
+                uint16_t *tex_tiles = (uint16_t *)n64_mem_alloc(num_otex * TEX_TILE_BYTES);
                 surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
                 /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
                 float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
@@ -428,8 +426,8 @@ int main(void) {
                                 tile[p] = 0x8421;
                         }
 
-                        /* No cache flush needed — tile is in uncached memory.
-                         * Create surface pointing to the uncached buffer. */
+                        /* Flush cache so RDP can read the pixel data from RDRAM */
+                        data_cache_hit_writeback(tile, TEX_TILE_BYTES);
                         tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
