@@ -369,7 +369,7 @@ int main(void) {
                 #define TEX_TILE_DIM 32
                 #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
-                if (num_otex > 768) num_otex = 768;  /* 768 × 2KB = 1.5MB uncached */
+                /* Use ALL object textures — expansion pak has plenty of RDRAM */
 
                 printf("  Heap before tex: %u KB free\n",
                        n64_mem_available() / 1024);
@@ -453,7 +453,9 @@ int main(void) {
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
                 rdpq_init();
 
-                /* No Z-buffer for now — back-to-front room order handles depth */
+                /* Z-buffer for proper depth sorting */
+                surface_t zbuf = surface_alloc(FMT_RGBA16, 320, 240);
+                bool has_zbuf = (zbuf.buffer != NULL);
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -597,11 +599,12 @@ int main(void) {
 
                     /* Begin frame */
                     surface_t *disp = display_get();
-                    rdpq_attach_clear(disp, NULL);
+                    rdpq_attach_clear(disp, has_zbuf ? &zbuf : NULL);
 
                     rdpq_set_mode_standard();
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
                     rdpq_mode_persp(true);
+                    if (has_zbuf) rdpq_mode_zbuf(true, true);
                     rdpq_mode_filter(FILTER_POINT);
 
                     /* Track current texture for batching */
@@ -663,8 +666,8 @@ int main(void) {
                              * wrong texture data. TODO: render as solid color. */
                             if (!has_tex) continue;
 
-                            /* Transform vertices: {X, Y, R, G, B, A, S, T, INV_W} */
-                            float sv[4][9];
+                            /* Transform vertices: {X,Y,Z,R,G,B,A,S,T,INV_W} */
+                            float sv[4][10];
                             bool visible = true;
 
                             for (int v = 0; v < face->vertex_count; v++) {
@@ -686,38 +689,36 @@ int main(void) {
                                 float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + wy * inv_z;
 
-                                /* Only cull if vertex is WAY off-screen.
-                                 * RDP handles clipping for partially visible faces.
-                                 * RDP uses s12.2 coords, so stay within ~1024. */
                                 if (screen_x < -1024 || screen_x > 1344 ||
                                     screen_y < -1024 || screen_y > 1264)
                                     { visible = false; break; }
 
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
+                                /* Z normalized to [0,1] for zbuf (0=near, 1=far) */
+                                sv[v][2] = rz / 32768.0f;
+                                if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
 
-                                /* Per-vertex lighting (TR1: 0=bright, 8191=dark) */
                                 int16_t light = rv->light;
                                 float bright = 1.0f - ((float)light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 bright = 0.4f + bright * 0.6f;
-                                sv[v][2] = bright;
                                 sv[v][3] = bright;
                                 sv[v][4] = bright;
-                                sv[v][5] = 1.0f;
+                                sv[v][5] = bright;
+                                sv[v][6] = 1.0f;
 
-                                /* Texture coords mapped to tile space */
                                 if (has_tex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    sv[v][6] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    sv[v][7] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                 } else {
-                                    sv[v][6] = 0.0f;
                                     sv[v][7] = 0.0f;
+                                    sv[v][8] = 0.0f;
                                 }
-                                sv[v][8] = 1.0f / rz;
+                                sv[v][9] = 1.0f / rz;
                             }
 
                             if (!visible) continue;
@@ -727,9 +728,9 @@ int main(void) {
                                         - (sv[1][1]-sv[0][1])*(sv[2][0]-sv[0][0]);
                             if (cross < 0 && !(face->texture & 0x8000)) continue; */
 
-                            rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
-                                rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
                     }
 
@@ -866,14 +867,13 @@ int main(void) {
                                         }
                                     }
 
-                                    float sv[4][9];
+                                    float sv[4][10];
                                     bool visible = true;
 
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
 
-                                        /* Transform mesh-local vertex through bone matrix */
                                         float lx = (float)mesh->vertices[vi].x;
                                         float ly = (float)mesh->vertices[vi].y;
                                         float lz = (float)mesh->vertices[vi].z;
@@ -881,7 +881,6 @@ int main(void) {
                                         float wy = M_CUR[4]*lx + M_CUR[5]*ly + M_CUR[6]*lz + M_CUR[7];
                                         float wz = M_CUR[8]*lx + M_CUR[9]*ly + M_CUR[10]*lz + M_CUR[11];
 
-                                        /* Camera transform (same as rooms) */
                                         float cx = wx - cam_x;
                                         float cy_val = wy - cam_y;
                                         float cz = wz - cam_z;
@@ -899,24 +898,26 @@ int main(void) {
 
                                         sv[v][0] = screen_x;
                                         sv[v][1] = screen_y;
-                                        sv[v][2] = 1.0f; sv[v][3] = 1.0f;
-                                        sv[v][4] = 1.0f; sv[v][5] = 1.0f;
+                                        sv[v][2] = rz / 32768.0f;
+                                        if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
+                                        sv[v][3] = 1.0f; sv[v][4] = 1.0f;
+                                        sv[v][5] = 1.0f; sv[v][6] = 1.0f;
 
                                         if (has_tex && tex_uv_map) {
                                             float tu = (float)(otex->uv[v].u >> 8);
                                             float tv = (float)(otex->uv[v].v >> 8);
-                                            sv[v][6] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                            sv[v][7] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                            sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                            sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                         } else {
-                                            sv[v][6] = 0; sv[v][7] = 0;
+                                            sv[v][7] = 0; sv[v][8] = 0;
                                         }
-                                        sv[v][8] = 1.0f / rz;
+                                        sv[v][9] = 1.0f / rz;
                                     }
 
                                     if (!visible) continue;
-                                    rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
+                                    rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                                     if (face->vertex_count == 4)
-                                        rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                                        rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 }
                             }
                         }
