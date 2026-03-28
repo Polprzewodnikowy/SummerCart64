@@ -877,123 +877,52 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Decode first animation frame */
+                            /* Position stack for bone hierarchy (no rotation) */
+                            float ps[8][3]; int psp = 0;
+                            float bx = (float)lara_item->pos.x;
+                            float by = (float)lara_item->pos.y;
+                            float bz = (float)lara_item->pos.z;
+
+                            /* Apply root Y offset from first anim frame */
                             int frame_off = lara_obj->frame_offset / 2;
-                            int16_t *fr = g_level.anim_frames ? &g_level.anim_frames[frame_off] : NULL;
+                            if (g_level.anim_frames)
+                                by += (float)g_level.anim_frames[frame_off + 7];
 
-                            /* 3x4 float matrix stack: [R00 R01 R02 Tx R10 R11 R12 Ty R20 R21 R22 Tz] */
-                            float ms[8][12];
-                            int msp = 0;
-                            #define MI(m) do{memset(m,0,48);(m)[0]=(m)[4]=(m)[8]=1.0f;}while(0)
-                            #define MPUSH() do{if(msp<7){memcpy(ms[msp+1],ms[msp],48);msp++;}}while(0)
-                            #define MPOP()  do{if(msp>0)msp--;}while(0)
-                            #define MC ms[msp]
-
-                            /* Translate: T += R * offset */
-                            #define MTR(m,dx,dy,dz) do{ \
-                                (m)[3]+=(m)[0]*(dx)+(m)[1]*(dy)+(m)[2]*(dz); \
-                                (m)[7]+=(m)[4]*(dx)+(m)[5]*(dy)+(m)[6]*(dz); \
-                                (m)[11]+=(m)[8]*(dx)+(m)[9]*(dy)+(m)[10]*(dz); \
-                            }while(0)
-
-                            /* Rotations matching TR1's exact convention (from tr_anim.c) */
-                            /* Y: col0=col0*c-col2*s, col2=col0*s+col2*c */
-                            #define MRY(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
-                                _t=(m)[0];(m)[0]=_t*_c-(m)[2]*_s;(m)[2]=_t*_s+(m)[2]*_c; \
-                                _t=(m)[4];(m)[4]=_t*_c-(m)[6]*_s;(m)[6]=_t*_s+(m)[6]*_c; \
-                                _t=(m)[8];(m)[8]=_t*_c-(m)[10]*_s;(m)[10]=_t*_s+(m)[10]*_c; \
-                            }while(0)
-
-                            /* X: col1=col1*c+col2*s, col2=-col1*s+col2*c */
-                            #define MRX(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
-                                _t=(m)[1];(m)[1]=_t*_c+(m)[2]*_s;(m)[2]=-_t*_s+(m)[2]*_c; \
-                                _t=(m)[5];(m)[5]=_t*_c+(m)[6]*_s;(m)[6]=-_t*_s+(m)[6]*_c; \
-                                _t=(m)[9];(m)[9]=_t*_c+(m)[10]*_s;(m)[10]=-_t*_s+(m)[10]*_c; \
-                            }while(0)
-
-                            /* Z: col0=col0*c-col1*s, col1=col0*s+col1*c */
-                            #define MRZ(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
-                                _t=(m)[0];(m)[0]=_t*_c-(m)[1]*_s;(m)[1]=_t*_s+(m)[1]*_c; \
-                                _t=(m)[4];(m)[4]=_t*_c-(m)[5]*_s;(m)[5]=_t*_s+(m)[5]*_c; \
-                                _t=(m)[8];(m)[8]=_t*_c-(m)[9]*_s;(m)[9]=_t*_s+(m)[9]*_c; \
-                            }while(0)
-
-                            /* Decode TR1 rotation (2 words → 3 float radians) */
-                            #define TRANG(v) ((float)(int16_t)(v) * 6.28318f / 65536.0f)
-
-                            /* Init at Lara's world position + facing */
-                            MI(MC);
-                            MC[3] = (float)lara_item->pos.x;
-                            MC[7] = (float)lara_item->pos.y;
-                            MC[11] = (float)lara_item->pos.z;
-                            float lara_yaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
-                            MRY(MC, lara_yaw);
-
-                            /* Apply root offset from frame */
-                            if (fr) MTR(MC, (float)fr[6], (float)fr[7], (float)fr[8]);
-
-                            /* Dynamic lighting: room ambient + point lights */
+                            /* Dynamic lighting from room */
                             float lara_shade = 1.0f;
-                            {
-                                int lr = lara_room;
-                                if (lr >= 0 && lr < g_level.room_count) {
-                                    tr_room_t *rm = &g_level.rooms[lr];
-                                    /* Start with room ambient (0=bright, 0x1FFF=dark) */
-                                    float amb = 1.0f - (float)rm->ambient / 8191.0f;
-                                    if (amb < 0) amb = 0;
-                                    if (amb > 1) amb = 1;
-
-                                    /* Add contribution from point lights */
-                                    float lx = (float)lara_item->pos.x;
-                                    float ly_pos = (float)lara_item->pos.y;
-                                    float lz = (float)lara_item->pos.z;
-                                    float light_add = 0;
-                                    for (int li = 0; li < rm->light_count; li++) {
-                                        float dx = lx - (float)rm->lights[li].pos.x;
-                                        float dy = ly_pos - (float)rm->lights[li].pos.y;
-                                        float dz = lz - (float)rm->lights[li].pos.z;
-                                        float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-                                        float falloff = (float)rm->lights[li].falloff;
-                                        if (falloff > 0 && dist < falloff) {
-                                            float intensity = (float)rm->lights[li].intensity / 8191.0f;
-                                            light_add += intensity * (1.0f - dist / falloff);
-                                        }
-                                    }
-                                    lara_shade = amb + light_add;
-                                    if (lara_shade > 1.0f) lara_shade = 1.0f;
-                                    if (lara_shade < 0.1f) lara_shade = 0.1f;
+                            if (lara_room >= 0 && lara_room < g_level.room_count) {
+                                tr_room_t *rm = &g_level.rooms[lara_room];
+                                float amb = 1.0f - (float)rm->ambient / 8191.0f;
+                                if (amb < 0) amb = 0;
+                                if (amb > 1) amb = 1;
+                                float light_add = 0;
+                                for (int li = 0; li < rm->light_count; li++) {
+                                    float dx = bx - (float)rm->lights[li].pos.x;
+                                    float dy = by - (float)rm->lights[li].pos.y;
+                                    float dz = bz - (float)rm->lights[li].pos.z;
+                                    float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+                                    float falloff = (float)rm->lights[li].falloff;
+                                    if (falloff > 0 && dist < falloff)
+                                        light_add += ((float)rm->lights[li].intensity / 8191.0f) * (1.0f - dist / falloff);
                                 }
+                                lara_shade = amb + light_add;
+                                if (lara_shade > 1.0f) lara_shade = 1.0f;
+                                if (lara_shade < 0.1f) lara_shade = 0.1f;
                             }
 
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
-                            /* B button toggles bone rotations for debugging */
-                            static bool use_rotations = false;
-                            if (pressed.b) use_rotations = !use_rotations;
-
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi == 0) {
-                                    /* Root: optionally apply rotation */
-                                    if (use_rotations && fr) {
-                                        uint16_t w1=(uint16_t)fr[9], w2=(uint16_t)fr[10];
-                                        MRY(MC, TRANG((w1&0x3FF0)<<2));
-                                        MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
-                                        MRZ(MC, TRANG((w2&0x3FF)<<6));
-                                    }
-                                } else {
+                                if (mi > 0) {
                                     int bi = lara_obj->bone_idx + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
-                                        if (bone->flags & 1) MPOP();
-                                        if (bone->flags & 2) MPUSH();
-                                        MTR(MC, (float)bone->x, (float)bone->y, (float)bone->z);
-                                    }
-                                    if (use_rotations && fr) {
-                                        uint16_t w1=(uint16_t)fr[9+mi*2], w2=(uint16_t)fr[10+mi*2];
-                                        MRY(MC, TRANG((w1&0x3FF0)<<2));
-                                        MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
-                                        MRZ(MC, TRANG((w2&0x3FF)<<6));
+                                        if (bone->flags & 1) { if (psp > 0) { psp--; bx=ps[psp][0]; by=ps[psp][1]; bz=ps[psp][2]; } }
+                                        if (bone->flags & 2) { if (psp < 7) { ps[psp][0]=bx; ps[psp][1]=by; ps[psp][2]=bz; psp++; } }
+                                        bx += (float)bone->x;
+                                        by += (float)bone->y;
+                                        bz += (float)bone->z;
                                     }
                                 }
 
@@ -1005,51 +934,38 @@ int main(void) {
                                     tr_face_t *face = &mesh->faces[f];
                                     if (face->vertex_count < 3) continue;
 
-                                    /* Determine if face is textured or flat-colored */
                                     bool is_flat = (face->texture & 0x8000) != 0;
                                     uint16_t tex_idx = face->texture & 0x7FFF;
-                                    bool has_tex = false;
                                     tr_object_texture_t *otex = NULL;
-                                    float flat_r = 0.8f, flat_g = 0.6f, flat_b = 0.5f;
+                                    float fr = lara_shade, fg = lara_shade, fb = lara_shade;
 
                                     if (is_flat) {
-                                        /* Flat face: upload white texture so
-                                         * TEX0*SHADE = SHADE = palette color */
                                         uint8_t ci = tex_idx & 0xFF;
-                                        flat_r = (float)g_level.palette[ci*3+0] / 63.0f;
-                                        flat_g = (float)g_level.palette[ci*3+1] / 63.0f;
-                                        flat_b = (float)g_level.palette[ci*3+2] / 63.0f;
+                                        fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
+                                        fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
+                                        fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
                                         if (white_px && last_tex_idx != -2) {
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                                             last_tex_idx = -2;
                                         }
                                     } else if (tex_idx < num_otex) {
                                         otex = &g_level.object_textures[tex_idx];
-                                        has_tex = true;
                                         if ((int)tex_idx != last_tex_idx) {
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                             last_tex_idx = (int)tex_idx;
                                         }
-                                    } else {
-                                        continue; /* Invalid texture */
-                                    }
+                                    } else continue;
 
                                     float sv[4][10];
                                     bool visible = true;
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
+                                        float wx = bx + (float)mesh->vertices[vi].x;
+                                        float wy = by + (float)mesh->vertices[vi].y;
+                                        float wz = bz + (float)mesh->vertices[vi].z;
 
-                                        float lx=(float)mesh->vertices[vi].x;
-                                        float ly=(float)mesh->vertices[vi].y;
-                                        float lz=(float)mesh->vertices[vi].z;
-                                        float wx=MC[0]*lx+MC[1]*ly+MC[2]*lz+MC[3];
-                                        float wy=MC[4]*lx+MC[5]*ly+MC[6]*lz+MC[7];
-                                        float wz=MC[8]*lx+MC[9]*ly+MC[10]*lz+MC[11];
-
-                                        float cx = wx - cam_x;
-                                        float cy_val = wy - cam_y;
-                                        float cz = wz - cam_z;
+                                        float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
                                         float rz_yaw = cx * sy + cz * cy;
                                         float ry = cy_val * cp - rz_yaw * sp;
@@ -1061,23 +977,18 @@ int main(void) {
                                         sv[v][1] = 120.0f + ry * inv_z;
                                         sv[v][2] = rz / 32768.0f;
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-
                                         if (is_flat) {
-                                            /* Flat face: palette color × lighting */
-                                            sv[v][3] = flat_r * lara_shade;
-                                            sv[v][4] = flat_g * lara_shade;
-                                            sv[v][5] = flat_b * lara_shade;
-                                            sv[v][6] = 1.0f;
-                                            sv[v][7] = 0; sv[v][8] = 0;
+                                            sv[v][3]=fr; sv[v][4]=fg; sv[v][5]=fb;
                                         } else {
-                                            /* Textured face: shade from lighting */
-                                            sv[v][3] = lara_shade; sv[v][4] = lara_shade;
-                                            sv[v][5] = lara_shade; sv[v][6] = 1.0f;
+                                            sv[v][3]=lara_shade; sv[v][4]=lara_shade; sv[v][5]=lara_shade;
+                                        }
+                                        sv[v][6] = 1.0f;
+                                        if (!is_flat && otex) {
                                             float tu = (float)(otex->uv[v].u >> 8);
                                             float tv = (float)(otex->uv[v].v >> 8);
                                             sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                             sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                        }
+                                        } else { sv[v][7] = 0; sv[v][8] = 0; }
                                         sv[v][9] = 1.0f / rz;
                                     }
                                     if (!visible) continue;
