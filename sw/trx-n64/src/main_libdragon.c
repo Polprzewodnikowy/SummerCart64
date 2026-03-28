@@ -102,7 +102,7 @@ static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
 int main(void) {
     console_init();
     console_set_render_mode(RENDER_MANUAL);
-    controller_init();
+    joypad_init();
 
     printf("TRX-N64: Tomb Raider 1\n");
     printf("N64 + SC64 Port\n");
@@ -145,6 +145,8 @@ int main(void) {
         printf("\nLoading LEVEL1 (Caves)...\n");
 
         uint32_t level_size = 0;
+        /* Note: asset_load is renamed to sc64_asset_load via -D flag
+         * to avoid collision with libdragon's asset_load */
         void *level_data = asset_load_with_size(&g_asset_mgr, 1, &level_size);
 
         if (level_data && level_size > 0) {
@@ -207,10 +209,10 @@ int main(void) {
 
     /* Idle loop with controller test */
     while (1) {
-        controller_scan();
-        struct controller_data keys = get_keys_pressed();
+        joypad_poll();
+        joypad_buttons_t keys = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-        if (keys.c[0].start) {
+        if (keys.start) {
             /* Reload / cycle levels in future */
             console_clear();
             printf("START pressed — future: menu\n");

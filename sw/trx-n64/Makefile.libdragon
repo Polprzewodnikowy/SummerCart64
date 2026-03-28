@@ -1,7 +1,7 @@
 N64_INST = /opt/libdragon
 include $(N64_INST)/include/n64.mk
 
-CFLAGS += -Isrc -I../asset_streaming/src -DN64_TARGET -Wno-unused-variable -Wno-comment
+CFLAGS += -Isrc -I../asset_streaming/src -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations -Dasset_load=sc64_asset_load
 
 src = src/main_libdragon.c \
       src/level/tr_level_parse.c \
