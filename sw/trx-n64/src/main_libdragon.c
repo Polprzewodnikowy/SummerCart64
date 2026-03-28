@@ -647,15 +647,26 @@ int main(void) {
                         }
                     }
 
-                    /* Draw rooms (Z-buffer handles depth sorting) */
+                    /* Draw rooms with frustum culling */
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
+                        /* Room-level frustum cull: check if room center is visible */
+                        float rcx = room->x + room->sectors_x * 512.0f - cam_x;
+                        float rcz = room->z + room->sectors_z * 512.0f - cam_z;
+                        float room_rz = rcx * sy + rcz * cy; /* camera-space Z */
+                        float room_rx = rcx * cy - rcz * sy; /* camera-space X */
+                        float room_radius = (room->sectors_x + room->sectors_z) * 512.0f;
+                        /* Skip if room is entirely behind camera */
+                        if (room_rz < -room_radius) continue;
+                        /* Skip if room is entirely off to the side */
+                        if (room_rz > 0 && fabsf(room_rx) > room_rz * 2.5f + room_radius) continue;
+
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 600) max_faces = 600;  /* Cap per room */
+                        if (max_faces > 600) max_faces = 600;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -840,6 +851,14 @@ int main(void) {
                         for (int si = 0; si < room->static_mesh_count; si++) {
                             tr_room_static_mesh_t *sm = &room->static_meshes[si];
 
+                            /* Quick frustum cull for static mesh */
+                            float sdx = (float)sm->pos.x - cam_x;
+                            float sdz = (float)sm->pos.z - cam_z;
+                            float sm_rz = sdx * sy + sdz * cy;
+                            if (sm_rz < -1024) continue; /* Behind camera */
+                            float sm_rx = sdx * cy - sdz * sy;
+                            if (sm_rz > 0 && fabsf(sm_rx) > sm_rz * 3.0f) continue; /* Off side */
+
                             /* Find the static object definition to get mesh_idx */
                             int mesh_idx = -1;
                             for (int oi = 0; oi < g_level.static_object_count; oi++) {
@@ -948,6 +967,14 @@ int main(void) {
                         for (int ri = 0; ri < num_draw; ri++)
                             if (rooms_to_draw[ri] == item->room) { item_vis = true; break; }
                         if (!item_vis) continue;
+
+                        /* Frustum cull item */
+                        float idx = (float)item->pos.x - cam_x;
+                        float idz = (float)item->pos.z - cam_z;
+                        float item_rz = idx * sy + idz * cy;
+                        if (item_rz < -2048) continue;
+                        float item_rx = idx * cy - idz * sy;
+                        if (item_rz > 0 && fabsf(item_rx) > item_rz * 3.0f) continue;
 
                         /* Find object definition for this item */
                         tr_object_def_t *iobj = NULL;
