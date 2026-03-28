@@ -50,13 +50,15 @@ uint32_t n64_mem_available(void) { return GAME_HEAP_SIZE - heap_offset; }
  * the magic key sequence. This is independent of libdragon.
  * ------------------------------------------------------------------- */
 
-/* SC64 registers mapped via PI at physical 0x1FFF0000.
- * Access via KSEG1 uncached: 0xA0000000 + 0x1FFF0000 = 0xBFFF0000
- * But PI peripherals use 0x10000000 base, so cart space is:
- * 0xB0000000 + offset. SC64 is at cart addr 0x1FFF0000,
- * which in KSEG1 is 0x1FFF0000 | 0xA0000000 = 0xBFFF0000 */
-#define SC64_REGS_BASE  0xBFFF0000UL
-#define SC64_REG_KEY    (*(volatile uint32_t *)(SC64_REGS_BASE + 0x10))
+/* SC64 register struct (from bootloader/src/sc64.c)
+ * Physical base: 0x1FFF0000, accessed via UNCACHED (|0xA0000000) = 0xBFFF0000 */
+#define SC64_REGS_BASE      0xBFFF0000UL
+#define SC64_REG_SCR        (*(volatile uint32_t *)(SC64_REGS_BASE + 0x00))
+#define SC64_REG_DATA0      (*(volatile uint32_t *)(SC64_REGS_BASE + 0x04))
+#define SC64_REG_DATA1      (*(volatile uint32_t *)(SC64_REGS_BASE + 0x08))
+#define SC64_REG_IDENTIFIER (*(volatile uint32_t *)(SC64_REGS_BASE + 0x0C))
+#define SC64_REG_KEY        (*(volatile uint32_t *)(SC64_REGS_BASE + 0x10))
+#define SC64_V2_IDENTIFIER  0x53437632UL  /* "SCv2" */
 #define SC64_KEY_RESET  0x00000000UL
 #define SC64_KEY_LOCK   0xFFFFFFFFUL
 #define SC64_KEY_UNL_1  0x5F554E4CUL  /* "_UNL" */
@@ -113,7 +115,8 @@ static bool sc64_detect(void) {
 static bool sc64_unlock(void) {
     if (!sc64_detect()) return false;
 
-    /* Configure PI domain 2 timing for SC64 register access */
+    /* Configure PI domain 2 timing for SC64 register access
+     * (same values as bootloader's pi_io_config) */
     pi_wait();
     PI_BSD_DOM2_LAT = 0x05;
     PI_BSD_DOM2_PWD = 0x0C;
@@ -121,14 +124,26 @@ static bool sc64_unlock(void) {
     PI_BSD_DOM2_RLS = 0x02;
     pi_wait();
 
+    /* The N64FlashcartMenu may have left SC64 unlocked.
+     * Try reading IDENTIFIER first without re-locking. */
+    pi_wait();
+    uint32_t id = SC64_REG_IDENTIFIER;
+    pi_wait();
+
+    if (id == SC64_V2_IDENTIFIER) {
+        return true;  /* Already unlocked by menu */
+    }
+
+    /* Not unlocked — try the unlock sequence */
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_RESET);
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_1);
     sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_2);
 
+    /* Verify by reading IDENTIFIER */
     pi_wait();
-    uint32_t val = SC64_REG_KEY;
+    id = SC64_REG_IDENTIFIER;
     pi_wait();
-    return (val != 0);
+    return (id == SC64_V2_IDENTIFIER);
 }
 
 /* -------------------------------------------------------------------
