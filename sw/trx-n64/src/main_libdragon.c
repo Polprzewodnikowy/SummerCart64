@@ -477,9 +477,16 @@ int main(void) {
                     joypad_inputs_t input = joypad_get_inputs(JOYPAD_PORT_1);
                     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-                    /* Camera movement */
-                    float move_speed = 32.0f;
+                    /* Camera movement — L/R bumpers cycle speed levels */
+                    static int speed_level = 1;  /* 0=slow, 1=normal, 2=fast, 3=turbo */
+                    if (pressed.l) { speed_level--; if (speed_level < 0) speed_level = 3; }
+                    if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
+                    float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
+                    float move_speed = speed_mult[speed_level];
                     float turn_speed = 0.05f;
+
+                    /* Z button = temporary boost (hold for turbo) */
+                    if (input.btn.z) move_speed *= 4.0f;
 
                     /* Analog stick: move/turn */
                     if (input.stick_x > 20 || input.stick_x < -20)
@@ -528,7 +535,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 5;  /* Limit visible rooms for FPS */
+                    int max_rooms = 8;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -550,7 +557,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 200) max_faces = 200;  /* Cap per room */
+                        if (max_faces > 400) max_faces = 400;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -628,10 +635,10 @@ int main(void) {
 
                             if (!visible) continue;
 
-                            /* Backface cull: skip if winding is clockwise on screen */
+                            /* Backface cull: skip if winding is counter-clockwise */
                             float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
                                         - (sv[1][1]-sv[0][1])*(sv[2][0]-sv[0][0]);
-                            if (cross > 0 && !(face->texture & 0x8000)) continue;
+                            if (cross < 0 && !(face->texture & 0x8000)) continue;
 
                             rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
