@@ -517,7 +517,7 @@ int main(void) {
                     /* ===== FLOOR COLLISION =====
                      * Find the sector under the camera and snap Y to floor.
                      * A button toggles between walk mode and fly mode. */
-                    static bool walk_mode = true;
+                    static bool walk_mode = false;  /* Start in fly mode */
                     if (pressed.a) walk_mode = !walk_mode;
 
                     if (walk_mode) {
@@ -708,10 +708,10 @@ int main(void) {
 
                             if (!visible) continue;
 
-                            /* Backface cull: skip if winding is counter-clockwise */
-                            float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
+                            /* Backface cull disabled for debugging */
+                            /* float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
                                         - (sv[1][1]-sv[0][1])*(sv[2][0]-sv[0][0]);
-                            if (cross < 0 && !(face->texture & 0x8000)) continue;
+                            if (cross < 0 && !(face->texture & 0x8000)) continue; */
 
                             rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
