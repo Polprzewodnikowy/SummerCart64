@@ -605,7 +605,7 @@ int main(void) {
                     rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
                     rdpq_mode_persp(true);
                     if (has_zbuf) rdpq_mode_zbuf(true, true);
-                    rdpq_mode_filter(FILTER_POINT);
+                    rdpq_mode_filter(FILTER_BILINEAR);
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
@@ -621,7 +621,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 5;  /* Limit visible rooms for FPS */
+                    int max_rooms = 7;  /* Z-buffer handles depth, can show more */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -635,15 +635,14 @@ int main(void) {
                         }
                     }
 
-                    /* Draw far rooms first (reverse BFS order) for
-                     * rough back-to-front sorting without Z-buffer */
-                    for (int ri = num_draw - 1; ri >= 0; ri--) {
+                    /* Draw rooms (Z-buffer handles depth sorting) */
+                    for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 300) max_faces = 300;  /* Cap per room */
+                        if (max_faces > 500) max_faces = 500;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -734,8 +733,8 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW LARA (disabled for FPS) ===== */
-                    if (0) {
+                    /* ===== DRAW LARA ===== */
+                    {
                         /* Find Lara's object definition */
                         tr_object_def_t *lara_obj = NULL;
                         for (int i = 0; i < g_level.object_count; i++) {
