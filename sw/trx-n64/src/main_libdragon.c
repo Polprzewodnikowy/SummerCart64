@@ -765,42 +765,86 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Decode first animation frame for root offset */
+                            /* Decode first animation frame */
                             int frame_off = lara_obj->frame_offset / 2;
                             int16_t *fr = g_level.anim_frames ? &g_level.anim_frames[frame_off] : NULL;
 
-                            /* Bone tree with position stack */
-                            float pos_stack[8][3];
-                            int psp = 0;
-                            float bx = (float)lara_item->pos.x;
-                            float by = (float)lara_item->pos.y;
-                            float bz = (float)lara_item->pos.z;
+                            /* 3x4 float matrix stack: [R00 R01 R02 Tx R10 R11 R12 Ty R20 R21 R22 Tz] */
+                            float ms[8][12];
+                            int msp = 0;
+                            #define MI(m) do{memset(m,0,48);(m)[0]=(m)[4]=(m)[8]=1.0f;}while(0)
+                            #define MPUSH() do{if(msp<7){memcpy(ms[msp+1],ms[msp],48);msp++;}}while(0)
+                            #define MPOP()  do{if(msp>0)msp--;}while(0)
+                            #define MC ms[msp]
 
-                            /* Apply root offset from animation frame (fixes floor clipping) */
-                            if (fr) {
-                                by += (float)fr[7]; /* Y offset lifts her above floor */
-                            }
+                            /* Translate: T += R * offset */
+                            #define MTR(m,dx,dy,dz) do{ \
+                                (m)[3]+=(m)[0]*(dx)+(m)[1]*(dy)+(m)[2]*(dz); \
+                                (m)[7]+=(m)[4]*(dx)+(m)[5]*(dy)+(m)[6]*(dz); \
+                                (m)[11]+=(m)[8]*(dx)+(m)[9]*(dy)+(m)[10]*(dz); \
+                            }while(0)
+
+                            /* Rotate Y: columns 0,2 */
+                            #define MRY(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
+                                _t=(m)[0];(m)[0]=_t*_c+(m)[2]*_s;(m)[2]=-_t*_s+(m)[2]*_c; \
+                                _t=(m)[4];(m)[4]=_t*_c+(m)[6]*_s;(m)[6]=-_t*_s+(m)[6]*_c; \
+                                _t=(m)[8];(m)[8]=_t*_c+(m)[10]*_s;(m)[10]=-_t*_s+(m)[10]*_c; \
+                            }while(0)
+
+                            /* Rotate X: columns 1,2 */
+                            #define MRX(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
+                                _t=(m)[1];(m)[1]=_t*_c-(m)[2]*_s;(m)[2]=_t*_s+(m)[2]*_c; \
+                                _t=(m)[5];(m)[5]=_t*_c-(m)[6]*_s;(m)[6]=_t*_s+(m)[6]*_c; \
+                                _t=(m)[9];(m)[9]=_t*_c-(m)[10]*_s;(m)[10]=_t*_s+(m)[10]*_c; \
+                            }while(0)
+
+                            /* Rotate Z: columns 0,1 */
+                            #define MRZ(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
+                                _t=(m)[0];(m)[0]=_t*_c-(m)[1]*_s;(m)[1]=_t*_s+(m)[1]*_c; \
+                                _t=(m)[4];(m)[4]=_t*_c-(m)[5]*_s;(m)[5]=_t*_s+(m)[5]*_c; \
+                                _t=(m)[8];(m)[8]=_t*_c-(m)[9]*_s;(m)[9]=_t*_s+(m)[9]*_c; \
+                            }while(0)
+
+                            /* Decode TR1 rotation (2 words → 3 float radians) */
+                            #define TRANG(v) ((float)(int16_t)(v) * 6.28318f / 65536.0f)
+
+                            /* Init at Lara's world position + facing */
+                            MI(MC);
+                            MC[3] = (float)lara_item->pos.x;
+                            MC[7] = (float)lara_item->pos.y;
+                            MC[11] = (float)lara_item->pos.z;
+                            float lara_yaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
+                            MRY(MC, lara_yaw);
+
+                            /* Apply root offset from frame */
+                            if (fr) MTR(MC, (float)fr[6], (float)fr[7], (float)fr[8]);
 
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
-                            /* Pre-lookup palette for flat-colored faces */
-                            uint16_t *pal = pal16;  /* RGBA16 palette from earlier */
-
                             for (int mi = 0; mi < mc; mi++) {
-                                if (mi > 0) {
+                                if (mi == 0) {
+                                    /* Root: apply first rotation */
+                                    if (fr) {
+                                        uint16_t w1=(uint16_t)fr[9], w2=(uint16_t)fr[10];
+                                        MRY(MC, TRANG((w1&0x3FF0)<<2));
+                                        MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
+                                        MRZ(MC, TRANG((w2&0x3FF)<<6));
+                                    }
+                                } else {
                                     int bi = lara_obj->bone_idx + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
-                                        if (bone->flags & 1) {
-                                            if (psp > 0) { psp--; bx=pos_stack[psp][0]; by=pos_stack[psp][1]; bz=pos_stack[psp][2]; }
-                                        }
-                                        if (bone->flags & 2) {
-                                            if (psp < 7) { pos_stack[psp][0]=bx; pos_stack[psp][1]=by; pos_stack[psp][2]=bz; psp++; }
-                                        }
-                                        bx += (float)bone->x;
-                                        by += (float)bone->y;
-                                        bz += (float)bone->z;
+                                        if (bone->flags & 1) MPOP();
+                                        if (bone->flags & 2) MPUSH();
+                                        MTR(MC, (float)bone->x, (float)bone->y, (float)bone->z);
+                                    }
+                                    /* Apply per-mesh rotation from frame */
+                                    if (fr) {
+                                        uint16_t w1=(uint16_t)fr[9+mi*2], w2=(uint16_t)fr[10+mi*2];
+                                        MRY(MC, TRANG((w1&0x3FF0)<<2));
+                                        MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
+                                        MRZ(MC, TRANG((w2&0x3FF)<<6));
                                     }
                                 }
 
@@ -847,9 +891,12 @@ int main(void) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
 
-                                        float wx = bx + (float)mesh->vertices[vi].x;
-                                        float wy = by + (float)mesh->vertices[vi].y;
-                                        float wz = bz + (float)mesh->vertices[vi].z;
+                                        float lx=(float)mesh->vertices[vi].x;
+                                        float ly=(float)mesh->vertices[vi].y;
+                                        float lz=(float)mesh->vertices[vi].z;
+                                        float wx=MC[0]*lx+MC[1]*ly+MC[2]*lz+MC[3];
+                                        float wy=MC[4]*lx+MC[5]*ly+MC[6]*lz+MC[7];
+                                        float wz=MC[8]*lx+MC[9]*ly+MC[10]*lz+MC[11];
 
                                         float cx = wx - cam_x;
                                         float cy_val = wy - cam_y;
