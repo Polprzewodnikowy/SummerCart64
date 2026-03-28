@@ -678,7 +678,16 @@ int main(void) {
                              * wrong texture data. TODO: render as solid color. */
                             if (!has_tex) continue;
 
-                            /* Transform vertices: {X,Y,Z,R,G,B,A,S,T,INV_W} */
+                            /* Quick distance check with first vertex */
+                            {
+                                uint16_t v0i = face->vertices[0];
+                                if (v0i < room->mesh.vertex_count) {
+                                    float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
+                                    float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
+                                    if (dx*dx + dz*dz > 16384.0f*16384.0f) continue;
+                                }
+                            }
+
                             float sv[4][10];
                             bool visible = true;
 
@@ -951,7 +960,14 @@ int main(void) {
                         if (gmi >= g_level.mesh_count) continue;
                         tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
-                        float item_shade = 1.0f - (float)item->shade / 8191.0f;
+                        /* shade=0 means use room ambient, not fully dark */
+                        float item_shade;
+                        if (item->shade == 0 || item->shade == -1) {
+                            tr_room_t *irm = &g_level.rooms[item->room];
+                            item_shade = 1.0f - (float)irm->ambient / 8191.0f;
+                        } else {
+                            item_shade = 1.0f - (float)item->shade / 8191.0f;
+                        }
                         if (item_shade < 0.1f) item_shade = 0.1f;
                         if (item_shade > 1.0f) item_shade = 1.0f;
                         float iyaw = (float)item->rotation * 3.14159f / 32768.0f;
@@ -1026,11 +1042,15 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Position stack for bone hierarchy (no rotation) */
+                            /* Position stack with yaw rotation for bone offsets */
                             float ps[8][3]; int psp = 0;
                             float bx = (float)lara_item->pos.x;
                             float by = (float)lara_item->pos.y;
                             float bz = (float)lara_item->pos.z;
+
+                            /* Lara's facing direction */
+                            float lyaw = (float)lara_item->rotation * 3.14159f / 32768.0f;
+                            float lsy = sinf(lyaw), lcy = cosf(lyaw);
 
                             /* Apply root Y offset from first anim frame */
                             int frame_off = lara_obj->frame_offset / 2;
@@ -1069,9 +1089,11 @@ int main(void) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
                                         if (bone->flags & 1) { if (psp > 0) { psp--; bx=ps[psp][0]; by=ps[psp][1]; bz=ps[psp][2]; } }
                                         if (bone->flags & 2) { if (psp < 7) { ps[psp][0]=bx; ps[psp][1]=by; ps[psp][2]=bz; psp++; } }
-                                        bx += (float)bone->x;
+                                        /* Rotate bone offset by Lara's yaw */
+                                        float ox = (float)bone->x, oz = (float)bone->z;
+                                        bx += ox * lcy - oz * lsy;
                                         by += (float)bone->y;
-                                        bz += (float)bone->z;
+                                        bz += ox * lsy + oz * lcy;
                                     }
                                 }
 
@@ -1110,9 +1132,12 @@ int main(void) {
                                     for (int v = 0; v < face->vertex_count; v++) {
                                         uint16_t vi = face->vertices[v];
                                         if (vi >= mesh->vertex_count) { visible = false; break; }
-                                        float wx = bx + (float)mesh->vertices[vi].x;
+                                        /* Rotate vertex by Lara's yaw */
+                                        float vx = (float)mesh->vertices[vi].x;
+                                        float vz = (float)mesh->vertices[vi].z;
+                                        float wx = bx + vx * lcy - vz * lsy;
                                         float wy = by + (float)mesh->vertices[vi].y;
-                                        float wz = bz + (float)mesh->vertices[vi].z;
+                                        float wz = bz + vx * lsy + vz * lcy;
 
                                         float cx = wx - cam_x, cy_val = wy - cam_y, cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
