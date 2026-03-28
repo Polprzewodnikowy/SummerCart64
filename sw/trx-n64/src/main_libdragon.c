@@ -528,7 +528,7 @@ int main(void) {
                     /* ===== ROOM TRACKING + FLOOR COLLISION =====
                      * Always track which room the camera is in (for BFS).
                      * A button toggles walk mode (floor clamping). */
-                    static bool walk_mode = true;  /* Walk by default */
+                    static bool walk_mode = false;  /* Fly default, A=toggle walk */
                     if (pressed.a) walk_mode = !walk_mode;
 
                     {
