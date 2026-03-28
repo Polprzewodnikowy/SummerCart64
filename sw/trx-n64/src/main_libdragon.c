@@ -368,7 +368,10 @@ int main(void) {
                 #define TEX_TILE_DIM 32
                 #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
-                if (num_otex > 1024) num_otex = 1024;  /* 1024 × 2KB = 2MB */
+                if (num_otex > 256) num_otex = 256;  /* 256 × 2KB = 512KB */
+
+                printf("  Heap before tex: %u KB free\n",
+                       n64_mem_available() / 1024);
 
                 /* Allocate texture pixel data from bump allocator.
                  * The alternating-lines bug was caused by heap overlap (texture
