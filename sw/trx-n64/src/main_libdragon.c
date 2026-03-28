@@ -184,9 +184,48 @@ int main(void) {
         printf("  SC64 not detected (emulator?)\n");
     }
 
-    /* Try to initialize asset streaming */
+    /*
+     * Load assets via libdragon's filesystem.
+     * Put tr1_assets.bin on the SD card as a regular file,
+     * and read it with fopen/fread. No raw sector access needed.
+     */
+    printf("Loading assets from SD card...\n");
+
+    /* Try to open the asset file from the filesystem */
+    FILE *asset_file = fopen("rom:/tr1_assets.bin", "rb");
+    if (!asset_file) {
+        asset_file = fopen("sd:/tr1_assets.bin", "rb");
+    }
+    if (!asset_file) {
+        /* Try DFS (DragonFS) */
+        asset_file = fopen("/tr1_assets.bin", "rb");
+    }
+
+    if (asset_file) {
+        printf("  Asset file opened!\n");
+
+        /* Read the entire file into memory */
+        fseek(asset_file, 0, SEEK_END);
+        long file_size = ftell(asset_file);
+        fseek(asset_file, 0, SEEK_SET);
+        printf("  File size: %ld bytes\n", file_size);
+
+        /* Read first 512 bytes (archive header) */
+        static uint8_t header_buf[512] __attribute__((aligned(16)));
+        size_t read = fread(header_buf, 1, 512, asset_file);
+        printf("  Read %u bytes\n", (unsigned)read);
+        printf("  Magic: %c%c%c%c\n",
+               header_buf[0], header_buf[1], header_buf[2], header_buf[3]);
+
+        fclose(asset_file);
+    } else {
+        printf("  No asset file found.\n");
+        printf("  Copy tr1_assets.bin to SD card.\n");
+    }
+
+    /* Also try SC64 raw access for comparison */
     if (sc64_ok) {
-        printf("Initializing asset streaming...\n");
+        printf("\nTrying SC64 raw SD access...\n");
         asset_error_t err = asset_init(&g_asset_mgr, &(asset_init_config_t){
             .archive_base_sector = ARCHIVE_SECTOR,
             .cache_base = CACHE_BASE,
@@ -198,43 +237,10 @@ int main(void) {
         });
 
         if (err == ASSET_OK) {
-            printf("  OK! %u assets found.\n", g_asset_mgr.index_count);
+            printf("  SC64 OK! %u assets found.\n", g_asset_mgr.index_count);
             g_has_assets = true;
         } else {
-            printf("  Failed: %s (code %d)\n", asset_error_string(err), err);
-
-            /* Debug: try raw SC64 SD read to see error code */
-            printf("  Debug: trying raw SD sector read...\n");
-            static uint8_t test_buf[512] __attribute__((aligned(16)));
-            uint32_t sd_err;
-
-            /* Try SD init */
-            sc64_pi_write(&SC64_REG_DATA0, 0);
-            sc64_pi_write(&SC64_REG_DATA1, 1);  /* SD_OP_INIT */
-            sc64_pi_write(&SC64_REG_SCR, 'i');
-            pi_wait();
-            uint32_t sr;
-            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
-            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
-            printf("  SD init: err=%u\n", sd_err);
-
-            /* Try sector set */
-            sc64_pi_write(&SC64_REG_DATA0, 0x10000);  /* sector 65536 */
-            sc64_pi_write(&SC64_REG_DATA1, 0);
-            sc64_pi_write(&SC64_REG_SCR, 'I');
-            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
-            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
-            printf("  Sector set: err=%u\n", sd_err);
-
-            /* Try read 1 sector */
-            sc64_pi_write(&SC64_REG_DATA0, (uint32_t)test_buf);
-            sc64_pi_write(&SC64_REG_DATA1, 1);
-            sc64_pi_write(&SC64_REG_SCR, 's');
-            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
-            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
-            printf("  SD read: err=%u\n", sd_err);
-            printf("  First 4 bytes: %02x %02x %02x %02x\n",
-                   test_buf[0], test_buf[1], test_buf[2], test_buf[3]);
+            printf("  SC64 failed: %s\n", asset_error_string(err));
         }
     }
 
