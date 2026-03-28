@@ -1192,14 +1192,14 @@ int main(void) {
                                 if (lara_shade < 0.1f) lara_shade = 0.1f;
                             }
 
+                            /* bone_idx might be raw DWORD offset — try /4 */
+                            int base_bone = lara_obj->bone_idx / 4;
+
                             for (int mi = 0; mi < mc; mi++) {
                                 if (mi == 0) {
-                                    /* Root mesh: apply frame rotation */
-                                    if (fr) {
-                                        APPLY_ROT(MC, (uint16_t)fr[9], (uint16_t)fr[10]);
-                                    }
+                                    /* Root mesh: skip rotation for now (debug) */
                                 } else {
-                                    int bi = lara_obj->bone_idx + (mi - 1);
+                                    int bi = base_bone + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
                                         if (bone->flags & 1) MPOP();
