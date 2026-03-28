@@ -369,7 +369,7 @@ int main(void) {
                 #define TEX_TILE_DIM 32
                 #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
-                if (num_otex > 512) num_otex = 512;  /* 512 × 2KB = 1MB uncached */
+                if (num_otex > 768) num_otex = 768;  /* 768 × 2KB = 1.5MB uncached */
 
                 printf("  Heap before tex: %u KB free\n",
                        n64_mem_available() / 1024);
@@ -435,8 +435,9 @@ int main(void) {
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
-                printf("  %d textures ready (%d KB). Heap: %u KB left.\n",
-                       num_otex, num_otex * TEX_TILE_BYTES / 1024,
+                printf("  %d/%d textures ready (%d KB). Heap: %u KB left.\n",
+                       num_otex, (int)g_level.object_texture_count,
+                       num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
                 /* ============================================
@@ -644,11 +645,12 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Upload pre-converted RGBA16 texture tile */
+                            /* Upload texture if available */
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool has_tex = false;
                             tr_object_texture_t *otex = NULL;
-                            if (tex_idx < num_otex && tex_surfs) {
+                            if (tex_idx < num_otex && tex_surfs &&
+                                tex_idx < g_level.object_texture_count) {
                                 otex = &g_level.object_textures[tex_idx];
                                 has_tex = true;
                                 if ((int)tex_idx != last_tex_idx) {
@@ -656,6 +658,10 @@ int main(void) {
                                     last_tex_idx = (int)tex_idx;
                                 }
                             }
+                            /* Skip faces with no valid texture (flat-colored faces
+                             * or textures beyond our cap) — they'd render with
+                             * wrong texture data. TODO: render as solid color. */
+                            if (!has_tex) continue;
 
                             /* Transform vertices: {X, Y, R, G, B, A, S, T, INV_W} */
                             float sv[4][9];
