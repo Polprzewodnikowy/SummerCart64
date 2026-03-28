@@ -459,7 +459,7 @@ int main(void) {
 
                 /* Close console, init display for 3D */
                 console_close();
-                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
+                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
 
                 /* Z-buffer for proper depth sorting */
@@ -629,6 +629,7 @@ int main(void) {
                     rdpq_mode_persp(true);
                     if (has_zbuf) rdpq_mode_zbuf(true, true);
                     rdpq_mode_filter(FILTER_BILINEAR);
+                    rdpq_mode_antialias(AA_STANDARD);
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
@@ -1307,7 +1308,7 @@ int main(void) {
 
                 /* Re-init display and rdpq for 3D */
                 console_close();
-                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE);
+                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
                 goto render_loop;
 
