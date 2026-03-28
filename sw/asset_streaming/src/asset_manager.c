@@ -128,8 +128,8 @@ static uint32_t sc64_sd_deinit(void) {
  * NOT directly into RDRAM. We then PI DMA from that buffer into our
  * destination.
  */
-#define SC64_BUFFER_BASE    UNCACHED(0x1FFE0000UL)
-#define SC64_BUFFER_SIZE    (0x10000)  /* 64 KB buffer */
+#define SC64_BUFFER_BASE    (0x1FFE0000UL)  /* Physical PI address of SC64 SDRAM buffer */
+#define SC64_BUFFER_SIZE    (8192)         /* 8 KB buffer (from sc64.h sc64_buffers_t) */
 
 #define PI_REG_DRAM_ADDR    (*(io32_t *)(UNCACHED(0x04600000UL) + 0x00))
 #define PI_REG_CART_ADDR    (*(io32_t *)(UNCACHED(0x04600000UL) + 0x04))
@@ -147,18 +147,21 @@ static uint32_t sc64_sd_read_sectors(void *dest, uint32_t sector, uint32_t count
         uint32_t max_sectors = SC64_BUFFER_SIZE / 512;
         if (chunk > max_sectors) chunk = max_sectors;
 
-        /* Step 1: SD → SC64 SDRAM buffer */
+        /* Step 1: SD → SC64 SDRAM buffer (pass physical PI address) */
         err = sc64_cmd(CMD_SD_SECTOR_SET, current_sector, 0, NULL, NULL);
         if (err) return err;
-        err = sc64_cmd(CMD_SD_READ, SC64_BUFFER_BASE & 0x1FFFFFFF, chunk, NULL, NULL);
+        err = sc64_cmd(CMD_SD_READ, SC64_BUFFER_BASE, chunk, NULL, NULL);
         if (err) return err;
 
-        /* Step 2: PI DMA from SC64 SDRAM buffer → RDRAM */
+        /* Step 2: PI DMA from SC64 SDRAM → RDRAM
+         * PI_DRAM_ADDR = physical RDRAM address (strip KSEG bits)
+         * PI_CART_ADDR = PI bus address of SC64 buffer (0x1FFE0000)
+         * PI_WR_LEN = bytes - 1 (triggers cart→RDRAM DMA) */
         uint32_t bytes = chunk * 512;
         data_cache_hit_invalidate(dst, bytes);
         pi_wait();
         PI_REG_DRAM_ADDR = (uint32_t)dst & 0x1FFFFFFF;
-        PI_REG_CART_ADDR = SC64_BUFFER_BASE & 0x1FFFFFFF;
+        PI_REG_CART_ADDR = SC64_BUFFER_BASE;
         PI_REG_WR_LEN = bytes - 1;
         pi_wait();
 
