@@ -467,9 +467,7 @@ int main(void) {
                     }
                 }
 
-                /* Simple sin/cos for camera movement */
-                #define SINF(a) ((a) - (a)*(a)*(a)/6.0f + (a)*(a)*(a)*(a)*(a)/120.0f)
-                #define COSF(a) (1.0f - (a)*(a)/2.0f + (a)*(a)*(a)*(a)/24.0f)
+                /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
 
                 /* Render loop */
@@ -496,8 +494,8 @@ int main(void) {
                     if (input.btn.d_left) cam_rot_y -= turn_speed;
                     if (input.btn.d_right) cam_rot_y += turn_speed;
 
-                    float sy = SINF(WRAP_ANGLE(cam_rot_y));
-                    float cy = COSF(WRAP_ANGLE(cam_rot_y));
+                    float sy = sinf(cam_rot_y);
+                    float cy = cosf(cam_rot_y);
                     cam_x += forward * sy;
                     cam_z += forward * cy;
                     if (input.btn.c_up) cam_y -= move_speed;
@@ -530,7 +528,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 8;  /* Limit visible rooms for FPS */
+                    int max_rooms = 5;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -552,7 +550,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 400) max_faces = 400;  /* Cap per room */
+                        if (max_faces > 200) max_faces = 200;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -629,6 +627,11 @@ int main(void) {
                             }
 
                             if (!visible) continue;
+
+                            /* Backface cull: skip if winding is clockwise on screen */
+                            float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
+                                        - (sv[1][1]-sv[0][1])*(sv[2][0]-sv[0][0]);
+                            if (cross > 0 && !(face->texture & 0x8000)) continue;
 
                             rdpq_triangle(&TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             if (face->vertex_count == 4)
