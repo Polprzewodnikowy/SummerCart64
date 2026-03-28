@@ -552,7 +552,9 @@ int main(void) {
                                 otex = &g_level.object_textures[tex_idx];
                                 has_tex = true;
                                 if ((int)tex_idx != last_tex_idx) {
-                                    rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                    /* Use upload_sub to force LoadTile (avoids TMEM interleave bug) */
+                                    rdpq_tex_upload_sub(TILE0, &tex_surfs[tex_idx], NULL,
+                                                        0, 0, TEX_TILE_DIM, TEX_TILE_DIM);
                                     last_tex_idx = (int)tex_idx;
                                 }
                             }
