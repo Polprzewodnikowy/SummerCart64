@@ -1,9 +1,14 @@
 N64_INST = /opt/libdragon
 include $(N64_INST)/include/n64.mk
 
-CFLAGS += -Isrc -DN64_TARGET -Wno-unused-variable
+CFLAGS += -Isrc -I../asset_streaming/src -DN64_TARGET -Wno-unused-variable -Wno-comment
 
-src = src/main_libdragon.c
+src = src/main_libdragon.c \
+      src/level/tr_level_parse.c \
+      ../asset_streaming/src/asset_manager.c \
+      ../asset_streaming/src/asset_cache.c \
+      ../asset_streaming/src/lz4_decode.c \
+      ../asset_streaming/src/asset_debug.c
 
 all: trx-n64.z64
 .PHONY: all

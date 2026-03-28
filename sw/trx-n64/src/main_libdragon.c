@@ -1,9 +1,10 @@
 /*
  * TRX-N64: Tomb Raider 1 — N64 + SC64 Port
- * Libdragon boot version (works in emulators + real hardware)
+ * Libdragon boot — works in emulators + SC64 real hardware
  *
- * Uses libdragon for boot sequence, display, and controller input.
- * Our game code (parser, renderer, physics, etc.) runs on top.
+ * Uses libdragon for boot/display/input.
+ * Uses SC64 registers directly for asset streaming from SD card.
+ * Uses our own .PHD parser for level loading.
  */
 
 #include <libdragon.h>
@@ -12,18 +13,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* Our game headers — no bootloader dependencies */
+/* Our game code */
 #include "level/tr_types.h"
 #include "level/tr_level_parse.h"
-#include "render/n64_transform.h"
 
-/* Forward declarations for platform shims */
-void n64_mem_init(void);
-void *n64_mem_alloc(uint32_t size);
-uint32_t n64_mem_available(void);
+/* Asset streaming system */
+#include "asset_manager.h"
 
 /* -------------------------------------------------------------------
- * Bump allocator (game heap)
+ * Bump allocator
  * ------------------------------------------------------------------- */
 
 #define GAME_HEAP_SIZE  (2 * 1024 * 1024)
@@ -44,21 +42,64 @@ void *n64_mem_alloc(uint32_t size) {
 uint32_t n64_mem_available(void) { return GAME_HEAP_SIZE - heap_offset; }
 
 /* -------------------------------------------------------------------
- * Stubs for bootloader symbols
+ * SC64 unlock (needed before asset streaming)
+ *
+ * The SC64 registers are locked on boot. We unlock them by writing
+ * the magic key sequence. This is independent of libdragon.
  * ------------------------------------------------------------------- */
 
-void delay_ms(int ms) {
-    /* libdragon has wait_ms but let's just busy-wait */
-    uint32_t start = TICKS_READ();
-    while (TICKS_READ() - start < (uint32_t)(TICKS_PER_SECOND / 1000 * ms)) {}
+#define SC64_REGS_BASE  0x1FFF0000UL
+#define SC64_REG_KEY    (*(volatile uint32_t *)(SC64_REGS_BASE + 0x10))
+#define SC64_KEY_RESET  0x00000000UL
+#define SC64_KEY_LOCK   0xFFFFFFFFUL
+#define SC64_KEY_UNL_1  0x5F554E4CUL  /* "_UNL" */
+#define SC64_KEY_UNL_2  0x4F434B5FUL  /* "OCK_" */
+
+/* PI interface for register access */
+#define PI_BASE_REG     0xA4600000UL
+#define PI_STATUS_REG   (*(volatile uint32_t *)(PI_BASE_REG + 0x10))
+
+static void pi_wait(void) {
+    while (PI_STATUS_REG & 3) {}
 }
+
+static void sc64_pi_write(volatile uint32_t *addr, uint32_t value) {
+    pi_wait();
+    *addr = value;
+    pi_wait();
+}
+
+static bool sc64_unlock(void) {
+    sc64_pi_write(&SC64_REG_KEY, SC64_KEY_RESET);
+    sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_1);
+    sc64_pi_write(&SC64_REG_KEY, SC64_KEY_UNL_2);
+
+    /* Check if unlock succeeded by reading key register */
+    pi_wait();
+    uint32_t val = SC64_REG_KEY;
+    pi_wait();
+    return (val != 0);  /* Non-zero = unlocked */
+}
+
+/* -------------------------------------------------------------------
+ * Globals
+ * ------------------------------------------------------------------- */
+
+static asset_manager_t g_asset_mgr;
+static tr_level_t g_level;
+static bool g_has_assets = false;
+
+#define ARCHIVE_SECTOR  0x10000
+#define CACHE_BASE      ((uint8_t *)0xB1000000)
+#define CACHE_SIZE      (3 * 1024 * 1024)
+#define SLOT_SIZE       (512 * 1024)
+static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
 
 /* -------------------------------------------------------------------
  * Main
  * ------------------------------------------------------------------- */
 
 int main(void) {
-    /* Initialize libdragon subsystems */
     console_init();
     console_set_render_mode(RENDER_MANUAL);
     controller_init();
@@ -66,61 +107,113 @@ int main(void) {
     printf("TRX-N64: Tomb Raider 1\n");
     printf("N64 + SC64 Port\n");
     printf("========================\n\n");
-    printf("ROM booted via libdragon!\n\n");
 
-    /* Try to initialize game systems */
-    printf("Initializing memory...\n");
     n64_mem_init();
-    printf("  Game heap: %d KB\n\n", GAME_HEAP_SIZE / 1024);
 
-    /* In emulator: no SC64 hardware, no SD card.
-     * Show status screen with controller input test. */
-    printf("No SC64 detected (emulator mode).\n\n");
-    printf("Systems ready:\n");
-    printf("  Level parser (21/21 tested)\n");
-    printf("  Vertex transform pipeline\n");
-    printf("  RDP triangle commands\n");
-    printf("  CI8 texture pipeline\n");
-    printf("  Animation decoder\n");
-    printf("  Collision system\n");
-    printf("  Audio mixer\n\n");
-    printf("Controller test:\n");
-    printf("  Press buttons to verify input.\n\n");
+    /* Try to unlock SC64 */
+    printf("Unlocking SC64...\n");
+    bool sc64_ok = sc64_unlock();
+    if (sc64_ok) {
+        printf("  SC64 unlocked!\n");
+    } else {
+        printf("  SC64 not detected (emulator?)\n");
+    }
+
+    /* Try to initialize asset streaming */
+    if (sc64_ok) {
+        printf("Initializing asset streaming...\n");
+        asset_error_t err = asset_init(&g_asset_mgr, &(asset_init_config_t){
+            .archive_base_sector = ARCHIVE_SECTOR,
+            .cache_base = CACHE_BASE,
+            .cache_size = CACHE_SIZE,
+            .slot_size = SLOT_SIZE,
+            .staging_buffer = staging,
+            .staging_size = sizeof(staging),
+            .backend = NULL,
+        });
+
+        if (err == ASSET_OK) {
+            printf("  OK! %u assets found.\n", g_asset_mgr.index_count);
+            g_has_assets = true;
+        } else {
+            printf("  Failed: %s\n", asset_error_string(err));
+        }
+    }
+
+    /* If we have assets, try to load level 1 */
+    if (g_has_assets) {
+        printf("\nLoading LEVEL1 (Caves)...\n");
+
+        uint32_t level_size = 0;
+        void *level_data = asset_load_with_size(&g_asset_mgr, 1, &level_size);
+
+        if (level_data && level_size > 0) {
+            printf("  Loaded %u KB from SD card.\n", level_size / 1024);
+
+            /* Parse the .PHD level */
+            printf("  Parsing .PHD format...\n");
+            n64_mem_init();  /* Reset heap for level data */
+            tr_parse_result_t res = tr_level_parse(
+                (const uint8_t *)level_data, level_size, &g_level);
+
+            if (res == TR_PARSE_OK) {
+                printf("  Parse OK!\n\n");
+
+                /* Show level stats */
+                int total_faces = 0, total_verts = 0;
+                for (int i = 0; i < g_level.room_count; i++) {
+                    total_faces += g_level.rooms[i].mesh.face_count;
+                    total_verts += g_level.rooms[i].mesh.vertex_count;
+                }
+
+                int lara_room = -1;
+                for (int i = 0; i < g_level.item_count; i++) {
+                    if (g_level.items[i].object_id == 0) {
+                        lara_room = g_level.items[i].room;
+                        break;
+                    }
+                }
+
+                printf("=== LEVEL 1: CAVES ===\n");
+                printf("  Rooms:    %d\n", g_level.room_count);
+                printf("  Faces:    %d\n", total_faces);
+                printf("  Vertices: %d\n", total_verts);
+                printf("  Items:    %d\n", (int)g_level.item_count);
+                printf("  Textures: %d (%d pages)\n",
+                       (int)g_level.object_texture_count,
+                       (int)g_level.tex_page_count);
+                printf("  Anims:    %d\n", (int)g_level.anim_count);
+                printf("  Lara:     room %d\n", lara_room);
+                printf("  Heap:     %u KB used\n\n",
+                       (GAME_HEAP_SIZE - n64_mem_available()) / 1024);
+
+                printf("LEVEL LOADED SUCCESSFULLY!\n");
+                printf("Tomb Raider 1 on N64.\n");
+            } else {
+                printf("  Parse FAILED: %s\n", tr_parse_error_string(res));
+            }
+        } else {
+            printf("  Failed to load from SD!\n");
+        }
+    } else {
+        printf("\nNo assets available.\n");
+        printf("For SC64 hardware:\n");
+        printf("  1. Pack levels: tr1_pack.py\n");
+        printf("  2. Write to SD: dd seek=65536\n");
+        printf("  3. Boot via SC64 menu\n");
+    }
 
     console_render();
 
-    /* Controller test loop */
+    /* Idle loop with controller test */
     while (1) {
         controller_scan();
         struct controller_data keys = get_keys_pressed();
 
-        if (keys.c[0].A || keys.c[0].B || keys.c[0].start ||
-            keys.c[0].up || keys.c[0].down || keys.c[0].left || keys.c[0].right ||
-            keys.c[0].Z || keys.c[0].L || keys.c[0].R) {
-
+        if (keys.c[0].start) {
+            /* Reload / cycle levels in future */
             console_clear();
-            printf("TRX-N64: Tomb Raider 1\n");
-            printf("========================\n\n");
-
-            printf("Controller input detected!\n\n");
-
-            if (keys.c[0].A)     printf("  A pressed\n");
-            if (keys.c[0].B)     printf("  B pressed\n");
-            if (keys.c[0].Z)     printf("  Z pressed\n");
-            if (keys.c[0].start) printf("  START pressed\n");
-            if (keys.c[0].up)    printf("  UP pressed\n");
-            if (keys.c[0].down)  printf("  DOWN pressed\n");
-            if (keys.c[0].left)  printf("  LEFT pressed\n");
-            if (keys.c[0].right) printf("  RIGHT pressed\n");
-            if (keys.c[0].L)     printf("  L pressed\n");
-            if (keys.c[0].R)     printf("  R pressed\n");
-
-            printf("\nStick: %d, %d\n", keys.c[0].x, keys.c[0].y);
-
-            printf("\nAll 21 TR1 levels verified.\n");
-            printf("Waiting for SC64 hardware\n");
-            printf("for full gameplay.\n");
-
+            printf("START pressed — future: menu\n");
             console_render();
         }
     }
