@@ -35,12 +35,21 @@ typedef volatile uint32_t io32_t;
  * Without this, accesses cause TLB miss exceptions. */
 #define UNCACHED(addr)      ((addr) | 0xA0000000UL)
 
-/* Cache invalidate: ensure CPU sees DMA'd data from SC64 */
+/* Cache operations for DMA coherency */
+static inline void data_cache_hit_writeback(void *addr, uint32_t len) {
+    uint32_t a = (uint32_t)addr & ~0xF;
+    uint32_t end = ((uint32_t)addr + len + 0xF) & ~0xF;
+    while (a < end) {
+        asm volatile ("cache 0x19, 0(%0)" :: "r"(a));  /* D-cache hit writeback */
+        a += 16;
+    }
+}
+
 static inline void data_cache_hit_invalidate(void *addr, uint32_t len) {
     uint32_t a = (uint32_t)addr & ~0xF;
     uint32_t end = ((uint32_t)addr + len + 0xF) & ~0xF;
     while (a < end) {
-        asm volatile ("cache 0x11, 0(%0)" :: "r"(a));
+        asm volatile ("cache 0x11, 0(%0)" :: "r"(a));  /* D-cache hit invalidate */
         a += 16;
     }
 }
@@ -112,12 +121,15 @@ static uint32_t sc64_sd_deinit(void) {
 
 static uint32_t sc64_sd_read_sectors(void *dest, uint32_t sector, uint32_t count) {
     uint32_t err;
-    /* SC64 DMA needs physical RDRAM address (strip KSEG0/1 bits) */
-    uint32_t phys_dest = (uint32_t)dest & 0x1FFFFFFF;
+    /* SC64 firmware expects the buffer address as passed by the CPU.
+     * The bootloader passes raw KSEG0 pointers (0x80xxxxxx). */
     err = sc64_cmd(CMD_SD_SECTOR_SET, sector, 0, NULL, NULL);
     if (err) return err;
-    err = sc64_cmd(CMD_SD_READ, phys_dest, count, NULL, NULL);
-    /* Invalidate data cache so CPU sees DMA'd data */
+    /* Writeback cache before DMA (ensure no stale writes) */
+    data_cache_hit_writeback(dest, count * 512);
+    err = sc64_cmd(CMD_SD_READ, (uint32_t)dest, count, NULL, NULL);
+    if (err) return err;
+    /* Invalidate cache so CPU sees DMA'd data */
     data_cache_hit_invalidate(dest, count * 512);
     return err;
 }

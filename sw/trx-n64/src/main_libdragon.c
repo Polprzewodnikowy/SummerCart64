@@ -201,7 +201,40 @@ int main(void) {
             printf("  OK! %u assets found.\n", g_asset_mgr.index_count);
             g_has_assets = true;
         } else {
-            printf("  Failed: %s\n", asset_error_string(err));
+            printf("  Failed: %s (code %d)\n", asset_error_string(err), err);
+
+            /* Debug: try raw SC64 SD read to see error code */
+            printf("  Debug: trying raw SD sector read...\n");
+            static uint8_t test_buf[512] __attribute__((aligned(16)));
+            uint32_t sd_err;
+
+            /* Try SD init */
+            sc64_pi_write(&SC64_REG_DATA0, 0);
+            sc64_pi_write(&SC64_REG_DATA1, 1);  /* SD_OP_INIT */
+            sc64_pi_write(&SC64_REG_SCR, 'i');
+            pi_wait();
+            uint32_t sr;
+            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
+            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
+            printf("  SD init: err=%u\n", sd_err);
+
+            /* Try sector set */
+            sc64_pi_write(&SC64_REG_DATA0, 0x10000);  /* sector 65536 */
+            sc64_pi_write(&SC64_REG_DATA1, 0);
+            sc64_pi_write(&SC64_REG_SCR, 'I');
+            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
+            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
+            printf("  Sector set: err=%u\n", sd_err);
+
+            /* Try read 1 sector */
+            sc64_pi_write(&SC64_REG_DATA0, (uint32_t)test_buf);
+            sc64_pi_write(&SC64_REG_DATA1, 1);
+            sc64_pi_write(&SC64_REG_SCR, 's');
+            do { pi_wait(); sr = SC64_REG_SCR; } while (sr & (1U<<31));
+            sd_err = (sr & (1U<<30)) ? SC64_REG_DATA0 : 0;
+            printf("  SD read: err=%u\n", sd_err);
+            printf("  First 4 bytes: %02x %02x %02x %02x\n",
+                   test_buf[0], test_buf[1], test_buf[2], test_buf[3]);
         }
     }
 
