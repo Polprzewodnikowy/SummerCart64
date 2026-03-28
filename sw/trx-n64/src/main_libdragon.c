@@ -488,7 +488,7 @@ int main(void) {
                     /* Z button = temporary boost (hold for turbo) */
                     if (input.btn.z) move_speed *= 4.0f;
 
-                    /* Joystick: look around */
+                    /* Joystick: look around (X = turn, Y = move forward/back) */
                     if (input.stick_x > 20 || input.stick_x < -20)
                         cam_rot_y += input.stick_x * turn_speed * 0.01f;
                     cam_rot_y = WRAP_ANGLE(cam_rot_y);
@@ -496,17 +496,90 @@ int main(void) {
                     float sy = sinf(cam_rot_y);
                     float cy = cosf(cam_rot_y);
 
-                    /* D-pad: strafe all directions */
-                    if (input.btn.d_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
-                    if (input.btn.d_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
+                    /* Joystick Y: move forward/back */
+                    if (input.stick_y > 20) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
+                    if (input.stick_y < -20) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
+
+                    /* D-pad: strafe left/right, fly up/down */
                     if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
                     if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+                    if (input.btn.d_up) cam_y -= move_speed;
+                    if (input.btn.d_down) cam_y += move_speed;
 
-                    /* C buttons: move forward/back + up/down */
+                    /* C buttons: move forward/back + strafe left/right */
                     if (input.btn.c_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
                     if (input.btn.c_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
-                    if (input.btn.c_left) cam_y += move_speed;
-                    if (input.btn.c_right) cam_y -= move_speed;
+                    if (input.btn.c_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
+                    if (input.btn.c_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+
+                    /* ===== FLOOR COLLISION =====
+                     * Find the sector under the camera and snap Y to floor.
+                     * A button toggles between walk mode and fly mode. */
+                    static bool walk_mode = true;
+                    if (pressed.a) walk_mode = !walk_mode;
+
+                    if (walk_mode) {
+                        /* Find which room the camera is in by checking
+                         * current room + its portal neighbors */
+                        int cam_room = lara_room;
+                        int32_t icx = (int32_t)cam_x;
+                        int32_t icz = (int32_t)cam_z;
+
+                        /* Check current room first */
+                        tr_room_t *cur = &g_level.rooms[lara_room];
+                        int32_t rx = icx - cur->x;
+                        int32_t rz = icz - cur->z;
+                        if (rx < 0 || rx >= cur->sectors_x * 1024 ||
+                            rz < 0 || rz >= cur->sectors_z * 1024) {
+                            /* Camera left current room — check portal neighbors */
+                            for (int p = 0; p < cur->portal_count; p++) {
+                                int dest = cur->portals[p].room;
+                                if (dest < 0 || dest >= g_level.room_count) continue;
+                                tr_room_t *rm = &g_level.rooms[dest];
+                                rx = icx - rm->x;
+                                rz = icz - rm->z;
+                                if (rx >= 0 && rx < rm->sectors_x * 1024 &&
+                                    rz >= 0 && rz < rm->sectors_z * 1024) {
+                                    cam_room = dest;
+                                    break;
+                                }
+                            }
+                        }
+
+                        /* Get sector at camera position */
+                        tr_room_t *room = &g_level.rooms[cam_room];
+                        int32_t sx = (icx - room->x) >> 10;
+                        int32_t sz = (icz - room->z) >> 10;
+                        if (sx < 0) sx = 0;
+                        if (sx >= room->sectors_x) sx = room->sectors_x - 1;
+                        if (sz < 0) sz = 0;
+                        if (sz >= room->sectors_z) sz = room->sectors_z - 1;
+
+                        if (room->sectors) {
+                            tr_sector_t *sector = &room->sectors[sz * room->sectors_x + sx];
+                            int32_t floor_y = sector->floor * -256;
+
+                            /* Follow pit room portals for deeper floors */
+                            if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
+                                tr_room_t *below = &g_level.rooms[sector->pit_room];
+                                int32_t bx = (icx - below->x) >> 10;
+                                int32_t bz = (icz - below->z) >> 10;
+                                if (bx >= 0 && bx < below->sectors_x &&
+                                    bz >= 0 && bz < below->sectors_z && below->sectors) {
+                                    tr_sector_t *bs = &below->sectors[bz * below->sectors_x + bx];
+                                    int32_t bf = bs->floor * -256;
+                                    if (bf > floor_y) floor_y = bf;
+                                }
+                            }
+
+                            /* Place camera at eye height above floor */
+                            float eye_height = 768.0f;  /* Lara's eye level */
+                            cam_y = (float)floor_y - eye_height;
+
+                            /* Update lara_room for portal traversal */
+                            lara_room = cam_room;
+                        }
+                    }
 
                     /* Start button: return to console */
                     if (pressed.start) break;
