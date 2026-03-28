@@ -513,9 +513,9 @@ int main(void) {
                                 if (s1 > 256) s1 = 256;
                                 if (t1 > 256) t1 = 256;
 
-                                /* Clamp tile size to fit TMEM (max ~64x64 for CI8) */
-                                if ((s1-s0) > 64) s1 = s0 + 64;
-                                if ((t1-t0) > 64) t1 = t0 + 64;
+                                /* Clamp tile size to fit TMEM (max ~32x32 for CI8 + palette) */
+                                if ((s1-s0) > 32) s1 = s0 + 32;
+                                if ((t1-t0) > 32) t1 = t0 + 32;
 
                                 /* Upload tile to TMEM if not already loaded */
                                 if (tp != cur_tex_page || s0 != cur_tex_s0 ||
