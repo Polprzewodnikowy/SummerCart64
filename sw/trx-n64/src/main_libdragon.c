@@ -856,10 +856,14 @@ int main(void) {
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
 
+                            /* B button toggles bone rotations for debugging */
+                            static bool use_rotations = false;
+                            if (pressed.b) use_rotations = !use_rotations;
+
                             for (int mi = 0; mi < mc; mi++) {
                                 if (mi == 0) {
-                                    /* Root: apply first rotation */
-                                    if (fr) {
+                                    /* Root: optionally apply rotation */
+                                    if (use_rotations && fr) {
                                         uint16_t w1=(uint16_t)fr[9], w2=(uint16_t)fr[10];
                                         MRY(MC, TRANG((w1&0x3FF0)<<2));
                                         MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
@@ -873,8 +877,7 @@ int main(void) {
                                         if (bone->flags & 2) MPUSH();
                                         MTR(MC, (float)bone->x, (float)bone->y, (float)bone->z);
                                     }
-                                    /* Apply per-mesh rotation from frame */
-                                    if (fr) {
+                                    if (use_rotations && fr) {
                                         uint16_t w1=(uint16_t)fr[9+mi*2], w2=(uint16_t)fr[10+mi*2];
                                         MRY(MC, TRANG((w1&0x3FF0)<<2));
                                         MRX(MC, TRANG((((w1&0xF)<<6)|((w2&0xFC00)>>10))<<6));
