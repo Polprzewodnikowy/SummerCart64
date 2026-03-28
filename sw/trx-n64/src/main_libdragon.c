@@ -459,7 +459,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 6;  /* Limit visible rooms for FPS */
+                    int max_rooms = 4;  /* Limit visible rooms for FPS */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -479,7 +479,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 400) max_faces = 400;  /* Cap per room */
+                        if (max_faces > 200) max_faces = 200;  /* Cap per room */
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -507,30 +507,31 @@ int main(void) {
                                         int th = v1 - v0 + 1;
                                         if (tw < 1) tw = 1;
                                         if (th < 1) th = 1;
-                                        int ow = tw > 32 ? 32 : tw;
-                                        int oh = th > 32 ? 32 : th;
 
-                                        /* Convert CI8 tile to RGBA16 (subsample if > 32) */
+                                        /* Always scale to 32x32 (power-of-2, aligned TMEM stride) */
                                         uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
-                                        for (int y = 0; y < oh; y++) {
-                                            int src_v = v0 + y * th / oh;
+                                        for (int y = 0; y < 32; y++) {
+                                            int src_v = v0 + y * th / 32;
                                             if (src_v > 255) src_v = 255;
-                                            for (int x = 0; x < ow; x++) {
-                                                int src_u = u0 + x * tw / ow;
+                                            for (int x = 0; x < 32; x++) {
+                                                int src_u = u0 + x * tw / 32;
                                                 if (src_u > 255) src_u = 255;
                                                 uint8_t ci = page[src_v * 256 + src_u];
-                                                tile_rgba[y * ow + x] = palette16[ci];
+                                                tile_rgba[y * 32 + x] = palette16[ci];
                                             }
                                         }
 
+                                        /* Flush CPU cache so RDP DMA reads correct data */
+                                        data_cache_hit_writeback(tile_rgba, sizeof(uint16_t) * 32 * 32);
+
                                         surface_t tile_surf = surface_make_linear(
-                                            tile_rgba, FMT_RGBA16, ow, oh);
+                                            tile_rgba, FMT_RGBA16, 32, 32);
                                         rdpq_tex_upload(TILE0, &tile_surf, NULL);
 
                                         tile_u0 = (float)u0;
                                         tile_v0 = (float)v0;
-                                        tile_su = (float)ow / (float)tw;
-                                        tile_sv = (float)oh / (float)th;
+                                        tile_su = 32.0f / (float)tw;
+                                        tile_sv = 32.0f / (float)th;
                                         last_tex_idx = (int)tex_idx;
                                     }
                                 }
