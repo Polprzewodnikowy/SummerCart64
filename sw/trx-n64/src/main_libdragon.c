@@ -459,7 +459,7 @@ int main(void) {
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
-                float cam_rot_y = 0;
+                float cam_rot_y = 0, cam_rot_x = 0;  /* yaw + pitch */
 
                 /* Find Lara's start position */
                 for (int i = 0; i < g_level.item_count; i++) {
@@ -482,36 +482,34 @@ int main(void) {
                     joypad_inputs_t input = joypad_get_inputs(JOYPAD_PORT_1);
                     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-                    /* Camera movement — L/R bumpers cycle speed levels */
-                    static int speed_level = 1;  /* 0=slow, 1=normal, 2=fast, 3=turbo */
+                    /* Camera speed — L/R bumpers cycle levels */
+                    static int speed_level = 1;
                     if (pressed.l) { speed_level--; if (speed_level < 0) speed_level = 3; }
                     if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
                     float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
                     float move_speed = speed_mult[speed_level];
-                    float turn_speed = 0.12f;
-
-                    /* Z button = temporary boost (hold for turbo) */
                     if (input.btn.z) move_speed *= 4.0f;
 
-                    /* Joystick: look around (X = turn, Y = move forward/back) */
+                    /* Joystick: look around (X = turn, Y = pitch up/down) */
                     if (input.stick_x > 20 || input.stick_x < -20)
-                        cam_rot_y += input.stick_x * turn_speed * 0.01f;
+                        cam_rot_y += input.stick_x * 0.0012f;
+                    if (input.stick_y > 20 || input.stick_y < -20)
+                        cam_rot_x -= input.stick_y * 0.0008f;
                     cam_rot_y = WRAP_ANGLE(cam_rot_y);
+                    /* Clamp pitch to ~80 degrees */
+                    if (cam_rot_x > 1.3f) cam_rot_x = 1.3f;
+                    if (cam_rot_x < -1.3f) cam_rot_x = -1.3f;
 
                     float sy = sinf(cam_rot_y);
                     float cy = cosf(cam_rot_y);
 
-                    /* Joystick Y: move forward/back */
-                    if (input.stick_y > 20) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
-                    if (input.stick_y < -20) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
-
-                    /* D-pad: strafe left/right, fly up/down */
+                    /* D-pad: move forward/back + strafe */
+                    if (input.btn.d_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
+                    if (input.btn.d_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
                     if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
                     if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
-                    if (input.btn.d_up) cam_y -= move_speed;
-                    if (input.btn.d_down) cam_y += move_speed;
 
-                    /* C buttons: move forward/back + strafe left/right */
+                    /* C buttons: move forward/back + strafe */
                     if (input.btn.c_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
                     if (input.btn.c_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
                     if (input.btn.c_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
@@ -520,7 +518,7 @@ int main(void) {
                     /* ===== ROOM TRACKING + FLOOR COLLISION =====
                      * Always track which room the camera is in (for BFS).
                      * A button toggles walk mode (floor clamping). */
-                    static bool walk_mode = false;
+                    static bool walk_mode = true;  /* Walk by default */
                     if (pressed.a) walk_mode = !walk_mode;
 
                     {
@@ -588,8 +586,8 @@ int main(void) {
                                     }
                                 }
 
-                                float floor_limit = (float)floor_y - 768.0f;
-                                if (cam_y > floor_limit) cam_y = floor_limit;
+                                /* Gravity: always walk on floor */
+                                cam_y = (float)floor_y - 768.0f;
                             }
                         }
                     }
@@ -606,6 +604,10 @@ int main(void) {
                     rdpq_mode_persp(true);
                     if (has_zbuf) rdpq_mode_zbuf(true, true);
                     rdpq_mode_filter(FILTER_BILINEAR);
+
+                    /* Precompute pitch rotation */
+                    float sp = sinf(cam_rot_x);
+                    float cp = cosf(cam_rot_x);
 
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
@@ -679,14 +681,19 @@ int main(void) {
                                 float wy = rv->y - cam_y;
                                 float wz = room->z + rv->z - cam_z;
 
+                                /* Yaw rotation (around Y) */
                                 float rx = wx * cy - wz * sy;
-                                float rz = wx * sy + wz * cy;
+                                float rz_yaw = wx * sy + wz * cy;
+
+                                /* Pitch rotation (around X) */
+                                float ry = wy * cp - rz_yaw * sp;
+                                float rz = wy * sp + rz_yaw * cp;
 
                                 if (rz < 1.0f) { visible = false; break; }
 
                                 float inv_z = 256.0f / rz;
                                 float screen_x = 160.0f + rx * inv_z;
-                                float screen_y = 120.0f + wy * inv_z;
+                                float screen_y = 120.0f + ry * inv_z;
 
                                 if (screen_x < -1024 || screen_x > 1344 ||
                                     screen_y < -1024 || screen_y > 1264)
@@ -833,12 +840,14 @@ int main(void) {
                                         float cy_val = wy - cam_y;
                                         float cz = wz - cam_z;
                                         float rx = cx * cy - cz * sy;
-                                        float rz = cx * sy + cz * cy;
+                                        float rz_yaw = cx * sy + cz * cy;
+                                        float ry = cy_val * cp - rz_yaw * sp;
+                                        float rz = cy_val * sp + rz_yaw * cp;
                                         if (rz < 1.0f) { visible = false; break; }
 
                                         float inv_z = 256.0f / rz;
                                         sv[v][0] = 160.0f + rx * inv_z;
-                                        sv[v][1] = 120.0f + cy_val * inv_z;
+                                        sv[v][1] = 120.0f + ry * inv_z;
                                         sv[v][2] = rz / 32768.0f;
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
 
