@@ -370,7 +370,8 @@ static tr_parse_result_t parse_meshes(tr_reader_t *r, tr_level_t *level) {
             }
         }
 
-        /* Merge all faces */
+        /* Merge all faces (textured first, then flat-colored) */
+        mesh->textured_face_count = tex_quad_count + tex_tri_count;
         mesh->face_count = tex_quad_count + tex_tri_count +
                            flat_quad_count + flat_tri_count;
         mesh->faces = ALLOC_ARRAY(tr_face_t, mesh->face_count);

@@ -748,26 +748,37 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
-                            /* Bone tree with simple position stack (no rotations).
-                             * Each bone has push/pop flags + xyz offset. */
+                            /* Decode first animation frame for root offset */
+                            int frame_off = lara_obj->frame_offset / 2;
+                            int16_t *fr = g_level.anim_frames ? &g_level.anim_frames[frame_off] : NULL;
+
+                            /* Bone tree with position stack */
                             float pos_stack[8][3];
                             int psp = 0;
                             float bx = (float)lara_item->pos.x;
                             float by = (float)lara_item->pos.y;
                             float bz = (float)lara_item->pos.z;
 
+                            /* Apply root offset from animation frame (fixes floor clipping) */
+                            if (fr) {
+                                by += (float)fr[7]; /* Y offset lifts her above floor */
+                            }
+
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
+
+                            /* Pre-lookup palette for flat-colored faces */
+                            uint16_t *pal = pal16;  /* RGBA16 palette from earlier */
 
                             for (int mi = 0; mi < mc; mi++) {
                                 if (mi > 0) {
                                     int bi = lara_obj->bone_idx + (mi - 1);
                                     if (bi >= 0 && bi < g_level.anim_bone_count) {
                                         tr_anim_bone_t *bone = &g_level.anim_bones[bi];
-                                        if (bone->flags & 1) { /* pop */
+                                        if (bone->flags & 1) {
                                             if (psp > 0) { psp--; bx=pos_stack[psp][0]; by=pos_stack[psp][1]; bz=pos_stack[psp][2]; }
                                         }
-                                        if (bone->flags & 2) { /* push */
+                                        if (bone->flags & 2) {
                                             if (psp < 7) { pos_stack[psp][0]=bx; pos_stack[psp][1]=by; pos_stack[psp][2]=bz; psp++; }
                                         }
                                         bx += (float)bone->x;
@@ -784,12 +795,28 @@ int main(void) {
                                     tr_face_t *face = &mesh->faces[f];
                                     if (face->vertex_count < 3) continue;
 
+                                    /* Determine if face is textured or flat-colored */
+                                    bool is_flat = (face->texture & 0x8000) != 0;
                                     uint16_t tex_idx = face->texture & 0x7FFF;
-                                    if (tex_idx >= num_otex) continue;
-                                    tr_object_texture_t *otex = &g_level.object_textures[tex_idx];
-                                    if ((int)tex_idx != last_tex_idx) {
-                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        last_tex_idx = (int)tex_idx;
+                                    bool has_tex = false;
+                                    tr_object_texture_t *otex = NULL;
+                                    float flat_r = 0.8f, flat_g = 0.6f, flat_b = 0.5f;
+
+                                    if (is_flat) {
+                                        /* Flat face: use palette color */
+                                        uint8_t ci = tex_idx & 0xFF;
+                                        flat_r = (float)g_level.palette[ci*3+0] / 63.0f;
+                                        flat_g = (float)g_level.palette[ci*3+1] / 63.0f;
+                                        flat_b = (float)g_level.palette[ci*3+2] / 63.0f;
+                                    } else if (tex_idx < num_otex) {
+                                        otex = &g_level.object_textures[tex_idx];
+                                        has_tex = true;
+                                        if ((int)tex_idx != last_tex_idx) {
+                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                            last_tex_idx = (int)tex_idx;
+                                        }
+                                    } else {
+                                        continue; /* Invalid texture */
                                     }
 
                                     float sv[4][10];
@@ -814,13 +841,20 @@ int main(void) {
                                         sv[v][1] = 120.0f + cy_val * inv_z;
                                         sv[v][2] = rz / 32768.0f;
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-                                        sv[v][3] = 1.0f; sv[v][4] = 0.8f;
-                                        sv[v][5] = 0.6f; sv[v][6] = 1.0f;
 
-                                        float tu = (float)(otex->uv[v].u >> 8);
-                                        float tv = (float)(otex->uv[v].v >> 8);
-                                        sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                        sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                        if (is_flat) {
+                                            /* Flat face: shade = palette color */
+                                            sv[v][3] = flat_r; sv[v][4] = flat_g;
+                                            sv[v][5] = flat_b; sv[v][6] = 1.0f;
+                                            sv[v][7] = 0; sv[v][8] = 0;
+                                        } else {
+                                            sv[v][3] = 1.0f; sv[v][4] = 1.0f;
+                                            sv[v][5] = 1.0f; sv[v][6] = 1.0f;
+                                            float tu = (float)(otex->uv[v].u >> 8);
+                                            float tv = (float)(otex->uv[v].v >> 8);
+                                            sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                            sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                        }
                                         sv[v][9] = 1.0f / rz;
                                     }
                                     if (!visible) continue;

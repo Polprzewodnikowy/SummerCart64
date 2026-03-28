@@ -170,6 +170,7 @@ typedef struct {
 
     tr_face_t  *faces;
     int16_t     face_count;
+    int16_t     textured_face_count;  /* First N faces are textured, rest are flat-colored */
 } tr_object_mesh_t;
 
 /* -------------------------------------------------------------------
