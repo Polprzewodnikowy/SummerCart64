@@ -784,21 +784,22 @@ int main(void) {
                                 (m)[11]+=(m)[8]*(dx)+(m)[9]*(dy)+(m)[10]*(dz); \
                             }while(0)
 
-                            /* Rotate Y: columns 0,2 */
+                            /* Rotations matching TR1's exact convention (from tr_anim.c) */
+                            /* Y: col0=col0*c-col2*s, col2=col0*s+col2*c */
                             #define MRY(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
-                                _t=(m)[0];(m)[0]=_t*_c+(m)[2]*_s;(m)[2]=-_t*_s+(m)[2]*_c; \
-                                _t=(m)[4];(m)[4]=_t*_c+(m)[6]*_s;(m)[6]=-_t*_s+(m)[6]*_c; \
-                                _t=(m)[8];(m)[8]=_t*_c+(m)[10]*_s;(m)[10]=-_t*_s+(m)[10]*_c; \
+                                _t=(m)[0];(m)[0]=_t*_c-(m)[2]*_s;(m)[2]=_t*_s+(m)[2]*_c; \
+                                _t=(m)[4];(m)[4]=_t*_c-(m)[6]*_s;(m)[6]=_t*_s+(m)[6]*_c; \
+                                _t=(m)[8];(m)[8]=_t*_c-(m)[10]*_s;(m)[10]=_t*_s+(m)[10]*_c; \
                             }while(0)
 
-                            /* Rotate X: columns 1,2 */
+                            /* X: col1=col1*c+col2*s, col2=-col1*s+col2*c */
                             #define MRX(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
-                                _t=(m)[1];(m)[1]=_t*_c-(m)[2]*_s;(m)[2]=_t*_s+(m)[2]*_c; \
-                                _t=(m)[5];(m)[5]=_t*_c-(m)[6]*_s;(m)[6]=_t*_s+(m)[6]*_c; \
-                                _t=(m)[9];(m)[9]=_t*_c-(m)[10]*_s;(m)[10]=_t*_s+(m)[10]*_c; \
+                                _t=(m)[1];(m)[1]=_t*_c+(m)[2]*_s;(m)[2]=-_t*_s+(m)[2]*_c; \
+                                _t=(m)[5];(m)[5]=_t*_c+(m)[6]*_s;(m)[6]=-_t*_s+(m)[6]*_c; \
+                                _t=(m)[9];(m)[9]=_t*_c+(m)[10]*_s;(m)[10]=-_t*_s+(m)[10]*_c; \
                             }while(0)
 
-                            /* Rotate Z: columns 0,1 */
+                            /* Z: col0=col0*c-col1*s, col1=col0*s+col1*c */
                             #define MRZ(m,a) do{ float _s=sinf(a),_c=cosf(a),_t; \
                                 _t=(m)[0];(m)[0]=_t*_c-(m)[1]*_s;(m)[1]=_t*_s+(m)[1]*_c; \
                                 _t=(m)[4];(m)[4]=_t*_c-(m)[5]*_s;(m)[5]=_t*_s+(m)[5]*_c; \
@@ -818,6 +819,39 @@ int main(void) {
 
                             /* Apply root offset from frame */
                             if (fr) MTR(MC, (float)fr[6], (float)fr[7], (float)fr[8]);
+
+                            /* Dynamic lighting: room ambient + point lights */
+                            float lara_shade = 1.0f;
+                            {
+                                int lr = lara_room;
+                                if (lr >= 0 && lr < g_level.room_count) {
+                                    tr_room_t *rm = &g_level.rooms[lr];
+                                    /* Start with room ambient (0=bright, 0x1FFF=dark) */
+                                    float amb = 1.0f - (float)rm->ambient / 8191.0f;
+                                    if (amb < 0) amb = 0;
+                                    if (amb > 1) amb = 1;
+
+                                    /* Add contribution from point lights */
+                                    float lx = (float)lara_item->pos.x;
+                                    float ly_pos = (float)lara_item->pos.y;
+                                    float lz = (float)lara_item->pos.z;
+                                    float light_add = 0;
+                                    for (int li = 0; li < rm->light_count; li++) {
+                                        float dx = lx - (float)rm->lights[li].pos.x;
+                                        float dy = ly_pos - (float)rm->lights[li].pos.y;
+                                        float dz = lz - (float)rm->lights[li].pos.z;
+                                        float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+                                        float falloff = (float)rm->lights[li].falloff;
+                                        if (falloff > 0 && dist < falloff) {
+                                            float intensity = (float)rm->lights[li].intensity / 8191.0f;
+                                            light_add += intensity * (1.0f - dist / falloff);
+                                        }
+                                    }
+                                    lara_shade = amb + light_add;
+                                    if (lara_shade > 1.0f) lara_shade = 1.0f;
+                                    if (lara_shade < 0.1f) lara_shade = 0.1f;
+                                }
+                            }
 
                             int mc = lara_obj->mesh_count;
                             if (mc > 15) mc = 15;
@@ -914,13 +948,16 @@ int main(void) {
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
 
                                         if (is_flat) {
-                                            /* Flat face: shade = palette color */
-                                            sv[v][3] = flat_r; sv[v][4] = flat_g;
-                                            sv[v][5] = flat_b; sv[v][6] = 1.0f;
+                                            /* Flat face: palette color × lighting */
+                                            sv[v][3] = flat_r * lara_shade;
+                                            sv[v][4] = flat_g * lara_shade;
+                                            sv[v][5] = flat_b * lara_shade;
+                                            sv[v][6] = 1.0f;
                                             sv[v][7] = 0; sv[v][8] = 0;
                                         } else {
-                                            sv[v][3] = 1.0f; sv[v][4] = 1.0f;
-                                            sv[v][5] = 1.0f; sv[v][6] = 1.0f;
+                                            /* Textured face: shade from lighting */
+                                            sv[v][3] = lara_shade; sv[v][4] = lara_shade;
+                                            sv[v][5] = lara_shade; sv[v][6] = 1.0f;
                                             float tu = (float)(otex->uv[v].u >> 8);
                                             float tv = (float)(otex->uv[v].v >> 8);
                                             sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
