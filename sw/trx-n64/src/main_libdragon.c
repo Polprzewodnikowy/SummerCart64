@@ -674,21 +674,13 @@ int main(void) {
                 uint16_t  *mip2_pixels = NULL;
 
                 if (tex_tiles && num_otex > 0) {
-                    /* Only allocate mips if heap has enough room.
-                     * Need ~560 KB for mip pixels + surfaces, plus
-                     * headroom for GL texture arrays and other allocs. */
-                    uint32_t mip_need = num_otex * (MIP1_BYTES + MIP2_BYTES +
-                                        2 * sizeof(surface_t));
-                    uint32_t heap_avail = n64_mem_available();
-                    if (heap_avail > mip_need + 64 * 1024) { /* 64 KB headroom */
-                        mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                        mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                        mip1_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP1_BYTES);
-                        mip2_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP2_BYTES);
-                    } else {
-                        printf("  Mip skip: need %u KB, have %u KB\n",
-                               mip_need/1024, heap_avail/1024);
-                    }
+                    /* Mip pixels in UNCACHED memory (required for rdpq DMA).
+                     * No GL objects created for mips, so no RSPQ block pressure.
+                     * Surface_t structs can live in cached bump heap. */
+                    mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    mip1_pixels = (uint16_t *)malloc_uncached_aligned(64, num_otex * MIP1_BYTES);
+                    mip2_pixels = (uint16_t *)malloc_uncached_aligned(64, num_otex * MIP2_BYTES);
                 }
 
                 bool mips_ok = (mip1_surfs && mip2_surfs &&
@@ -738,9 +730,7 @@ int main(void) {
                         mip1_surfs[i] = surface_make_linear(d16, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
                         mip2_surfs[i] = surface_make_linear(d8, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
                     }
-                    /* Flush cached pixel data so DMA can read it */
-                    data_cache_hit_writeback(mip1_pixels, num_otex * MIP1_BYTES);
-                    data_cache_hit_writeback(mip2_pixels, num_otex * MIP2_BYTES);
+                    /* Uncached memory — no cache flush needed */
                     printf("  Mips ready: %d KB (16x16) + %d KB (8x8)\n",
                            num_otex * MIP1_BYTES / 1024, num_otex * MIP2_BYTES / 1024);
                 } else {
