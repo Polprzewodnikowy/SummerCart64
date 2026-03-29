@@ -1309,74 +1309,46 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Frustum culling by room AABB
+                     * VISIBILITY: Current room + portal-connected rooms
                      *
                      * Rules:
                      *   1. Current room is ALWAYS visible.
                      *   2. Rooms directly connected via portals: ALWAYS visible.
-                     *   3. Other rooms: frustum cull using room AABB.
+                     *   3. Nothing else — indoor caves only need rooms
+                     *      reachable through openings.
                      *   4. Culling decides draw/not-draw.
                      *      LOD decides which representation to draw.
                      * =================================================== */
-                    #define MAX_DRAW_ROOMS 32
-                    int vis_rooms[MAX_DRAW_ROOMS * 2];
+                    #define MAX_DRAW_ROOMS 16
+                    int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
 
-                    /* Build connected-room set for rules 1+2 */
-                    bool room_forced[TR_MAX_ROOMS];
-                    memset(room_forced, 0, sizeof(room_forced));
-                    if (lara_room >= 0 && lara_room < g_level.room_count) {
-                        room_forced[lara_room] = true;
-                        tr_room_t *lr = &g_level.rooms[lara_room];
-                        for (int p = 0; p < lr->portal_count; p++) {
-                            int dest = lr->portals[p].room;
-                            if (dest >= 0 && dest < g_level.room_count)
-                                room_forced[dest] = true;
-                        }
+                    /* Rule 1: current room */
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        g_chunks[lara_room].dist_sq = 0.0f;
+                        g_chunks[lara_room].visible = true;
+                        vis_rooms[vis_count++] = lara_room;
                     }
 
-                    for (int ri = 0; ri < g_chunk_count; ri++) {
-                        tr_chunk_t *c = &g_chunks[ri];
-
-                        /* Compute distance (needed for LOD regardless) */
-                        float ddx = c->cx - cam_x;
-                        float ddz = c->cz - cam_z;
-                        c->dist_sq = ddx * ddx + ddz * ddz;
-                        c->visible = false;
-
-                        /* Rules 1+2: current room + connected rooms always visible */
-                        if (room_forced[ri]) {
+                    /* Rule 2: portal-connected rooms */
+                    if (lara_room >= 0 && lara_room < g_level.room_count) {
+                        tr_room_t *lr = &g_level.rooms[lara_room];
+                        for (int p = 0; p < lr->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
+                            int dest = lr->portals[p].room;
+                            if (dest < 0 || dest >= g_chunk_count) continue;
+                            /* Avoid duplicates */
+                            bool dup = false;
+                            for (int vi = 0; vi < vis_count; vi++) {
+                                if (vis_rooms[vi] == dest) { dup = true; break; }
+                            }
+                            if (dup) continue;
+                            tr_chunk_t *c = &g_chunks[dest];
+                            float ddx = c->cx - cam_x;
+                            float ddz = c->cz - cam_z;
+                            c->dist_sq = ddx * ddx + ddz * ddz;
                             c->visible = true;
-                        } else {
-                            /* Per-room distance gate — small rooms cull
-                             * earlier, large rooms stay visible further */
-                            if (c->dist_sq > c->max_draw_dist2) {
-                                continue;
-                            }
-
-                            /* Rule 2: frustum cull by AABB center+extent */
-                            float cx_r = ddx * cy - ddz * sy;
-                            float cz_r = ddx * sy + ddz * cy;
-                            float half_x = (c->max_x - c->min_x) * 0.5f;
-                            float half_z = (c->max_z - c->min_z) * 0.5f;
-                            float extent = half_x + half_z;
-
-                            float near_z = cz_r - extent;
-                            if (near_z < -512.0f) {
-                                continue; /* behind camera */
-                            }
-
-                            float far_z = cz_r + extent;
-                            if (far_z < 1.0f) far_z = 1.0f;
-                            float frustum_w = far_z * CHUNK_TAN_H + extent;
-                            if (cx_r > -frustum_w && cx_r < frustum_w) {
-                                c->visible = true;
-                            }
+                            vis_rooms[vis_count++] = dest;
                         }
-
-                        if (!c->visible) continue;
-                        if (vis_count >= MAX_DRAW_ROOMS * 2) continue;
-                        vis_rooms[vis_count++] = ri;
                     }
 
                     /* Rule 3: LOD classification — separate from culling.
