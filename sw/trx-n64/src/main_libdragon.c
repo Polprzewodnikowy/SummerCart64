@@ -699,7 +699,13 @@ int main(void) {
                 #define MIP0_DIM 32
                 #define MIP1_DIM 16
                 #define MIP2_DIM 8
-                #define BAKED_BYTES_PER_ROOM (MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
+                #define BAKED_BYTES_PER_ROOM_FULL (MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
+                /* Only load mip1+mip2 (skip mip0) to save uncached RDRAM.
+                 * mip0 (32×32) = 2048 bytes/room — too expensive for 38 rooms.
+                 * mip1+mip2 = 640 bytes/room × 38 = ~24 KB. */
+                #define BAKED_MIP1_OFFSET (MIP0_DIM*MIP0_DIM*2)
+                #define BAKED_MIP2_OFFSET (MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2)
+                #define BAKED_LOAD_PER_ROOM (MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
                 #define BAKED_HEADER_SIZE 16
 
                 /* Try to include auto-generated baked offsets header.
@@ -729,37 +735,36 @@ int main(void) {
                         printf("  Baked data: %d rooms, %d mips\n",
                                baked_room_count, bake_mips);
 
-                        /* Allocate uncached memory for baked pixel data */
-                        int total_baked = baked_room_count * BAKED_BYTES_PER_ROOM;
+                        /* Only load mip1+mip2 per room (24 KB total, not 100 KB).
+                         * Skip mip0 (32×32) to preserve uncached RDRAM for RSPQ. */
+                        int total_baked = baked_room_count * BAKED_LOAD_PER_ROOM;
                         baked_pixels = (uint16_t *)malloc_uncached_aligned(
                             64, total_baked);
-                        baked_mip0 = (surface_t *)n64_mem_alloc(
-                            baked_room_count * sizeof(surface_t));
                         baked_mip1 = (surface_t *)n64_mem_alloc(
                             baked_room_count * sizeof(surface_t));
                         baked_mip2 = (surface_t *)n64_mem_alloc(
                             baked_room_count * sizeof(surface_t));
 
-                        if (baked_pixels && baked_mip0 && baked_mip1 && baked_mip2) {
-                            /* DMA all baked pixel data from ROM */
-                            dma_read(baked_pixels,
-                                     ROM_CART_BASE + BAKED_ROM_OFFSET + BAKED_HEADER_SIZE,
-                                     total_baked);
-
-                            /* Create surface_t wrappers for each room's mips */
+                        if (baked_pixels && baked_mip1 && baked_mip2) {
+                            /* DMA mip1+mip2 for each room from ROM
+                             * (skip mip0 data in the .baked file) */
                             for (int bi = 0; bi < baked_room_count; bi++) {
-                                uint8_t *base = (uint8_t *)baked_pixels +
-                                    bi * BAKED_BYTES_PER_ROOM;
-                                baked_mip0[bi] = surface_make_linear(
-                                    (uint16_t *)base, FMT_RGBA16, MIP0_DIM, MIP0_DIM);
+                                uint32_t rom_room_base = ROM_CART_BASE +
+                                    BAKED_ROM_OFFSET + BAKED_HEADER_SIZE +
+                                    bi * BAKED_BYTES_PER_ROOM_FULL +
+                                    BAKED_MIP1_OFFSET;
+                                uint8_t *dst = (uint8_t *)baked_pixels +
+                                    bi * BAKED_LOAD_PER_ROOM;
+                                dma_read(dst, rom_room_base, BAKED_LOAD_PER_ROOM);
+
                                 baked_mip1[bi] = surface_make_linear(
-                                    (uint16_t *)(base + MIP0_DIM*MIP0_DIM*2),
+                                    (uint16_t *)dst,
                                     FMT_RGBA16, MIP1_DIM, MIP1_DIM);
                                 baked_mip2[bi] = surface_make_linear(
-                                    (uint16_t *)(base + MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2),
+                                    (uint16_t *)(dst + MIP1_DIM*MIP1_DIM*2),
                                     FMT_RGBA16, MIP2_DIM, MIP2_DIM);
                             }
-                            printf("  Baked loaded: %d KB from ROM\n",
+                            printf("  Baked loaded: %d KB (mip1+mip2 only)\n",
                                    total_baked / 1024);
                         } else {
                             printf("  Baked alloc failed\n");
@@ -1462,8 +1467,10 @@ int main(void) {
                                 } else if (rd > CHUNK_MID_DIST2 && baked_mip1) {
                                     rdpq_tex_upload(TILE0, &baked_mip1[room_idx], NULL);
                                     room_uv_scale = (float)MIP1_DIM / (float)MIP0_DIM;
-                                } else if (baked_mip0) {
-                                    rdpq_tex_upload(TILE0, &baked_mip0[room_idx], NULL);
+                                } else if (baked_mip1) {
+                                    /* No mip0 loaded — use mip1 as closest baked level */
+                                    rdpq_tex_upload(TILE0, &baked_mip1[room_idx], NULL);
+                                    room_uv_scale = (float)MIP1_DIM / (float)MIP0_DIM;
                                 }
                                 room_baked = true;
                                 far_last_tex = -99; /* force re-check if fallback */
