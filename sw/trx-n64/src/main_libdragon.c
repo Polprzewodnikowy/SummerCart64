@@ -869,8 +869,7 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start button: return to console */
-                    if (pressed.start) break;
+                    /* Start button disabled during GL mode (console alloc crashes) */
 
                     /* Begin frame — OpenGL RSP T&L */
                     surface_t *disp = display_get();
@@ -883,8 +882,11 @@ int main(void) {
                         glViewport(0, 0, 320, 240);
 
                         /* Perspective projection */
-                        /* Scale TR1 coords down to fit GL fixed-point range */
-                        #define WORLD_SCALE (1.0f / 64.0f)
+                        /* Scale TR1 coords down to fit GL fixed-point range.
+                         * TR1 rooms span ~30000 units. GL RSP uses s15.16 fixed-point
+                         * which can represent +-32767. Scale by 1/256 to bring max
+                         * camera-relative coords (~15000) down to ~58. */
+                        #define WORLD_SCALE (1.0f / 256.0f)
 
                         glMatrixMode(GL_PROJECTION);
                         glLoadIdentity();
@@ -928,16 +930,6 @@ int main(void) {
                     glLoadIdentity();
                     glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
                     glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
-
-                    /* DEBUG: test triangle to verify GL pipeline works */
-                    glBegin(GL_TRIANGLES);
-                    glColor4f(1, 0, 0, 1);
-                    glVertex3f(-2, -1, -5);
-                    glColor4f(0, 1, 0, 1);
-                    glVertex3f( 2, -1, -5);
-                    glColor4f(0, 0, 1, 1);
-                    glVertex3f( 0,  2, -5);
-                    glEnd();
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
