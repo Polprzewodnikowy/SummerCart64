@@ -633,7 +633,8 @@ int main(void) {
                     static bool walk_mode = false;
                     static int speed_level = 1;
                     if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
-                    if (pressed.l) walk_mode = !walk_mode;
+                    static bool collision_on = false;
+                    if (pressed.l) collision_on = !collision_on;
                     float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
                     float move_speed = speed_mult[speed_level];
                     if (input.btn.z) move_speed *= 4.0f;
@@ -708,7 +709,7 @@ int main(void) {
                         lara_room = cam_room;
 
                         /* Floor clamping (walk mode only) */
-                        if (walk_mode) {
+                        if (walk_mode && collision_on) {
                             tr_room_t *room = &g_level.rooms[cam_room];
                             int32_t sx = (icx - room->x) >> 10;
                             int32_t sz = (icz - room->z) >> 10;
