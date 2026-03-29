@@ -1729,8 +1729,14 @@ int main(void) {
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
                                 int want_tex;
+                                uint8_t sm_fr = (uint8_t)(sm_bright * 255.0f);
+                                uint8_t sm_fg = sm_fr, sm_fb = sm_fr;
                                 if (is_flat) {
                                     want_tex = -2;
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    sm_fr = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * sm_bright * 255.0f);
+                                    sm_fg = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * sm_bright * 255.0f);
+                                    sm_fb = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * sm_bright * 255.0f);
                                 } else if (tex_idx < num_otex && gl_textures) {
                                     want_tex = (int)tex_idx;
                                 } else continue;
@@ -1751,7 +1757,6 @@ int main(void) {
                                 if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
 
                                 float px[4], py[4], pz[4], fs[4], ft[4];
-                                uint8_t cr[4], cg[4], cb[4];
                                 bool ok = true;
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
@@ -1771,9 +1776,7 @@ int main(void) {
                                     py[v] = -(wy - cam_y) * WORLD_SCALE * SM_Z_BIAS;
                                     pz[v] = -(wz - cam_z) * WORLD_SCALE * SM_Z_BIAS;
 
-                                    cr[v] = (uint8_t)(sm_bright * 255.0f);
-                                    cg[v] = cr[v];
-                                    cb[v] = cr[v];
+                                    /* Palette color for flat, uniform shade for textured */
 
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
@@ -1795,7 +1798,7 @@ int main(void) {
                                         int i = idx[k];
                                         gl_vert_t *vp = &gl_verts[gl_vc++];
                                         vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                        vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
+                                        vp->r = sm_fr; vp->g = sm_fg; vp->b = sm_fb; vp->a = 255;
                                         vp->s = fs[i]; vp->t = ft[i];
                                     }
                                 }
@@ -1891,9 +1894,17 @@ int main(void) {
                                     uint16_t tex_idx = face->texture & 0x7FFF;
                                     bool is_flat = (face->texture & 0x8000) != 0;
                                     int want_tex;
-                                    if (is_flat) want_tex = -2;
-                                    else if (tex_idx < num_otex && gl_textures) want_tex = (int)tex_idx;
-                                    else continue;
+                                    /* Flat-colored face: look up palette color */
+                                    uint8_t flat_r = lshade, flat_g = lshade, flat_b = lshade;
+                                    if (is_flat) {
+                                        want_tex = -2;
+                                        uint8_t ci = tex_idx & 0xFF;
+                                        flat_r = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * lara_shade * 255.0f);
+                                        flat_g = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * lara_shade * 255.0f);
+                                        flat_b = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * lara_shade * 255.0f);
+                                    } else if (tex_idx < num_otex && gl_textures) {
+                                        want_tex = (int)tex_idx;
+                                    } else continue;
 
                                     if (want_tex != cur_tex) {
                                         FLUSH_GL();
@@ -1945,7 +1956,10 @@ int main(void) {
                                             int i = idx[k];
                                             gl_vert_t *vp = &gl_verts[gl_vc++];
                                             vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                            vp->r = lshade; vp->g = lshade; vp->b = lshade; vp->a = 255;
+                                            vp->r = is_flat ? flat_r : lshade;
+                                            vp->g = is_flat ? flat_g : lshade;
+                                            vp->b = is_flat ? flat_b : lshade;
+                                            vp->a = 255;
                                             vp->s = ffs[i]; vp->t = fft[i];
                                         }
                                     }
@@ -1955,7 +1969,72 @@ int main(void) {
                     }
                     FLUSH_GL();
 
+                    /* ===== LARA SHADOW (dark circle on floor) ===== */
+                    {
+                        /* Use Lara's item position directly */
+                        tr_item_t *shadow_item = NULL;
+                        for (int i = 0; i < g_level.item_count; i++)
+                            if (g_level.items[i].object_id == 0) { shadow_item = &g_level.items[i]; break; }
+
+                        if (shadow_item) {
+                            int32_t shadow_fl, shadow_cl;
+                            GET_SECTOR_HEIGHTS(shadow_item->pos.x, shadow_item->pos.z,
+                                               shadow_item->pos.y, shadow_fl, shadow_cl);
+                            float shadow_y = (float)shadow_fl + 4.0f;
+                            float shadow_rad = 120.0f;
+                            float shadow_cx_w = (float)shadow_item->pos.x;
+                            float shadow_cz_w = (float)shadow_item->pos.z;
+
+                            if (gl_white_tex) {
+                                FLUSH_GL();
+                                glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                cur_tex = -2;
+                            }
+
+                            glEnable(GL_BLEND);
+                            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                            glDepthMask(GL_FALSE);
+
+                            float sc_x = (shadow_cx_w - cam_x) * WORLD_SCALE;
+                            float sc_y = -(shadow_y - cam_y) * WORLD_SCALE;
+                            float sc_z = -(shadow_cz_w - cam_z) * WORLD_SCALE;
+
+                            #define SHADOW_PTS 12
+                            float rim_x[SHADOW_PTS], rim_z2[SHADOW_PTS];
+                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
+                                float a = (float)sp3 * 6.28318f / (float)SHADOW_PTS;
+                                float wx = shadow_cx_w + shadow_rad * sinf(a);
+                                float wz = shadow_cz_w + shadow_rad * cosf(a);
+                                rim_x[sp3] = (wx - cam_x) * WORLD_SCALE;
+                                rim_z2[sp3] = -(wz - cam_z) * WORLD_SCALE;
+                            }
+
+                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
+                                int next = (sp3 + 1) % SHADOW_PTS;
+                                if (gl_vc + 3 > MAX_GL_VERTS) FLUSH_GL();
+                                gl_vert_t *v0 = &gl_verts[gl_vc++];
+                                v0->x = sc_x; v0->y = sc_y; v0->z = sc_z;
+                                v0->r = 0; v0->g = 0; v0->b = 0; v0->a = 160;
+                                v0->s = 0; v0->t = 0;
+                                gl_vert_t *v1 = &gl_verts[gl_vc++];
+                                v1->x = rim_x[sp3]; v1->y = sc_y; v1->z = rim_z2[sp3];
+                                v1->r = 0; v1->g = 0; v1->b = 0; v1->a = 80;
+                                v1->s = 0; v1->t = 0;
+                                gl_vert_t *v2 = &gl_verts[gl_vc++];
+                                v2->x = rim_x[next]; v2->y = sc_y; v2->z = rim_z2[next];
+                                v2->r = 0; v2->g = 0; v2->b = 0; v2->a = 80;
+                                v2->s = 0; v2->t = 0;
+                            }
+                            FLUSH_GL();
+
+                            glDisable(GL_BLEND);
+                            glDepthMask(GL_TRUE);
+                            #undef SHADOW_PTS
+                        }
+                    }
+
                     } /* end GL near pass */
+
                     #undef FLUSH_GL
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
