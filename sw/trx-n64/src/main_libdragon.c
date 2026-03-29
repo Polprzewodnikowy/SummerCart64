@@ -1260,35 +1260,35 @@ int main(void) {
                         float ddz = c->cz - cam_z;
                         c->dist_sq = ddx*ddx + ddz*ddz;
 
-                        /* LOD classify with overlap band.
+                        /* Three-tier LOD with overlap at mid/far boundary.
                          *
-                         * Rooms in the overlap zone (0.7×–1.2× FAR threshold)
-                         * are submitted to BOTH passes: far pass draws them
-                         * first as backdrop, near pass overwrites with Z-buffer
-                         * and RSP projection.  This hides the seam between the
-                         * two projection pipelines (CPU float vs RSP fixed-pt).
+                         * NEAR (< 4 sectors): GL, no fog
+                         * MID  (4-7 sectors): GL, with fog in vertex color
+                         * FAR  (> 7 sectors): RDPQ CPU projection, fog
                          *
-                         * Outside the band:
-                         *   closer than 0.7× → near only
-                         *   farther than 1.2× → far only
-                         * Inside the band → both passes */
-                        #define LOD_OVERLAP_INNER (CHUNK_FAR_DIST2 * 0.85f)
-                        #define LOD_OVERLAP_OUTER (CHUNK_FAR_DIST2 * 1.1f)
+                         * Mid/far overlap band: rooms drawn in both RDPQ
+                         * far pass and GL near pass to hide the seam. */
+                        #define LOD_MID_FAR_INNER (CHUNK_MID_DIST2 * 0.85f)
+                        #define LOD_MID_FAR_OUTER (CHUNK_MID_DIST2 * 1.1f)
 
-                        if (c->dist_sq < LOD_OVERLAP_INNER) {
-                            /* Clearly near */
+                        if (c->dist_sq < CHUNK_NEAR_DIST2) {
+                            /* NEAR — GL, no fog */
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
-                        } else if (c->dist_sq > LOD_OVERLAP_OUTER) {
-                            /* Clearly far */
+                        } else if (c->dist_sq < LOD_MID_FAR_INNER) {
+                            /* MID — GL with fog */
+                            c->lod = CHUNK_LOD_MID;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
+                        } else if (c->dist_sq > LOD_MID_FAR_OUTER) {
+                            /* FAR — RDPQ only */
                             c->lod = CHUNK_LOD_FAR;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
                         } else {
-                            /* Overlap band — draw in both passes.
-                             * Far pass draws first, near pass overwrites. */
-                            c->lod = CHUNK_LOD_NEAR; /* near for hysteresis tracking */
+                            /* Mid/far overlap — both passes */
+                            c->lod = CHUNK_LOD_MID;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
                             if (near_count < MAX_DRAW_ROOMS)
@@ -1445,17 +1445,17 @@ int main(void) {
                                     float ry = cy_v * cp - rz_yaw * sp;
                                     float rz = cy_v * sp + rz_yaw * cp;
 
-                                    if (rz < 64.0f) { visible = false; break; }
+                                    if (rz < 128.0f) { visible = false; break; }
 
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + rx * inv_z;
                                     float scy = 120.0f + ry * inv_z;
-                                    /* Clamp to safe RDP range but don't reject —
-                                     * partially visible faces need to draw */
-                                    if (scx < -1024) scx = -1024;
-                                    if (scx > 1344) scx = 1344;
-                                    if (scy < -1024) scy = -1024;
-                                    if (scy > 1264) scy = 1264;
+                                    /* Clamp to RDP-safe range. Reject faces with
+                                     * any vertex wildly off-screen (distortion) */
+                                    if (scx < -400 || scx > 720 ||
+                                        scy < -300 || scy > 540) {
+                                        visible = false; break;
+                                    }
 
                                     /* Lighting (simplified: no per-vertex fog for perf) */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
@@ -1469,7 +1469,7 @@ int main(void) {
                                     /* Simplified fog: per-room, not per-vertex */
                                     float room_d = (room_idx < g_chunk_count)
                                         ? g_chunks[room_idx].dist_sq : 0.0f;
-                                    float fog = (room_d - 26214400.0f) / 598785600.0f;
+                                    float fog = (room_d - 16777216.0f) / 383223784.0f;
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f;
                                     r = r * (1.0f - fog) + 0.35f * fog;
@@ -1669,18 +1669,18 @@ int main(void) {
                                 float g = is_water ? bright * 0.6f : bright;
                                 float b = is_water ? bright * 1.0f : bright;
 
-                                /* Far pass: blend lighting with RGB fog.
-                                 * Uses dist² (no sqrtf) for performance.
-                                 * Fog color is cave-appropriate mid-gray.
-                                 * Vertical gradient: lower verts get denser fog. */
-                                if (pass == 0) {
+                                /* Apply fog for MID LOD rooms (GL near pass)
+                                 * and far pass. NEAR rooms have no fog. */
+                                bool apply_fog = (room_idx < g_chunk_count &&
+                                    g_chunks[room_idx].lod >= CHUNK_LOD_MID);
+                                if (apply_fog) {
                                     float fdx = vx_w - cam_x;
                                     float fdz = vz_w - cam_z;
                                     float d2 = fdx*fdx + fdz*fdz;
-                                    /* Quadratic ramp: fog ∝ dist², visually close to linear */
-                                    float fog = (d2 - 26214400.0f) / (99090432.0f);
-                                    /* 26214400 = 5120² (start), 625000000 = 25000² (end)
-                                     * divisor = end² - start² = 598785600 */
+                                    float fog = (d2 - 16777216.0f) / 383223784.0f;
+                                    /* 16777216 = 4096² (near/mid boundary)
+                                     * 400000000 = 20000² (far world clip)
+                                     * divisor = end² - start² */
                                     /* Vertical bias: lower = more fog (TR1 Y-down) */
                                     float y_bias = (vy_w - cam_y) * 0.00004f;
                                     if (y_bias < 0.0f) y_bias = 0.0f;

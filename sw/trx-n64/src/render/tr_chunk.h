@@ -22,13 +22,15 @@
  * LOD levels
  * --------------------------------------------------------------------- */
 
-#define CHUNK_LOD_NEAR  0   /* Full detail — near pass, Z-buffer on       */
-#define CHUNK_LOD_FAR   1   /* Coarse — far pass, back-to-front, no Z-buf */
+#define CHUNK_LOD_NEAR  0   /* Full detail — GL RSP T&L, no fog           */
+#define CHUNK_LOD_MID   1   /* Mid detail — GL RSP T&L, with fog          */
+#define CHUNK_LOD_FAR   2   /* Far detail — RDPQ CPU projection, fog      */
 
 /* Distance thresholds in TR1 world units (squared for cheap comparison).
- * 1 sector = 1024 units. ~5 sectors near, ~10 sectors = far. */
-#define CHUNK_NEAR_DIST2  (5120.0f  * 5120.0f)
-#define CHUNK_FAR_DIST2   (7168.0f * 7168.0f)   /* ~7 sectors = far */
+ * NEAR < 4 sectors, MID 4-7 sectors, FAR > 7 sectors */
+#define CHUNK_NEAR_DIST2  (4096.0f  * 4096.0f)
+#define CHUNK_MID_DIST2   (7168.0f  * 7168.0f)
+#define CHUNK_FAR_DIST2   CHUNK_MID_DIST2  /* alias for compatibility */
 
 /* Far clip distance.  Portal visibility replaces frustum culling,
  * so this only affects the fog ramp endpoint. */
