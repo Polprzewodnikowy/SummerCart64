@@ -879,28 +879,28 @@ int main(void) {
                     /* One-time GL state setup on first frame */
                     if (!gl_setup_done) {
                         gl_setup_done = true;
-                        glViewport(0, 0, 320, 240);
 
-                        /* Perspective projection */
-                        /* Scale TR1 coords down to fit GL fixed-point range.
-                         * TR1 rooms span ~30000 units. GL RSP uses s15.16 fixed-point
-                         * which can represent +-32767. Scale by 1/256 to bring max
-                         * camera-relative coords (~15000) down to ~58. */
+                        /* Scale factor: TR1 coords are huge, scale to GL range */
                         #define WORLD_SCALE (1.0f / 256.0f)
 
+                        /* Projection via glFrustum (matches libdragon gldemo pattern) */
+                        float near_p = 0.1f;
+                        float far_p = 200.0f;
+                        float aspect = 320.0f / 240.0f;
                         glMatrixMode(GL_PROJECTION);
                         glLoadIdentity();
-                        gluPerspective(60.0f, 320.0f / 240.0f,
-                                       32.0f * WORLD_SCALE, 32768.0f * WORLD_SCALE);
+                        glFrustum(-near_p * aspect, near_p * aspect,
+                                  -near_p, near_p, near_p, far_p);
 
                         glEnable(GL_DEPTH_TEST);
                         glDepthFunc(GL_LESS);
-                        glEnable(GL_TEXTURE_2D);
-                        glDisable(GL_CULL_FACE);  /* Disable until winding is verified */
+                        glDisable(GL_CULL_FACE);
                         glShadeModel(GL_SMOOTH);
 
-                        glDisable(GL_TEXTURE_2D);  /* DEBUG: test geometry without textures */
-                        glDisable(GL_FOG);  /* Disable fog too for clarity */
+                        /* DEBUG: no textures, no fog — just vertex colors */
+                        glDisable(GL_TEXTURE_2D);
+                        glDisable(GL_FOG);
+                        glDisable(GL_LIGHTING);
 
                         /* Create GL texture objects */
                         if (gl_textures) {
