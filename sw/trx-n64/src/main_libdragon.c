@@ -766,29 +766,54 @@ int main(void) {
                     if (collision_on) {
                         /* TCL mode: wall + floor + ceiling collision.
                          * D-pad up/down disabled, gravity pulls to floor. */
-                        dy = 0;  /* no manual Y movement in collision mode */
+                        dy = 0;
                         static float vy = 0;
                         vy += 16.0f;  /* gravity */
 
+                        /* Wall collision: check destination AND a probe point
+                         * 512 units ahead (prevents skipping thin wall sectors) */
+                        #define IS_WALL(fx, fz, cy, cf, cc) do { \
+                            GET_SECTOR_HEIGHTS(fx, fz, cy, cf, cc); \
+                        } while(0)
+                        #define BLOCKED(fx, fz, cfl, ccl) \
+                            ((cfl - ccl) < 512 || (cfl - cur_floor) < -768)
+
                         if (dx != 0 || dz != 0) {
-                            int32_t cur_floor, cur_ceil, dst_floor, dst_ceil;
+                            int32_t cur_floor, cur_ceil;
                             GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, cur_floor, cur_ceil);
-                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, cam_y, dst_floor, dst_ceil);
-                            int32_t gap = dst_floor - dst_ceil;
-                            int32_t step = dst_floor - cur_floor;
-                            if (gap < 512 || step < -768) {
-                                /* Try X only */
-                                GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, cam_y, dst_floor, dst_ceil);
-                                gap = dst_floor - dst_ceil;
-                                step = dst_floor - cur_floor;
-                                if (gap < 512 || step < -768) dx = 0;
-                                /* Try Z only */
-                                GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, cam_y, dst_floor, dst_ceil);
-                                gap = dst_floor - dst_ceil;
-                                step = dst_floor - cur_floor;
-                                if (gap < 512 || step < -768) dz = 0;
+
+                            /* Normalize movement direction for probe */
+                            float len = sqrtf(dx*dx + dz*dz);
+                            float nx = dx / len, nz = dz / len;
+                            /* Probe 512 units ahead of destination */
+                            float probe_x = cam_x + dx + nx * 512.0f;
+                            float probe_z = cam_z + dz + nz * 512.0f;
+
+                            int32_t df, dc, pf, pc;
+                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, cam_y, df, dc);
+                            GET_SECTOR_HEIGHTS(probe_x, probe_z, cam_y, pf, pc);
+
+                            bool wall = BLOCKED(cam_x+dx, cam_z+dz, df, dc) ||
+                                        BLOCKED(probe_x, probe_z, pf, pc);
+                            if (wall) {
+                                /* Try X-only slide */
+                                float px2 = cam_x + dx + nx * 512.0f;
+                                GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, cam_y, df, dc);
+                                GET_SECTOR_HEIGHTS(px2, cam_z, cam_y, pf, pc);
+                                if (BLOCKED(cam_x+dx, cam_z, df, dc) ||
+                                    BLOCKED(px2, cam_z, pf, pc))
+                                    dx = 0;
+                                /* Try Z-only slide */
+                                float pz2 = cam_z + dz + nz * 512.0f;
+                                GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, cam_y, df, dc);
+                                GET_SECTOR_HEIGHTS(cam_x, pz2, cam_y, pf, pc);
+                                if (BLOCKED(cam_x, cam_z+dz, df, dc) ||
+                                    BLOCKED(cam_x, pz2, pf, pc))
+                                    dz = 0;
                             }
                         }
+                        #undef IS_WALL
+                        #undef BLOCKED
 
                         cam_x += dx; cam_z += dz;
                         cam_y += vy;
@@ -1553,6 +1578,16 @@ int main(void) {
                 printf("Paused. Press START for 3D.\n");
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
                 printf("FPS: %d  Audio: %d samples\n", fps_display, parsed_samples);
+                printf("SndData: ptr=%p size=%d idx=%d details=%d\n",
+                       g_level.sample_data, (int)g_level.sample_data_size,
+                       (int)g_level.sample_index_count, (int)g_level.sound_detail_count);
+                if (g_level.sample_data && g_level.sample_index_count > 0) {
+                    int32_t o = g_level.sample_indices[0];
+                    uint8_t *w = g_level.sample_data + o;
+                    printf("  [0] off=%d hdr=%02x%02x%02x%02x\n", o, w[0],w[1],w[2],w[3]);
+                }
+                printf("Flags: 0x%x compressed=%u fullsize=%u\n",
+                       (unsigned)level_flags, (unsigned)level_compressed, (unsigned)level_size);
                 printf("Room: %d  Collision: %s\n", lara_room, collision_on?"ON (tcl)":"OFF (noclip)");
                 {
                     int32_t pfl, pcl;
