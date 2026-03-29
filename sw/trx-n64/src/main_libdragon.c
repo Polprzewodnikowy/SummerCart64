@@ -13,6 +13,8 @@
 #define __LIBDRAGON_ASSET_H  /* Prevent libdragon's asset.h from loading */
 
 #include <libdragon.h>
+#include <GL/gl.h>
+#include <GL/gl_integration.h>
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
 #include <rdpq_mode.h>
@@ -515,6 +517,31 @@ int main(void) {
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
                 }
 
+                /* Create GL texture objects from our surface_t array */
+                GLuint *gl_textures = NULL;
+                GLuint gl_white_tex = 0;
+                if (num_otex > 0 && tex_surfs) {
+                    gl_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
+                    if (gl_textures) {
+                        glGenTextures(num_otex, gl_textures);
+                        for (int i = 0; i < num_otex; i++) {
+                            glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
+                        }
+                    }
+                }
+                if (white_px) {
+                    glGenTextures(1, &gl_white_tex);
+                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                    glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
+                }
+
                 /* ============================================
                  * AUDIO INIT
                  * ============================================ */
@@ -610,14 +637,49 @@ int main(void) {
                  * Flat-shaded room triangles via rdpq.
                  */
 
-                /* Close console, init display for 3D */
+                /* Close console, init display + OpenGL for RSP T&L */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-                rdpq_init();
+                gl_init();
 
-                /* Z-buffer for proper depth sorting */
-                surface_t zbuf = surface_alloc(FMT_RGBA16, 320, 240);
-                bool has_zbuf = (zbuf.buffer != NULL);
+                /* GL setup: perspective projection, depth test, fog */
+                glViewport(0, 0, 320, 240);
+                glMatrixMode(GL_PROJECTION);
+                glLoadIdentity();
+                /* Perspective: ~73 degree horizontal FOV, aspect 4:3, near=32, far=32768 */
+                float near_clip = 32.0f, far_clip = 32768.0f;
+                float fov_y = 60.0f * 3.14159f / 180.0f;  /* vertical FOV in radians */
+                float aspect = 320.0f / 240.0f;
+                float f = 1.0f / tanf(fov_y / 2.0f);
+                float proj[16] = {
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (far_clip + near_clip) / (near_clip - far_clip), -1,
+                    0, 0, (2 * far_clip * near_clip) / (near_clip - far_clip), 0
+                };
+                glLoadMatrixf(proj);
+
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(GL_LESS);
+                glEnable(GL_TEXTURE_2D);
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glFrontFace(GL_CW);  /* TR1 uses CW winding */
+                glShadeModel(GL_SMOOTH);
+
+                /* GL fog for distance fade */
+                glEnable(GL_FOG);
+                glFogi(GL_FOG_MODE, GL_LINEAR);
+                float fog_start = 0.0f, fog_end = 16384.0f;
+                glFogf(GL_FOG_START, fog_start);
+                glFogf(GL_FOG_END, fog_end);
+                float fog_color[] = {0, 0, 0, 1};
+                glFogfv(GL_FOG_COLOR, fog_color);
+
+                /* Texture environment: modulate texture with vertex color */
+                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+                bool has_zbuf = true;  /* GL manages zbuf internally */
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -863,16 +925,19 @@ int main(void) {
                     /* Start button: return to console */
                     if (pressed.start) break;
 
-                    /* Begin frame */
+                    /* Begin frame — OpenGL RSP T&L */
                     surface_t *disp = display_get();
-                    rdpq_attach_clear(disp, has_zbuf ? &zbuf : NULL);
+                    rdpq_attach(disp, display_get_zbuf());
+                    gl_context_begin();
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    rdpq_set_mode_standard();
-                    rdpq_mode_combiner(RDPQ_COMBINER1((TEX0, 0, SHADE, 0), (TEX0, 0, SHADE, 0)));
-                    rdpq_mode_persp(true);
-                    if (has_zbuf) rdpq_mode_zbuf(true, true);
-                    rdpq_mode_filter(FILTER_BILINEAR);
-                    rdpq_mode_antialias(AA_STANDARD);
+                    /* Set camera modelview matrix */
+                    glMatrixMode(GL_MODELVIEW);
+                    glLoadIdentity();
+                    /* Camera: pitch then yaw then translate */
+                    glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
+                    glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
+                    glTranslatef(-cam_x, -cam_y, -cam_z);
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
@@ -906,14 +971,14 @@ int main(void) {
                         }
                     }
 
-                    /* Draw rooms with frustum culling */
+                    /* ===== DRAW ROOMS via OpenGL RSP T&L ===== */
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room-level cull: only skip rooms entirely behind camera */
+                        /* Room-level cull: skip rooms entirely behind camera */
                         float rcx = room->x + room->sectors_x * 512.0f - cam_x;
                         float rcz = room->z + room->sectors_z * 512.0f - cam_z;
                         float room_rz = rcx * sy + rcz * cy;
@@ -926,100 +991,63 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Upload texture if available */
+                            /* Bind GL texture */
                             uint16_t tex_idx = face->texture & 0x7FFF;
-                            bool has_tex = false;
-                            tr_object_texture_t *otex = NULL;
-                            if (tex_idx < num_otex && tex_surfs &&
-                                tex_idx < g_level.object_texture_count) {
-                                otex = &g_level.object_textures[tex_idx];
-                                has_tex = true;
+                            bool is_flat = (face->texture & 0x8000) != 0;
+                            if (!is_flat && tex_idx < num_otex && gl_textures) {
                                 if ((int)tex_idx != last_tex_idx) {
-                                    rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                    glBindTexture(GL_TEXTURE_2D, gl_textures[tex_idx]);
                                     last_tex_idx = (int)tex_idx;
                                 }
-                            }
-                            /* Skip faces with no valid texture (flat-colored faces
-                             * or textures beyond our cap) — they'd render with
-                             * wrong texture data. TODO: render as solid color. */
-                            if (!has_tex) continue;
+                            } else if (is_flat && gl_white_tex) {
+                                if (last_tex_idx != -2) {
+                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                    last_tex_idx = -2;
+                                }
+                            } else continue;
 
-                            float sv[4][10];
-                            bool visible = true;
+                            tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                ? &g_level.object_textures[tex_idx] : NULL;
 
+                            /* Emit triangle(s) — RSP handles T&L + clipping */
+                            glBegin(GL_TRIANGLE_FAN);
                             for (int v = 0; v < face->vertex_count; v++) {
                                 uint16_t vi = face->vertices[v];
-                                if (vi >= room->mesh.vertex_count) { visible = false; break; }
-
+                                if (vi >= room->mesh.vertex_count) break;
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                float wx = room->x + rv->x - cam_x;
-                                float wy = rv->y - cam_y;
-                                float wz = room->z + rv->z - cam_z;
-
-                                /* Yaw rotation (around Y) */
-                                float rx = wx * cy - wz * sy;
-                                float rz_yaw = wx * sy + wz * cy;
-
-                                /* Pitch rotation (around X) */
-                                float ry = wy * cp - rz_yaw * sp;
-                                float rz = wy * sp + rz_yaw * cp;
-
-                                if (rz < 32.0f) { visible = false; break; }
-
-                                float inv_z = 256.0f / rz;
-                                float screen_x = 160.0f + rx * inv_z;
-                                float screen_y = 120.0f + ry * inv_z;
-
-                                /* Clamp to safe RDP coordinate range */
-                                if (screen_x < -2048.0f) screen_x = -2048.0f;
-                                if (screen_x > 2048.0f) screen_x = 2048.0f;
-                                if (screen_y < -2048.0f) screen_y = -2048.0f;
-                                if (screen_y > 2048.0f) screen_y = 2048.0f;
-
-                                sv[v][0] = screen_x;
-                                sv[v][1] = screen_y;
-                                /* Z normalized to [0,1] for zbuf (0=near, 1=far) */
-                                sv[v][2] = rz / 32768.0f;
-                                if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
-
-                                /* Distance fog: darken with distance */
-                                float fog = 1.0f - rz / 16384.0f;
-                                if (fog < 0.0f) fog = 0.0f;
-
-                                int16_t light = rv->light;
-                                float bright = 1.0f - ((float)light / 8191.0f);
+                                /* Vertex color from room lighting */
+                                float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
-                                bright = (0.4f + bright * 0.6f) * fog;
-                                /* Water rooms get blue tint */
-                                sv[v][3] = is_water ? bright * 0.4f : bright;
-                                sv[v][4] = is_water ? bright * 0.6f : bright;
-                                sv[v][5] = is_water ? bright * 1.0f : bright;
-                                sv[v][6] = 1.0f;
+                                bright = 0.4f + bright * 0.6f;
+                                if (is_water)
+                                    glColor4f(bright * 0.4f, bright * 0.6f, bright, 1.0f);
+                                else if (is_flat) {
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    float fr = (float)g_level.palette[ci*3+0] / 63.0f;
+                                    float fg = (float)g_level.palette[ci*3+1] / 63.0f;
+                                    float fb = (float)g_level.palette[ci*3+2] / 63.0f;
+                                    glColor4f(fr * bright, fg * bright, fb * bright, 1.0f);
+                                } else
+                                    glColor4f(bright, bright, bright, 1.0f);
 
-                                if (has_tex && tex_uv_map) {
+                                /* Texture coordinates */
+                                if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    sv[v][7] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    sv[v][8] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    float s = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    float t = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    /* Normalize to [0,1] for GL (our tiles are TEX_TILE_DIM x TEX_TILE_DIM) */
+                                    glTexCoord2f(s / (float)TEX_TILE_DIM, t / (float)TEX_TILE_DIM);
                                 } else {
-                                    sv[v][7] = 0.0f;
-                                    sv[v][8] = 0.0f;
+                                    glTexCoord2f(0, 0);
                                 }
-                                sv[v][9] = 1.0f / rz;
+
+                                /* World-space position — RSP does the rest */
+                                glVertex3f(room->x + rv->x, rv->y, room->z + rv->z);
                             }
-
-                            if (!visible) continue;
-
-                            /* Backface cull disabled for debugging */
-                            /* float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
-                                        - (sv[1][1]-sv[0][1])*(sv[2][0]-sv[0][0]);
-                            if (cross < 0 && !(face->texture & 0x8000)) continue; */
-
-                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
-                            if (face->vertex_count == 4)
-                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            glEnd();
                         }
 
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
@@ -1543,6 +1571,7 @@ int main(void) {
                     (void)0; /* Suppress empty statement warning */
 
                     /* Show frame */
+                    gl_context_end();
                     rdpq_detach_show();
 
                     /* Audio: mix and submit to AI */
@@ -1582,7 +1611,7 @@ int main(void) {
                 }
 
                 /* START pressed — return to console briefly */
-                rdpq_close();
+                gl_close();
                 display_close();
                 console_init();
                 console_set_render_mode(RENDER_MANUAL);
