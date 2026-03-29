@@ -2008,7 +2008,6 @@ int main(void) {
                                 if (!room_baked) {
                                     if (is_flat) {
                                         if (white_px && far_last_tex != -2) {
-                                            rspq_flush();
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                                             far_last_tex = -2;
                                             perf_far_uploads++;
@@ -2152,7 +2151,6 @@ int main(void) {
 
                     /* Upload the global CI8 palette once for the whole pass */
                     rdpq_mode_tlut(TLUT_RGBA16);
-                    rspq_flush();
                     rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
 
                     int near_last_tex = -99; /* force first upload */
@@ -2272,7 +2270,6 @@ int main(void) {
                             if (!is_flat && tex_idx < num_otex && ci8_surfs) {
                                 if ((int)tex_idx != near_last_tex &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
-                                    rspq_flush();
                                     if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                     near_last_tex = (int)tex_idx;
@@ -2282,7 +2279,6 @@ int main(void) {
                             } else if (is_flat) {
                                 if (white_px && near_last_tex != -2 &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
-                                    rspq_flush();
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
                                     near_last_tex = -2;
@@ -2384,7 +2380,7 @@ int main(void) {
                             for (int tri = 0; tri < num_tris; tri++) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
-                                if ((perf_near_tris & 63) == 0) rspq_flush();
+                                if ((perf_near_tris & 31) == 0) rspq_flush();
                             }
                         }
                     }
@@ -2447,7 +2443,6 @@ int main(void) {
                                     sm_fg = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
                                     sm_fb = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
                                     if (white_px && near_last_tex != -2) {
-                                        rspq_flush();
                                         rdpq_mode_tlut(TLUT_NONE);
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                         near_last_tex = -2;
@@ -2455,7 +2450,6 @@ int main(void) {
                                 } else if (tex_idx < num_otex && ci8_surfs) {
                                     sm_fr = sm_fg = sm_fb = sm_bright;
                                     if ((int)tex_idx != near_last_tex) {
-                                        rspq_flush();
                                         if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                         rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                         near_last_tex = (int)tex_idx;
@@ -2533,7 +2527,7 @@ int main(void) {
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                     perf_near_tris++;
-                                    if ((perf_near_tris & 63) == 0) rspq_flush();
+                                    if ((perf_near_tris & 31) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -2638,14 +2632,12 @@ int main(void) {
                                         l_fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
                                         l_fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
                                         if (white_px && near_last_tex != -2) {
-                                            rspq_flush();
                                             rdpq_mode_tlut(TLUT_NONE);
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                                             near_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex && ci8_surfs) {
                                         if ((int)tex_idx != near_last_tex) {
-                                            rspq_flush();
                                             if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                             rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                             near_last_tex = (int)tex_idx;
@@ -2699,7 +2691,7 @@ int main(void) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                         perf_near_tris++;
                                     }
-                                    if ((perf_near_tris & 63) == 0) rspq_flush();
+                                    if ((perf_near_tris & 31) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -2961,7 +2953,6 @@ int main(void) {
                                 ifg = (float)g_level.palette[ci*3+1]/63.0f*item_shade;
                                 ifb = (float)g_level.palette[ci*3+2]/63.0f*item_shade;
                                 if (white_px && near_last_tex != -2) {
-                                    rspq_flush();
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
                                     near_last_tex = -2;
@@ -2969,7 +2960,6 @@ int main(void) {
                             } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
                                 if ((int)tex_idx != near_last_tex) {
-                                    rspq_flush();
                                     if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                     near_last_tex = (int)tex_idx;
@@ -3016,7 +3006,7 @@ int main(void) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 perf_near_tris++;
                             }
-                            if ((perf_near_tris & 63) == 0) rspq_flush();
+                            if ((perf_near_tris & 31) == 0) rspq_flush();
                         }
                     }
                     perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
