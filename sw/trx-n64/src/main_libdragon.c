@@ -880,12 +880,14 @@ int main(void) {
                     if (!gl_setup_done) {
                         gl_setup_done = true;
 
-                        /* Scale factor: TR1 coords are huge, scale to GL range */
-                        #define WORLD_SCALE (1.0f / 256.0f)
+                        /* Scale factor: TR1 camera-relative coords can be up to ~15000.
+                         * GL fixed-point is s15.16, max +-32767. Scale 1/4 keeps
+                         * max values around ~3750 which is well within range. */
+                        #define WORLD_SCALE (1.0f / 4.0f)
 
-                        /* Projection via glFrustum (matches libdragon gldemo pattern) */
-                        float near_p = 0.1f;
-                        float far_p = 200.0f;
+                        /* Projection via glFrustum */
+                        float near_p = 4.0f;   /* 16 TR1 units */
+                        float far_p = 8000.0f;  /* 32000 TR1 units */
                         float aspect = 320.0f / 240.0f;
                         glMatrixMode(GL_PROJECTION);
                         glLoadIdentity();
