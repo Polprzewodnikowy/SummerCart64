@@ -880,14 +880,13 @@ int main(void) {
                     if (!gl_setup_done) {
                         gl_setup_done = true;
 
-                        /* Scale factor: TR1 camera-relative coords can be up to ~15000.
-                         * GL fixed-point is s15.16, max +-32767. Scale 1/4 keeps
-                         * max values around ~3750 which is well within range. */
-                        #define WORLD_SCALE (1.0f / 256.0f)
+                        /* Scale: 1/32 keeps nearby walls (~2000 units) at ~62 GL units.
+                         * Max camera-relative (~15000) = ~470 — within s15.16 range. */
+                        #define WORLD_SCALE (1.0f / 32.0f)
 
                         /* Projection: 60 deg vertical FOV */
-                        float near_p = 0.05f;
-                        float far_p = 200.0f;
+                        float near_p = 0.5f;    /* ~16 TR1 units */
+                        float far_p = 600.0f;   /* ~19200 TR1 units */
                         float fov_half = 30.0f * 3.14159f / 180.0f;  /* half of 60 deg */
                         float top = near_p * tanf(fov_half);
                         float right = top * (320.0f / 240.0f);
@@ -967,11 +966,9 @@ int main(void) {
                     }
 
                     /* ===== DRAW ROOMS via OpenGL — batched vertex array ===== */
-                    /* Build triangle vertex buffer on CPU, draw with glDrawArrays.
-                     * Max ~3000 triangles = 9000 vertices × 7 floats (xyz + rgba) */
-                    #define MAX_GL_VERTS 9000
-                    static float gl_pos[MAX_GL_VERTS * 3];
-                    static float gl_col[MAX_GL_VERTS * 4];
+                    #define MAX_GL_VERTS 6000
+                    static float gl_pos[MAX_GL_VERTS * 3] __attribute__((aligned(16)));
+                    static float gl_col[MAX_GL_VERTS * 4] __attribute__((aligned(16)));
                     int gl_vert_count = 0;
 
                     for (int ri = 0; ri < num_draw; ri++) {
@@ -988,7 +985,7 @@ int main(void) {
                         if (room_rz < -room_radius) continue;
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 500) max_faces = 500;
+                        if (max_faces > 300) max_faces = 300;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
@@ -1015,7 +1012,7 @@ int main(void) {
                                 float rz = wy * sp + rz_yaw * cp;
 
                                 vx[v] = rx * WORLD_SCALE;
-                                vy[v] = ry * WORLD_SCALE;
+                                vy[v] = -ry * WORLD_SCALE;  /* Negate Y: TR1 Y-down → GL Y-up */
                                 vz[v] = -rz * WORLD_SCALE;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
@@ -1049,6 +1046,10 @@ int main(void) {
 
                     draw_batch:
                     if (gl_vert_count > 0) {
+                        /* Flush CPU cache so RSP can DMA the vertex data */
+                        data_cache_hit_writeback(gl_pos, gl_vert_count * 3 * sizeof(float));
+                        data_cache_hit_writeback(gl_col, gl_vert_count * 4 * sizeof(float));
+
                         glEnableClientState(GL_VERTEX_ARRAY);
                         glEnableClientState(GL_COLOR_ARRAY);
                         glVertexPointer(3, GL_FLOAT, 0, gl_pos);
