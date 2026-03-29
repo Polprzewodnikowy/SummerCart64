@@ -1310,7 +1310,7 @@ int main(void) {
                             /* Project portal's 4 vertices to screen space */
                             int16_t pmin_x = 320, pmin_y = 240;
                             int16_t pmax_x = 0, pmax_y = 0;
-                            bool portal_behind = true;
+                            int verts_behind = 0, verts_front = 0;
                             for (int pv = 0; pv < 4; pv++) {
                                 float px_w = (float)(room->x + portal->vertices[pv].x);
                                 float py_w = (float)portal->vertices[pv].y;
@@ -1322,8 +1322,11 @@ int main(void) {
                                 float rz_yaw = cx_p * sy + cz_p * cy;
                                 float ry_p = cy_p * cp - rz_yaw * sp;
                                 float rz_p = cy_p * sp + rz_yaw * cp;
-                                if (rz_p < 4.0f) continue; /* vertex behind camera */
-                                portal_behind = false;
+                                if (rz_p < 4.0f) {
+                                    verts_behind++;
+                                    continue;
+                                }
+                                verts_front++;
                                 float inv_z = 256.0f / rz_p;
                                 int16_t sx = (int16_t)(160.0f + rx_p * inv_z);
                                 int16_t sy2 = (int16_t)(120.0f + ry_p * inv_z);
@@ -1336,11 +1339,18 @@ int main(void) {
                                 if (sy2 < pmin_y) pmin_y = sy2;
                                 if (sy2 > pmax_y) pmax_y = sy2;
                             }
-                            if (portal_behind) {
-                                /* All portal verts behind camera — widen to full
-                                 * screen since portal wraps around behind us */
-                                pmin_x = 0; pmin_y = 0;
-                                pmax_x = 320; pmax_y = 240;
+                            if (verts_front == 0) {
+                                /* All behind camera — use full parent clip */
+                                pmin_x = pcl; pmin_y = pct;
+                                pmax_x = pcr; pmax_y = pcb;
+                            } else if (verts_behind > 0) {
+                                /* Portal crosses near plane — expand rect to
+                                 * parent clip bounds on any edge that has a
+                                 * behind-camera vertex.  Conservative: just
+                                 * use parent clip rect (the portal is very
+                                 * close and spans a wide angle). */
+                                pmin_x = pcl; pmin_y = pct;
+                                pmax_x = pcr; pmax_y = pcb;
                             }
 
                             /* Clip portal rect against parent's clip rect */
@@ -1933,7 +1943,7 @@ int main(void) {
                      * Z-bias: scale static mesh positions slightly closer
                      * to camera (0.999×) to win Z-test against coplanar
                      * room walls.  glPolygonOffset not available in libdragon. */
-                    #define SM_Z_BIAS 0.999f
+                    #define SM_Z_BIAS 0.997f  /* stronger bias to reduce Z-fighting flicker */
                     for (int ri = 0; ri < near_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
