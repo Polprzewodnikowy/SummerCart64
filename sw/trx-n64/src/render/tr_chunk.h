@@ -65,6 +65,38 @@ typedef struct {
     int   lod;               /* CHUNK_LOD_NEAR or CHUNK_LOD_FAR           */
     float dist_sq;           /* Squared XZ distance from camera           */
     bool  visible;           /* Passed frustum test this frame            */
+    int   cluster_id;        /* Index into g_clusters (-1 = none)         */
 } tr_chunk_t;
+
+/* -----------------------------------------------------------------------
+ * Cluster — groups 2-4 adjacent rooms for hierarchical LOD
+ *
+ * At distance, instead of drawing every face in every child room,
+ * the renderer applies face decimation (skip every Nth face) to reduce
+ * triangle count.  Coverage remains complete because the same rooms
+ * are drawn, just at reduced face density.
+ *
+ * LOD tiers:
+ *   NEAR  (cluster_dist < FAR_DIST2): draw all child rooms, full faces
+ *   FAR   (< VERY_FAR_DIST2):         face_skip = 2 (draw every 2nd face)
+ *   VFAR  (>= VERY_FAR_DIST2):        face_skip = 4 (draw every 4th face)
+ * --------------------------------------------------------------------- */
+
+#define MAX_CLUSTER_CHILDREN  4
+#define MAX_CLUSTERS          64
+#define CHUNK_VERY_FAR_DIST2  (15360.0f * 15360.0f)  /* ~15 sectors */
+
+typedef struct {
+    int   children[MAX_CLUSTER_CHILDREN]; /* Room indices (child chunks) */
+    int   child_count;
+
+    /* Combined bounding sphere from children */
+    float cx, cy, cz;
+    float radius;
+
+    /* Per frame */
+    float dist_sq;           /* Squared XZ distance from camera           */
+    int   face_skip;         /* 1 = all faces, 2 = every 2nd, 4 = every 4th */
+} tr_cluster_t;
 
 #endif /* TR_CHUNK_H */

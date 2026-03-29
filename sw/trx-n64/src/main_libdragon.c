@@ -203,8 +203,12 @@ static tr_level_t g_level;
 static bool g_has_assets = false;
 
 /* Chunk array — one entry per TR1 room, built once after level parse */
-static tr_chunk_t g_chunks[TR_MAX_ROOMS];
-static int        g_chunk_count = 0;
+static tr_chunk_t  g_chunks[TR_MAX_ROOMS];
+static int         g_chunk_count = 0;
+
+/* Cluster array — groups of 2-4 rooms for hierarchical LOD */
+static tr_cluster_t g_clusters[MAX_CLUSTERS];
+static int          g_cluster_count = 0;
 
 #define ARCHIVE_SECTOR  0x10000
 #define CACHE_BASE      ((uint8_t *)0xB1000000)
@@ -245,9 +249,74 @@ static void build_chunks(const tr_level_t *level) {
         float dz = c->max_z - c->min_z;
         c->radius = sqrtf(dx*dx + dy*dy + dz*dz) * 0.5f;
 
-        c->lod     = CHUNK_LOD_NEAR;
-        c->dist_sq = 0.0f;
-        c->visible = false;
+        c->lod        = CHUNK_LOD_NEAR;
+        c->dist_sq    = 0.0f;
+        c->visible    = false;
+        c->cluster_id = -1;
+    }
+}
+
+/*
+ * Build spatial clusters from portal connectivity.
+ * Each cluster groups up to MAX_CLUSTER_CHILDREN adjacent rooms.
+ * Rooms are assigned to clusters via greedy BFS: start from an
+ * unassigned room, pull in portal-connected neighbors.
+ */
+static void build_clusters(const tr_level_t *level) {
+    g_cluster_count = 0;
+    bool assigned[TR_MAX_ROOMS];
+    memset(assigned, 0, sizeof(assigned));
+
+    for (int seed = 0; seed < g_chunk_count && g_cluster_count < MAX_CLUSTERS; seed++) {
+        if (assigned[seed]) continue;
+
+        tr_cluster_t *cl = &g_clusters[g_cluster_count];
+        cl->child_count = 0;
+
+        /* Seed the cluster with this room */
+        cl->children[cl->child_count++] = seed;
+        assigned[seed] = true;
+        g_chunks[seed].cluster_id = g_cluster_count;
+
+        /* Pull in portal-connected neighbors up to MAX_CLUSTER_CHILDREN */
+        for (int ci = 0; ci < cl->child_count && cl->child_count < MAX_CLUSTER_CHILDREN; ci++) {
+            int ri = cl->children[ci];
+            if (ri < 0 || ri >= level->room_count) continue;
+            const tr_room_t *room = &level->rooms[ri];
+            for (int p = 0; p < room->portal_count && cl->child_count < MAX_CLUSTER_CHILDREN; p++) {
+                int dest = room->portals[p].room;
+                if (dest >= 0 && dest < g_chunk_count && !assigned[dest]) {
+                    assigned[dest] = true;
+                    cl->children[cl->child_count++] = dest;
+                    g_chunks[dest].cluster_id = g_cluster_count;
+                }
+            }
+        }
+
+        /* Compute combined bounding sphere from children */
+        float min_x = 1e18f, max_x = -1e18f;
+        float min_y = 1e18f, max_y = -1e18f;
+        float min_z = 1e18f, max_z = -1e18f;
+        for (int ci = 0; ci < cl->child_count; ci++) {
+            tr_chunk_t *c = &g_chunks[cl->children[ci]];
+            if (c->min_x < min_x) min_x = c->min_x;
+            if (c->max_x > max_x) max_x = c->max_x;
+            if (c->min_y < min_y) min_y = c->min_y;
+            if (c->max_y > max_y) max_y = c->max_y;
+            if (c->min_z < min_z) min_z = c->min_z;
+            if (c->max_z > max_z) max_z = c->max_z;
+        }
+        cl->cx = (min_x + max_x) * 0.5f;
+        cl->cy = (min_y + max_y) * 0.5f;
+        cl->cz = (min_z + max_z) * 0.5f;
+        float dx = max_x - min_x;
+        float dy = max_y - min_y;
+        float dz = max_z - min_z;
+        cl->radius   = sqrtf(dx*dx + dy*dy + dz*dz) * 0.5f;
+        cl->dist_sq  = 0.0f;
+        cl->face_skip = 1;
+
+        g_cluster_count++;
     }
 }
 
@@ -683,7 +752,9 @@ int main(void) {
 
                 /* Build chunk array (one per room) for frustum/LOD queries */
                 build_chunks(&g_level);
-                printf("  %d chunks built.\n", g_chunk_count);
+                build_clusters(&g_level);
+                printf("  %d chunks, %d clusters built.\n",
+                       g_chunk_count, g_cluster_count);
 
                 /* Pre-compute shadow circle points (avoid sinf/cosf per frame) */
                 float shadow_circ[16][2];
@@ -1138,6 +1209,21 @@ int main(void) {
                         }
                     }
 
+                    /* Update cluster face_skip based on cluster-center distance.
+                     * All children in a cluster share the same face_skip. */
+                    for (int ci = 0; ci < g_cluster_count; ci++) {
+                        tr_cluster_t *cl = &g_clusters[ci];
+                        float cdx = cl->cx - cam_x;
+                        float cdz = cl->cz - cam_z;
+                        cl->dist_sq = cdx*cdx + cdz*cdz;
+                        if (cl->dist_sq < CHUNK_FAR_DIST2)
+                            cl->face_skip = 1;       /* near: all faces */
+                        else if (cl->dist_sq < CHUNK_VERY_FAR_DIST2)
+                            cl->face_skip = 2;       /* far: every 2nd face */
+                        else
+                            cl->face_skip = 4;       /* very far: every 4th */
+                    }
+
                     /* Bubble-sort far rooms back-to-front (prep for Phase 2 far pass).
                      * Small list so insertion sort is fine. */
                     for (int i = 1; i < far_count; i++) {
@@ -1223,10 +1309,18 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room already passed chunk_frustum_visible() — no redundant
-                         * per-room cull needed.  Face loop follows directly. */
+                        /* Cluster face decimation: look up face_skip from the
+                         * room's cluster.  Near rooms (skip=1) draw all faces.
+                         * Far rooms draw every Nth face to reduce tri count. */
+                        int face_skip = 1;
+                        if (room_idx < g_chunk_count) {
+                            int cid = g_chunks[room_idx].cluster_id;
+                            if (cid >= 0 && cid < g_cluster_count)
+                                face_skip = g_clusters[cid].face_skip;
+                        }
+
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f++) {
+                        for (int f = 0; f < max_faces; f += face_skip) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
