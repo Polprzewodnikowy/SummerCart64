@@ -1106,7 +1106,10 @@ int main(void) {
                      * Using rdpq_clear instead of manual set_mode_fill +
                      * fill_rectangle to avoid RDP mode tracking conflicts
                      * with the subsequent set_mode_standard for the far pass. */
-                    rdpq_clear(RGBA32(0, 0, 0, 0xFF));
+                    /* Clear to fog color (not black) so sub-pixel gaps
+                     * between triangles blend in instead of showing stark
+                     * black seams.  Matches the far-pass fog target color. */
+                    rdpq_clear(RGBA32(64, 56, 77, 0xFF));
                     rdpq_clear_z(0xFFFC);
 
                     /* Precompute pitch sin/cos for CPU projection */
