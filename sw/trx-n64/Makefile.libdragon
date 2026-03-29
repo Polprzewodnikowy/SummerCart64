@@ -13,7 +13,28 @@ src = src/main_libdragon.c \
       ../asset_streaming/src/lz4_decode.c \
       ../asset_streaming/src/asset_debug.c
 
+# Baked chunk data directory
+LEVEL_DIR = data/levels
+BAKE_DIR = $(BUILD_DIR)/baked
+
 all: trx-n64.z64
 .PHONY: all
 
+# Bake chunk textures for all available levels
+bake: $(BAKE_DIR)
+	@for phd in $(LEVEL_DIR)/*.PHD; do \
+		name=$$(basename $$phd .PHD); \
+		echo "Baking $$name..."; \
+		python3 tools/bake_chunks.py $$phd $(BAKE_DIR)/$$name.baked; \
+	done
+.PHONY: bake
+
+$(BAKE_DIR):
+	@mkdir -p $(BAKE_DIR)
+
+# Auto-bake Level 1 before building ROM (always available for testing)
+$(BUILD_DIR)/level1.baked: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_chunks.py | $(BAKE_DIR)
+	python3 tools/bake_chunks.py $< $@
+
+# Build depends on baked data
 $(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)
