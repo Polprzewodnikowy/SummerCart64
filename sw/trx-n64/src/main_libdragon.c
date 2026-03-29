@@ -1444,6 +1444,7 @@ int main(void) {
                             glColorPointer(4, GL_UNSIGNED_BYTE, VERT_STRIDE, &gl_verts[0].r); \
                             glTexCoordPointer(2, GL_FLOAT, VERT_STRIDE, &gl_verts[0].s); \
                             glDrawArrays(GL_TRIANGLES, 0, gl_vc); \
+                            rspq_flush(); \
                             glDisableClientState(GL_VERTEX_ARRAY); \
                             glDisableClientState(GL_COLOR_ARRAY); \
                             glDisableClientState(GL_TEXTURE_COORD_ARRAY); \
