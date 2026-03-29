@@ -869,8 +869,13 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start button: pause to debug console */
-                    if (pressed.start) break;
+                    /* Start: pause/unpause (freezes frame, press again to resume) */
+                    if (pressed.start) {
+                        while (1) {
+                            joypad_poll();
+                            if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
+                        }
+                    }
 
                     /* Begin frame — OpenGL RSP T&L */
                     surface_t *disp = display_get();
@@ -1663,86 +1668,6 @@ int main(void) {
                         }
                     }
                 }
-
-                /* START pressed — pause. Wait for START without switching to console
-                 * (console_init crashes due to GL memory usage). */
-                {
-                    /* Just wait for START press in a tight loop */
-                    while (1) {
-                        joypad_poll();
-                        if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
-                    }
-                }
-                /* Skip all the console debug output — go straight back to render */
-                goto render_loop;
-                /* Dead code below — kept for reference but never reached */
-                console_init();
-                console_set_render_mode(RENDER_MANUAL);
-                printf("Paused. Press START for 3D.\n");
-                printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
-                printf("FPS: %d  Audio: %d samples\n", fps_display, parsed_samples);
-                printf("SndData: ptr=%p size=%d idx=%d details=%d\n",
-                       g_level.sample_data, (int)g_level.sample_data_size,
-                       (int)g_level.sample_index_count, (int)g_level.sound_detail_count);
-                if (g_level.sample_data && g_level.sample_index_count > 0) {
-                    int32_t o = g_level.sample_indices[0];
-                    uint8_t *w = g_level.sample_data + o;
-                    printf("  [0] off=%d hdr=%02x%02x%02x%02x\n", o, w[0],w[1],w[2],w[3]);
-                }
-                printf("Flags: 0x%x comp=%u full=%u\n",
-                       (unsigned)level_flags, (unsigned)level_compressed, (unsigned)level_size);
-                /* Parse positions: rooms,mesh,anim,obj,tex,cam,snd,box,atex,items,lm,cine,demo,smap,sdet,sidx */
-                printf("Parse@:");
-                for (int pi = 0; pi < g_parse_count && pi < 16; pi++)
-                    printf(" %u", g_parse_pos[pi]);
-                printf("\n");
-                printf("Room: %d  Collision: %s\n", lara_room, collision_on?"ON (tcl)":"OFF (noclip)");
-                {
-                    int32_t pfl, pcl;
-                    GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
-                    printf("Sector: floor=%d ceil=%d\n", pfl, pcl);
-                    printf("  eye_floor=%.0f eye_ceil=%.0f\n",
-                           (float)pfl - 768.0f, (float)pcl + 128.0f);
-                }
-                /* Debug: Lara animation info */
-                {
-                    tr_object_def_t *dbg_obj = NULL;
-                    for (int i = 0; i < g_level.object_count; i++)
-                        if (g_level.objects[i].object_id == 0) { dbg_obj = &g_level.objects[i]; break; }
-                    if (dbg_obj) {
-                        int ai = dbg_obj->anim_idx;
-                        printf("Lara: meshes=%d anim_idx=%d\n", dbg_obj->mesh_count, ai);
-                        printf("  frame_off=%u bone_idx=%d\n", dbg_obj->frame_offset, dbg_obj->bone_idx);
-                        if (ai >= 0 && ai < g_level.anim_count) {
-                            tr_anim_t *a = &g_level.anims[ai];
-                            printf("  anim: frames=%d-%d size=%d interp=%d\n",
-                                   a->frame_base, a->frame_end, a->frame_size, a->interpolation);
-                            /* Show first frame rotation data for mesh 0 */
-                            int fo = dbg_obj->frame_offset / 2;
-                            if (g_level.anim_frames && fo + 11 < g_level.anim_frame_count) {
-                                int16_t *f = &g_level.anim_frames[fo];
-                                printf("  fr0: off=%d,%d,%d rot0=%04x,%04x\n",
-                                       f[6], f[7], f[8], (uint16_t)f[9], (uint16_t)f[10]);
-                            }
-                        }
-                    }
-                }
-                console_render();
-
-                /* Wait for START to re-enter 3D */
-                while (1) {
-                    joypad_poll();
-                    joypad_buttons_t p2 = joypad_get_buttons_pressed(JOYPAD_PORT_1);
-                    if (p2.start) break;
-                }
-
-                /* Re-init display and GL for 3D */
-                console_close();
-                display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
-                rdpq_init();
-                gl_init();
-                gl_setup_done = false;  /* Re-setup GL state + textures on first frame */
-                goto render_loop;
 
             } else {
                 printf("  Parse FAILED: %s\n", tr_parse_error_string(res));
