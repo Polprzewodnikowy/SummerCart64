@@ -1402,11 +1402,12 @@ int main(void) {
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + rx * inv_z;
                                     float scy = 120.0f + ry * inv_z;
-                                    /* Tight clamp — RDP can't handle extreme coords */
-                                    if (scx < -512 || scx > 832 ||
-                                        scy < -512 || scy > 752) {
-                                        visible = false; break;
-                                    }
+                                    /* Clamp to safe RDP range but don't reject —
+                                     * partially visible faces need to draw */
+                                    if (scx < -1024) scx = -1024;
+                                    if (scx > 1344) scx = 1344;
+                                    if (scy < -1024) scy = -1024;
+                                    if (scy > 1264) scy = 1264;
 
                                     /* Lighting (simplified: no per-vertex fog for perf) */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
