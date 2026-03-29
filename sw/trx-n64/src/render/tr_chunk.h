@@ -72,6 +72,9 @@ typedef struct {
     float fog_start_dist2;   /* Distance where fog begins                 */
     int   size_class;        /* 0=small, 1=medium, 2=large, 3=open        */
 
+    /* Per-room fog color (computed once from ambient + water flag) */
+    float fog_r, fog_g, fog_b;
+
     /* Updated per frame */
     int   lod;               /* CHUNK_LOD_NEAR or CHUNK_LOD_FAR           */
     float dist_sq;           /* Squared XZ distance from camera           */

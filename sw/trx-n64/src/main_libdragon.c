@@ -270,22 +270,28 @@ static void build_chunks(const tr_level_t *level) {
         #define SIZE_LARGE  2
         #define SIZE_OPEN   3
 
+        /* Openness bias: rooms with more portals have longer
+         * sightlines through openings.  Pushes thresholds out
+         * slightly so fog/LOD transitions happen further away. */
+        float openness = 1.0f + r->portal_count * 0.15f;
+        if (openness > 2.0f) openness = 2.0f;
+
         if (room_sectors < 2.0f) {
             c->size_class = SIZE_SMALL;
-            c->near_dist2     = 2048.0f * 2048.0f;   /* ~2 sectors */
-            c->fog_start_dist2 = 1536.0f * 1536.0f;  /* fog early */
+            c->near_dist2     = 2048.0f * 2048.0f * openness;
+            c->fog_start_dist2 = 1536.0f * 1536.0f * openness;
         } else if (room_sectors < 4.0f) {
             c->size_class = SIZE_MEDIUM;
-            c->near_dist2     = 4096.0f * 4096.0f;   /* ~4 sectors */
-            c->fog_start_dist2 = 3072.0f * 3072.0f;
+            c->near_dist2     = 4096.0f * 4096.0f * openness;
+            c->fog_start_dist2 = 3072.0f * 3072.0f * openness;
         } else if (room_sectors < 8.0f) {
             c->size_class = SIZE_LARGE;
-            c->near_dist2     = 6144.0f * 6144.0f;   /* ~6 sectors */
-            c->fog_start_dist2 = 4096.0f * 4096.0f;
+            c->near_dist2     = 6144.0f * 6144.0f * openness;
+            c->fog_start_dist2 = 4096.0f * 4096.0f * openness;
         } else {
             c->size_class = SIZE_OPEN;
-            c->near_dist2     = 8192.0f * 8192.0f;   /* ~8 sectors */
-            c->fog_start_dist2 = 6144.0f * 6144.0f;
+            c->near_dist2     = 8192.0f * 8192.0f * openness;
+            c->fog_start_dist2 = 6144.0f * 6144.0f * openness;
         }
 
         /* Max draw distance from size + connectivity */
@@ -294,6 +300,25 @@ static void build_chunks(const tr_level_t *level) {
         if (draw_dist < 7168.0f) draw_dist = 7168.0f;
         if (draw_dist > 16384.0f) draw_dist = 16384.0f;
         c->max_draw_dist2 = draw_dist * draw_dist;
+
+        /* Per-room fog color from ambient light + water flag.
+         * Dark rooms get darker fog, water rooms get blue tint.
+         * TR1 ambient: 0 = bright, 8191 = dark. */
+        float amb = 1.0f - ((float)r->ambient / 8191.0f);
+        if (amb < 0.0f) amb = 0.0f;
+        if (amb > 1.0f) amb = 1.0f;
+        bool is_water = (r->flags & 1) != 0;
+        if (is_water) {
+            /* Blue-green underwater haze */
+            c->fog_r = 0.08f + amb * 0.10f;
+            c->fog_g = 0.15f + amb * 0.15f;
+            c->fog_b = 0.25f + amb * 0.20f;
+        } else {
+            /* Cave fog: darker rooms get darker, warmer fog */
+            c->fog_r = 0.20f + amb * 0.15f;
+            c->fog_g = 0.18f + amb * 0.14f;
+            c->fog_b = 0.22f + amb * 0.18f;
+        }
 
         c->lod        = CHUNK_LOD_NEAR;
         c->dist_sq    = 0.0f;
@@ -1023,6 +1048,12 @@ int main(void) {
                 int perf_near_faces __attribute__((unused)) = 0;
                 int perf_near_binds = 0;
 
+                /* Active fog color — lerps toward current room's fog.
+                 * Starts at neutral cave fog. */
+                float active_fog_r = 0.35f;
+                float active_fog_g = 0.32f;
+                float active_fog_b = 0.40f;
+
                 /* Render loop */
                 render_loop:
                 while (1) {
@@ -1331,7 +1362,20 @@ int main(void) {
                      * between triangles blend in instead of showing stark
                      * black seams.  Matches the far-pass fog target color. */
                     /* Clear to fog color so gaps/undrawn areas blend in */
-                    rdpq_clear(RGBA32(89, 82, 102, 0xFF));
+                    /* Lerp active fog toward current room's fog color.
+                     * Slow blend (0.08/frame) prevents harsh snapping. */
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        float lr = 0.08f; /* lerp rate */
+                        active_fog_r += (g_chunks[lara_room].fog_r - active_fog_r) * lr;
+                        active_fog_g += (g_chunks[lara_room].fog_g - active_fog_g) * lr;
+                        active_fog_b += (g_chunks[lara_room].fog_b - active_fog_b) * lr;
+                    }
+
+                    /* Clear to active fog color so void matches the fog */
+                    rdpq_clear(RGBA32(
+                        (uint8_t)(active_fog_r * 255.0f),
+                        (uint8_t)(active_fog_g * 255.0f),
+                        (uint8_t)(active_fog_b * 255.0f), 0xFF));
                     rdpq_clear_z(0xFFFC);
 
                     /* Precompute pitch sin/cos for CPU projection */
@@ -1768,9 +1812,9 @@ int main(void) {
                                     float r = is_water ? bright * 0.4f : bright;
                                     float g = is_water ? bright * 0.6f : bright;
                                     float b = is_water ? bright * 1.0f : bright;
-                                    r = r * (1.0f - fog) + 0.35f * fog;
-                                    g = g * (1.0f - fog) + 0.32f * fog;
-                                    b = b * (1.0f - fog) + 0.40f * fog;
+                                    r = r * (1.0f - fog) + active_fog_r * fog;
+                                    g = g * (1.0f - fog) + active_fog_g * fog;
+                                    b = b * (1.0f - fog) + active_fog_b * fog;
 
                                     /* Tex coords */
                                     float ts = 0, tt = 0;
@@ -2042,10 +2086,10 @@ int main(void) {
                                     fog += y_bias;
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
-                                    /* Cave fog: dark blue-gray but visible */
-                                    r = r * (1.0f - fog) + 0.35f * fog;
-                                    g = g * (1.0f - fog) + 0.32f * fog;
-                                    b = b * (1.0f - fog) + 0.40f * fog;
+                                    /* Fog toward active room fog color */
+                                    r = r * (1.0f - fog) + active_fog_r * fog;
+                                    g = g * (1.0f - fog) + active_fog_g * fog;
+                                    b = b * (1.0f - fog) + active_fog_b * fog;
                                 }
 
                                 cr[v] = (uint8_t)(r * 255.0f);
