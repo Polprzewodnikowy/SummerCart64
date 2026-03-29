@@ -959,6 +959,9 @@ int main(void) {
 
                             float sv[4][10];
                             bool visible = true;
+                            /* Track screen bounds across all verts for frustum cull */
+                            float sx_min = 99999, sx_max = -99999;
+                            float sy_min = 99999, sy_max = -99999;
 
                             for (int v = 0; v < face->vertex_count; v++) {
                                 uint16_t vi = face->vertices[v];
@@ -984,9 +987,10 @@ int main(void) {
                                 float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + ry * inv_z;
 
-                                if (screen_x < -1024 || screen_x > 1344 ||
-                                    screen_y < -1024 || screen_y > 1264)
-                                    { visible = false; break; }
+                                if (screen_x < sx_min) sx_min = screen_x;
+                                if (screen_x > sx_max) sx_max = screen_x;
+                                if (screen_y < sy_min) sy_min = screen_y;
+                                if (screen_y > sy_max) sy_max = screen_y;
 
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
@@ -1022,6 +1026,10 @@ int main(void) {
                             }
 
                             if (!visible) continue;
+                            /* Frustum cull: reject only if entire face is off one side */
+                            if (sx_max < -512 || sx_min > 832 ||
+                                sy_max < -512 || sy_min > 752)
+                                continue;
 
                             /* Backface cull disabled for debugging */
                             /* float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
