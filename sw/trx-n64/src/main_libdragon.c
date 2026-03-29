@@ -869,12 +869,44 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start: pause/unpause (freezes frame, press again to resume) */
+                    /* Start: pause with debug overlay */
                     if (pressed.start) {
+                        /* End current GL context so we can draw text */
+                        gl_context_end();
+
+                        /* Get the framebuffer we just rendered to and draw text on it */
+                        surface_t *pause_disp = display_get();
+                        graphics_set_color(0xFFFFFFFF, 0x000000C0);
+
+                        char buf[64];
+                        graphics_draw_text(pause_disp, 8, 8, "PAUSED - Press START");
+                        snprintf(buf, sizeof(buf), "Cam: %.0f, %.0f, %.0f", cam_x, cam_y, cam_z);
+                        graphics_draw_text(pause_disp, 8, 20, buf);
+                        snprintf(buf, sizeof(buf), "FPS: %d  Room: %d", fps_display, lara_room);
+                        graphics_draw_text(pause_disp, 8, 32, buf);
+                        snprintf(buf, sizeof(buf), "Coll: %s", collision_on ? "ON" : "OFF");
+                        graphics_draw_text(pause_disp, 8, 44, buf);
+                        snprintf(buf, sizeof(buf), "Audio: %d samples", parsed_samples);
+                        graphics_draw_text(pause_disp, 8, 56, buf);
+                        {
+                            int32_t pfl, pcl;
+                            GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
+                            snprintf(buf, sizeof(buf), "Floor: %d  Ceil: %d", pfl, pcl);
+                            graphics_draw_text(pause_disp, 8, 68, buf);
+                        }
+                        snprintf(buf, sizeof(buf), "SndData: %p idx=%d",
+                                 g_level.sample_data, (int)g_level.sample_index_count);
+                        graphics_draw_text(pause_disp, 8, 80, buf);
+
+                        display_show(pause_disp);
+
+                        /* Wait for START to unpause */
                         while (1) {
                             joypad_poll();
                             if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
                         }
+                        /* Resume — next iteration will call display_get + gl_context_begin */
+                        continue;
                     }
 
                     /* Begin frame — OpenGL RSP T&L */
@@ -1095,8 +1127,17 @@ int main(void) {
                                 if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    fs[v] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] / (float)TEX_TILE_DIM;
-                                    ft[v] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] / (float)TEX_TILE_DIM;
+                                    /* GL with glSurfaceTexImageN64 uses 0-1 normalized coords.
+                                     * s,t are in tile-pixel space (0..TEX_TILE_DIM), normalize. */
+                                    float s_raw = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    float t_raw = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    /* Clamp to valid range to prevent bleeding */
+                                    if (s_raw < 0.5f) s_raw = 0.5f;
+                                    if (t_raw < 0.5f) t_raw = 0.5f;
+                                    if (s_raw > TEX_TILE_DIM - 0.5f) s_raw = TEX_TILE_DIM - 0.5f;
+                                    if (t_raw > TEX_TILE_DIM - 0.5f) t_raw = TEX_TILE_DIM - 0.5f;
+                                    fs[v] = s_raw / (float)TEX_TILE_DIM;
+                                    ft[v] = t_raw / (float)TEX_TILE_DIM;
                                 } else {
                                     fs[v] = 0; ft[v] = 0;
                                 }
