@@ -1265,8 +1265,10 @@ int main(void) {
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
                             }
                         }
-                        /* Mip atlas GL texture objects (much fewer than per-tile) */
-                        if (mips_ok && gl_mip1_atlas) {
+                        /* Mip atlas GL texture objects — DISABLED for OOM debugging.
+                         * If base 880 textures boot fine without this, the issue
+                         * is per-block memory for large (128×128) atlas surfaces. */
+                        if (0 && mips_ok && gl_mip1_atlas) {
                             glGenTextures(num_mip1_atlas, gl_mip1_atlas);
                             for (int a = 0; a < num_mip1_atlas; a++) {
                                 glBindTexture(GL_TEXTURE_2D, gl_mip1_atlas[a]);
