@@ -580,41 +580,28 @@ int main(void) {
                 }
 
                 #define TEX_TILE_DIM 32
-                #define TEX_TILE_BYTES_CI8 (TEX_TILE_DIM * TEX_TILE_DIM)  /* 1 byte/pixel */
-                #define TEX_TILE_BYTES TEX_TILE_BYTES_CI8
+                #define TEX_TILE_BYTES (TEX_TILE_DIM * TEX_TILE_DIM * 2)
                 int num_otex = g_level.object_texture_count;
+                /* Use ALL object textures — expansion pak has plenty of RDRAM */
 
                 printf("  Heap before tex: %u KB free\n",
                        n64_mem_available() / 1024);
 
-                /* CI8 textures: 1 byte/pixel + shared 256-entry TLUT.
-                 * Saves ~900 KB uncached vs RGBA16 (2 bytes/pixel).
-                 * TR1 already uses a global 256-color palette — perfect for CI8. */
-                uint8_t *tex_tiles = (uint8_t *)malloc_uncached_aligned(
-                    64, num_otex * TEX_TILE_BYTES_CI8);
-
-                /* TLUT: the pal16 array converted to uncached for RDP access */
-                uint16_t *tlut_pal = (uint16_t *)malloc_uncached_aligned(64, 256 * 2);
-                if (tlut_pal) {
-                    for (int i = 0; i < 256; i++)
-                        tlut_pal[i] = pal16[i];
-                }
-
+                /* Allocate texture pixel data via uncached malloc (not from
+                 * the bump heap — it's full with level data + parser allocs).
+                 * Requires expansion pak (8MB) for the extra RDRAM. */
+                uint16_t *tex_tiles = (uint16_t *)malloc_uncached_aligned(
+                    64, num_otex * TEX_TILE_BYTES);
                 surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
                 float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
 
-                /* TLUT surface for rdpq_tex_upload palette */
-                surface_t tlut_surf = {0};
-                if (tlut_pal)
-                    tlut_surf = surface_make_linear(tlut_pal, FMT_RGBA16, 256, 1);
-
                 if (tex_tiles && tex_surfs && tex_uv_map) {
-                    printf("  Converting %d textures to %dx%d CI8...\n",
-                           num_otex, TEX_TILE_DIM, TEX_TILE_DIM);
+                    printf("  Converting %d textures to 16x16 RGBA16...\n", num_otex);
                     console_render();
                     for (int i = 0; i < num_otex; i++) {
                         tr_object_texture_t *otex = &g_level.object_textures[i];
-                        uint8_t *tile = tex_tiles + i * TEX_TILE_BYTES_CI8;
+                        uint16_t *tile = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
 
                         /* Compute UV bounding box */
                         int u0 = 255, v0 = 255, u1 = 0, v1 = 0;
@@ -631,37 +618,40 @@ int main(void) {
                         if (tw < 1) tw = 1;
                         if (th < 1) th = 1;
 
+                        /* Store UV mapping */
                         tex_uv_map[i*4+0] = (float)u0;
                         tex_uv_map[i*4+1] = (float)v0;
                         tex_uv_map[i*4+2] = (float)TEX_TILE_DIM / (float)tw;
                         tex_uv_map[i*4+3] = (float)TEX_TILE_DIM / (float)th;
 
-                        /* Store CI8 palette indices directly (not RGBA16).
-                         * 1 byte per pixel instead of 2 = half the memory. */
+                        /* Convert CI8 tile to RGBA16, subsample to 16x16.
+                         * Writing through uncached pointer — goes straight to RDRAM. */
                         if (otex->tex_page < num_tex_pages) {
                             uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
                             for (int y = 0; y < TEX_TILE_DIM; y++) {
-                                int sy2 = v0 + y * th / TEX_TILE_DIM;
-                                if (sy2 > 255) sy2 = 255;
+                                int sy = v0 + y * th / TEX_TILE_DIM;
+                                if (sy > 255) sy = 255;
                                 for (int x = 0; x < TEX_TILE_DIM; x++) {
                                     int sx = u0 + x * tw / TEX_TILE_DIM;
                                     if (sx > 255) sx = 255;
-                                    tile[y * TEX_TILE_DIM + x] = page[sy2 * 256 + sx];
+                                    tile[y * TEX_TILE_DIM + x] = pal16[page[sy * 256 + sx]];
                                 }
                             }
                         } else {
-                            memset(tile, 0x80, TEX_TILE_BYTES_CI8);
+                            /* Invalid tex page — fill with gray */
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
+                                tile[p] = 0x8421;
                         }
 
-                        tex_surfs[i] = surface_make_linear(tile, FMT_CI8,
+                        /* Uncached memory — no flush needed */
+                        tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
-                printf("  %d/%d CI8 textures ready (%d KB, saved %d KB vs RGBA16).\n",
+                printf("  %d/%d textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
-                       num_otex * TEX_TILE_BYTES_CI8 / 1024,
-                       num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024); /* savings */
-                printf("  Heap: %u KB left.\n", n64_mem_available() / 1024);
+                       num_otex * TEX_TILE_BYTES / 1024,
+                       n64_mem_available() / 1024);
 
                 /* ---- Memory audit ----
                  * Print allocation totals so we can track what's consuming
@@ -720,8 +710,11 @@ int main(void) {
 
                 /* Try to include auto-generated baked offsets header.
                  * If not available, define defaults (no baked data). */
-                /* Baked tile loading disabled until CI8 texture conversion
-                 * frees enough uncached RDRAM headroom. */
+                /* Baked tile loading disabled — even 24 KB uncached
+                 * pushes RSPQ over the edge.  Bake tool stays in repo
+                 * for when we free uncached headroom (e.g., by reducing
+                 * base texture count or switching to CI4 format).
+                 * On-demand mip (640 bytes) is the stable path. */
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
 
@@ -743,12 +736,11 @@ int main(void) {
                         printf("  Baked data: %d rooms, %d mips\n",
                                baked_room_count, bake_mips);
 
-                        /* Load mip1+mip2 per room into CACHED heap (not uncached).
-                         * Cached heap doesn't compete with RSPQ block memory.
-                         * Cache is written back once after DMA so rdpq_tex_upload
-                         * can read correct data from RDRAM. */
+                        /* Only load mip1+mip2 per room (24 KB total, not 100 KB).
+                         * Skip mip0 (32×32) to preserve uncached RDRAM for RSPQ. */
                         int total_baked = baked_room_count * BAKED_LOAD_PER_ROOM;
-                        baked_pixels = (uint16_t *)n64_mem_alloc(total_baked + 64);
+                        baked_pixels = (uint16_t *)malloc_uncached_aligned(
+                            64, total_baked);
                         baked_mip1 = (surface_t *)n64_mem_alloc(
                             baked_room_count * sizeof(surface_t));
                         baked_mip2 = (surface_t *)n64_mem_alloc(
@@ -773,9 +765,7 @@ int main(void) {
                                     (uint16_t *)(dst + MIP1_DIM*MIP1_DIM*2),
                                     FMT_RGBA16, MIP2_DIM, MIP2_DIM);
                             }
-                            /* Writeback cached data so DMA/RDP can read it */
-                            data_cache_hit_writeback(baked_pixels, total_baked);
-                            printf("  Baked loaded: %d KB (mip1+mip2, cached heap)\n",
+                            printf("  Baked loaded: %d KB (mip1+mip2 only)\n",
                                    total_baked / 1024);
                         } else {
                             printf("  Baked alloc failed\n");
@@ -788,18 +778,19 @@ int main(void) {
                     printf("  No baked data in ROM\n");
                 }
 
-                /* On-demand CI8 mip buffers for far pass.
-                 * 16×16 = 256 bytes, 8×8 = 64 bytes. Tiny. */
-                uint8_t *mip1_buf = NULL, *mip2_buf = NULL;
+                /* Fallback: on-demand mip buffers (used when no baked data) */
+                uint16_t *mip1_buf = NULL, *mip2_buf = NULL;
                 surface_t mip1_surf = {0}, mip2_surf = {0};
-                mip1_buf = (uint8_t *)malloc_uncached_aligned(
-                    64, MIP1_DIM * MIP1_DIM);
-                mip2_buf = (uint8_t *)malloc_uncached_aligned(
-                    64, MIP2_DIM * MIP2_DIM);
-                if (mip1_buf)
-                    mip1_surf = surface_make_linear(mip1_buf, FMT_CI8, MIP1_DIM, MIP1_DIM);
-                if (mip2_buf)
-                    mip2_surf = surface_make_linear(mip2_buf, FMT_CI8, MIP2_DIM, MIP2_DIM);
+                if (baked_room_count == 0) {
+                    mip1_buf = (uint16_t *)malloc_uncached_aligned(
+                        64, MIP1_DIM * MIP1_DIM * 2);
+                    mip2_buf = (uint16_t *)malloc_uncached_aligned(
+                        64, MIP2_DIM * MIP2_DIM * 2);
+                    if (mip1_buf)
+                        mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                    if (mip2_buf)
+                        mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                }
 
                 /* GL texture objects — created after gl_init() */
                 GLuint *gl_textures = NULL;
@@ -1449,10 +1440,6 @@ int main(void) {
                         rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
-                        /* Enable CI8 palette mode + upload TLUT once */
-                        rdpq_mode_tlut(TLUT_RGBA16);
-                        if (tlut_pal)
-                            rdpq_tex_upload_tlut(tlut_pal, 0, 256);
 
                         int far_last_tex = -1;
                         int far_tris = 0;
@@ -1541,24 +1528,42 @@ int main(void) {
                                         }
 
                                         rspq_flush();
-                                        uint8_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
+                                        uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
 
                                         if (mip_level == 2 && mip2_buf) {
-                                            /* 32→8: nearest-neighbor CI8 subsample */
+                                            /* 32→8: 4×4 box filter */
                                             for (int my = 0; my < MIP2_DIM; my++)
-                                                for (int mx = 0; mx < MIP2_DIM; mx++)
+                                                for (int mx = 0; mx < MIP2_DIM; mx++) {
+                                                    int bx = mx*4, by = my*4;
+                                                    int sr=0,sg=0,sb=0,sa=0;
+                                                    for (int dy=0;dy<4;dy++)
+                                                        for (int dx=0;dx<4;dx++) {
+                                                            uint16_t p = src[(by+dy)*TEX_TILE_DIM+(bx+dx)];
+                                                            sr+=p>>11; sg+=(p>>6)&0x1F;
+                                                            sb+=(p>>1)&0x1F; sa|=p&1;
+                                                        }
                                                     mip2_buf[my*MIP2_DIM+mx] =
-                                                        src[(my*4)*TEX_TILE_DIM + (mx*4)];
+                                                        (((sr+8)>>4)<<11)|(((sg+8)>>4)<<6)|(((sb+8)>>4)<<1)|sa;
+                                                }
                                             rdpq_tex_upload(TILE0, &mip2_surf, NULL);
                                         } else if (mip_level == 1 && mip1_buf) {
-                                            /* 32→16: nearest-neighbor CI8 subsample */
+                                            /* 32→16: 2×2 box filter */
                                             for (int my = 0; my < MIP1_DIM; my++)
-                                                for (int mx = 0; mx < MIP1_DIM; mx++)
-                                                    mip1_buf[my*MIP1_DIM+mx] =
-                                                        src[(my*2)*TEX_TILE_DIM + (mx*2)];
+                                                for (int mx = 0; mx < MIP1_DIM; mx++) {
+                                                    int bx = mx*2, by = my*2;
+                                                    uint16_t p00 = src[by*TEX_TILE_DIM+bx];
+                                                    uint16_t p10 = src[by*TEX_TILE_DIM+bx+1];
+                                                    uint16_t p01 = src[(by+1)*TEX_TILE_DIM+bx];
+                                                    uint16_t p11 = src[(by+1)*TEX_TILE_DIM+bx+1];
+                                                    int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                                    int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                                    int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                                    int aa = (p00|p10|p01|p11)&1;
+                                                    mip1_buf[my*MIP1_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                                                }
                                             rdpq_tex_upload(TILE0, &mip1_surf, NULL);
                                         } else {
-                                            /* Level 0: full 32×32 CI8 base */
+                                            /* Level 0: full 32×32 base */
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                         }
                                         far_last_tex = (int)tex_idx;
