@@ -314,9 +314,10 @@ int main(void) {
         printf("  Found: sector=%u, size=%u, compressed=%u, flags=0x%x\n",
                level_sector, level_size, level_compressed, level_flags);
 
-        /* Read level data from ROM via PI DMA */
-        uint32_t read_size = level_compressed ? level_compressed : level_size;
-        if (read_size == 0) read_size = level_size;
+        /* Read level data from ROM via PI DMA.
+         * Always read full uncompressed size — the asset packer
+         * stores uncompressed .PHD data despite showing compression stats. */
+        uint32_t read_size = level_size;
         uint32_t read_bytes = (read_size + 511) & ~511;
 
         /* Align read size to 16 bytes for DMA */
@@ -628,10 +629,11 @@ int main(void) {
                     joypad_inputs_t input = joypad_get_inputs(JOYPAD_PORT_1);
                     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
-                    /* Camera speed — L/R bumpers cycle levels */
+                    /* Controls */
+                    static bool walk_mode = false;
                     static int speed_level = 1;
-                    if (pressed.l) { speed_level--; if (speed_level < 0) speed_level = 3; }
                     if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
+                    if (pressed.l) walk_mode = !walk_mode;
                     float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
                     float move_speed = speed_mult[speed_level];
                     if (input.btn.z) move_speed *= 4.0f;
@@ -664,7 +666,6 @@ int main(void) {
                     /* ===== ROOM TRACKING + FLOOR COLLISION =====
                      * Always track which room the camera is in (for BFS).
                      * A button toggles walk mode (floor clamping). */
-                    static bool walk_mode = false;  /* Fly default, A=toggle walk */
                     if (pressed.a) walk_mode = !walk_mode;
 
                     {
