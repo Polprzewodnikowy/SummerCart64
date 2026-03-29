@@ -658,11 +658,86 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
-                /* Mip atlas system deferred — both per-tile GL objects and
-                 * atlas approaches hit RSPQ/RDRAM memory limits.  The base
-                 * 880 × 32×32 textures use the full RSPQ block budget.
-                 * Mip selection requires either reducing base texture count
-                 * or moving to RDPQ-based texture streaming (future work). */
+                /* ---- RDPQ mip surfaces for far pass ----
+                 * No GL objects needed — just surface_t wrappers for
+                 * rdpq_tex_upload.  Uses regular heap (cached RDRAM),
+                 * not uncached, so no RSPQ block pressure.
+                 * Mip1 = 16×16, Mip2 = 8×8, box-filtered from 32×32 base. */
+                #define MIP1_DIM 16
+                #define MIP2_DIM 8
+                #define MIP1_BYTES (MIP1_DIM * MIP1_DIM * 2)
+                #define MIP2_BYTES (MIP2_DIM * MIP2_DIM * 2)
+
+                surface_t *mip1_surfs = NULL;
+                surface_t *mip2_surfs = NULL;
+                uint16_t  *mip1_pixels = NULL;
+                uint16_t  *mip2_pixels = NULL;
+
+                if (tex_tiles && num_otex > 0) {
+                    mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    /* Pixel data in cached heap — NOT uncached.
+                     * rdpq_tex_upload will DMA from here, which works fine
+                     * as long as we writeback the cache after filling. */
+                    mip1_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP1_BYTES);
+                    mip2_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP2_BYTES);
+                }
+
+                bool mips_ok = (mip1_surfs && mip2_surfs &&
+                                mip1_pixels && mip2_pixels && tex_tiles);
+
+                if (mips_ok) {
+                    printf("  Generating mip surfaces (%dx%d + %dx%d)...\n",
+                           MIP1_DIM, MIP1_DIM, MIP2_DIM, MIP2_DIM);
+                    for (int i = 0; i < num_otex; i++) {
+                        uint16_t *src = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                        uint16_t *d16 = mip1_pixels + i * MIP1_DIM * MIP1_DIM;
+                        uint16_t *d8  = mip2_pixels + i * MIP2_DIM * MIP2_DIM;
+
+                        /* 32→16: 2×2 box filter */
+                        for (int y = 0; y < MIP1_DIM; y++)
+                            for (int x = 0; x < MIP1_DIM; x++) {
+                                int sx = x*2, sy_m = y*2;
+                                uint16_t p00 = src[sy_m*TEX_TILE_DIM + sx];
+                                uint16_t p10 = src[sy_m*TEX_TILE_DIM + sx+1];
+                                uint16_t p01 = src[(sy_m+1)*TEX_TILE_DIM + sx];
+                                uint16_t p11 = src[(sy_m+1)*TEX_TILE_DIM + sx+1];
+                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+
+                                          ((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+
+                                          ((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                int aa = (p00|p10|p01|p11) & 1;
+                                d16[y*MIP1_DIM+x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                            }
+                        /* 16→8: 2×2 box filter from mip1 */
+                        for (int y = 0; y < MIP2_DIM; y++)
+                            for (int x = 0; x < MIP2_DIM; x++) {
+                                int sx = x*2, sy_m = y*2;
+                                uint16_t p00 = d16[sy_m*MIP1_DIM + sx];
+                                uint16_t p10 = d16[sy_m*MIP1_DIM + sx+1];
+                                uint16_t p01 = d16[(sy_m+1)*MIP1_DIM + sx];
+                                uint16_t p11 = d16[(sy_m+1)*MIP1_DIM + sx+1];
+                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+
+                                          ((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+
+                                          ((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                int aa = (p00|p10|p01|p11) & 1;
+                                d8[y*MIP2_DIM+x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                            }
+
+                        mip1_surfs[i] = surface_make_linear(d16, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                        mip2_surfs[i] = surface_make_linear(d8, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                    }
+                    /* Flush cached pixel data so DMA can read it */
+                    data_cache_hit_writeback(mip1_pixels, num_otex * MIP1_BYTES);
+                    data_cache_hit_writeback(mip2_pixels, num_otex * MIP2_BYTES);
+                    printf("  Mips ready: %d KB (16x16) + %d KB (8x8)\n",
+                           num_otex * MIP1_BYTES / 1024, num_otex * MIP2_BYTES / 1024);
+                } else {
+                    printf("  Mip alloc failed — far pass uses base 32x32\n");
+                }
 
                 /* Create a 1x1 solid white texture for flat-colored faces.
                  * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
@@ -1258,8 +1333,16 @@ int main(void) {
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
                                         if (far_uploads < FAR_MAX_UPLOADS) {
-                                            rspq_flush(); /* drain before upload */
-                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                            rspq_flush();
+                                            /* Mip selection by room distance */
+                                            float rd = (room_idx < g_chunk_count)
+                                                ? g_chunks[room_idx].dist_sq : 0.0f;
+                                            if (mips_ok && rd > CHUNK_VERY_FAR_DIST2)
+                                                rdpq_tex_upload(TILE0, &mip2_surfs[tex_idx], NULL);
+                                            else if (mips_ok && rd > CHUNK_FAR_DIST2)
+                                                rdpq_tex_upload(TILE0, &mip1_surfs[tex_idx], NULL);
+                                            else
+                                                rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                             far_last_tex = (int)tex_idx;
                                             far_uploads++;
                                         }
@@ -1327,13 +1410,21 @@ int main(void) {
                                     g = g * (1.0f - fog) + 0.13f * fog;
                                     b = b * (1.0f - fog) + 0.18f * fog;
 
-                                    /* Texture coords in pixel space */
+                                    /* Texture coords in pixel space.
+                                     * Scale for mip level: 32→16 = ×0.5, 32→8 = ×0.25 */
                                     float ts = 0, tt = 0;
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
                                         ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                         tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                        /* Scale for active mip level */
+                                        float rd2 = cx_v*cx_v + cz_v*cz_v;
+                                        if (mips_ok && rd2 > CHUNK_VERY_FAR_DIST2) {
+                                            ts *= 0.25f; tt *= 0.25f;
+                                        } else if (mips_ok && rd2 > CHUNK_FAR_DIST2) {
+                                            ts *= 0.5f; tt *= 0.5f;
+                                        }
                                     }
 
                                     sv[v][0] = scx;
