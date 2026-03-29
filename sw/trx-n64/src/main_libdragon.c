@@ -946,6 +946,21 @@ int main(void) {
                 }
                 cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z; cam_rot_y = spawn_rot;
 
+                /* Fix lara_room for camera offset — the camera may be
+                 * in a different room than Lara's item spawn room. */
+                {
+                    int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
+                    for (int _ri = 0; _ri < g_level.room_count; _ri++) {
+                        tr_room_t *_rm = &g_level.rooms[_ri];
+                        int32_t rx = icx - _rm->x, rz = icz - _rm->z;
+                        if (rx >= 0 && rx < _rm->sectors_x * 1024 &&
+                            rz >= 0 && rz < _rm->sectors_z * 1024) {
+                            lara_room = _ri;
+                            break;
+                        }
+                    }
+                }
+
                 /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
 
