@@ -909,19 +909,12 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room-level frustum cull: check if room center is visible */
+                        /* Room-level cull: only skip rooms entirely behind camera */
                         float rcx = room->x + room->sectors_x * 512.0f - cam_x;
                         float rcz = room->z + room->sectors_z * 512.0f - cam_z;
-                        float room_rz = rcx * sy + rcz * cy; /* camera-space Z */
-                        float room_rx = rcx * cy - rcz * sy; /* camera-space X */
+                        float room_rz = rcx * sy + rcz * cy;
                         float room_radius = (room->sectors_x + room->sectors_z) * 512.0f;
-                        /* Skip if room is entirely behind camera */
                         if (room_rz < -room_radius) continue;
-                        /* Skip if room is entirely off to the side */
-                        if (room_rz > 0) {
-                            float lim = room_rz * 2.5f + room_radius;
-                            if (room_rx > lim || room_rx < -lim) continue;
-                        }
 
                         int max_faces = room->mesh.face_count;
                         if (max_faces > 500) max_faces = 500;
@@ -947,21 +940,8 @@ int main(void) {
                              * wrong texture data. TODO: render as solid color. */
                             if (!has_tex) continue;
 
-                            /* Quick distance cull with first vertex (squared, no sqrt) */
-                            {
-                                uint16_t v0i = face->vertices[0];
-                                if (v0i < room->mesh.vertex_count) {
-                                    float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
-                                    float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
-                                    if (dx*dx + dz*dz > 200000000.0f) continue; /* ~14K units */
-                                }
-                            }
-
                             float sv[4][10];
                             bool visible = true;
-                            /* Track screen bounds across all verts for frustum cull */
-                            float sx_min = 99999, sx_max = -99999;
-                            float sy_min = 99999, sy_max = -99999;
 
                             for (int v = 0; v < face->vertex_count; v++) {
                                 uint16_t vi = face->vertices[v];
@@ -987,10 +967,7 @@ int main(void) {
                                 float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + ry * inv_z;
 
-                                if (screen_x < sx_min) sx_min = screen_x;
-                                if (screen_x > sx_max) sx_max = screen_x;
-                                if (screen_y < sy_min) sy_min = screen_y;
-                                if (screen_y > sy_max) sy_max = screen_y;
+                                /* No screen-space culling — let RDP clip */
 
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
@@ -1026,10 +1003,6 @@ int main(void) {
                             }
 
                             if (!visible) continue;
-                            /* Frustum cull: reject only if entire face is off one side */
-                            if (sx_max < -512 || sx_min > 832 ||
-                                sy_max < -512 || sy_min > 752)
-                                continue;
 
                             /* Backface cull disabled for debugging */
                             /* float cross = (sv[1][0]-sv[0][0])*(sv[2][1]-sv[0][1])
