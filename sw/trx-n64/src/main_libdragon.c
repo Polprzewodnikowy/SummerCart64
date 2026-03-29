@@ -938,9 +938,9 @@ int main(void) {
                 for (int i = 0; i < g_level.item_count; i++) {
                     if (g_level.items[i].object_id == 0) {
                         spawn_rot = (float)g_level.items[i].rotation * 3.14159f / 32768.0f;
-                        spawn_x = (float)g_level.items[i].pos.x - 600.0f * sinf(spawn_rot);
+                        spawn_x = (float)g_level.items[i].pos.x;
                         spawn_y = (float)g_level.items[i].pos.y - 768;
-                        spawn_z = (float)g_level.items[i].pos.z - 600.0f * cosf(spawn_rot);
+                        spawn_z = (float)g_level.items[i].pos.z;
                         break;
                     }
                 }
