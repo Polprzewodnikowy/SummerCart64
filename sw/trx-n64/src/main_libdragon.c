@@ -957,16 +957,21 @@ int main(void) {
                 #define BAKED_LOAD_PER_ROOM (MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
                 #define BAKED_HEADER_SIZE 16
 
-                /* Baked RGBA16 tile offsets from ROM.
-                 * Pixels loaded into CACHED heap (not uncached) to avoid
-                 * competing with RSPQ block memory. Cache written back
-                 * once after DMA so rdpq_tex_upload reads correct data. */
+                /* Baked tile offsets from ROM.
+                 * Try build/ first (where build_full_rom.py generates it),
+                 * then fall back to current directory. */
                 #if __has_include("baked_offsets.h")
                 #include "baked_offsets.h"
+                #elif __has_include("../build/baked_offsets.h")
+                #include "../build/baked_offsets.h"
                 #else
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
                 #endif
+
+                printf("  Baked ROM: offset=0x%X size=%u\n",
+                       (unsigned)BAKED_ROM_OFFSET, (unsigned)BAKED_ROM_SIZE);
+                console_render();
 
                 int baked_room_count = 0;
                 /* BAK3: 5 mip tiers per room — CI8, CI4, IA8, IA4 */
@@ -1204,6 +1209,7 @@ int main(void) {
                 #define FAR_TRI_BUDGET      400
                 #define FAR_UPLOAD_BUDGET   8
                 #define NEAR_TRI_BUDGET     1400
+                #define NEAR_FACE_BUDGET    600  /* cap total face iterations (including culled) */
                 #define NEAR_UPLOAD_BUDGET  48
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
@@ -1530,9 +1536,9 @@ int main(void) {
 
                         /* === NEAR PASS === */
                         STAT("=== NEAR (CI8 zbuf) ===");
-                        STAT("Rooms:%d  Tris:%d/%d  Faces:%d",
+                        STAT("Rooms:%d  Tris:%d/%d  Faces:%d/%d",
                              perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET,
-                             perf_near_faces);
+                             perf_near_faces, NEAR_FACE_BUDGET);
                         STAT("Binds:%d  Culled:%d  DSkip:%d",
                              perf_near_binds, perf_near_culled,
                              perf_near_detail_skip);
@@ -2147,6 +2153,18 @@ int main(void) {
                         bool is_water = (room->flags & 1) != 0;
                         perf_near_rooms++;
 
+                        /* Sphere-in-front: skip near-plane clip for this room
+                         * if all geometry is guaranteed past z=NEAR_Z. */
+                        bool near_no_clip = false;
+                        if (room_idx < g_chunk_count) {
+                            tr_chunk_t *ck = &g_chunks[room_idx];
+                            float cxr = ck->cx - cam_x, czr = ck->cz - cam_z;
+                            float cyr = ck->cy - cam_y;
+                            float rz_c = cxr * sy + czr * cy;
+                            float rz_sph = cyr * sp + rz_c * cp;
+                            if (rz_sph - ck->radius > NEAR_Z) near_no_clip = true;
+                        }
+
                         bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
@@ -2157,7 +2175,8 @@ int main(void) {
                         float room_oz = (float)room->z - cam_z;
 
                         for (int f = 0; f < room->mesh.face_count; f++) {
-                            if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
+                            if (perf_near_tris >= NEAR_TRI_BUDGET ||
+                                perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
                             perf_near_faces++;
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
@@ -2272,10 +2291,10 @@ int main(void) {
                             }
                             if (!ok || all_behind) continue;
 
-                            /* Near-plane clip */
+                            /* Near-plane clip (skip if room sphere is fully in front) */
                             float clipped[6][8];
                             int clip_nv = nv;
-                            if (any_behind) {
+                            if (!near_no_clip && any_behind) {
                                 clip_nv = 0;
                                 for (int i = 0; i < nv; i++) {
                                     int j = (i + 1) % nv;
