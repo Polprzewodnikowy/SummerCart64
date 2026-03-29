@@ -1127,17 +1127,12 @@ int main(void) {
                                 if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    /* GL with glSurfaceTexImageN64 uses 0-1 normalized coords.
-                                     * s,t are in tile-pixel space (0..TEX_TILE_DIM), normalize. */
-                                    float s_raw = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    float t_raw = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Clamp to valid range to prevent bleeding */
-                                    if (s_raw < 0.5f) s_raw = 0.5f;
-                                    if (t_raw < 0.5f) t_raw = 0.5f;
-                                    if (s_raw > TEX_TILE_DIM - 0.5f) s_raw = TEX_TILE_DIM - 0.5f;
-                                    if (t_raw > TEX_TILE_DIM - 0.5f) t_raw = TEX_TILE_DIM - 0.5f;
-                                    fs[v] = s_raw / (float)TEX_TILE_DIM;
-                                    ft[v] = t_raw / (float)TEX_TILE_DIM;
+                                    float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    /* Pass pixel-space coords directly — libdragon GL
+                                     * with glSurfaceTexImageN64 may expect pixel coords */
+                                    fs[v] = s_px;
+                                    ft[v] = t_px;
                                 } else {
                                     fs[v] = 0; ft[v] = 0;
                                 }
