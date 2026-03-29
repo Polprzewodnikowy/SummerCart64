@@ -14,6 +14,7 @@
 
 #include <libdragon.h>
 #include <GL/gl.h>
+#include <GL/glu.h>
 #include <GL/gl_integration.h>
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
@@ -882,19 +883,13 @@ int main(void) {
                         glViewport(0, 0, 320, 240);
 
                         /* Perspective projection */
+                        /* Scale TR1 coords down to fit GL fixed-point range */
+                        #define WORLD_SCALE (1.0f / 64.0f)
+
                         glMatrixMode(GL_PROJECTION);
                         glLoadIdentity();
-                        float near_clip = 32.0f, far_clip = 32768.0f;
-                        float fov_y_r = 60.0f * 3.14159f / 180.0f;
-                        float asp = 320.0f / 240.0f;
-                        float ff = 1.0f / tanf(fov_y_r / 2.0f);
-                        float proj[16] = {
-                            ff/asp, 0, 0, 0,
-                            0, ff, 0, 0,
-                            0, 0, (far_clip+near_clip)/(near_clip-far_clip), -1,
-                            0, 0, (2*far_clip*near_clip)/(near_clip-far_clip), 0
-                        };
-                        glLoadMatrixf(proj);
+                        gluPerspective(60.0f, 320.0f / 240.0f,
+                                       32.0f * WORLD_SCALE, 32768.0f * WORLD_SCALE);
 
                         glEnable(GL_DEPTH_TEST);
                         glDepthFunc(GL_LESS);
@@ -1027,10 +1022,10 @@ int main(void) {
                                     glTexCoord2f(0, 0);
                                 }
 
-                                /* Camera-relative position — avoids fixed-point overflow */
-                                glVertex3f(room->x + rv->x - cam_x,
-                                           rv->y - cam_y,
-                                           room->z + rv->z - cam_z);
+                                /* Camera-relative, scaled to fit GL fixed-point */
+                                glVertex3f((room->x + rv->x - cam_x) * WORLD_SCALE,
+                                           (rv->y - cam_y) * WORLD_SCALE,
+                                           (room->z + rv->z - cam_z) * WORLD_SCALE);
                             }
                             glEnd();
                         }  /* end room face loop */
