@@ -1212,6 +1212,7 @@ int main(void) {
                 int perf_far_rooms = 0;
                 int perf_far_tris = 0;
                 int perf_far_uploads = 0;
+                int perf_far_baked = 0;     /* rooms using baked tile */
                 int perf_near_rooms = 0;
                 int perf_near_tris = 0;
                 int perf_near_binds = 0;
@@ -1222,6 +1223,9 @@ int main(void) {
                 int perf_vis_ring2 = 0;     /* ring 2 rooms */
                 uint32_t perf_frame_start = 0;
                 uint32_t perf_frame_us = 0; /* last frame time in µs */
+                uint32_t perf_far_us = 0;   /* CPU time: far pass */
+                uint32_t perf_near_us = 0;  /* CPU time: near pass */
+                uint32_t perf_rsp_us = 0;   /* RSP sync stall at frame end */
 
                 /* Active fog color — lerps toward current room's fog.
                  * Starts at neutral cave fog. */
@@ -1473,11 +1477,40 @@ int main(void) {
                             graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
                         } while(0)
 
-                        /* === TIMING === */
-                        STAT("=== FRAME ===");
+                        /* ============================================================
+                         * Hardware diagnostics — START/PAUSE overlay.
+                         * Columns: left side uses 8..155 px, right 160..312 px.
+                         * Two-column layout via separate x-coordinate per section.
+                         * ============================================================ */
+
+                        /* === CPU TIMING === */
+                        STAT("=== CPU ===");
                         STAT("FPS: %d  Frame: %u us", fps_display, perf_frame_us);
-                        float budget_pct = (float)perf_frame_us / 33333.0f * 100.0f;
-                        STAT("Budget: %.0f%% of 30fps", budget_pct);
+                        {
+                            float budget_pct = (float)perf_frame_us / 33333.0f * 100.0f;
+                            uint32_t other_us = perf_frame_us > perf_far_us + perf_near_us
+                                ? perf_frame_us - perf_far_us - perf_near_us : 0;
+                            STAT("Budget: %.0f%%  far:%uus near:%uus",
+                                 budget_pct, perf_far_us, perf_near_us);
+                            STAT("Vis+misc: %u us", other_us);
+                        }
+
+                        /* === RSP / RDP === */
+                        STAT("=== RSP/RDP ===");
+                        /* RSP stall: time CPU waited for RSP at frame end.
+                         * Low (~0) = CPU-bound.  High = RSP/RDP-bound. */
+                        STAT("RSP stall: %u us  (%s)",
+                             perf_rsp_us,
+                             perf_rsp_us > 4000 ? "RDP-BOUND" :
+                             perf_rsp_us > 1000 ? "RSP-bound" : "CPU-bound");
+                        /* RDP load estimate: far+near tris × ~24 RDP cycles/tri
+                         * at 62.5 MHz → max ~2.6M tris/s at 30fps.
+                         * This is a rough lower-bound (texturing/blending costs more). */
+                        {
+                            int total_tris = perf_far_tris + perf_near_tris;
+                            float rdp_est = (float)total_tris / 2604.0f; /* % of 30fps budget */
+                            STAT("RDP tris: %d  Load est: %.0f%%", total_tris, rdp_est);
+                        }
 
                         /* === VISIBILITY === */
                         STAT("=== VISIBILITY ===");
@@ -1487,34 +1520,39 @@ int main(void) {
                              g_chunks[lara_room].size_class == 1 ? "medium" :
                              g_chunks[lara_room].size_class == 2 ? "large" : "open")
                             : "?");
-                        STAT("Visible: %d (ring1:%d ring2:%d)",
+                        STAT("Visible: %d  ring1:%d ring2:%d",
                              perf_vis_total, perf_vis_ring1, perf_vis_ring2);
 
-                        /* === RDPQ NEAR PASS === */
-                        STAT("=== NEAR ===");
-                        STAT("Rooms: %d  Tris: %d/%d",
+                        /* === NEAR PASS === */
+                        STAT("=== NEAR (CI8 zbuf) ===");
+                        STAT("Rooms:%d  Tris:%d/%d",
                              perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET);
-                        STAT("Binds: %d/%d", perf_near_binds, TEX_BIND_BUDGET_NEAR);
-                        STAT("Culled: %d  Detail skip: %d",
-                             perf_near_culled, perf_near_detail_skip);
+                        STAT("Binds:%d/%d  Culled:%d",
+                             perf_near_binds, TEX_BIND_BUDGET_NEAR, perf_near_culled);
+                        STAT("Detail skip: %d", perf_near_detail_skip);
 
-                        /* === RDPQ FAR PASS === */
-                        STAT("=== RDPQ FAR ===");
-                        STAT("Rooms: %d  Tris: %d/%d  Uploads: %d/%d",
-                             perf_far_rooms, perf_far_tris, FAR_TRI_BUDGET,
-                             perf_far_uploads, FAR_UPLOAD_BUDGET);
+                        /* === FAR PASS === */
+                        STAT("=== FAR (baked tiles) ===");
+                        STAT("Rooms:%d  Baked:%d  Tris:%d/%d",
+                             perf_far_rooms, perf_far_baked,
+                             perf_far_tris, FAR_TRI_BUDGET);
+                        STAT("Uploads:%d/%d  No-baked:%d",
+                             perf_far_uploads, FAR_UPLOAD_BUDGET,
+                             perf_far_rooms - perf_far_baked);
 
                         /* === MEMORY === */
                         STAT("=== MEMORY ===");
-                        uint32_t heap_free = n64_mem_available();
-                        uint32_t heap_used = GAME_HEAP_SIZE - heap_free;
-                        STAT("Heap: %uKB / %uKB (%uKB free)",
-                             heap_used / 1024, GAME_HEAP_SIZE / 1024,
-                             heap_free / 1024);
+                        {
+                            uint32_t heap_free = n64_mem_available();
+                            uint32_t heap_used = GAME_HEAP_SIZE - heap_free;
+                            STAT("Heap: %uKB/%uKB  free:%uKB",
+                                 heap_used / 1024, GAME_HEAP_SIZE / 1024,
+                                 heap_free / 1024);
+                        }
 
                         /* === CAMERA === */
                         STAT("=== CAMERA ===");
-                        STAT("Pos: %.0f, %.0f, %.0f", cam_x, cam_y, cam_z);
+                        STAT("Pos: %.0f %.0f %.0f", cam_x, cam_y, cam_z);
                         {
                             int32_t pfl, pcl;
                             GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
@@ -1539,12 +1577,11 @@ int main(void) {
                      *   4. RDPQ near pass (CI8 per-face, zbuf on)
                      *   5. rdpq_detach_show()
                      *
-                     * All geometry uses pure RDPQ.  GL is linked as a stub
-                     * but not entered in the hot path. */
+                     * All geometry uses pure RDPQ.  No GL. */
                     /* Reset per-frame perf counters */
                     /* Reset per-frame counters + start frame timer */
                     perf_far_rooms = 0; perf_far_tris = 0;
-                    perf_far_uploads = 0;
+                    perf_far_uploads = 0; perf_far_baked = 0;
                     perf_near_rooms = 0; perf_near_tris = 0;
                     perf_near_binds = 0; perf_near_culled = 0;
                     perf_near_detail_skip = 0;
@@ -1796,13 +1833,15 @@ int main(void) {
                     for (int i = 0; i < far_count; i++)
                         rooms_to_draw[num_draw++] = far_rooms[i];
 
+                    uint32_t perf_far_t0 = TICKS_READ(); /* start far pass timer */
+
                     /* ===== RDPQ FAR PASS (performance-optimized) =====
                      * CPU-projected, textured + shaded triangles via rdpq.
                      * Key perf choices:
                      *   - rspq_flush (non-blocking) not rspq_wait (blocking)
-                     *   - Flush every 80 tris (not 20) to reduce sync overhead
+                     *   - Flush every 128 tris to reduce sync overhead
                      *   - Per-face centroid back-cull before vertex projection
-                     *   - Cap far rooms at 16 to limit total far-pass work
+                     *   - Baked tile is default; no per-face RGBA16 fallback
                      *   - Room origin pre-computed as float outside face loop */
                     {
                         rdpq_set_mode_standard();
@@ -1890,6 +1929,7 @@ int main(void) {
 
                             bool is_water = (room->flags & 1) != 0;
                             perf_far_rooms++;
+                            if (room_baked) perf_far_baked++;
 
                             /* Pre-compute room origin offset (avoid per-vertex int→float) */
                             float room_ox = (float)room->x - cam_x;
@@ -2049,15 +2089,22 @@ int main(void) {
                     }
                     far_pass_done:
 
+                    /* Record far pass CPU time */
+                    {
+                        uint32_t d = TICKS_DISTANCE(perf_far_t0, TICKS_READ());
+                        perf_far_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
+
                     /* Flush far pass + reset TLUT before near pass.
                      * Far pass uses CI4/CI8 baked tiles with TLUT;
                      * near pass re-enables it with the global pal16. */
                     rdpq_mode_tlut(TLUT_NONE);
                     rspq_flush();
 
+                    uint32_t perf_near_t0 = TICKS_READ(); /* start near pass timer */
+
                     /* ===== RDPQ NEAR PASS — ring 1, CI8 textures, z-buffered =====
-                     * Pure CPU transform + rdpq_triangle, same paradigm as far pass.
-                     * Eliminates GL context switching overhead. */
+                     * Pure CPU transform + rdpq_triangle, same paradigm as far pass. */
 
                     /* RDPQ near pass state:
                      *  - CI8 + global pal16 TLUT (1 KB/tex vs 2 KB RGBA16)
@@ -3081,8 +3128,21 @@ int main(void) {
                         }
                         rdpq_mode_pop();
                     }}
-                    /* End near pass — reset TLUT mode before detach */
+                    /* End near pass — record CPU time, measure RSP stall, detach */
                     rdpq_mode_tlut(TLUT_NONE);
+                    {
+                        uint32_t d = TICKS_DISTANCE(perf_near_t0, TICKS_READ());
+                        perf_near_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
+                    /* Measure how long CPU stalls waiting for RSP/RDP to drain.
+                     * Large value = RSP/RDP is the bottleneck.
+                     * Near zero = CPU is the bottleneck (RSP always idle). */
+                    {
+                        uint32_t rsp_t0 = TICKS_READ();
+                        rspq_wait();
+                        uint32_t d = TICKS_DISTANCE(rsp_t0, TICKS_READ());
+                        perf_rsp_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
 
                     rdpq_detach_show();
 
