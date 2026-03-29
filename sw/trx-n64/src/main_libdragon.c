@@ -833,6 +833,15 @@ int main(void) {
                 bool collision_on = false;  /* L = tcl toggle */
                 int speed_level = 1;
 
+                /* Per-frame perf counters (updated each frame, shown on pause) */
+                int perf_far_rooms = 0;
+                int perf_far_faces = 0;
+                int perf_far_tris = 0;
+                int perf_far_uploads = 0;
+                int perf_near_rooms = 0;
+                int perf_near_faces = 0;
+                int perf_near_binds = 0;
+
                 /* Render loop */
                 render_loop:
                 while (1) {
@@ -1072,9 +1081,15 @@ int main(void) {
                             snprintf(buf, sizeof(buf), "Floor: %d  Ceil: %d", pfl, pcl);
                             graphics_draw_text(pause_disp, 8, 68, buf);
                         }
-                        snprintf(buf, sizeof(buf), "SndData: %p idx=%d",
-                                 g_level.sample_data, (int)g_level.sample_index_count);
+                        snprintf(buf, sizeof(buf), "Far: %dr %dt %du",
+                                 perf_far_rooms, perf_far_tris, perf_far_uploads);
                         graphics_draw_text(pause_disp, 8, 80, buf);
+                        snprintf(buf, sizeof(buf), "Near: %dr %db",
+                                 perf_near_rooms, perf_near_binds);
+                        graphics_draw_text(pause_disp, 8, 92, buf);
+                        snprintf(buf, sizeof(buf), "Heap: %uKB free",
+                                 n64_mem_available() / 1024);
+                        graphics_draw_text(pause_disp, 8, 104, buf);
 
                         display_show(pause_disp);
 
@@ -1099,6 +1114,12 @@ int main(void) {
                      *
                      * This split lets the far pass use raw RDPQ texture
                      * uploads without competing for GL object/RSPQ memory. */
+                    /* Reset per-frame perf counters */
+                    perf_far_rooms = 0; perf_far_faces = 0;
+                    perf_far_tris = 0;  perf_far_uploads = 0;
+                    perf_near_rooms = 0; perf_near_faces = 0;
+                    perf_near_binds = 0;
+
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
 
@@ -1274,6 +1295,7 @@ int main(void) {
                             if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                             tr_room_t *room = &g_level.rooms[room_idx];
                             bool is_water = (room->flags & 1) != 0;
+                            perf_far_rooms++;
 
                             /* Pre-compute room origin offset (avoid per-vertex int→float) */
                             float room_ox = (float)room->x - cam_x;
@@ -1305,12 +1327,14 @@ int main(void) {
                                         rspq_flush();
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                         far_last_tex = (int)tex_idx;
+                                        perf_far_uploads++;
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
                                         rspq_flush();
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                         far_last_tex = -2;
+                                        perf_far_uploads++;
                                     }
                                 } else continue;
 
@@ -1383,7 +1407,9 @@ int main(void) {
                                 for (int tri = 0; tri < num_tris; tri++) {
                                     rdpq_triangle(&TRIFMT_SHADE_TEX,
                                         sv[0], sv[tri+1], sv[tri+2]);
-                                    if ((++far_tris & 79) == 0)
+                                    far_tris++;
+                                    perf_far_tris = far_tris;
+                                    if ((far_tris & 79) == 0)
                                         rspq_flush();
                                 }
                             }
@@ -1495,9 +1521,7 @@ int main(void) {
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
-
-                        /* Near pass: draw all faces (face decimation is far-pass only,
-                         * which now runs in the RDPQ path). */
+                        perf_near_rooms++;
                         int max_faces = room->mesh.face_count;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
@@ -1520,6 +1544,7 @@ int main(void) {
                                 else if (want_tex >= 0)
                                     glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
                                 cur_tex = want_tex;
+                                perf_near_binds++;
                             }
 
                             tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
