@@ -462,8 +462,111 @@ def box_filter_2x(pixels, src_dim):
     return out
 
 
+def quantize_to_ci8(rgba16_pixels, dim):
+    """Convert RGBA16 pixels to CI8: 256-color palette + index array.
+    Returns (palette_rgba16[256], indices[dim*dim])."""
+    # Extract unique RGB5 values, build palette
+    colors = {}
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        key = (r5, g5, b5)
+        colors[key] = colors.get(key, 0) + 1
+
+    # Sort by frequency, take top 256
+    sorted_colors = sorted(colors.keys(), key=lambda k: colors[k], reverse=True)[:256]
+    palette_map = {c: i for i, c in enumerate(sorted_colors)}
+
+    # Build palette in RGBA16 format
+    palette = [0] * 256
+    for i, (r5, g5, b5) in enumerate(sorted_colors):
+        palette[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1
+
+    # Map pixels to nearest palette entry
+    indices = []
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        key = (r5, g5, b5)
+        if key in palette_map:
+            indices.append(palette_map[key])
+        else:
+            # Find nearest color
+            best_idx = 0
+            best_dist = 999999
+            for ci, (pr, pg, pb) in enumerate(sorted_colors):
+                d = (r5-pr)**2 + (g5-pg)**2 + (b5-pb)**2
+                if d < best_dist:
+                    best_dist = d
+                    best_idx = ci
+            indices.append(best_idx)
+
+    return palette, indices
+
+
+def quantize_to_ci4(rgba16_pixels, dim):
+    """Convert RGBA16 pixels to CI4: 16-color palette + nibble-packed array.
+    Returns (palette_rgba16[16], packed_bytes[dim*dim/2])."""
+    # Median-cut-lite: collect colors, reduce to 16
+    colors = {}
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        key = (r5, g5, b5)
+        colors[key] = colors.get(key, 0) + 1
+
+    sorted_colors = sorted(colors.keys(), key=lambda k: colors[k], reverse=True)[:16]
+    palette_map = {c: i for i, c in enumerate(sorted_colors)}
+
+    palette = [0] * 16
+    for i, (r5, g5, b5) in enumerate(sorted_colors):
+        palette[i] = (r5 << 11) | (g5 << 6) | (b5 << 1) | 1
+
+    # Map pixels to nearest palette entry
+    indices = []
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        key = (r5, g5, b5)
+        if key in palette_map:
+            indices.append(palette_map[key])
+        else:
+            best_idx = 0
+            best_dist = 999999
+            for ci, (pr, pg, pb) in enumerate(sorted_colors):
+                d = (r5-pr)**2 + (g5-pg)**2 + (b5-pb)**2
+                if d < best_dist:
+                    best_dist = d
+                    best_idx = ci
+            indices.append(best_idx)
+
+    # Pack into nibbles (2 pixels per byte, high nibble first)
+    packed = []
+    for i in range(0, len(indices), 2):
+        hi = indices[i] & 0xF
+        lo = indices[i+1] & 0xF if i+1 < len(indices) else 0
+        packed.append((hi << 4) | lo)
+
+    return palette, packed
+
+
 def bake_level(phd_path, output_path):
-    """Bake all rooms in a TR1 .PHD level file."""
+    """Bake all rooms in a TR1 .PHD level file.
+
+    Output format (BAK2):
+      Header: 16 bytes
+      Per room:
+        mip0: 32×32 RGBA16 (2048 bytes)
+        mip1_pal: 256 × RGBA16 palette (512 bytes)
+        mip1_idx: 16×16 CI8 indices (256 bytes)
+        mip2_pal: 16 × RGBA16 palette (32 bytes)
+        mip2_idx: 8×8 CI4 packed nibbles (32 bytes)
+      Total per room: 2048 + 512 + 256 + 32 + 32 = 2880 bytes
+    """
     print(f"Baking chunks: {phd_path}")
 
     with open(phd_path, 'rb') as f:
@@ -475,7 +578,6 @@ def bake_level(phd_path, output_path):
     print(f"  Texture pages: {len(level['tex_pages'])}")
     print(f"  Object textures: {len(level['obj_textures'])}")
 
-    # Bake each room
     MIP0_DIM = 32
     MIP1_DIM = 16
     MIP2_DIM = 8
@@ -483,44 +585,55 @@ def bake_level(phd_path, output_path):
     baked_rooms = []
     for ri, room in enumerate(rooms):
         face_count = len(room['quads']) + len(room['tris'])
-        mip0 = bake_room(room, level['tex_pages'],
-                         level['obj_textures'], level['palette'],
-                         tile_dim=MIP0_DIM)
-        mip1 = box_filter_2x(mip0, MIP0_DIM)
-        mip2 = box_filter_2x(mip1, MIP1_DIM)
-        baked_rooms.append((mip0, mip1, mip2))
+        # Generate RGBA16 at all levels first
+        mip0_rgba = bake_room(room, level['tex_pages'],
+                              level['obj_textures'], level['palette'],
+                              tile_dim=MIP0_DIM)
+        mip1_rgba = box_filter_2x(mip0_rgba, MIP0_DIM)
+        mip2_rgba = box_filter_2x(mip1_rgba, MIP1_DIM)
+
+        # Quantize mip1 to CI8, mip2 to CI4
+        mip1_pal, mip1_idx = quantize_to_ci8(mip1_rgba, MIP1_DIM)
+        mip2_pal, mip2_ci4 = quantize_to_ci4(mip2_rgba, MIP2_DIM)
+
+        baked_rooms.append((mip0_rgba, mip1_pal, mip1_idx, mip2_pal, mip2_ci4))
         if ri % 5 == 0:
             print(f"  Room {ri}/{len(rooms)} ({face_count} faces)")
 
     # Write binary output
     with open(output_path, 'wb') as f:
-        # Header
-        f.write(b'BAKE')
+        # Header: BAK2 magic + room count + mip info
+        f.write(b'BAK2')
         f.write(struct.pack('<HHHHHH',
-                            len(rooms),  # room_count
+                            len(rooms),
                             3,           # mip_levels
-                            MIP0_DIM,    # mip0_dim
-                            MIP1_DIM,    # mip1_dim
-                            MIP2_DIM,    # mip2_dim
-                            0))          # reserved
+                            MIP0_DIM,
+                            MIP1_DIM,
+                            MIP2_DIM,
+                            0))
 
-        # Per-room mip data
-        for ri, (mip0, mip1, mip2) in enumerate(baked_rooms):
+        # Per-room data
+        for ri, (mip0, m1_pal, m1_idx, m2_pal, m2_ci4) in enumerate(baked_rooms):
+            # mip0: 32×32 RGBA16
             for px in mip0:
                 f.write(struct.pack('<H', px))
-            for px in mip1:
+            # mip1: CI8 palette (256 entries) + indices
+            for px in m1_pal:
                 f.write(struct.pack('<H', px))
-            for px in mip2:
+            f.write(bytes(m1_idx))
+            # mip2: CI4 palette (16 entries) + packed nibbles
+            for px in m2_pal:
                 f.write(struct.pack('<H', px))
+            f.write(bytes(m2_ci4))
 
-    total_bytes = 16 + len(rooms) * (MIP0_DIM*MIP0_DIM*2 +
-                                      MIP1_DIM*MIP1_DIM*2 +
-                                      MIP2_DIM*MIP2_DIM*2)
+    per_room = (MIP0_DIM*MIP0_DIM*2 + 256*2 + MIP1_DIM*MIP1_DIM +
+                16*2 + MIP2_DIM*MIP2_DIM//2)
+    total_bytes = 16 + len(rooms) * per_room
     print(f"  Output: {output_path} ({total_bytes} bytes, "
           f"{total_bytes/1024:.1f} KB)")
-    print(f"  Per room: {MIP0_DIM}×{MIP0_DIM} + {MIP1_DIM}×{MIP1_DIM} + "
-          f"{MIP2_DIM}×{MIP2_DIM} = "
-          f"{MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2} bytes")
+    print(f"  Per room: mip0={MIP0_DIM}² RGBA16 + "
+          f"mip1={MIP1_DIM}² CI8 + mip2={MIP2_DIM}² CI4 = "
+          f"{per_room} bytes")
 
 
 if __name__ == '__main__':
