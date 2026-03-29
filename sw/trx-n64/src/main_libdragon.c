@@ -741,7 +741,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 5;  /* Balance FPS vs draw distance */
+                    int max_rooms = 4;  /* Balance FPS vs draw distance */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -774,7 +774,7 @@ int main(void) {
                         if (room_rz > 0 && fabsf(room_rx) > room_rz * 2.5f + room_radius) continue;
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 600) max_faces = 600;
+                        if (max_faces > 400) max_faces = 400;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -1317,58 +1317,61 @@ int main(void) {
 
                     /* ===== SHADOW CIRCLE under Lara ===== */
                     {
-                        /* Find Lara item for shadow position */
                         tr_item_t *shadow_item = NULL;
                         for (int i = 0; i < g_level.item_count; i++)
                             if (g_level.items[i].object_id == 0) { shadow_item = &g_level.items[i]; break; }
                     if (shadow_item) {
-                        tr_item_t *lara_item = shadow_item;
-                        /* Dark circle on floor: 4 vertices forming a flat quad */
-                        float sx_pos = (float)lara_item->pos.x;
-                        float sy_pos = (float)lara_item->pos.y + 10.0f; /* Slightly above floor */
-                        float sz_pos = (float)lara_item->pos.z;
-                        float srad = 140.0f;
+                        float sx_pos = (float)shadow_item->pos.x;
+                        float sy_pos = (float)shadow_item->pos.y + 10.0f;
+                        float sz_pos = (float)shadow_item->pos.z;
+                        float srad = 120.0f;
 
                         if (white_px && last_tex_idx != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                             last_tex_idx = -2;
                         }
 
-                        /* 8-point octagon for rounder shadow */
-                        float k = srad * 0.707f; /* cos(45°) */
-                        float oct[8][2] = {
-                            {0,-srad},{k,-k},{srad,0},{k,k},
-                            {0,srad},{-k,k},{-srad,0},{-k,-k}
-                        };
-                        float sv_s[8][10];
+                        /* Enable semi-transparent blending for shadow */
+                        rdpq_mode_push();
+                        rdpq_mode_blender(RDPQ_BLENDER_MULTIPLY);
+
+                        /* 16-point circle */
+                        float circ[16][2];
+                        for (int p = 0; p < 16; p++) {
+                            float a = (float)p * 6.28318f / 16.0f;
+                            circ[p][0] = srad * sinf(a);
+                            circ[p][1] = srad * cosf(a);
+                        }
+                        float sv_s[16][10];
                         bool vis = true;
-                        for (int v = 0; v < 8; v++) {
-                            float wx = sx_pos + oct[v][0];
+                        for (int v = 0; v < 16; v++) {
+                            float wx = sx_pos + circ[v][0];
                             float wy = sy_pos;
-                            float wz = sz_pos + oct[v][1];
-                            float cx_v = wx-cam_x, cy_v = wy-cam_y, cz_v = wz-cam_z;
-                            float rx = cx_v*cy - cz_v*sy;
-                            float rz_y = cx_v*sy + cz_v*cy;
-                            float ry = cy_v*cp - rz_y*sp;
-                            float rz = cy_v*sp + rz_y*cp;
+                            float wz = sz_pos + circ[v][1];
+                            float cx_v=wx-cam_x, cy_v=wy-cam_y, cz_v=wz-cam_z;
+                            float rx=cx_v*cy-cz_v*sy;
+                            float rz_y=cx_v*sy+cz_v*cy;
+                            float ry=cy_v*cp-rz_y*sp;
+                            float rz=cy_v*sp+rz_y*cp;
                             if (rz < 1.0f) { vis = false; break; }
-                            float inv_z = 256.0f / rz;
-                            sv_s[v][0] = 160.0f + rx*inv_z;
-                            sv_s[v][1] = 120.0f + ry*inv_z;
-                            sv_s[v][2] = rz/32768.0f - 0.001f;
-                            if (sv_s[v][2] > 1) sv_s[v][2] = 1;
-                            if (sv_s[v][2] < 0) sv_s[v][2] = 0;
-                            sv_s[v][3]=0.08f; sv_s[v][4]=0.07f;
-                            sv_s[v][5]=0.06f; sv_s[v][6]=1.0f;
+                            float inv_z=256.0f/rz;
+                            sv_s[v][0]=160.0f+rx*inv_z;
+                            sv_s[v][1]=120.0f+ry*inv_z;
+                            sv_s[v][2]=rz/32768.0f-0.001f;
+                            if(sv_s[v][2]>1)sv_s[v][2]=1;
+                            if(sv_s[v][2]<0)sv_s[v][2]=0;
+                            /* Dark with 40% opacity via alpha */
+                            sv_s[v][3]=0; sv_s[v][4]=0;
+                            sv_s[v][5]=0; sv_s[v][6]=0.4f;
                             sv_s[v][7]=0; sv_s[v][8]=0;
                             sv_s[v][9]=1.0f/rz;
                         }
                         if (vis) {
-                            /* 6 triangles as fan from point 0 */
-                            for (int t = 1; t < 7; t++)
+                            for (int t = 1; t < 15; t++)
                                 rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX,
                                     sv_s[0], sv_s[t], sv_s[t+1]);
                         }
+                        rdpq_mode_pop();
                     }}
 
                     /* FPS display: draw as colored rectangles for digits */
@@ -1430,7 +1433,7 @@ int main(void) {
                 console_set_render_mode(RENDER_MANUAL);
                 printf("Paused. Press START for 3D.\n");
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
-                printf("FPS: %d\n", fps_display);
+                printf("FPS: %d  Audio: %d samples\n", fps_display, parsed_samples);
                 /* Debug: Lara animation info */
                 {
                     tr_object_def_t *dbg_obj = NULL;
