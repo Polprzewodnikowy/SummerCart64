@@ -2154,7 +2154,9 @@ int main(void) {
                     {
                         int loop_start = 0;
                         int loop_end   = near_count;
-                        int pass       = 1;  /* near pass identifier for fog logic */
+                        int pass       = 1;
+                        int gl_tri_count = 0;
+                        #define GL_TRI_BUDGET 600  /* cap total GL tris per frame */
 
                     for (int ri = loop_start; ri < loop_end; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -2311,9 +2313,13 @@ int main(void) {
                                     vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
                                     vp->s = fs[i]; vp->t = ft[i];
                                 }
+                                gl_tri_count++;
                             }
+                            if (gl_tri_count >= GL_TRI_BUDGET)
+                                goto gl_room_pass_done;
                         }
                     }
+                    gl_room_pass_done:
                     FLUSH_GL();
 
                     /* ===== GL STATIC MESHES (near rooms only) =====
