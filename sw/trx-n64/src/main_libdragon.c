@@ -2188,6 +2188,7 @@ int main(void) {
                                 if ((int)tex_idx != near_last_tex &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
                                     rspq_flush();
+                                    if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                     near_last_tex = (int)tex_idx;
                                     near_uploads++;
@@ -2199,7 +2200,6 @@ int main(void) {
                                     rspq_flush();
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                    rdpq_mode_tlut(TLUT_RGBA16);
                                     near_last_tex = -2;
                                     near_uploads++;
                                 }
@@ -2383,13 +2383,13 @@ int main(void) {
                                         rspq_flush();
                                         rdpq_mode_tlut(TLUT_NONE);
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        rdpq_mode_tlut(TLUT_RGBA16);
                                         near_last_tex = -2;
                                     }
                                 } else if (tex_idx < num_otex && ci8_surfs) {
                                     sm_fr = sm_fg = sm_fb = sm_bright;
                                     if ((int)tex_idx != near_last_tex) {
                                         rspq_flush();
+                                        if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                         rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                         near_last_tex = (int)tex_idx;
                                     }
@@ -2570,12 +2570,12 @@ int main(void) {
                                             rspq_flush();
                                             rdpq_mode_tlut(TLUT_NONE);
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            rdpq_mode_tlut(TLUT_RGBA16);
                                             near_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex && ci8_surfs) {
                                         if ((int)tex_idx != near_last_tex) {
                                             rspq_flush();
+                                            if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                             rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                             near_last_tex = (int)tex_idx;
                                         }
@@ -2888,13 +2888,13 @@ int main(void) {
                                     rspq_flush();
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                    rdpq_mode_tlut(TLUT_RGBA16);
                                     near_last_tex = -2;
                                 }
                             } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
                                 if ((int)tex_idx != near_last_tex) {
                                     rspq_flush();
+                                    if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
                                     near_last_tex = (int)tex_idx;
                                 }
