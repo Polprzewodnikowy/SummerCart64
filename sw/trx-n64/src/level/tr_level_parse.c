@@ -712,24 +712,35 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
         r_skip(&r, level->sound_detail_count * 8);
     }
 
-    /* Sample indices: byte offsets into sample data blob */
-    MARK_POS(&r);  /* [15] snd_indices */
-    level->sample_index_count = r_s32(&r);
-    level->sample_indices = alloc(level->sample_index_count * 4);
-    if (level->sample_indices) {
-        for (int i = 0; i < level->sample_index_count; i++)
-            level->sample_indices[i] = r_s32(&r);
-    } else {
-        r_skip(&r, level->sample_index_count * 4);
-    }
-
-    /* Sample data: raw PCM blob (rest of file) */
-    /* TR1 embeds samples as concatenated RIFF/WAV chunks */
-    level->sample_data_size = level_size - r.pos;
-    if (level->sample_data_size > 0 && level->sample_data_size < 2*1024*1024) {
+    /* TR1 sample data: uint32 byte count + concatenated RIFF/WAV chunks.
+     * There are NO separate sample indices in TR1 .PHD files —
+     * we scan for RIFF headers to build the index ourselves. */
+    MARK_POS(&r);  /* [15] sample_data */
+    level->sample_data_size = r_s32(&r);
+    if (level->sample_data_size > 0 && level->sample_data_size < 2*1024*1024 &&
+        r_has(&r, level->sample_data_size)) {
         level->sample_data = alloc(level->sample_data_size);
-        if (level->sample_data)
+        if (level->sample_data) {
             r_read(&r, level->sample_data, level->sample_data_size);
+            /* Scan for RIFF headers to build sample indices */
+            int max_samples = 256;
+            level->sample_indices = ALLOC_ARRAY(int32_t, max_samples);
+            level->sample_index_count = 0;
+            if (level->sample_indices) {
+                uint32_t pos = 0;
+                while (pos + 8 < (uint32_t)level->sample_data_size &&
+                       level->sample_index_count < max_samples) {
+                    uint8_t *p = level->sample_data + pos;
+                    if (p[0]=='R' && p[1]=='I' && p[2]=='F' && p[3]=='F') {
+                        level->sample_indices[level->sample_index_count++] = pos;
+                        uint32_t chunk_size = p[4]|(p[5]<<8)|(p[6]<<16)|(p[7]<<24);
+                        pos += 8 + chunk_size;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
     } else {
         level->sample_data = NULL;
         level->sample_data_size = 0;

@@ -965,13 +965,17 @@ int main(void) {
                                 float ry = wy * cp - rz_yaw * sp;
                                 float rz = wy * sp + rz_yaw * cp;
 
-                                if (rz < 1.0f) { visible = false; break; }
+                                if (rz < 32.0f) { visible = false; break; }
 
                                 float inv_z = 256.0f / rz;
                                 float screen_x = 160.0f + rx * inv_z;
                                 float screen_y = 120.0f + ry * inv_z;
 
-                                /* No screen-space culling — let RDP clip */
+                                /* Clamp to safe RDP coordinate range */
+                                if (screen_x < -2048.0f) screen_x = -2048.0f;
+                                if (screen_x > 2048.0f) screen_x = 2048.0f;
+                                if (screen_y < -2048.0f) screen_y = -2048.0f;
+                                if (screen_y > 2048.0f) screen_y = 2048.0f;
 
                                 sv[v][0] = screen_x;
                                 sv[v][1] = screen_y;
@@ -1169,13 +1173,19 @@ int main(void) {
                                     float rz_yaw = cx * sy + cz * cy;
                                     float ry = cy_val * cp - rz_yaw * sp;
                                     float rz = cy_val * sp + rz_yaw * cp;
-                                    if (rz < 1.0f) { visible = false; break; }
+                                    if (rz < 32.0f) { visible = false; break; }
 
                                     float inv_z = 256.0f / rz;
                                     float fog = 1.0f - rz / 16384.0f;
                                     if (fog < 0) fog = 0;
-                                    sv[v][0] = 160.0f + rx * inv_z;
-                                    sv[v][1] = 120.0f + ry * inv_z;
+                                    float scx = 160.0f + rx * inv_z;
+                                    float scy = 120.0f + ry * inv_z;
+                                    if (scx < -2048) scx = -2048;
+                                    if (scx > 2048) scx = 2048;
+                                    if (scy < -2048) scy = -2048;
+                                    if (scy > 2048) scy = 2048;
+                                    sv[v][0] = scx;
+                                    sv[v][1] = scy;
                                     sv[v][2] = rz / 32768.0f;
                                     if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
 
@@ -1275,10 +1285,15 @@ int main(void) {
                                 float rz_y = cx_v*sy + cz_v*cy;
                                 float ry = cy_v*cp - rz_y*sp;
                                 float rz = cy_v*sp + rz_y*cp;
-                                if (rz < 1.0f) { vis = false; break; }
+                                if (rz < 32.0f) { vis = false; break; }
                                 float inv_z = 256.0f / rz;
                                 float fog = 1.0f - rz/16384.0f; if (fog < 0) fog = 0;
-                                sv[v][0] = 160.0f + rx*inv_z; sv[v][1] = 120.0f + ry*inv_z;
+                                float scx2 = 160.0f + rx*inv_z, scy2 = 120.0f + ry*inv_z;
+                                if (scx2<-2048) scx2=-2048;
+                                if (scx2>2048) scx2=2048;
+                                if (scy2<-2048) scy2=-2048;
+                                if (scy2>2048) scy2=2048;
+                                sv[v][0] = scx2; sv[v][1] = scy2;
                                 sv[v][2] = rz/32768.0f; if (sv[v][2]>1) sv[v][2]=1;
                                 if (is_flat) { sv[v][3]=ifr*fog; sv[v][4]=ifg*fog; sv[v][5]=ifb*fog; }
                                 else { sv[v][3]=item_shade*fog; sv[v][4]=item_shade*fog; sv[v][5]=item_shade*fog; }
@@ -1421,11 +1436,17 @@ int main(void) {
                                         float rz_yaw = cx * sy + cz * cy;
                                         float ry = cy_val * cp - rz_yaw * sp;
                                         float rz = cy_val * sp + rz_yaw * cp;
-                                        if (rz < 1.0f) { visible = false; break; }
+                                        if (rz < 32.0f) { visible = false; break; }
 
                                         float inv_z = 256.0f / rz;
-                                        sv[v][0] = 160.0f + rx * inv_z;
-                                        sv[v][1] = 120.0f + ry * inv_z;
+                                        float lsx = 160.0f + rx * inv_z;
+                                        float lsy2 = 120.0f + ry * inv_z;
+                                        if (lsx<-2048) lsx=-2048;
+                                        if (lsx>2048) lsx=2048;
+                                        if (lsy2<-2048) lsy2=-2048;
+                                        if (lsy2>2048) lsy2=2048;
+                                        sv[v][0] = lsx;
+                                        sv[v][1] = lsy2;
                                         sv[v][2] = rz / 32768.0f;
                                         if (sv[v][2] > 1.0f) sv[v][2] = 1.0f;
                                         if (is_flat) {
@@ -1482,10 +1503,15 @@ int main(void) {
                             float rz_y=cx_v*sy+cz_v*cy;
                             float ry=cy_v*cp-rz_y*sp;
                             float rz=cy_v*sp+rz_y*cp;
-                            if (rz < 1.0f) { vis = false; break; }
+                            if (rz < 32.0f) { vis = false; break; }
                             float inv_z=256.0f/rz;
-                            sv_s[v][0]=160.0f+rx*inv_z;
-                            sv_s[v][1]=120.0f+ry*inv_z;
+                            float shx=160.0f+rx*inv_z, shy=120.0f+ry*inv_z;
+                            if(shx<-2048)shx=-2048;
+                            if(shx>2048)shx=2048;
+                            if(shy<-2048)shy=-2048;
+                            if(shy>2048)shy=2048;
+                            sv_s[v][0]=shx;
+                            sv_s[v][1]=shy;
                             sv_s[v][2]=rz/32768.0f-0.001f;
                             if(sv_s[v][2]>1)sv_s[v][2]=1;
                             if(sv_s[v][2]<0)sv_s[v][2]=0;
