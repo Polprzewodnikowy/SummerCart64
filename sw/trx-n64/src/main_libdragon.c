@@ -1206,7 +1206,7 @@ int main(void) {
 
                 /* Budget constants — visible to both the render passes and the
                  * pause-screen STAT display (must be defined before both). */
-                #define FAR_TRI_BUDGET      400
+                #define FAR_TRI_BUDGET      200
                 #define FAR_UPLOAD_BUDGET   8
                 #define NEAR_TRI_BUDGET     1400
                 #define NEAR_FACE_BUDGET    600  /* cap total face iterations (including culled) */
@@ -1952,6 +1952,10 @@ int main(void) {
 
                             for (int f = 0; f < room->mesh.face_count; f++) {
                                 if (far_tris >= FAR_TRI_BUDGET) goto far_pass_done;
+                                /* Baked rooms: skip every other face — the baked
+                                 * tile provides visual coverage, geometry is just
+                                 * for silhouette shape. Halves face transforms. */
+                                if (room_baked && (f & 1)) continue;
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -2384,7 +2388,9 @@ int main(void) {
                             float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
 
                             for (int f = 0; f < mesh->face_count && f < 100; f++) {
-                                if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
+                                if (perf_near_tris >= NEAR_TRI_BUDGET ||
+                                    perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
+                                perf_near_faces++;
                                 tr_face_t *face = &mesh->faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -2571,7 +2577,9 @@ int main(void) {
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
                                 for (int f = 0; f < mesh->face_count; f++) {
-                                    if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
+                                    if (perf_near_tris >= NEAR_TRI_BUDGET ||
+                                        perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
+                                    perf_near_faces++;
                                     tr_face_t *face = &mesh->faces[f];
                                     int nv = face->vertex_count;
                                     if (nv < 3) continue;
@@ -2890,7 +2898,9 @@ int main(void) {
                         float isy = sinf(iyaw), icy = cosf(iyaw);
 
                         for (int f = 0; f < mesh->face_count && f < 50; f++) {
-                            if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
+                            if (perf_near_tris >= NEAR_TRI_BUDGET ||
+                                perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
+                            perf_near_faces++;
                             tr_face_t *face = &mesh->faces[f];
                             if (face->vertex_count < 3) continue;
                             bool is_flat = (face->texture & 0x8000) != 0;
