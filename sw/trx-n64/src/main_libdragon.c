@@ -658,6 +658,79 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
+                /* ---- Mip levels: 16x16 (level 1) and 8x8 (level 2) ----
+                 * Box-filter downsample from the 32x32 base textures.
+                 * Each mip level gets its own GL texture array so the
+                 * renderer can bind the appropriate level per face. */
+                #define MIP1_DIM 16
+                #define MIP2_DIM 8
+                #define MIP1_BYTES (MIP1_DIM * MIP1_DIM * 2)
+                #define MIP2_BYTES (MIP2_DIM * MIP2_DIM * 2)
+
+                uint16_t *mip1_tiles = NULL;
+                uint16_t *mip2_tiles = NULL;
+                surface_t *mip1_surfs = NULL;
+                surface_t *mip2_surfs = NULL;
+                GLuint *gl_mip1_textures = NULL;
+                GLuint *gl_mip2_textures = NULL;
+
+                if (tex_tiles && num_otex > 0) {
+                    mip1_tiles = (uint16_t *)malloc_uncached_aligned(
+                        64, num_otex * MIP1_BYTES);
+                    mip2_tiles = (uint16_t *)malloc_uncached_aligned(
+                        64, num_otex * MIP2_BYTES);
+                    mip1_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    mip2_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                    gl_mip1_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
+                    gl_mip2_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
+                }
+
+                if (mip1_tiles && mip2_tiles && mip1_surfs && mip2_surfs) {
+                    printf("  Generating mip levels (%dx%d, %dx%d)...\n",
+                           MIP1_DIM, MIP1_DIM, MIP2_DIM, MIP2_DIM);
+                    for (int i = 0; i < num_otex; i++) {
+                        uint16_t *src32 = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                        uint16_t *dst16 = mip1_tiles + i * MIP1_DIM * MIP1_DIM;
+                        uint16_t *dst8  = mip2_tiles + i * MIP2_DIM * MIP2_DIM;
+
+                        /* 32→16: 2x2 box filter */
+                        for (int y = 0; y < MIP1_DIM; y++) {
+                            for (int x = 0; x < MIP1_DIM; x++) {
+                                int sx = x * 2, sy = y * 2;
+                                /* Average 4 RGBA16 pixels (5-5-5-1 format) */
+                                uint16_t p00 = src32[sy * TEX_TILE_DIM + sx];
+                                uint16_t p10 = src32[sy * TEX_TILE_DIM + sx + 1];
+                                uint16_t p01 = src32[(sy+1) * TEX_TILE_DIM + sx];
+                                uint16_t p11 = src32[(sy+1) * TEX_TILE_DIM + sx + 1];
+                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                int aa = (p00|p10|p01|p11) & 1;
+                                dst16[y * MIP1_DIM + x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                            }
+                        }
+                        /* 16→8: 2x2 box filter from mip1 */
+                        for (int y = 0; y < MIP2_DIM; y++) {
+                            for (int x = 0; x < MIP2_DIM; x++) {
+                                int sx = x * 2, sy = y * 2;
+                                uint16_t p00 = dst16[sy * MIP1_DIM + sx];
+                                uint16_t p10 = dst16[sy * MIP1_DIM + sx + 1];
+                                uint16_t p01 = dst16[(sy+1) * MIP1_DIM + sx];
+                                uint16_t p11 = dst16[(sy+1) * MIP1_DIM + sx + 1];
+                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                int aa = (p00|p10|p01|p11) & 1;
+                                dst8[y * MIP2_DIM + x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                            }
+                        }
+                        mip1_surfs[i] = surface_make_linear(dst16, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                        mip2_surfs[i] = surface_make_linear(dst8, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                    }
+                    printf("  Mips: %d KB (16x16) + %d KB (8x8)\n",
+                           num_otex * MIP1_BYTES / 1024, num_otex * MIP2_BYTES / 1024);
+                }
+
                 /* Create a 1x1 solid white texture for flat-colored faces.
                  * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
                 uint16_t *white_px = (uint16_t *)malloc_uncached_aligned(64, 8);
@@ -1096,7 +1169,7 @@ int main(void) {
                         glDisable(GL_LIGHTING);
                         glDisable(GL_FOG);
 
-                        /* Create GL texture objects */
+                        /* Create GL texture objects (base 32x32) */
                         if (gl_textures) {
                             glGenTextures(num_otex, gl_textures);
                             for (int i = 0; i < num_otex; i++) {
@@ -1106,6 +1179,29 @@ int main(void) {
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
+                            }
+                        }
+                        /* Mip level GL texture objects (16x16, 8x8) */
+                        if (gl_mip1_textures && mip1_surfs) {
+                            glGenTextures(num_otex, gl_mip1_textures);
+                            for (int i = 0; i < num_otex; i++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_mip1_textures[i]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip1_surfs[i], NULL);
+                            }
+                        }
+                        if (gl_mip2_textures && mip2_surfs) {
+                            glGenTextures(num_otex, gl_mip2_textures);
+                            for (int i = 0; i < num_otex; i++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_mip2_textures[i]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip2_surfs[i], NULL);
                             }
                         }
                         if (white_px) {
@@ -1289,19 +1385,24 @@ int main(void) {
 
                     for (int pass = 0; pass < 2; pass++) {
                         int loop_start, loop_end;
+                        tex_budget_t tex_bud;
                         if (pass == 0) {
                             /* FAR PASS */
                             glDisable(GL_DEPTH_TEST);
                             glDepthMask(GL_FALSE);
                             loop_start = near_count;
                             loop_end   = num_draw;
+                            tex_bud.budget = TEX_BIND_BUDGET_FAR;
                         } else {
                             /* NEAR PASS */
                             glEnable(GL_DEPTH_TEST);
                             glDepthMask(GL_TRUE);
                             loop_start = 0;
                             loop_end   = near_count;
+                            tex_bud.budget = TEX_BIND_BUDGET_NEAR;
                         }
+                        tex_bud.binds_this_frame = 0;
+                        tex_bud.last_bound_tex = -1;
 
                     for (int ri = loop_start; ri < loop_end; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -1340,11 +1441,36 @@ int main(void) {
                             } else continue;
 
                             if (want_tex != cur_tex) {
-                                FLUSH_GL();
-                                if (want_tex == -2 && gl_white_tex)
-                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                else if (want_tex >= 0)
-                                    glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                /* Texture bind budget: if exceeded, reuse the
+                                 * last bound texture (visually acceptable at
+                                 * distance; near pass has generous budget). */
+                                if (tex_bud.binds_this_frame >= tex_bud.budget &&
+                                    tex_bud.last_bound_tex >= 0) {
+                                    /* Budget exceeded — skip this bind, use
+                                     * whatever texture is currently active */
+                                } else {
+                                    FLUSH_GL();
+                                    if (want_tex == -2 && gl_white_tex) {
+                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                    } else if (want_tex >= 0) {
+                                        /* Mip selection: choose texture LOD
+                                         * based on room distance from camera.
+                                         * Near pass uses base (32x32).
+                                         * Far pass: 16x16 or 8x8 by distance. */
+                                        float rd = (room_idx < g_chunk_count)
+                                            ? g_chunks[room_idx].dist_sq : 0.0f;
+                                        if (pass == 0 && rd > CHUNK_VERY_FAR_DIST2 &&
+                                            gl_mip2_textures)
+                                            glBindTexture(GL_TEXTURE_2D, gl_mip2_textures[want_tex]);
+                                        else if (pass == 0 && rd > CHUNK_FAR_DIST2 &&
+                                                 gl_mip1_textures)
+                                            glBindTexture(GL_TEXTURE_2D, gl_mip1_textures[want_tex]);
+                                        else
+                                            glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                    }
+                                    tex_bud.binds_this_frame++;
+                                    tex_bud.last_bound_tex = want_tex;
+                                }
                                 cur_tex = want_tex;
                             }
 
@@ -1363,9 +1489,12 @@ int main(void) {
                                 if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                px[v] = (room->x + rv->x - cam_x) * WORLD_SCALE;
-                                py[v] = -(rv->y - cam_y) * WORLD_SCALE;
-                                pz[v] = -(room->z + rv->z - cam_z) * WORLD_SCALE;
+                                float vx_w = (float)(room->x + rv->x);
+                                float vy_w = (float)rv->y;
+                                float vz_w = (float)(room->z + rv->z);
+                                px[v] = (vx_w - cam_x) * WORLD_SCALE;
+                                py[v] = -(vy_w - cam_y) * WORLD_SCALE;
+                                pz[v] = -(vz_w - cam_z) * WORLD_SCALE;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
@@ -1374,6 +1503,32 @@ int main(void) {
                                 float r = is_water ? bright * 0.4f : bright;
                                 float g = is_water ? bright * 0.6f : bright;
                                 float b = is_water ? bright * 1.0f : bright;
+
+                                /* Far pass: blend lighting with RGB fog.
+                                 * Uses dist² (no sqrtf) for performance.
+                                 * Fog color is cave-appropriate mid-gray.
+                                 * Vertical gradient: lower verts get denser fog. */
+                                if (pass == 0) {
+                                    float fdx = vx_w - cam_x;
+                                    float fdz = vz_w - cam_z;
+                                    float d2 = fdx*fdx + fdz*fdz;
+                                    /* Quadratic ramp: fog ∝ dist², visually close to linear */
+                                    float fog = (d2 - 26214400.0f) / (99090432.0f);
+                                    /* 26214400 = 5120² (start), 125304832 = 11200² (end)
+                                     * divisor = end² - start² = 99090432 */
+                                    /* Vertical bias: lower = more fog (TR1 Y-down) */
+                                    float y_bias = (vy_w - cam_y) * 0.00004f;
+                                    if (y_bias < 0.0f) y_bias = 0.0f;
+                                    if (y_bias > 0.2f) y_bias = 0.2f;
+                                    fog += y_bias;
+                                    if (fog < 0.0f) fog = 0.0f;
+                                    if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
+                                    /* Cave fog: dark blue-gray but visible */
+                                    r = r * (1.0f - fog) + 0.15f * fog;
+                                    g = g * (1.0f - fog) + 0.13f * fog;
+                                    b = b * (1.0f - fog) + 0.18f * fog;
+                                }
+
                                 cr[v] = (uint8_t)(r * 255.0f);
                                 cg[v] = (uint8_t)(g * 255.0f);
                                 cb[v] = (uint8_t)(b * 255.0f);
