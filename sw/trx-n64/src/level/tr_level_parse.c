@@ -15,7 +15,11 @@
 #include "../platform/n64_platform.h"
 
 #include <string.h>
-#include <stdio.h>
+
+/* External debug position array (defined in main) */
+extern uint32_t g_parse_pos[16];
+extern int g_parse_count;
+#define MARK_POS(r) do { if (g_parse_count < 16) g_parse_pos[g_parse_count++] = (r)->pos; } while(0)
 
 /* -------------------------------------------------------------------
  * Reader helpers (little-endian → big-endian swap)
@@ -623,84 +627,83 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
 
     /* Rooms + floor data */
     tr_parse_result_t res;
-    printf("  [parse] rooms @ %u\n", r.pos);
+    g_parse_count = 0;
+    MARK_POS(&r);  /* [0] rooms */
     res = parse_rooms(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Object meshes */
-    printf("  [parse] meshes @ %u\n", r.pos);
+    MARK_POS(&r);  /* [1] meshes */
     res = parse_meshes(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Animations (all sub-sections) */
-    printf("  [parse] anims @ %u\n", r.pos);
+    MARK_POS(&r);  /* [2] anims */
     res = parse_anims(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Objects + static objects */
-    printf("  [parse] objects @ %u\n", r.pos);
+    MARK_POS(&r);  /* [3] objects */
     res = parse_objects(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Textures, sprites, sprite sequences */
-    printf("  [parse] textures @ %u\n", r.pos);
+    MARK_POS(&r);  /* [4] textures */
     res = parse_textures(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Cameras + sinks (skip for now) */
-    printf("  [parse] cameras @ %u\n", r.pos);
+    MARK_POS(&r);  /* [5] cameras */
     int32_t num_cameras = r_s32(&r);
     r_skip(&r, num_cameras * 16);
 
     /* Sound sources (skip) */
-    printf("  [parse] sound_src @ %u (cams=%d)\n", r.pos, num_cameras);
+    MARK_POS(&r);  /* [6] sound_src */
     int32_t num_sound_sources = r_s32(&r);
     r_skip(&r, num_sound_sources * 16);
 
     /* Pathfinding boxes (skip) */
-    printf("  [parse] boxes @ %u (snd_src=%d)\n", r.pos, num_sound_sources);
+    MARK_POS(&r);  /* [7] boxes */
     int32_t num_boxes = r_s32(&r);
     r_skip(&r, num_boxes * 20);  /* TR1: 20 bytes per box */
     int32_t num_overlaps = r_s32(&r);
     r_skip(&r, num_overlaps * 2);
-    printf("  [parse] zones @ %u (boxes=%d overlaps=%d)\n", r.pos, num_boxes, num_overlaps);
     /* Zone data: 6 arrays × num_boxes × int16
      * TR1: GroundZone1, GroundZone2, FlyZone, then alt versions = 6 arrays */
     r_skip(&r, 6 * num_boxes * 2);
 
     /* Animated texture ranges (skip for now) */
-    printf("  [parse] anim_tex @ %u\n", r.pos);
+    MARK_POS(&r);  /* [8] anim_tex */
     int32_t anim_tex_size = r_s32(&r);
     r_skip(&r, anim_tex_size * 2);
 
     /* Items */
-    printf("  [parse] items @ %u (anim_tex=%d)\n", r.pos, anim_tex_size);
+    MARK_POS(&r);  /* [9] items */
     res = parse_items(&r, level);
     if (res != TR_PARSE_OK) return res;
 
     /* Light map + palette */
-    printf("  [parse] lightmap @ %u\n", r.pos);
+    MARK_POS(&r);  /* [10] lightmap */
     parse_palette_and_lightmap(&r, level);
 
     /* Cinematic frames (skip) */
-    printf("  [parse] cine @ %u\n", r.pos);
+    MARK_POS(&r);  /* [11] cine */
     int16_t num_cine = r_s16(&r);
     r_skip(&r, num_cine * 16);
 
     /* Demo data (skip) */
-    printf("  [parse] demo @ %u (cine=%d)\n", r.pos, num_cine);
+    MARK_POS(&r);  /* [12] demo */
     uint16_t demo_size = r_u16(&r);
     r_skip(&r, demo_size);
 
     /* Sound map: 256 entries mapping effect ID → sample info index */
-    printf("  [parse] sound_map @ %u (demo=%d)\n", r.pos, demo_size);
+    MARK_POS(&r);  /* [13] sound_map */
     for (int i = 0; i < 256; i++)
         level->sound_map[i] = r_s16(&r);
 
     /* Sound details (sample info entries): 8 bytes each */
-    printf("  [parse] snd_details @ %u\n", r.pos);
+    MARK_POS(&r);  /* [14] snd_details */
     level->sound_detail_count = r_s32(&r);
-    printf("  [parse] snd_detail_count=%d\n", (int)level->sound_detail_count);
     level->sound_details = alloc(level->sound_detail_count * 8);
     if (level->sound_details) {
         for (int i = 0; i < level->sound_detail_count * 4; i++)
@@ -710,9 +713,8 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
     }
 
     /* Sample indices: byte offsets into sample data blob */
-    printf("  [parse] snd_indices @ %u\n", r.pos);
+    MARK_POS(&r);  /* [15] snd_indices */
     level->sample_index_count = r_s32(&r);
-    printf("  [parse] snd_index_count=%d\n", (int)level->sample_index_count);
     level->sample_indices = alloc(level->sample_index_count * 4);
     if (level->sample_indices) {
         for (int i = 0; i < level->sample_index_count; i++)
@@ -723,18 +725,14 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
 
     /* Sample data: raw PCM blob (rest of file) */
     /* TR1 embeds samples as concatenated RIFF/WAV chunks */
-    printf("  [parse] snd_data @ %u (remaining=%d)\n", r.pos, (int)(level_size - r.pos));
     level->sample_data_size = level_size - r.pos;
     if (level->sample_data_size > 0 && level->sample_data_size < 2*1024*1024) {
         level->sample_data = alloc(level->sample_data_size);
         if (level->sample_data)
             r_read(&r, level->sample_data, level->sample_data_size);
-        else
-            printf("  [parse] FAILED to alloc %d bytes for samples\n", (int)level->sample_data_size);
     } else {
         level->sample_data = NULL;
         level->sample_data_size = 0;
-        printf("  [parse] skipping samples (size=%d)\n", (int)level->sample_data_size);
     }
 
     /* Now go back and read texture pages */

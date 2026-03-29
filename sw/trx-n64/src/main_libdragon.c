@@ -38,6 +38,10 @@
 static uint8_t game_heap[GAME_HEAP_SIZE] __attribute__((aligned(16)));
 static uint32_t heap_offset = 0;
 
+/* Parse debug positions (filled by parser, shown on pause) */
+uint32_t g_parse_pos[16];
+int g_parse_count = 0;
+
 void n64_mem_init(void) { heap_offset = 0; }
 
 void *n64_mem_alloc(uint32_t size) {
@@ -408,14 +412,6 @@ int main(void) {
                     uint8_t *w = g_level.sample_data + off0;
                     printf("  Sample[0]: off=%d, hdr=%c%c%c%c\n",
                            off0, w[0], w[1], w[2], w[3]);
-                }
-                printf("\nPress START to continue...\n");
-                console_render();
-                /* Wait for START press so user can read parse info */
-                while (1) {
-                    joypad_poll();
-                    joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
-                    if (bp.start) break;
                 }
                 printf("Preparing textures...\n");
                 console_render();
@@ -1575,8 +1571,13 @@ int main(void) {
                     uint8_t *w = g_level.sample_data + o;
                     printf("  [0] off=%d hdr=%02x%02x%02x%02x\n", o, w[0],w[1],w[2],w[3]);
                 }
-                printf("Flags: 0x%x compressed=%u fullsize=%u\n",
+                printf("Flags: 0x%x comp=%u full=%u\n",
                        (unsigned)level_flags, (unsigned)level_compressed, (unsigned)level_size);
+                /* Parse positions: rooms,mesh,anim,obj,tex,cam,snd,box,atex,items,lm,cine,demo,smap,sdet,sidx */
+                printf("Parse@:");
+                for (int pi = 0; pi < g_parse_count && pi < 16; pi++)
+                    printf(" %u", g_parse_pos[pi]);
+                printf("\n");
                 printf("Room: %d  Collision: %s\n", lara_room, collision_on?"ON (tcl)":"OFF (noclip)");
                 {
                     int32_t pfl, pcl;
