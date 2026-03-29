@@ -859,6 +859,47 @@ int main(void) {
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
+
+                /* Build CI8 tiles for the RDPQ near pass.
+                 * TR1 source textures ARE already CI8 (palette-indexed), so
+                 * we just read raw palette indices instead of converting to
+                 * RGBA16.  Paired with the global pal16 TLUT uploaded once
+                 * per frame: CI8 32×32 = 1 KB TMEM (vs 2 KB for RGBA16). */
+                uint8_t *ci8_tiles = NULL;
+                surface_t *ci8_surfs = NULL;
+                if (num_otex > 0) {
+                    ci8_tiles = (uint8_t *)malloc_uncached_aligned(
+                        64, num_otex * TEX_TILE_DIM * TEX_TILE_DIM);
+                    ci8_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                }
+                if (ci8_tiles && ci8_surfs) {
+                    for (int i = 0; i < num_otex; i++) {
+                        tr_object_texture_t *otex = &g_level.object_textures[i];
+                        uint8_t *ctile = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                        int u0 = (int)tex_uv_map[i*4+0];
+                        int v0 = (int)tex_uv_map[i*4+1];
+                        int tw = (int)(TEX_TILE_DIM / tex_uv_map[i*4+2] + 0.5f);
+                        int th = (int)(TEX_TILE_DIM / tex_uv_map[i*4+3] + 0.5f);
+                        if (tw < 1) tw = 1;
+                        if (th < 1) th = 1;
+                        if (otex->tex_page < num_tex_pages) {
+                            uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
+                            for (int y = 0; y < TEX_TILE_DIM; y++) {
+                                int sy = v0 + y * th / TEX_TILE_DIM;
+                                if (sy > 255) sy = 255;
+                                for (int x = 0; x < TEX_TILE_DIM; x++) {
+                                    int sx = u0 + x * tw / TEX_TILE_DIM;
+                                    if (sx > 255) sx = 255;
+                                    ctile[y * TEX_TILE_DIM + x] = page[sy * 256 + sx];
+                                }
+                            }
+                        } else {
+                            memset(ctile, 0, TEX_TILE_DIM * TEX_TILE_DIM);
+                        }
+                        ci8_surfs[i] = surface_make_linear(ctile, FMT_CI8,
+                                                           TEX_TILE_DIM, TEX_TILE_DIM);
+                    }
+                }
                 printf("  %d/%d textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
                        num_otex * TEX_TILE_BYTES / 1024,
@@ -1024,12 +1065,9 @@ int main(void) {
                         mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
                 }
 
-                /* GL texture objects — created after gl_init() */
-                GLuint *gl_textures = NULL;
-                GLuint gl_white_tex = 0;
-                if (num_otex > 0 && tex_surfs) {
-                    gl_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
-                }
+                /* GL texture objects — stubbed; GL is kept linked but not used
+                 * for rendering.  Near pass now uses custom RDPQ + CI8. */
+                (void)0; /* gl_textures / gl_white_tex removed */
 
                 /* ============================================
                  * AUDIO INIT
@@ -1134,13 +1172,14 @@ int main(void) {
                  * Flat-shaded room triangles via rdpq.
                  */
 
-                /* Close console, init display + OpenGL for RSP T&L */
+                /* Close console, init display.  GL is initialised as a stub
+                 * (keeps the pipeline linked) but never entered in the hot path.
+                 * All geometry now goes through custom RDPQ. */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
-                gl_init();
-                bool has_zbuf = true;  /* GL manages zbuf internally */
-                bool gl_setup_done = false;  /* Defer GL state to first frame */
+                gl_init();  /* stub — not used for rendering */
+                bool has_zbuf = true;  /* all passes use z-buffer */
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -1181,6 +1220,13 @@ int main(void) {
                 bool collision_on = false;  /* L = tcl toggle */
                 int speed_level = 1;
 
+                /* Budget constants — visible to both the render passes and the
+                 * pause-screen STAT display (must be defined before both). */
+                #define FAR_TRI_BUDGET      300
+                #define FAR_UPLOAD_BUDGET   8
+                #define NEAR_TRI_BUDGET     700
+                #define NEAR_UPLOAD_BUDGET  48
+
                 /* Per-frame perf counters (updated each frame, shown on pause) */
                 /* Per-frame performance counters — reset each frame,
                  * displayed on pause screen for diagnostics. */
@@ -1205,7 +1251,6 @@ int main(void) {
                 float active_fog_b = 0.40f;
 
                 /* Render loop */
-                render_loop:
                 while (1) {
                     /* Update FPS every 30 frames */
                     fps_frames++;
@@ -1439,7 +1484,7 @@ int main(void) {
 
                     /* Start: pause with hardware diagnostics */
                     if (pressed.start) {
-                        gl_context_end();
+                        /* No rdpq_attach yet — just grab a fresh display surface */
                         surface_t *pause_disp = display_get();
                         graphics_set_color(0xFFFFFFFF, 0x000000C0);
                         char buf[80];
@@ -1466,10 +1511,10 @@ int main(void) {
                         STAT("Visible: %d (ring1:%d ring2:%d)",
                              perf_vis_total, perf_vis_ring1, perf_vis_ring2);
 
-                        /* === GL NEAR PASS (main bottleneck) === */
-                        STAT("=== GL NEAR ===");
+                        /* === RDPQ NEAR PASS === */
+                        STAT("=== NEAR ===");
                         STAT("Rooms: %d  Tris: %d/%d",
-                             perf_near_rooms, perf_near_tris, GL_TRI_BUDGET);
+                             perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET);
                         STAT("Binds: %d/%d", perf_near_binds, TEX_BIND_BUDGET_NEAR);
                         STAT("Culled: %d  Detail skip: %d",
                              perf_near_culled, perf_near_detail_skip);
@@ -1511,14 +1556,12 @@ int main(void) {
                      * Frame order:
                      *   1. rdpq_attach (framebuffer + zbuf)
                      *   2. rdpq_clear (color + depth)
-                     *   3. RDPQ far pass (outside GL — future, empty stub now)
-                     *   4. gl_context_begin()
-                     *   5. GL near pass (existing RSP T&L pipeline)
-                     *   6. gl_context_end()
-                     *   7. rdpq_detach_show()
+                     *   3. RDPQ far pass  (CI8/IA4 baked tiles, no zbuf)
+                     *   4. RDPQ near pass (CI8 per-face, zbuf on)
+                     *   5. rdpq_detach_show()
                      *
-                     * This split lets the far pass use raw RDPQ texture
-                     * uploads without competing for GL object/RSPQ memory. */
+                     * All geometry uses pure RDPQ.  GL is linked as a stub
+                     * but not entered in the hot path. */
                     /* Reset per-frame perf counters */
                     /* Reset per-frame counters + start frame timer */
                     perf_far_rooms = 0; perf_far_tris = 0;
@@ -1580,7 +1623,8 @@ int main(void) {
                     #define STREAM_PRI_LOW    0
                     int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
-                    int vis_stream_pri[MAX_DRAW_ROOMS]; /* per-room streaming priority */
+                    int vis_stream_pri[MAX_DRAW_ROOMS]; /* streaming priority hints (future use) */
+                    (void)vis_stream_pri; /* suppresses set-but-unused warning */
 
                     /* Rule 1: current room — always, highest priority */
                     if (lara_room >= 0 && lara_room < g_chunk_count) {
@@ -1699,7 +1743,7 @@ int main(void) {
                     perf_vis_total = vis_count;
 
                     /* LOD classification.
-                     * Ring 1 (current + connected): GL near pass, full textures.
+                     * Ring 1 (current + connected): RDPQ near pass, CI8 textures, zbuf.
                      * Ring 2 (connected-to-connected): RDPQ far pass, IA4 + fog.
                      * Rule: never see void — ring 2 fills the gaps. */
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
@@ -1710,13 +1754,13 @@ int main(void) {
                         tr_chunk_t *c = &g_chunks[ri];
 
                         if (vi < ring1_end) {
-                            /* Ring 1: GL near pass with proper textures.
+                            /* Ring 1: RDPQ near pass, CI8 textures.
                              * Use per-room near threshold — small rooms
                              * transition to fog sooner, large rooms later.
                              * If too far for safe decimation (>3x near),
                              * demote to ring 2 IA4 fog instead. */
                             if (ri != lara_room && c->dist_sq > c->near_dist2 * 3.0f) {
-                                /* Too far for GL — fall back to IA4 fog */
+                                /* Too far — fall back to IA4 fog */
                                 c->lod = CHUNK_LOD_FAR;
                                 if (far_count < MAX_DRAW_ROOMS)
                                     far_rooms[far_count++] = ri;
@@ -1791,8 +1835,7 @@ int main(void) {
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
-                        #define FAR_TRI_BUDGET   300
-                        #define FAR_UPLOAD_BUDGET  8
+                        /* FAR_TRI_BUDGET / FAR_UPLOAD_BUDGET defined at function scope */
 
                         for (int fi = 0; fi < far_rooms_max; fi++) {
                             int room_idx = far_rooms[fi];
@@ -2094,202 +2137,123 @@ int main(void) {
                     }
                     far_pass_done:
 
-                    /* Flush far pass commands before GL context begins.
-                     * Non-blocking — far pass is now light enough (8 uploads,
-                     * 300 tri cap) that queue backlog is not a risk. */
-                    /* Reset RDPQ state before entering GL — the far pass
-                     * may have set TLUT mode for CI8/CI4 textures which
-                     * could corrupt GL's RGBA16 texture interpretation. */
+                    /* Flush far pass + reset TLUT before near pass.
+                     * Far pass uses CI4/CI8 baked tiles with TLUT;
+                     * near pass re-enables it with the global pal16. */
                     rdpq_mode_tlut(TLUT_NONE);
                     rspq_flush();
 
-                    /* ===== GL NEAR PASS ===== */
-                    gl_context_begin();
+                    /* ===== RDPQ NEAR PASS — ring 1, CI8 textures, z-buffered =====
+                     * Pure CPU transform + rdpq_triangle, same paradigm as far pass.
+                     * Eliminates GL context switching overhead. */
 
-                    /* One-time GL state setup on first frame */
-                    if (!gl_setup_done) {
-                        gl_setup_done = true;
+                    /* RDPQ near pass state:
+                     *  - CI8 + global pal16 TLUT (1 KB/tex vs 2 KB RGBA16)
+                     *  - TLUT uploaded once per frame; only tile re-uploads per change
+                     *  - Z-buffer: compare + write (depth clear already done above)
+                     *  - Bilinear filter for textured faces */
+                    rdpq_set_mode_standard();
+                    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+                    rdpq_mode_blender(0);
+                    rdpq_mode_filter(FILTER_BILINEAR);
+                    rdpq_mode_zbuf(true, true);
 
-                        #define WORLD_SCALE (1.0f / 32.0f)
+                    /* Upload the global CI8 palette once for the whole pass */
+                    rdpq_mode_tlut(TLUT_RGBA16);
+                    rspq_flush();
+                    rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
 
-                        float near_p = 4.0f;
-                        float far_p = 350.0f;
-                        float fov_half = 30.0f * 3.14159f / 180.0f;
-                        float top = near_p * tanf(fov_half);
-                        float right = top * (320.0f / 240.0f);
-                        glMatrixMode(GL_PROJECTION);
-                        glLoadIdentity();
-                        glFrustum(-right, right, -top, top, near_p, far_p);
+                    int near_last_tex = -99; /* force first upload */
+                    int near_uploads = 0;
 
-                        glEnable(GL_DEPTH_TEST);
-                        glDepthFunc(GL_LESS);
-                        glDisable(GL_CULL_FACE);
-                        glShadeModel(GL_SMOOTH);
-
-                        glEnable(GL_TEXTURE_2D);
-                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-                        glDisable(GL_LIGHTING);
-                        glDisable(GL_FOG);
-
-                        if (gl_textures) {
-                            glGenTextures(num_otex, gl_textures);
-                            for (int i = 0; i < num_otex; i++) {
-                                glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
-                            }
-                        }
-                        if (white_px) {
-                            glGenTextures(1, &gl_white_tex);
-                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
-                        }
-                    }
-
-                    glClear(GL_DEPTH_BUFFER_BIT);
-
-                    glMatrixMode(GL_MODELVIEW);
-                    glLoadIdentity();
-                    glRotatef(cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
-                    glRotatef(cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
-
-                    /* ===== GL NEAR PASS — interleaved vertex array ===== */
-                    /* Interleaved: pos(3f) + color(4ub) + texcoord(2f) = 24 bytes/vert */
-                    typedef struct {
-                        float x, y, z;
-                        uint8_t r, g, b, a;
-                        float s, t;
-                    } gl_vert_t;
-                    #define MAX_GL_VERTS 4000
-                    static gl_vert_t gl_verts[MAX_GL_VERTS] __attribute__((aligned(16)));
-                    int gl_vc = 0;
-                    int cur_tex = -1;
-                    #define VERT_STRIDE sizeof(gl_vert_t)
-
-                    #define FLUSH_GL() do { \
-                        if (gl_vc > 0) { \
-                            data_cache_hit_writeback(gl_verts, gl_vc * VERT_STRIDE); \
-                            glEnableClientState(GL_VERTEX_ARRAY); \
-                            glEnableClientState(GL_COLOR_ARRAY); \
-                            glEnableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            glVertexPointer(3, GL_FLOAT, VERT_STRIDE, &gl_verts[0].x); \
-                            glColorPointer(4, GL_UNSIGNED_BYTE, VERT_STRIDE, &gl_verts[0].r); \
-                            glTexCoordPointer(2, GL_FLOAT, VERT_STRIDE, &gl_verts[0].s); \
-                            glDrawArrays(GL_TRIANGLES, 0, gl_vc); \
-                            glDisableClientState(GL_VERTEX_ARRAY); \
-                            glDisableClientState(GL_COLOR_ARRAY); \
-                            glDisableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            gl_vc = 0; \
-                        } \
-                    } while(0)
-
-                    /* ===== GL NEAR PASS ONLY =====
-                     * Far pass moved to RDPQ (before gl_context_begin).
-                     * Near rooms are in rooms_to_draw[0 .. near_count-1]. */
-                    {
-                        int loop_start = 0;
-                        int loop_end   = near_count;
-                        int pass       = 1;
-                        int gl_tri_count = 0;
-                        #define GL_TRI_BUDGET 600  /* cap total GL tris per frame */
-                        #define TEX_BIND_BUDGET_NEAR 24  /* max texture binds per frame */
-
-                    for (int ri = loop_start; ri < loop_end; ri++) {
+                    /* ===== NEAR PASS: ROOM FACES =====
+                     * CPU transform + near-plane clip + project → rdpq_triangle.
+                     * CI8 tiles (1 KB each) with shared pal16 TLUT.
+                     * Z-buffer already cleared above. */
+                    for (int ri = 0; ri < near_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
                         perf_near_rooms++;
 
-                        /* Face decimation: for distant rooms, skip DETAIL
-                         * faces (small/decorative). ESSENTIAL faces (floors,
-                         * walls, portal-adjacent, silhouette) always render.
-                         * Current room: all faces, no skipping. */
                         bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
-                            if (c->dist_sq > c->near_dist2) {
-                                do_decimate = true;
-                            }
+                            if (c->dist_sq > c->near_dist2) do_decimate = true;
                         }
 
-                        int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f++) {
+                        float room_ox = (float)room->x - cam_x;
+                        float room_oz = (float)room->z - cam_z;
+
+                        for (int f = 0; f < room->mesh.face_count; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
 
-                            /* Skip DETAIL faces in distant rooms.
-                             * ESSENTIAL faces always render. */
                             if (do_decimate && (face->flags & FACE_FLAG_DETAIL)) {
                                 perf_near_detail_skip++;
                                 continue;
                             }
 
-                            /* Quick back-cull: check if face center is
-                             * behind camera using first vertex (cheap). */
+                            /* Back-cull using first vertex */
                             {
                                 uint16_t v0i = face->vertices[0];
                                 if (v0i < room->mesh.vertex_count) {
                                     tr_room_vertex_t *rv0 = &room->mesh.vertices[v0i];
-                                    float fdx = (float)(room->x + rv0->x) - cam_x;
-                                    float fdz = (float)(room->z + rv0->z) - cam_z;
-                                    float cz0 = fdx * sy + fdz * cy;
+                                    float cz0 = (room_ox + rv0->x) * sy + (room_oz + rv0->z) * cy;
                                     if (cz0 < -1024.0f) { perf_near_culled++; continue; }
                                 }
                             }
 
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
-                            int want_tex;
-                            if (is_flat) {
-                                want_tex = -2;
-                            } else if (tex_idx < num_otex && gl_textures) {
-                                want_tex = (int)tex_idx;
-                            } else continue;
 
-                            if (want_tex != cur_tex) {
-                                /* Texture bind budget: limit state changes
-                                 * per frame.  When exceeded, keep drawing
-                                 * with last-bound texture (never skip). */
-                                if (perf_near_binds < TEX_BIND_BUDGET_NEAR) {
-                                    FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex)
-                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    else if (want_tex >= 0)
-                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                    cur_tex = want_tex;
+                            /* Texture upload on change.
+                             * CI8 for textured faces (1 KB), white_surf (RGBA16)
+                             * for flat — TLUT mode is harmless for RGBA16 tiles. */
+                            if (!is_flat && tex_idx < num_otex && ci8_surfs) {
+                                if ((int)tex_idx != near_last_tex &&
+                                    near_uploads < NEAR_UPLOAD_BUDGET) {
+                                    rspq_flush();
+                                    rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                    near_last_tex = (int)tex_idx;
+                                    near_uploads++;
                                     perf_near_binds++;
                                 }
-                                /* Budget exceeded: render with cur_tex */
-                            }
+                            } else if (is_flat) {
+                                if (white_px && near_last_tex != -2 &&
+                                    near_uploads < NEAR_UPLOAD_BUDGET) {
+                                    rspq_flush();
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    rdpq_mode_tlut(TLUT_RGBA16);
+                                    near_last_tex = -2;
+                                    near_uploads++;
+                                }
+                            } else continue;
 
                             tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                 ? &g_level.object_textures[tex_idx] : NULL;
 
-                            int num_tris = nv - 2;
-                            if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                            /* Build per-face vertex data */
-                            float px[4], py[4], pz[4], fs[4], ft[4];
-                            uint8_t cr[4], cg[4], cb[4];
+                            /* CPU camera transform */
+                            float cv[4][8];
+                            bool any_behind = false, all_behind = true;
                             bool ok = true;
                             for (int v = 0; v < nv; v++) {
                                 uint16_t vi = face->vertices[v];
                                 if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                float vx_w = (float)(room->x + rv->x);
-                                float vy_w = (float)rv->y;
-                                float vz_w = (float)(room->z + rv->z);
-                                px[v] = (vx_w - cam_x) * WORLD_SCALE;
-                                py[v] = -(vy_w - cam_y) * WORLD_SCALE;
-                                pz[v] = -(vz_w - cam_z) * WORLD_SCALE;
+                                float cx_v = room_ox + rv->x;
+                                float cy_v = (float)rv->y - cam_y;
+                                float cz_v = room_oz + rv->z;
+                                float rx = cx_v * cy - cz_v * sy;
+                                float rz_yaw = cx_v * sy + cz_v * cy;
+                                float ry = cy_v * cp - rz_yaw * sp;
+                                float rz = cy_v * sp + rz_yaw * cp;
+
+                                if (rz < NEAR_Z) any_behind = true; else all_behind = false;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
@@ -2299,78 +2263,102 @@ int main(void) {
                                 float g = is_water ? bright * 0.6f : bright;
                                 float b = is_water ? bright * 1.0f : bright;
 
-                                /* Apply fog for MID LOD rooms (GL near pass).
-                                 * Uses per-room fog_start_dist2 so small rooms
-                                 * fog sooner and large rooms fog later. */
-                                bool apply_fog = (room_idx < g_chunk_count &&
-                                    g_chunks[room_idx].lod >= CHUNK_LOD_MID);
-                                if (apply_fog) {
-                                    float fdx = vx_w - cam_x;
-                                    float fdz = vz_w - cam_z;
-                                    float d2 = fdx*fdx + fdz*fdz;
+                                /* Fog for distant connected rooms */
+                                if (room_idx != lara_room && room_idx < g_chunk_count &&
+                                    g_chunks[room_idx].lod >= CHUNK_LOD_MID) {
+                                    float vx_w = room->x + rv->x;
+                                    float vz_w = room->z + rv->z;
+                                    float d2 = (vx_w-cam_x)*(vx_w-cam_x) + (vz_w-cam_z)*(vz_w-cam_z);
                                     float fog_start = g_chunks[room_idx].fog_start_dist2;
                                     float fog_range = g_chunks[room_idx].max_draw_dist2 - fog_start;
                                     if (fog_range < 1.0f) fog_range = 1.0f;
                                     float fog = (d2 - fog_start) / fog_range;
-                                    /* Vertical bias: lower = more fog (TR1 Y-down) */
-                                    float y_bias = (vy_w - cam_y) * 0.00004f;
-                                    if (y_bias < 0.0f) y_bias = 0.0f;
-                                    if (y_bias > 0.2f) y_bias = 0.2f;
-                                    fog += y_bias;
                                     if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
-                                    /* Fog toward active room fog color */
+                                    if (fog > 0.85f) fog = 0.85f;
                                     r = r * (1.0f - fog) + active_fog_r * fog;
                                     g = g * (1.0f - fog) + active_fog_g * fog;
                                     b = b * (1.0f - fog) + active_fog_b * fog;
                                 }
 
-                                cr[v] = (uint8_t)(r * 255.0f);
-                                cg[v] = (uint8_t)(g * 255.0f);
-                                cb[v] = (uint8_t)(b * 255.0f);
-
+                                float ts = 0, tt = 0;
                                 if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Normalize to 0-1, inset by half texel */
-                                    float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                    float base_s = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                    float base_t = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-
-                                    fs[v] = base_s;
-                                    ft[v] = base_t;
-                                } else {
-                                    fs[v] = 0; ft[v] = 0;
+                                    ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                } else if (is_flat) {
+                                    /* Flat color: pack into rgb vertex, white tex */
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    r = (float)g_level.palette[ci*3+0] / 63.0f;
+                                    g = (float)g_level.palette[ci*3+1] / 63.0f;
+                                    b = (float)g_level.palette[ci*3+2] / 63.0f;
                                 }
+
+                                cv[v][0] = rx;  cv[v][1] = ry;  cv[v][2] = rz;
+                                cv[v][3] = r;   cv[v][4] = g;   cv[v][5] = b;
+                                cv[v][6] = ts;  cv[v][7] = tt;
                             }
-                            if (!ok) continue;
+                            if (!ok || all_behind) continue;
 
-                            for (int tri = 0; tri < num_tris; tri++) {
-                                int idx[3] = {0, tri+1, tri+2};
-                                for (int k = 0; k < 3; k++) {
-                                    int i = idx[k];
-                                    gl_vert_t *vp = &gl_verts[gl_vc++];
-                                    vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                    vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
-                                    vp->s = fs[i]; vp->t = ft[i];
+                            /* Near-plane clip */
+                            float clipped[6][8];
+                            int clip_nv = nv;
+                            if (any_behind) {
+                                clip_nv = 0;
+                                for (int i = 0; i < nv; i++) {
+                                    int j = (i + 1) % nv;
+                                    float zi = cv[i][2], zj = cv[j][2];
+                                    bool i_in = (zi >= NEAR_Z), j_in = (zj >= NEAR_Z);
+                                    if (i_in) {
+                                        for (int k=0;k<8;k++) clipped[clip_nv][k]=cv[i][k];
+                                        clip_nv++;
+                                    }
+                                    if (i_in != j_in) {
+                                        float t = (NEAR_Z - zi) / (zj - zi);
+                                        for (int k=0;k<8;k++)
+                                            clipped[clip_nv][k]=cv[i][k]+t*(cv[j][k]-cv[i][k]);
+                                        clip_nv++;
+                                    }
                                 }
-                                gl_tri_count++;
+                                if (clip_nv < 3) continue;
+                            } else {
+                                for (int i=0;i<nv;i++)
+                                    for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
+                            }
+
+                            /* Project */
+                            float sv[6][10];
+                            bool screen_ok = true;
+                            for (int v = 0; v < clip_nv; v++) {
+                                float rz = clipped[v][2];
+                                float inv_z = 256.0f / rz;
+                                float scx = 160.0f + clipped[v][0] * inv_z;
+                                float scy = 120.0f + clipped[v][1] * inv_z;
+                                if (scx<-400||scx>720||scy<-300||scy>540) { screen_ok=false; break; }
+                                sv[v][0]=scx;   sv[v][1]=scy;
+                                sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f) sv[v][2]=1.0f;
+                                sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
+                                sv[v][5]=clipped[v][5]; sv[v][6]=1.0f;
+                                sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
+                                sv[v][9]=inv_z;
+                            }
+                            if (!screen_ok) continue;
+
+                            int num_tris = clip_nv - 2;
+                            for (int tri = 0; tri < num_tris; tri++) {
+                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
                             }
-                            if (gl_tri_count >= GL_TRI_BUDGET)
-                                goto gl_room_pass_done;
+                            if (perf_near_tris >= NEAR_TRI_BUDGET)
+                                goto near_room_pass_done;
                         }
                     }
-                    gl_room_pass_done:
-                    FLUSH_GL();
+                    near_room_pass_done:;
 
-                    /* ===== GL STATIC MESHES (near rooms only) =====
-                     * Z-bias: scale static mesh positions slightly closer
-                     * to camera (0.999×) to win Z-test against coplanar
-                     * room walls.  glPolygonOffset not available in libdragon. */
-                    #define SM_Z_BIAS 0.997f  /* stronger bias to reduce Z-fighting flicker */
+                    /* ===== NEAR PASS: STATIC MESHES =====
+                     * Z-bias: pull mesh slightly toward camera to win Z-test
+                     * against coplanar room walls (no glPolygonOffset in RDPQ). */
+                    #define SM_Z_BIAS 0.997f
                     for (int ri = 0; ri < near_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
@@ -2379,17 +2367,13 @@ int main(void) {
                         for (int si = 0; si < room->static_mesh_count; si++) {
                             tr_room_static_mesh_t *sm = &room->static_meshes[si];
 
-                            /* Quick frustum cull */
                             float sdx = (float)sm->pos.x - cam_x;
                             float sdz = (float)sm->pos.z - cam_z;
                             float sm_rz = sdx * sy + sdz * cy;
                             if (sm_rz < -1024) continue;
                             float sm_rx = sdx * cy - sdz * sy;
-                            /* Only apply horizontal frustum cull at distance —
-                             * when close, the mesh is visible even if off-center */
-                            if (sm_rz > 1024) { float l = sm_rz * 3.0f; if (sm_rx > l || sm_rx < -l) continue; }
+                            if (sm_rz > 1024) { float l=sm_rz*3.0f; if(sm_rx>l||sm_rx<-l) continue; }
 
-                            /* Find static object definition */
                             int mesh_idx = -1;
                             for (int oi = 0; oi < g_level.static_object_count; oi++) {
                                 if (g_level.static_objects[oi].object_id == sm->static_mesh_id) {
@@ -2404,7 +2388,6 @@ int main(void) {
                             float sm_bright = 1.0f - (float)sm->shade / 8191.0f;
                             if (sm_bright < 0.1f) sm_bright = 0.1f;
                             if (sm_bright > 1.0f) sm_bright = 1.0f;
-
                             float sm_yaw = (float)sm->rotation * 3.14159f / 32768.0f;
                             float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
 
@@ -2415,88 +2398,104 @@ int main(void) {
 
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
-                                int want_tex;
-                                uint8_t sm_fr = (uint8_t)(sm_bright * 255.0f);
-                                uint8_t sm_fg = sm_fr, sm_fb = sm_fr;
-                                if (is_flat) {
-                                    want_tex = -2;
-                                    uint8_t ci = tex_idx & 0xFF;
-                                    sm_fr = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * sm_bright * 255.0f);
-                                    sm_fg = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * sm_bright * 255.0f);
-                                    sm_fb = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * sm_bright * 255.0f);
-                                } else if (tex_idx < num_otex && gl_textures) {
-                                    want_tex = (int)tex_idx;
-                                } else continue;
+                                float sm_fr, sm_fg, sm_fb;
 
-                                if (want_tex != cur_tex) {
-                                    FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex)
-                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    else if (want_tex >= 0)
-                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                    cur_tex = want_tex;
-                                }
+                                if (is_flat) {
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    sm_fr = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
+                                    sm_fg = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
+                                    sm_fb = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
+                                    if (white_px && near_last_tex != -2) {
+                                        rspq_flush();
+                                        rdpq_mode_tlut(TLUT_NONE);
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                        rdpq_mode_tlut(TLUT_RGBA16);
+                                        near_last_tex = -2;
+                                    }
+                                } else if (tex_idx < num_otex && ci8_surfs) {
+                                    sm_fr = sm_fg = sm_fb = sm_bright;
+                                    if ((int)tex_idx != near_last_tex) {
+                                        rspq_flush();
+                                        rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                        near_last_tex = (int)tex_idx;
+                                    }
+                                } else continue;
 
                                 tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
-                                int num_tris = nv - 2;
-                                if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                                float px[4], py[4], pz[4], fs[4], ft[4];
+                                float sv[4][10];
                                 bool ok = true;
+                                float sm_cv[4][8];
+                                bool sm_any_behind = false, sm_all_behind = true;
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
                                     if (vi >= mesh->vertex_count) { ok = false; break; }
-
-                                    /* Local → world: rotate by yaw + translate */
                                     float lx = (float)mesh->vertices[vi].x;
                                     float lz = (float)mesh->vertices[vi].z;
-                                    float wx = (float)sm->pos.x + lx * sm_cy_r - lz * sm_sy_r;
+                                    float wx = (float)sm->pos.x + lx*sm_cy_r - lz*sm_sy_r;
                                     float wy = (float)sm->pos.y + (float)mesh->vertices[vi].y;
-                                    float wz = (float)sm->pos.z + lx * sm_sy_r + lz * sm_cy_r;
-
-                                    /* Camera-relative (CPU subtract, RSP rotates).
-                                     * SM_Z_BIAS pulls mesh slightly toward camera
-                                     * to win Z-test against coplanar room walls. */
-                                    px[v] = (wx - cam_x) * WORLD_SCALE * SM_Z_BIAS;
-                                    py[v] = -(wy - cam_y) * WORLD_SCALE * SM_Z_BIAS;
-                                    pz[v] = -(wz - cam_z) * WORLD_SCALE * SM_Z_BIAS;
-
-                                    /* Palette color for flat, uniform shade for textured */
-
+                                    float wz = (float)sm->pos.z + lx*sm_sy_r + lz*sm_cy_r;
+                                    /* Z-bias: shrink toward camera */
+                                    wx = cam_x + (wx - cam_x) * SM_Z_BIAS;
+                                    wy = cam_y + (wy - cam_y) * SM_Z_BIAS;
+                                    wz = cam_z + (wz - cam_z) * SM_Z_BIAS;
+                                    float cx_v=wx-cam_x, cy_v=wy-cam_y, cz_v=wz-cam_z;
+                                    float rx=cx_v*cy-cz_v*sy;
+                                    float rz_yaw=cx_v*sy+cz_v*cy;
+                                    float ry=cy_v*cp-rz_yaw*sp;
+                                    float rz=cy_v*sp+rz_yaw*cp;
+                                    if (rz < NEAR_Z) sm_any_behind=true; else sm_all_behind=false;
+                                    float ts=0, tt=0;
                                     if (otex && tex_uv_map) {
-                                        float tu = (float)(otex->uv[v].u >> 8);
-                                        float tv = (float)(otex->uv[v].v >> 8);
-                                        float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                        float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                        float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                        fs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                        ft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                    } else {
-                                        fs[v] = 0; ft[v] = 0;
+                                        float tu=(float)(otex->uv[v].u>>8);
+                                        float tv=(float)(otex->uv[v].v>>8);
+                                        ts=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
+                                        tt=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                     }
+                                    sm_cv[v][0]=rx; sm_cv[v][1]=ry; sm_cv[v][2]=rz;
+                                    sm_cv[v][3]=sm_fr; sm_cv[v][4]=sm_fg; sm_cv[v][5]=sm_fb;
+                                    sm_cv[v][6]=ts; sm_cv[v][7]=tt;
                                 }
-                                if (!ok) continue;
+                                if (!ok || sm_all_behind) continue;
 
-                                for (int tri = 0; tri < num_tris; tri++) {
-                                    int idx[3] = {0, tri+1, tri+2};
-                                    for (int k = 0; k < 3; k++) {
-                                        int i = idx[k];
-                                        gl_vert_t *vp = &gl_verts[gl_vc++];
-                                        vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                        vp->r = sm_fr; vp->g = sm_fg; vp->b = sm_fb; vp->a = 255;
-                                        vp->s = fs[i]; vp->t = ft[i];
+                                float sm_cl[6][8]; int sm_cnv = nv;
+                                if (sm_any_behind) {
+                                    sm_cnv = 0;
+                                    for (int i=0;i<nv;i++) {
+                                        int j=(i+1)%nv;
+                                        float zi=sm_cv[i][2],zj=sm_cv[j][2];
+                                        bool ii=(zi>=NEAR_Z),ji=(zj>=NEAR_Z);
+                                        if (ii){for(int k=0;k<8;k++)sm_cl[sm_cnv][k]=sm_cv[i][k];sm_cnv++;}
+                                        if(ii!=ji){float t=(NEAR_Z-zi)/(zj-zi);for(int k=0;k<8;k++)sm_cl[sm_cnv][k]=sm_cv[i][k]+t*(sm_cv[j][k]-sm_cv[i][k]);sm_cnv++;}
                                     }
+                                    if(sm_cnv<3) continue;
+                                } else { for(int i=0;i<nv;i++) for(int k=0;k<8;k++) sm_cl[i][k]=sm_cv[i][k]; }
+
+                                bool proj_ok = true;
+                                for (int v=0;v<sm_cnv;v++) {
+                                    float rz=sm_cl[v][2];
+                                    float inv_z=256.0f/rz;
+                                    float scx=160.0f+sm_cl[v][0]*inv_z;
+                                    float scy=120.0f+sm_cl[v][1]*inv_z;
+                                    if(scx<-400||scx>720||scy<-300||scy>540){proj_ok=false;break;}
+                                    sv[v][0]=scx; sv[v][1]=scy;
+                                    sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
+                                    sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
+                                    sv[v][6]=1.0f;
+                                    sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
+                                    sv[v][9]=inv_z;
                                 }
+                                if (!proj_ok) continue;
+                                int num_tris = sm_cnv - 2;
+                                for (int tri=0;tri<num_tris;tri++)
+                                    rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                             }
                         }
                     }
-                    FLUSH_GL();
-
                     #undef SM_Z_BIAS
 
-                    /* ===== GL LARA ===== */
+                    /* ===== NEAR PASS: LARA (RDPQ — same CPU-project paradigm) ===== */
                     {
                         static tr_object_def_t *lara_obj = NULL;
                         static tr_item_t *lara_item = NULL;
@@ -2580,151 +2579,74 @@ int main(void) {
 
                                     uint16_t tex_idx = face->texture & 0x7FFF;
                                     bool is_flat = (face->texture & 0x8000) != 0;
-                                    int want_tex;
-                                    /* Flat-colored face: look up palette color */
-                                    uint8_t flat_r = lshade, flat_g = lshade, flat_b = lshade;
-                                    if (is_flat) {
-                                        want_tex = -2;
-                                        uint8_t ci = tex_idx & 0xFF;
-                                        flat_r = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * lara_shade * 255.0f);
-                                        flat_g = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * lara_shade * 255.0f);
-                                        flat_b = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * lara_shade * 255.0f);
-                                    } else if (tex_idx < num_otex && gl_textures) {
-                                        want_tex = (int)tex_idx;
-                                    } else continue;
+                                    float l_fr = lara_shade, l_fg = lara_shade, l_fb = lara_shade;
 
-                                    if (want_tex != cur_tex) {
-                                        FLUSH_GL();
-                                        if (want_tex == -2 && gl_white_tex)
-                                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                        else if (want_tex >= 0)
-                                            glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                        cur_tex = want_tex;
-                                    }
+                                    if (is_flat) {
+                                        uint8_t ci = tex_idx & 0xFF;
+                                        l_fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
+                                        l_fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
+                                        l_fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
+                                        if (white_px && near_last_tex != -2) {
+                                            rspq_flush();
+                                            rdpq_mode_tlut(TLUT_NONE);
+                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                            rdpq_mode_tlut(TLUT_RGBA16);
+                                            near_last_tex = -2;
+                                        }
+                                    } else if (tex_idx < num_otex && ci8_surfs) {
+                                        if ((int)tex_idx != near_last_tex) {
+                                            rspq_flush();
+                                            rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                            near_last_tex = (int)tex_idx;
+                                        }
+                                    } else continue;
 
                                     tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                         ? &g_level.object_textures[tex_idx] : NULL;
 
-                                    int num_tris = nv - 2;
-                                    if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                                    float px[4], py[4], pz[4], ffs[4], fft[4];
-                                    bool ok = true;
+                                    float sv[4][10]; bool vis = true;
                                     for (int v = 0; v < nv; v++) {
                                         uint16_t vi = face->vertices[v];
-                                        if (vi >= mesh->vertex_count) { ok = false; break; }
-                                        float vx = (float)mesh->vertices[vi].x;
-                                        float vz = (float)mesh->vertices[vi].z;
-                                        float wx = bx + vx*lcy_r - vz*lsy_r;
+                                        if (vi >= mesh->vertex_count) { vis = false; break; }
+                                        float vx_l = (float)mesh->vertices[vi].x;
+                                        float vz_l = (float)mesh->vertices[vi].z;
+                                        float wx = bx + vx_l*lcy_r - vz_l*lsy_r;
                                         float wy = by + (float)mesh->vertices[vi].y;
-                                        float wz = bz + vx*lsy_r + vz*lcy_r;
+                                        float wz = bz + vx_l*lsy_r + vz_l*lcy_r;
 
-                                        px[v] = (wx - cam_x) * WORLD_SCALE;
-                                        py[v] = -(wy - cam_y) * WORLD_SCALE;
-                                        pz[v] = -(wz - cam_z) * WORLD_SCALE;
+                                        float cx_v=wx-cam_x, cy_v=wy-cam_y, cz_v=wz-cam_z;
+                                        float rx=cx_v*cy-cz_v*sy;
+                                        float rz_yaw=cx_v*sy+cz_v*cy;
+                                        float ry=cy_v*cp-rz_yaw*sp;
+                                        float rz=cy_v*sp+rz_yaw*cp;
+                                        if (rz < 32.0f) { vis = false; break; }
 
-                                        if (otex && tex_uv_map) {
-                                            float tu = (float)(otex->uv[v].u >> 8);
-                                            float tv = (float)(otex->uv[v].v >> 8);
-                                            float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                            float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                            float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                            ffs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                            fft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                        } else {
-                                            ffs[v] = 0; fft[v] = 0;
-                                        }
+                                        float inv_z=256.0f/rz;
+                                        float scx2=160.0f+rx*inv_z, scy2=120.0f+ry*inv_z;
+                                        if(scx2<-2048)scx2=-2048; if(scx2>2048)scx2=2048;
+                                        if(scy2<-2048)scy2=-2048; if(scy2>2048)scy2=2048;
+                                        sv[v][0]=scx2; sv[v][1]=scy2;
+                                        sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
+                                        sv[v][3]=l_fr; sv[v][4]=l_fg; sv[v][5]=l_fb;
+                                        sv[v][6]=1.0f;
+                                        if (!is_flat && otex && tex_uv_map) {
+                                            float tu=(float)(otex->uv[v].u>>8);
+                                            float tv=(float)(otex->uv[v].v>>8);
+                                            sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
+                                            sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
+                                        } else { sv[v][7]=0; sv[v][8]=0; }
+                                        sv[v][9]=1.0f/rz;
                                     }
-                                    if (!ok) continue;
-
-                                    for (int tri = 0; tri < num_tris; tri++) {
-                                        int idx[3] = {0, tri+1, tri+2};
-                                        for (int k = 0; k < 3; k++) {
-                                            int i = idx[k];
-                                            gl_vert_t *vp = &gl_verts[gl_vc++];
-                                            vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                            vp->r = is_flat ? flat_r : lshade;
-                                            vp->g = is_flat ? flat_g : lshade;
-                                            vp->b = is_flat ? flat_b : lshade;
-                                            vp->a = 255;
-                                            vp->s = ffs[i]; vp->t = fft[i];
-                                        }
-                                    }
+                                    if (!vis) continue;
+                                    rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
+                                    if (nv == 4)
+                                        rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 }
                             }
                         }
                     }
-                    FLUSH_GL();
 
-                    /* ===== LARA SHADOW (dark circle on floor) ===== */
-                    {
-                        /* Use Lara's item position directly */
-                        tr_item_t *shadow_item = NULL;
-                        for (int i = 0; i < g_level.item_count; i++)
-                            if (g_level.items[i].object_id == 0) { shadow_item = &g_level.items[i]; break; }
-
-                        if (shadow_item) {
-                            int32_t shadow_fl, shadow_cl;
-                            GET_SECTOR_HEIGHTS(shadow_item->pos.x, shadow_item->pos.z,
-                                               shadow_item->pos.y, shadow_fl, shadow_cl);
-                            float shadow_y = (float)shadow_fl + 4.0f;
-                            float shadow_rad = 120.0f;
-                            float shadow_cx_w = (float)shadow_item->pos.x;
-                            float shadow_cz_w = (float)shadow_item->pos.z;
-
-                            if (gl_white_tex) {
-                                FLUSH_GL();
-                                glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                cur_tex = -2;
-                            }
-
-                            glEnable(GL_BLEND);
-                            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                            glDepthMask(GL_FALSE);
-
-                            float sc_x = (shadow_cx_w - cam_x) * WORLD_SCALE;
-                            float sc_y = -(shadow_y - cam_y) * WORLD_SCALE;
-                            float sc_z = -(shadow_cz_w - cam_z) * WORLD_SCALE;
-
-                            #define SHADOW_PTS 12
-                            float rim_x[SHADOW_PTS], rim_z2[SHADOW_PTS];
-                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
-                                float a = (float)sp3 * 6.28318f / (float)SHADOW_PTS;
-                                float wx = shadow_cx_w + shadow_rad * sinf(a);
-                                float wz = shadow_cz_w + shadow_rad * cosf(a);
-                                rim_x[sp3] = (wx - cam_x) * WORLD_SCALE;
-                                rim_z2[sp3] = -(wz - cam_z) * WORLD_SCALE;
-                            }
-
-                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
-                                int next = (sp3 + 1) % SHADOW_PTS;
-                                if (gl_vc + 3 > MAX_GL_VERTS) FLUSH_GL();
-                                gl_vert_t *v0 = &gl_verts[gl_vc++];
-                                v0->x = sc_x; v0->y = sc_y; v0->z = sc_z;
-                                v0->r = 0; v0->g = 0; v0->b = 0; v0->a = 160;
-                                v0->s = 0; v0->t = 0;
-                                gl_vert_t *v1 = &gl_verts[gl_vc++];
-                                v1->x = rim_x[sp3]; v1->y = sc_y; v1->z = rim_z2[sp3];
-                                v1->r = 0; v1->g = 0; v1->b = 0; v1->a = 80;
-                                v1->s = 0; v1->t = 0;
-                                gl_vert_t *v2 = &gl_verts[gl_vc++];
-                                v2->x = rim_x[next]; v2->y = sc_y; v2->z = rim_z2[next];
-                                v2->r = 0; v2->g = 0; v2->b = 0; v2->a = 80;
-                                v2->s = 0; v2->t = 0;
-                            }
-                            FLUSH_GL();
-
-                            glDisable(GL_BLEND);
-                            glDepthMask(GL_TRUE);
-                            #undef SHADOW_PTS
-                        }
-                    }
-
-                    } /* end GL near pass */
-
-                    #undef FLUSH_GL
-
-#if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
+#if 0 /* ROOM SPRITES — disabled (out-of-scope loop variable) */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
                         for (int si = 0; si < room->mesh.sprite_count && si < 20; si++) {
                             uint16_t svi = room->mesh.sprite_vertices[si];
@@ -2770,9 +2692,9 @@ int main(void) {
                             spr_bright *= (1.0f - rz_s / 16384.0f);
                             if (spr_bright < 0) spr_bright = 0;
 
-                            if (white_px && last_tex_idx != -2) {
+                            if (white_px && near_last_tex != -2) {
                                 rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                last_tex_idx = -2;
+                                near_last_tex = -2;
                             }
 
                             float sv[4][10];
@@ -2792,7 +2714,9 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW STATIC OBJECTS ===== */
+#endif /* ROOM SPRITES disabled */
+
+#if 0 /* DRAW STATIC OBJECTS — superseded by NEAR PASS: STATIC MESHES (CI8, z-bias) */
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
@@ -2844,15 +2768,15 @@ int main(void) {
                                     fr_r = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
                                     fr_g = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
                                     fr_b = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
-                                    if (white_px && last_tex_idx != -2) {
+                                    if (white_px && near_last_tex != -2) {
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        last_tex_idx = -2;
+                                        near_last_tex = -2;
                                     }
                                 } else if (tex_idx < num_otex) {
                                     otex = &g_level.object_textures[tex_idx];
-                                    if ((int)tex_idx != last_tex_idx) {
+                                    if ((int)tex_idx != near_last_tex) {
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        last_tex_idx = (int)tex_idx;
+                                        near_last_tex = (int)tex_idx;
                                     }
                                 } else continue;
 
@@ -2913,6 +2837,7 @@ int main(void) {
                             }
                         }
                     }
+#endif /* DRAW STATIC OBJECTS disabled */
 
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
                     for (int ii = 0; ii < g_level.item_count && ii < 30; ii++) {
@@ -2969,10 +2894,20 @@ int main(void) {
                                 ifr = (float)g_level.palette[ci*3+0]/63.0f*item_shade;
                                 ifg = (float)g_level.palette[ci*3+1]/63.0f*item_shade;
                                 ifb = (float)g_level.palette[ci*3+2]/63.0f*item_shade;
-                                if (white_px && last_tex_idx != -2) { rdpq_tex_upload(TILE0, &white_surf, NULL); last_tex_idx = -2; }
-                            } else if (tex_idx < num_otex) {
+                                if (white_px && near_last_tex != -2) {
+                                    rspq_flush();
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    rdpq_mode_tlut(TLUT_RGBA16);
+                                    near_last_tex = -2;
+                                }
+                            } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
-                                if ((int)tex_idx != last_tex_idx) { rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL); last_tex_idx = (int)tex_idx; }
+                                if ((int)tex_idx != near_last_tex) {
+                                    rspq_flush();
+                                    rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                    near_last_tex = (int)tex_idx;
+                                }
                             } else continue;
 
                             float sv[4][10]; bool vis = true;
@@ -3015,7 +2950,7 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW LARA ===== */
+#if 0 /* DRAW LARA — superseded by NEAR PASS: LARA (CI8 textures above) */
                     {
                         /* Find Lara's object + item (cached after first frame) */
                         static tr_object_def_t *lara_obj = NULL;
@@ -3111,15 +3046,15 @@ int main(void) {
                                         fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
                                         fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
                                         fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
-                                        if (white_px && last_tex_idx != -2) {
+                                        if (white_px && near_last_tex != -2) {
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            last_tex_idx = -2;
+                                            near_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex) {
                                         otex = &g_level.object_textures[tex_idx];
-                                        if ((int)tex_idx != last_tex_idx) {
+                                        if ((int)tex_idx != near_last_tex) {
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                            last_tex_idx = (int)tex_idx;
+                                            near_last_tex = (int)tex_idx;
                                         }
                                     } else continue;
 
@@ -3174,6 +3109,7 @@ int main(void) {
                             }
                         }
                     }
+#endif /* DRAW LARA disabled */
 
                     /* ===== SHADOW CIRCLE under Lara ===== */
                     {
@@ -3185,9 +3121,9 @@ int main(void) {
                         float sy_pos = (float)shadow_item->pos.y + 10.0f;
                         float sz_pos = (float)shadow_item->pos.z;
 
-                        if (white_px && last_tex_idx != -2) {
+                        if (white_px && near_last_tex != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                            last_tex_idx = -2;
+                            near_last_tex = -2;
                         }
 
                         /* Enable semi-transparent blending for shadow */
@@ -3231,13 +3167,9 @@ int main(void) {
                         }
                         rdpq_mode_pop();
                     }}
-#endif /* phase 2 rdpq renderers */
+                    /* End near pass — reset TLUT mode before detach */
+                    rdpq_mode_tlut(TLUT_NONE);
 
-                    /* FPS display disabled during GL migration */
-
-                    /* Show frame (no glFinish — upload/tri caps prevent
-                     * queue backlog without blocking the CPU). */
-                    gl_context_end();
                     rdpq_detach_show();
 
                     /* Capture frame time */
