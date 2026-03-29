@@ -624,65 +624,8 @@ int main(void) {
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
                 gl_init();
-
-                /* GL setup: perspective projection, depth test, fog */
-                glViewport(0, 0, 320, 240);
-                glMatrixMode(GL_PROJECTION);
-                glLoadIdentity();
-                /* Perspective: ~73 degree horizontal FOV, aspect 4:3, near=32, far=32768 */
-                float near_clip = 32.0f, far_clip = 32768.0f;
-                float fov_y = 60.0f * 3.14159f / 180.0f;  /* vertical FOV in radians */
-                float aspect = 320.0f / 240.0f;
-                float f = 1.0f / tanf(fov_y / 2.0f);
-                float proj[16] = {
-                    f / aspect, 0, 0, 0,
-                    0, f, 0, 0,
-                    0, 0, (far_clip + near_clip) / (near_clip - far_clip), -1,
-                    0, 0, (2 * far_clip * near_clip) / (near_clip - far_clip), 0
-                };
-                glLoadMatrixf(proj);
-
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(GL_LESS);
-                glEnable(GL_TEXTURE_2D);
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glFrontFace(GL_CW);  /* TR1 uses CW winding */
-                glShadeModel(GL_SMOOTH);
-
-                /* GL fog for distance fade */
-                glEnable(GL_FOG);
-                glFogi(GL_FOG_MODE, GL_LINEAR);
-                float fog_start = 0.0f, fog_end = 16384.0f;
-                glFogf(GL_FOG_START, fog_start);
-                glFogf(GL_FOG_END, fog_end);
-                float fog_color[] = {0, 0, 0, 1};
-                glFogfv(GL_FOG_COLOR, fog_color);
-
-                /* Texture environment: modulate texture with vertex color */
-                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
                 bool has_zbuf = true;  /* GL manages zbuf internally */
-
-                /* Create GL texture objects (must be after gl_init) */
-                if (gl_textures) {
-                    glGenTextures(num_otex, gl_textures);
-                    for (int i = 0; i < num_otex; i++) {
-                        glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                        glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
-                    }
-                }
-                if (white_px) {
-                    glGenTextures(1, &gl_white_tex);
-                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                    glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
-                }
+                bool gl_setup_done = false;  /* Defer GL state to first frame */
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -932,12 +875,69 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
                     gl_context_begin();
+
+                    /* One-time GL state setup on first frame */
+                    if (!gl_setup_done) {
+                        gl_setup_done = true;
+                        glViewport(0, 0, 320, 240);
+
+                        /* Perspective projection */
+                        glMatrixMode(GL_PROJECTION);
+                        glLoadIdentity();
+                        float near_clip = 32.0f, far_clip = 32768.0f;
+                        float fov_y_r = 60.0f * 3.14159f / 180.0f;
+                        float asp = 320.0f / 240.0f;
+                        float ff = 1.0f / tanf(fov_y_r / 2.0f);
+                        float proj[16] = {
+                            ff/asp, 0, 0, 0,
+                            0, ff, 0, 0,
+                            0, 0, (far_clip+near_clip)/(near_clip-far_clip), -1,
+                            0, 0, (2*far_clip*near_clip)/(near_clip-far_clip), 0
+                        };
+                        glLoadMatrixf(proj);
+
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(GL_LESS);
+                        glEnable(GL_TEXTURE_2D);
+                        glEnable(GL_CULL_FACE);
+                        glCullFace(GL_BACK);
+                        glFrontFace(GL_CW);
+                        glShadeModel(GL_SMOOTH);
+
+                        glEnable(GL_FOG);
+                        glFogi(GL_FOG_MODE, GL_LINEAR);
+                        glFogf(GL_FOG_START, 0.0f);
+                        glFogf(GL_FOG_END, 16384.0f);
+                        float fog_color[] = {0, 0, 0, 1};
+                        glFogfv(GL_FOG_COLOR, fog_color);
+                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+                        /* Create GL texture objects */
+                        if (gl_textures) {
+                            glGenTextures(num_otex, gl_textures);
+                            for (int i = 0; i < num_otex; i++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
+                            }
+                        }
+                        if (white_px) {
+                            glGenTextures(1, &gl_white_tex);
+                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
+                        }
+                    }
+
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                     /* Set camera modelview matrix */
                     glMatrixMode(GL_MODELVIEW);
                     glLoadIdentity();
-                    /* Camera: pitch then yaw then translate */
                     glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
                     glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
                     glTranslatef(-cam_x, -cam_y, -cam_z);
