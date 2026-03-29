@@ -254,15 +254,45 @@ static void build_chunks(const tr_level_t *level) {
          * XZ dimension by a multiplier — a room should be drawable
          * until it would be just a few pixels on screen.
          * Clamp to [CHUNK_MID_DIST2 .. CHUNK_XXFAR_DIST2]. */
-        /* Per-room max draw distance from size + connectivity.
-         * Larger rooms and rooms with more portals (junction areas)
-         * stay visible further. */
+        /* Room size class + scaled thresholds.
+         * Computed once at load, stable for the room's lifetime.
+         *
+         * Classes:
+         *   SMALL  (< 2 sectors): tight thresholds, fast falloff
+         *   MEDIUM (2-4 sectors): normal TR1 ladder
+         *   LARGE  (4-8 sectors): stretched thresholds
+         *   OPEN   (> 8 sectors): full range, distant tiers matter */
         float max_dim = dx > dz ? dx : dz;
+        float room_sectors = max_dim / 1024.0f;
+
+        #define SIZE_SMALL  0
+        #define SIZE_MEDIUM 1
+        #define SIZE_LARGE  2
+        #define SIZE_OPEN   3
+
+        if (room_sectors < 2.0f) {
+            c->size_class = SIZE_SMALL;
+            c->near_dist2     = 2048.0f * 2048.0f;   /* ~2 sectors */
+            c->fog_start_dist2 = 1536.0f * 1536.0f;  /* fog early */
+        } else if (room_sectors < 4.0f) {
+            c->size_class = SIZE_MEDIUM;
+            c->near_dist2     = 4096.0f * 4096.0f;   /* ~4 sectors */
+            c->fog_start_dist2 = 3072.0f * 3072.0f;
+        } else if (room_sectors < 8.0f) {
+            c->size_class = SIZE_LARGE;
+            c->near_dist2     = 6144.0f * 6144.0f;   /* ~6 sectors */
+            c->fog_start_dist2 = 4096.0f * 4096.0f;
+        } else {
+            c->size_class = SIZE_OPEN;
+            c->near_dist2     = 8192.0f * 8192.0f;   /* ~8 sectors */
+            c->fog_start_dist2 = 6144.0f * 6144.0f;
+        }
+
+        /* Max draw distance from size + connectivity */
         float draw_dist = max_dim * 8.0f;
-        /* Boost for connected rooms: each portal adds ~1 sector */
         draw_dist += r->portal_count * 1024.0f;
-        if (draw_dist < 7168.0f) draw_dist = 7168.0f;   /* min: ~7 sectors */
-        if (draw_dist > 16384.0f) draw_dist = 16384.0f;  /* max: ~16 sectors */
+        if (draw_dist < 7168.0f) draw_dist = 7168.0f;
+        if (draw_dist > 16384.0f) draw_dist = 16384.0f;
         c->max_draw_dist2 = draw_dist * draw_dist;
 
         c->lod        = CHUNK_LOD_NEAR;
@@ -1454,8 +1484,10 @@ int main(void) {
                         tr_chunk_t *c = &g_chunks[ri];
 
                         if (vi < ring1_end) {
-                            /* Ring 1: GL near pass with proper textures */
-                            if (c->dist_sq < CHUNK_NEAR_DIST2) {
+                            /* Ring 1: GL near pass with proper textures.
+                             * Use per-room near threshold — small rooms
+                             * transition to fog sooner, large rooms later. */
+                            if (c->dist_sq < c->near_dist2) {
                                 c->lod = CHUNK_LOD_NEAR;
                             } else {
                                 c->lod = CHUNK_LOD_MID;
@@ -1990,18 +2022,19 @@ int main(void) {
                                 float g = is_water ? bright * 0.6f : bright;
                                 float b = is_water ? bright * 1.0f : bright;
 
-                                /* Apply fog for MID LOD rooms (GL near pass)
-                                 * and far pass. NEAR rooms have no fog. */
+                                /* Apply fog for MID LOD rooms (GL near pass).
+                                 * Uses per-room fog_start_dist2 so small rooms
+                                 * fog sooner and large rooms fog later. */
                                 bool apply_fog = (room_idx < g_chunk_count &&
                                     g_chunks[room_idx].lod >= CHUNK_LOD_MID);
                                 if (apply_fog) {
                                     float fdx = vx_w - cam_x;
                                     float fdz = vz_w - cam_z;
                                     float d2 = fdx*fdx + fdz*fdz;
-                                    float fog = (d2 - 16777216.0f) / 383223784.0f;
-                                    /* 16777216 = 4096² (near/mid boundary)
-                                     * 400000000 = 20000² (far world clip)
-                                     * divisor = end² - start² */
+                                    float fog_start = g_chunks[room_idx].fog_start_dist2;
+                                    float fog_range = g_chunks[room_idx].max_draw_dist2 - fog_start;
+                                    if (fog_range < 1.0f) fog_range = 1.0f;
+                                    float fog = (d2 - fog_start) / fog_range;
                                     /* Vertical bias: lower = more fog (TR1 Y-down) */
                                     float y_bias = (vy_w - cam_y) * 0.00004f;
                                     if (y_bias < 0.0f) y_bias = 0.0f;
