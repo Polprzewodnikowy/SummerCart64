@@ -1310,14 +1310,18 @@ int main(void) {
                         bool is_water = (room->flags & 1) != 0;
 
                         /* Face decimation: only for far pass (pass==0).
-                         * Near-pass rooms always draw all faces.
-                         * Far-pass rooms skip every Nth face based on cluster
-                         * distance to reduce triangle count at distance. */
+                         * Uses per-room distance (not cluster center) so rooms
+                         * get full detail as soon as they're individually close.
+                         * Threshold is generous: rooms go full-detail well before
+                         * they'd transition to the near pass. */
                         int face_skip = 1;
                         if (pass == 0 && room_idx < g_chunk_count) {
-                            int cid = g_chunks[room_idx].cluster_id;
-                            if (cid >= 0 && cid < g_cluster_count)
-                                face_skip = g_clusters[cid].face_skip;
+                            float rd = g_chunks[room_idx].dist_sq;
+                            if (rd > CHUNK_VERY_FAR_DIST2)
+                                face_skip = 4;
+                            else if (rd > CHUNK_FAR_DIST2 * 1.5f)
+                                face_skip = 2;
+                            /* else face_skip stays 1 — room is close enough */
                         }
 
                         int max_faces = room->mesh.face_count;
