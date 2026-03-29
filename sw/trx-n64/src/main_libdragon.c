@@ -1293,153 +1293,100 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Portal-clipped traversal + LOD
+                     * VISIBILITY: Frustum culling by room AABB
                      *
-                     * Proper TR1 portal visibility: each room carries a
-                     * screen-space clip rect.  Only rooms visible through
-                     * a chain of portals from the camera get drawn.
-                     * Rooms behind walls are automatically excluded.
-                     *
-                     * Each portal's 4 vertices are projected to screen,
-                     * the bounding rect is intersected with the parent
-                     * room's clip rect.  If non-empty, the destination
-                     * room is added with the clipped rect.
+                     * Rules:
+                     *   1. Current room (lara_room) is ALWAYS visible.
+                     *   2. Other rooms: frustum cull using room AABB.
+                     *   3. Culling decides draw/not-draw.
+                     *      LOD decides which representation to draw.
+                     *      These are separate — never let LOD/tier hide
+                     *      geometry that should exist.
                      * =================================================== */
-                    #define MAX_VIS_ROOMS 48
-
-                    typedef struct {
-                        int16_t room_idx;
-                        int16_t cl, ct, cr, cb; /* clip rect (screen space) */
-                    } vis_entry_t;
-
-                    vis_entry_t vis_queue[MAX_VIS_ROOMS];
+                    #define MAX_DRAW_ROOMS 32
+                    int vis_rooms[MAX_DRAW_ROOMS * 2];
                     int vis_count = 0;
-                    bool vis_visited[256];
-                    memset(vis_visited, 0, sizeof(vis_visited));
 
-                    /* Seed: camera room with full viewport */
-                    vis_queue[0].room_idx = lara_room;
-                    vis_queue[0].cl = 0; vis_queue[0].ct = 0;
-                    vis_queue[0].cr = 320; vis_queue[0].cb = 240;
-                    vis_count = 1;
-                    vis_visited[lara_room] = true;
+                    for (int ri = 0; ri < g_chunk_count; ri++) {
+                        tr_chunk_t *c = &g_chunks[ri];
 
-                    for (int qi = 0; qi < vis_count && vis_count < MAX_VIS_ROOMS; qi++) {
-                        int ri = vis_queue[qi].room_idx;
-                        int16_t pcl = vis_queue[qi].cl, pct = vis_queue[qi].ct;
-                        int16_t pcr = vis_queue[qi].cr, pcb = vis_queue[qi].cb;
-                        if (ri < 0 || ri >= g_level.room_count) continue;
-                        tr_room_t *room = &g_level.rooms[ri];
+                        /* Compute distance (needed for LOD regardless) */
+                        float ddx = c->cx - cam_x;
+                        float ddz = c->cz - cam_z;
+                        c->dist_sq = ddx * ddx + ddz * ddz;
+                        c->visible = false;
 
-                        for (int p = 0; p < room->portal_count &&
-                                        vis_count < MAX_VIS_ROOMS; p++) {
-                            tr_portal_t *portal = &room->portals[p];
-                            int dest = portal->room;
-                            if (dest < 0 || dest >= g_level.room_count) continue;
-                            if (vis_visited[dest]) continue;
+                        /* Rule 1: current room is ALWAYS visible */
+                        if (ri == lara_room) {
+                            c->visible = true;
+                        } else {
+                            /* Rule 2: frustum cull other rooms by AABB.
+                             * Test all 8 AABB corners against the view
+                             * frustum (4 planes: left, right, top, bottom).
+                             * If any corner is inside all planes, room is
+                             * potentially visible. Conservative: also accept
+                             * if AABB is very close (within 2 sectors). */
+                            if (c->dist_sq < 2048.0f * 2048.0f) {
+                                /* Very close rooms always visible */
+                                c->visible = true;
+                            } else {
+                                /* Test AABB against camera frustum.
+                                 * Transform AABB center to camera space
+                                 * and check against frustum half-angles. */
+                                float cx_r = ddx * cy - ddz * sy;  /* rotated X */
+                                float cz_r = ddx * sy + ddz * cy;  /* rotated Z (depth) */
 
-                            /* Project portal's 4 vertices to screen space */
-                            int16_t pmin_x = 320, pmin_y = 240;
-                            int16_t pmax_x = 0, pmax_y = 0;
-                            int verts_behind = 0, verts_front = 0;
-                            for (int pv = 0; pv < 4; pv++) {
-                                float px_w = (float)(room->x + portal->vertices[pv].x);
-                                float py_w = (float)portal->vertices[pv].y;
-                                float pz_w = (float)(room->z + portal->vertices[pv].z);
-                                float cx_p = px_w - cam_x;
-                                float cy_p = py_w - cam_y;
-                                float cz_p = pz_w - cam_z;
-                                float rx_p = cx_p * cy - cz_p * sy;
-                                float rz_yaw = cx_p * sy + cz_p * cy;
-                                float ry_p = cy_p * cp - rz_yaw * sp;
-                                float rz_p = cy_p * sp + rz_yaw * cp;
-                                if (rz_p < 4.0f) {
-                                    verts_behind++;
-                                    continue;
+                                /* Room behind camera? Check if nearest Z edge
+                                 * could still be in front. */
+                                float half_x = (c->max_x - c->min_x) * 0.5f;
+                                float half_z = (c->max_z - c->min_z) * 0.5f;
+                                float extent = half_x + half_z; /* conservative radius */
+                                float near_z = cz_r - extent;
+
+                                if (near_z < -512.0f) {
+                                    /* Entirely behind camera */
+                                    c->visible = false;
+                                } else {
+                                    /* Horizontal frustum test:
+                                     * Is the room's X extent within the
+                                     * frustum at its depth? */
+                                    float far_z = cz_r + extent;
+                                    if (far_z < 1.0f) far_z = 1.0f;
+                                    float frustum_w = far_z * CHUNK_TAN_H + extent;
+                                    if (cx_r > -frustum_w && cx_r < frustum_w) {
+                                        c->visible = true;
+                                    }
                                 }
-                                verts_front++;
-                                float inv_z = 256.0f / rz_p;
-                                int16_t sx = (int16_t)(160.0f + rx_p * inv_z);
-                                int16_t sy2 = (int16_t)(120.0f + ry_p * inv_z);
-                                if (sx < 0) sx = 0;
-                                if (sx > 320) sx = 320;
-                                if (sy2 < 0) sy2 = 0;
-                                if (sy2 > 240) sy2 = 240;
-                                if (sx < pmin_x) pmin_x = sx;
-                                if (sx > pmax_x) pmax_x = sx;
-                                if (sy2 < pmin_y) pmin_y = sy2;
-                                if (sy2 > pmax_y) pmax_y = sy2;
-                            }
-                            if (verts_front == 0) {
-                                /* All behind camera — use full parent clip */
-                                pmin_x = pcl; pmin_y = pct;
-                                pmax_x = pcr; pmax_y = pcb;
-                            } else if (verts_behind > 0) {
-                                /* Portal crosses near plane — expand rect to
-                                 * parent clip bounds on any edge that has a
-                                 * behind-camera vertex.  Conservative: just
-                                 * use parent clip rect (the portal is very
-                                 * close and spans a wide angle). */
-                                pmin_x = pcl; pmin_y = pct;
-                                pmax_x = pcr; pmax_y = pcb;
-                            }
-
-                            /* Clip portal rect against parent's clip rect */
-                            int16_t cl2 = pmin_x > pcl ? pmin_x : pcl;
-                            int16_t ct2 = pmin_y > pct ? pmin_y : pct;
-                            int16_t cr2 = pmax_x < pcr ? pmax_x : pcr;
-                            int16_t cb2 = pmax_y < pcb ? pmax_y : pcb;
-
-                            /* Non-empty clip rect = portal is visible */
-                            if (cl2 < cr2 && ct2 < cb2) {
-                                vis_visited[dest] = true;
-                                vis_queue[vis_count].room_idx = dest;
-                                vis_queue[vis_count].cl = cl2;
-                                vis_queue[vis_count].ct = ct2;
-                                vis_queue[vis_count].cr = cr2;
-                                vis_queue[vis_count].cb = cb2;
-                                vis_count++;
                             }
                         }
+
+                        if (!c->visible) continue;
+                        if (vis_count >= MAX_DRAW_ROOMS * 2) continue;
+                        vis_rooms[vis_count++] = ri;
                     }
 
-                    /* LOD classify visible rooms */
-                    #define MAX_DRAW_ROOMS 32
+                    /* Rule 3: LOD classification — separate from culling.
+                     * Culling decided visibility above.
+                     * LOD decides which rendering path (GL near vs RDPQ far). */
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
                     int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
 
+                    #define LOD_MID_FAR_INNER (CHUNK_MID_DIST2 * 0.85f)
+                    #define LOD_MID_FAR_OUTER (CHUNK_MID_DIST2 * 1.1f)
+
                     for (int vi = 0; vi < vis_count; vi++) {
-                        int ri = vis_queue[vi].room_idx;
-                        if (ri < 0 || ri >= g_chunk_count) continue;
+                        int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        float ddx = c->cx - cam_x;
-                        float ddz = c->cz - cam_z;
-                        c->dist_sq = ddx*ddx + ddz*ddz;
-
-                        /* Three-tier LOD with overlap at mid/far boundary.
-                         *
-                         * NEAR (< 4 sectors): GL, no fog
-                         * MID  (4-7 sectors): GL, with fog in vertex color
-                         * FAR  (> 7 sectors): RDPQ CPU projection, fog
-                         *
-                         * Mid/far overlap band: rooms drawn in both RDPQ
-                         * far pass and GL near pass to hide the seam. */
-                        #define LOD_MID_FAR_INNER (CHUNK_MID_DIST2 * 0.85f)
-                        #define LOD_MID_FAR_OUTER (CHUNK_MID_DIST2 * 1.1f)
-
                         if (c->dist_sq < CHUNK_NEAR_DIST2) {
-                            /* NEAR — GL, no fog */
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
                         } else if (c->dist_sq < LOD_MID_FAR_INNER) {
-                            /* MID — GL with fog */
                             c->lod = CHUNK_LOD_MID;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
                         } else if (c->dist_sq > LOD_MID_FAR_OUTER) {
-                            /* FAR — RDPQ only */
                             c->lod = CHUNK_LOD_FAR;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
@@ -1601,10 +1548,11 @@ int main(void) {
 
                                         /* Fallback chain (Lambert):
                                          * If upload budget exceeded, try lower mip.
-                                         * If still over budget, skip face. */
+                                         * If still over budget, use last-bound texture
+                                         * (never skip geometry due to budget). */
                                         if (perf_far_uploads >= FAR_UPLOAD_BUDGET) {
                                             if (mip_level < 2) mip_level = 2; /* try 8×8 */
-                                            else continue; /* already lowest, skip */
+                                            else goto far_skip_upload; /* use last-bound tex */
                                         }
 
                                         rspq_flush();
@@ -1652,7 +1600,7 @@ int main(void) {
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
                                         if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
-                                            continue;
+                                            goto far_skip_upload; /* use last-bound tex */
                                         rspq_flush();
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                         far_last_tex = -2;
