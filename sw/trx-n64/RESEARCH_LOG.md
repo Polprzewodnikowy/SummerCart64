@@ -469,7 +469,98 @@ reduce face count before the vertex cache even runs.
 
 ---
 
+## HailToDodongo/tiny3d — T3D Library Internals ★★★
+Source: https://github.com/HailToDodongo/tiny3d
+
+### T3DVertPacked Struct (32 bytes = 2 vertices, 16 bytes/vert)
+```c
+typedef struct {
+  int16_t posA[3];    // 0x00: position (integer part of s16.16)
+  uint16_t normA;     // 0x06: packed 5.6.5 normal
+  int16_t posB[3];    // 0x08: position B
+  uint16_t normB;     // 0x0E: normal B
+  uint32_t rgbaA;     // 0x10: RGBA8888 color A
+  uint32_t rgbaB;     // 0x14: RGBA8888 color B
+  int16_t stA[2];     // 0x18: UV A (10.5 fixed-point PIXEL coords)
+  int16_t stB[2];     // 0x1C: UV B
+} __attribute__((aligned(8))) T3DVertPacked;
+```
+UVs are pixel coords × 32 (10.5 fixed point). NOT normalized 0-1.
+
+### Key Specs
+- **Vertex cache**: 70 transformed vertices in RSP DMEM (36 bytes each)
+- **Clipping**: Sutherland-Hodgman on RSP, lazy-loaded overlay, 5 planes
+- **Guard band**: default 2× screen (most offscreen tris skip clipping)
+- **Perf reference**: ~8.8ms RSP for 3642 verts / ~2326 tris
+
+### Borrowable Techniques
+
+1. **Alpha-to-tile for per-triangle texture selection** ★★★
+   - `t3d_state_set_alpha_to_tile(true)` — 3 MSBs of vertex alpha
+     select which TMEM tile (0-7) to use for that triangle
+   - Pack up to 8 textures into TMEM simultaneously
+   - Select per-triangle with ZERO texture switch overhead
+   - "Completely free and adds no extra time"
+   - **For TR1**: pack 2-4 most-used room textures into TMEM at once,
+     encode tile index in vertex alpha. Eliminates most CI8 uploads
+     mid-frame. With CI8 at 1KB/tile, 4 tiles = 4KB = full TMEM.
+   - File: `src/t3d/t3d.h:568-585`
+
+2. **Minimal init + rdpq interop pattern**
+   ```c
+   rdpq_init();
+   t3d_init((T3DInitParams){});
+   // Vertices MUST be malloc_uncached (or data_cache_hit_writeback)
+   // rdpq_tex_upload works alongside t3d_tri_draw
+   // MUST call t3d_tri_sync() before any rdpq state changes
+   ```
+
+3. **Optimal matrix stack for many objects at same level**
+   ```c
+   t3d_matrix_push_pos(1);       // advance once
+   for each object:
+     t3d_matrix_set(mat, true);  // multiply with parent
+     t3d_vert_load / t3d_tri_draw
+   t3d_matrix_pop(1);            // pop once
+   ```
+   **For TR1 rooms**: push room matrix once, draw all room geometry,
+   pop. For Lara: push per-bone via segment addressing.
+
+4. **Triangle strips save ~45% bandwidth**
+   - `t3d_tri_draw_strip(indexBuff, count)` vs individual tri_draw
+   - TR1 quads naturally form strips (each quad = 2 tris sharing an edge)
+   - Build tool converts to strip format: `t3d_indexbuffer_convert()`
+   - File: `docs/modelOpt.md`
+
+5. **Vertex FX: spherical UV and UV offset on RSP**
+   - `T3D_VERTEX_FX_SPHERICAL_UV` — environment mapping
+   - `T3D_VERTEX_FX_UV_OFFSET` — UV scrolling (water/lava animation)
+   - Both computed on RSP, zero CPU cost
+   - File: `src/t3d/t3d.h:587-604`
+
+6. **Model BVH for frustum culling**
+   - `t3d_model_bvh_query_frustum()` — test model against frustum
+   - Built at export time with `--bvh` flag
+   - Returns which chunks are visible
+   - File: `src/t3d/t3dmodel.h`
+
+7. **Dynamic vertex replacement via segment**
+   - `t3d_model_make_object_vert_placeholder(model, obj, segId)`
+   - At runtime: `t3d_segment_set(segId, newVertices)`
+   - Swap vertex data without re-recording rspq_block
+   - **For TR1**: could swap between room vertex sets for animated rooms
+
+### TR1 Migration Specifics
+- Each TR1 room vertex (int16 x,y,z + int16 light) maps to T3DVertPacked
+  with position = x,y,z and rgbaA = light-derived vertex color
+- UV from tex_uv_map → 10.5 fixed-point pixel coords
+- 70-vert RSP cache fits ~2 TR1 room batches (35 verts each)
+- With alpha-to-tile: pack 4 CI8 textures (4KB TMEM total), select
+  per-triangle via vertex alpha. Reduces texture switches from ~48/frame
+  to ~12/frame (one switch per 4-texture group change)
+
+---
+
 ## Future Repos to Investigate
-- HailToDodongo/tiny3d (T3D) — libdragon RSP vertex T&L overlay ★ PRIORITY
 - libdragon GL internals — RSP overlay for OpenGL vertex processing
 - crashoveride95/n64homebrew — community rendering techniques
