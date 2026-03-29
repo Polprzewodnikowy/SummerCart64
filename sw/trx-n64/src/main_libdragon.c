@@ -674,13 +674,21 @@ int main(void) {
                 uint16_t  *mip2_pixels = NULL;
 
                 if (tex_tiles && num_otex > 0) {
-                    mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    /* Pixel data in cached heap — NOT uncached.
-                     * rdpq_tex_upload will DMA from here, which works fine
-                     * as long as we writeback the cache after filling. */
-                    mip1_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP1_BYTES);
-                    mip2_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP2_BYTES);
+                    /* Only allocate mips if heap has enough room.
+                     * Need ~560 KB for mip pixels + surfaces, plus
+                     * headroom for GL texture arrays and other allocs. */
+                    uint32_t mip_need = num_otex * (MIP1_BYTES + MIP2_BYTES +
+                                        2 * sizeof(surface_t));
+                    uint32_t heap_avail = n64_mem_available();
+                    if (heap_avail > mip_need + 64 * 1024) { /* 64 KB headroom */
+                        mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                        mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                        mip1_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP1_BYTES);
+                        mip2_pixels = (uint16_t *)n64_mem_alloc(num_otex * MIP2_BYTES);
+                    } else {
+                        printf("  Mip skip: need %u KB, have %u KB\n",
+                               mip_need/1024, heap_avail/1024);
+                    }
                 }
 
                 bool mips_ok = (mip1_surfs && mip2_surfs &&
