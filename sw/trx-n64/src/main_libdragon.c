@@ -32,6 +32,7 @@
 #include "level/tr_types.h"
 #include "level/tr_level_parse.h"
 #include "lz4_decode.h"
+#include "render/tr_chunk.h"
 
 /* -------------------------------------------------------------------
  * Bump allocator
@@ -201,11 +202,90 @@ static asset_manager_t g_asset_mgr;
 static tr_level_t g_level;
 static bool g_has_assets = false;
 
+/* Chunk array — one entry per TR1 room, built once after level parse */
+static tr_chunk_t g_chunks[TR_MAX_ROOMS];
+static int        g_chunk_count = 0;
+
 #define ARCHIVE_SECTOR  0x10000
 #define CACHE_BASE      ((uint8_t *)0xB1000000)
 #define CACHE_SIZE      (3 * 1024 * 1024)
 #define SLOT_SIZE       (512 * 1024)
 static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
+
+/* -------------------------------------------------------------------
+ * Chunk management — builds AABB/sphere for each room once at load
+ * ------------------------------------------------------------------- */
+
+static void build_chunks(const tr_level_t *level) {
+    g_chunk_count = 0;
+    for (int i = 0; i < level->room_count && g_chunk_count < TR_MAX_ROOMS; i++) {
+        const tr_room_t *r  = &level->rooms[i];
+        tr_chunk_t      *c  = &g_chunks[g_chunk_count++];
+        c->room_idx = i;
+
+        /* XZ bounds from sector grid */
+        c->min_x = (float)r->x;
+        c->max_x = (float)(r->x + r->sectors_x * 1024);
+        c->min_z = (float)r->z;
+        c->max_z = (float)(r->z + r->sectors_z * 1024);
+
+        /* Y bounds: TR1 uses Y-down convention.
+         * max_ceiling is the highest point (smallest Y value).
+         * min_floor   is the lowest  point (largest  Y value). */
+        c->min_y = (float)r->max_ceiling;
+        c->max_y = (float)r->min_floor;
+        if (c->min_y > c->max_y) { float t = c->min_y; c->min_y = c->max_y; c->max_y = t; }
+
+        /* Sphere: center + radius from AABB diagonal */
+        c->cx = (c->min_x + c->max_x) * 0.5f;
+        c->cy = (c->min_y + c->max_y) * 0.5f;
+        c->cz = (c->min_z + c->max_z) * 0.5f;
+        float dx = c->max_x - c->min_x;
+        float dy = c->max_y - c->min_y;
+        float dz = c->max_z - c->min_z;
+        c->radius = sqrtf(dx*dx + dy*dy + dz*dz) * 0.5f;
+
+        c->lod     = CHUNK_LOD_NEAR;
+        c->dist_sq = 0.0f;
+        c->visible = false;
+    }
+}
+
+/*
+ * Sphere–frustum test in TR1 world space (horizontal planes only).
+ *
+ * Uses the camera yaw rotation (sy, cy_ang) to put the sphere into
+ * camera-space XZ, then tests four planes: back, far, left, right.
+ * Pitch is ignored here; it only matters for top/bottom culling which
+ * is less critical for TR1's mostly horizontal rooms.
+ *
+ * Returns true if the sphere MAY be visible (conservative).
+ */
+static bool chunk_frustum_visible(const tr_chunk_t *c,
+                                  float cam_x, float cam_z,
+                                  float sy, float cy_ang) {
+    float dx = c->cx - cam_x;
+    float dz = c->cz - cam_z;
+    float r  = c->radius;
+
+    /* Rotate to camera-space XZ */
+    float rx = dx * cy_ang - dz * sy;
+    float rz = dx * sy     + dz * cy_ang;
+
+    /* Behind camera? (rz < 0 is behind; allow partial overlap with near plane) */
+    if (rz < -r) return false;
+
+    /* Beyond far clip? */
+    if (rz > CHUNK_FAR_WORLD + r) return false;
+
+    /* Outside right frustum edge?  (rx * sin_h - rz * cos_h > r) */
+    if (rx * CHUNK_SIN_H - rz * CHUNK_COS_H > r) return false;
+
+    /* Outside left frustum edge?  (-rx * sin_h - rz * cos_h > r) */
+    if (-rx * CHUNK_SIN_H - rz * CHUNK_COS_H > r) return false;
+
+    return true;
+}
 
 /* -------------------------------------------------------------------
  * Main
@@ -601,6 +681,10 @@ int main(void) {
                     }
                 }
 
+                /* Build chunk array (one per room) for frustum/LOD queries */
+                build_chunks(&g_level);
+                printf("  %d chunks built.\n", g_chunk_count);
+
                 /* Pre-compute shadow circle points (avoid sinf/cosf per frame) */
                 float shadow_circ[16][2];
                 {
@@ -980,30 +1064,100 @@ int main(void) {
                     /* Track current texture for batching */
                     int last_tex_idx = -1;
 
-                    /* Build visible room list via portal traversal.
-                     * Start from Lara's room, follow portals up to depth 4. */
-                    int rooms_to_draw[64];
-                    int num_draw = 0;
-                    bool room_drawn[256];
-                    memset(room_drawn, 0, sizeof(room_drawn));
+                    /* =====================================================
+                     * VISIBILITY: Portal BFS + chunk frustum cull + LOD
+                     *
+                     * Step 1 — Portal BFS gives us the set of rooms that
+                     *          are physically reachable through open portals.
+                     *          Cap at MAX_PORTAL_CANDIDATES to keep BFS fast.
+                     *
+                     * Step 2 — For each BFS candidate, run the sphere–frustum
+                     *          test via the pre-built chunk descriptors.
+                     *          Rooms behind the camera or outside the horizontal
+                     *          FOV are discarded before any geometry work.
+                     *
+                     * Step 3 — Classify surviving rooms into NEAR / FAR LOD
+                     *          based on squared XZ distance to camera.
+                     *          Near rooms are placed first in rooms_to_draw[];
+                     *          far rooms follow (sorted back-to-front for Phase 2).
+                     * =================================================== */
+                    #define MAX_PORTAL_CANDIDATES 64
+                    #define MAX_DRAW_ROOMS        32
 
-                    /* BFS portal traversal — limit depth for performance */
-                    rooms_to_draw[num_draw++] = lara_room;
-                    room_drawn[lara_room] = true;
-                    int queue_head = 0;
-                    int max_rooms = 12;
-                    while (queue_head < num_draw && num_draw < max_rooms) {
-                        int ri = rooms_to_draw[queue_head++];
+                    int  bfs_candidates[MAX_PORTAL_CANDIDATES];
+                    int  bfs_count = 0;
+                    bool bfs_visited[256];
+                    memset(bfs_visited, 0, sizeof(bfs_visited));
+
+                    /* BFS from camera room through portals */
+                    bfs_candidates[bfs_count++] = lara_room;
+                    bfs_visited[lara_room] = true;
+                    for (int bfs_head = 0;
+                         bfs_head < bfs_count && bfs_count < MAX_PORTAL_CANDIDATES; ) {
+                        int ri = bfs_candidates[bfs_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
-                        tr_room_t *room = &g_level.rooms[ri];
-                        for (int p = 0; p < room->portal_count && num_draw < max_rooms; p++) {
-                            int dest = room->portals[p].room;
-                            if (dest >= 0 && dest < g_level.room_count && !room_drawn[dest]) {
-                                room_drawn[dest] = true;
-                                rooms_to_draw[num_draw++] = dest;
+                        tr_room_t *broom = &g_level.rooms[ri];
+                        for (int p = 0; p < broom->portal_count &&
+                                        bfs_count < MAX_PORTAL_CANDIDATES; p++) {
+                            int dest = broom->portals[p].room;
+                            if (dest >= 0 && dest < g_level.room_count &&
+                                !bfs_visited[dest]) {
+                                bfs_visited[dest] = true;
+                                bfs_candidates[bfs_count++] = dest;
                             }
                         }
                     }
+
+                    /* Frustum cull + LOD classify each BFS candidate */
+                    int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
+                    int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
+
+                    for (int bi = 0; bi < bfs_count; bi++) {
+                        int ri = bfs_candidates[bi];
+                        if (ri < 0 || ri >= g_chunk_count) continue;
+                        tr_chunk_t *c = &g_chunks[ri];
+
+                        /* Frustum cull (sphere vs. 4 planes) */
+                        if (!chunk_frustum_visible(c, cam_x, cam_z, sy, cy))
+                            continue;
+
+                        /* XZ squared distance from camera to chunk center */
+                        float ddx = c->cx - cam_x;
+                        float ddz = c->cz - cam_z;
+                        c->dist_sq = ddx*ddx + ddz*ddz;
+
+                        /* LOD classify */
+                        if (c->dist_sq < CHUNK_FAR_DIST2) {
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
+                        } else {
+                            c->lod = CHUNK_LOD_FAR;
+                            if (far_count < MAX_DRAW_ROOMS)
+                                far_rooms[far_count++] = ri;
+                        }
+                    }
+
+                    /* Bubble-sort far rooms back-to-front (prep for Phase 2 far pass).
+                     * Small list so insertion sort is fine. */
+                    for (int i = 1; i < far_count; i++) {
+                        int key = far_rooms[i];
+                        float key_d = g_chunks[key].dist_sq;
+                        int j = i - 1;
+                        while (j >= 0 && g_chunks[far_rooms[j]].dist_sq < key_d) {
+                            far_rooms[j + 1] = far_rooms[j];
+                            j--;
+                        }
+                        far_rooms[j + 1] = key;
+                    }
+
+                    /* Merge: near rooms first, then far rooms */
+                    int rooms_to_draw[MAX_DRAW_ROOMS * 2];
+                    int num_draw = 0;
+                    for (int i = 0; i < near_count; i++)
+                        rooms_to_draw[num_draw++] = near_rooms[i];
+                    for (int i = 0; i < far_count; i++)
+                        rooms_to_draw[num_draw++] = far_rooms[i];
 
                     /* ===== DRAW ROOMS — interleaved vertex array ===== */
                     /* Interleaved: pos(3f) + color(4ub) + texcoord(2f) = 24 bytes/vert */
@@ -1041,28 +1195,13 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room-level cull: behind camera */
-                        float rcx = room->x + room->sectors_x * 512.0f - cam_x;
-                        float rcz = room->z + room->sectors_z * 512.0f - cam_z;
-                        float room_rz = rcx * sy + rcz * cy;
-                        float room_radius = (room->sectors_x + room->sectors_z) * 512.0f;
-                        if (room_rz < -room_radius) continue;
-
+                        /* Room already passed chunk_frustum_visible() — no redundant
+                         * per-room cull needed.  Face loop follows directly. */
                         int max_faces = room->mesh.face_count;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
-
-                            /* Distance cull only */
-                            {
-                                uint16_t v0i = face->vertices[0];
-                                if (v0i < room->mesh.vertex_count) {
-                                    float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
-                                    float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
-                                    if (dx*dx + dz*dz > 100000000.0f) continue;
-                                }
-                            }
 
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
