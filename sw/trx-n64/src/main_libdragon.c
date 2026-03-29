@@ -698,7 +698,9 @@ int main(void) {
                 level_data = NULL;
             } else if (level_sector > 0) {
                 uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
+                data_cache_hit_writeback_invalidate(comp_buf, read_bytes + 16);
                 dma_read(comp_buf, cart_addr, read_bytes);
+                data_cache_hit_invalidate(comp_buf, read_bytes + 16);
                 printf("  Loaded %u KB, first: %02x %02x %02x %02x\n",
                        read_bytes / 1024,
                        comp_buf[0], comp_buf[1], comp_buf[2], comp_buf[3]);
@@ -719,7 +721,11 @@ int main(void) {
                 printf("FAILED\n");
             } else if (level_sector > 0) {
                 uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
+                /* Flush any dirty cache lines before DMA writes to this region */
+                data_cache_hit_writeback_invalidate(level_data, read_bytes + 4096);
                 dma_read(level_data, cart_addr, read_bytes);
+                /* Invalidate cache so CPU reads fresh DMA data */
+                data_cache_hit_invalidate(level_data, read_bytes + 4096);
                 printf("  Loaded %u KB\n", read_bytes / 1024);
             }
         }
