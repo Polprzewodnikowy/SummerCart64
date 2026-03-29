@@ -1515,6 +1515,10 @@ int main(void) {
                             if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 float rd = (room_idx < g_chunk_count)
                                     ? g_chunks[room_idx].dist_sq : 0.0f;
+                                /* Only use baked tiles for rooms clearly in FAR zone.
+                                 * Rooms in the overlap band (also drawn by GL near
+                                 * pass) should use per-face textures, not baked. */
+                                if (rd < CHUNK_MID_DIST2) goto skip_baked;
                                 rspq_flush();
                                 if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
                                     /* IA4 extreme far: 4×4 silhouette, no TLUT */
@@ -1543,6 +1547,7 @@ int main(void) {
                                 far_last_tex = -99;
                                 perf_far_uploads++;
                             }
+                            skip_baked:;
                             bool is_water = (room->flags & 1) != 0;
                             perf_far_rooms++;
 
