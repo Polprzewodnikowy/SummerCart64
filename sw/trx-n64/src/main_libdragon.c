@@ -1530,14 +1530,23 @@ int main(void) {
                         if (vi < ring1_end) {
                             /* Ring 1: GL near pass with proper textures.
                              * Use per-room near threshold — small rooms
-                             * transition to fog sooner, large rooms later. */
-                            if (c->dist_sq < c->near_dist2) {
+                             * transition to fog sooner, large rooms later.
+                             * If too far for safe decimation (>3x near),
+                             * demote to ring 2 IA4 fog instead. */
+                            if (ri != lara_room && c->dist_sq > c->near_dist2 * 3.0f) {
+                                /* Too far for GL — fall back to IA4 fog */
+                                c->lod = CHUNK_LOD_FAR;
+                                if (far_count < MAX_DRAW_ROOMS)
+                                    far_rooms[far_count++] = ri;
+                            } else if (c->dist_sq < c->near_dist2) {
                                 c->lod = CHUNK_LOD_NEAR;
+                                if (near_count < MAX_DRAW_ROOMS)
+                                    near_rooms[near_count++] = ri;
                             } else {
                                 c->lod = CHUNK_LOD_MID;
+                                if (near_count < MAX_DRAW_ROOMS)
+                                    near_rooms[near_count++] = ri;
                             }
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
                         } else {
                             /* Ring 2: RDPQ far pass, IA4 fog fallback */
                             c->lod = CHUNK_LOD_FAR;
@@ -2016,14 +2025,14 @@ int main(void) {
                          * Current room (lara_room): all faces.
                          * Connected rooms beyond near threshold: skip
                          * every Nth face based on distance ratio.
-                         * Preserves silhouette, reduces fill + vertex cost. */
+                         * Cap at 2 — never decimate harder than 50%.
+                         * Beyond that, the room should be drawn as IA4
+                         * fog (ring 2) instead of decimated GL. */
                         int face_skip = 1; /* 1 = all faces */
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
-                            if (c->dist_sq > c->near_dist2 * 2.0f) {
-                                face_skip = 3; /* far connected: every 3rd */
-                            } else if (c->dist_sq > c->near_dist2) {
-                                face_skip = 2; /* mid connected: every 2nd */
+                            if (c->dist_sq > c->near_dist2) {
+                                face_skip = 2; /* connected beyond near: every 2nd */
                             }
                         }
 
