@@ -1307,6 +1307,10 @@ int main(void) {
                     int vis_rooms[MAX_DRAW_ROOMS * 2];
                     int vis_count = 0;
 
+                    /* Max draw distance squared — rooms beyond this are
+                     * not drawn at all.  Keeps memory bounded on N64. */
+                    #define MAX_DRAW_DIST2 (CHUNK_XXFAR_DIST2)
+
                     for (int ri = 0; ri < g_chunk_count; ri++) {
                         tr_chunk_t *c = &g_chunks[ri];
 
@@ -1320,43 +1324,28 @@ int main(void) {
                         if (ri == lara_room) {
                             c->visible = true;
                         } else {
-                            /* Rule 2: frustum cull other rooms by AABB.
-                             * Test all 8 AABB corners against the view
-                             * frustum (4 planes: left, right, top, bottom).
-                             * If any corner is inside all planes, room is
-                             * potentially visible. Conservative: also accept
-                             * if AABB is very close (within 2 sectors). */
-                            if (c->dist_sq < 2048.0f * 2048.0f) {
-                                /* Very close rooms always visible */
+                            /* Distance gate first — hard cutoff */
+                            if (c->dist_sq > MAX_DRAW_DIST2) {
+                                continue;
+                            }
+
+                            /* Rule 2: frustum cull by AABB center+extent */
+                            float cx_r = ddx * cy - ddz * sy;
+                            float cz_r = ddx * sy + ddz * cy;
+                            float half_x = (c->max_x - c->min_x) * 0.5f;
+                            float half_z = (c->max_z - c->min_z) * 0.5f;
+                            float extent = half_x + half_z;
+
+                            float near_z = cz_r - extent;
+                            if (near_z < -512.0f) {
+                                continue; /* behind camera */
+                            }
+
+                            float far_z = cz_r + extent;
+                            if (far_z < 1.0f) far_z = 1.0f;
+                            float frustum_w = far_z * CHUNK_TAN_H + extent;
+                            if (cx_r > -frustum_w && cx_r < frustum_w) {
                                 c->visible = true;
-                            } else {
-                                /* Test AABB against camera frustum.
-                                 * Transform AABB center to camera space
-                                 * and check against frustum half-angles. */
-                                float cx_r = ddx * cy - ddz * sy;  /* rotated X */
-                                float cz_r = ddx * sy + ddz * cy;  /* rotated Z (depth) */
-
-                                /* Room behind camera? Check if nearest Z edge
-                                 * could still be in front. */
-                                float half_x = (c->max_x - c->min_x) * 0.5f;
-                                float half_z = (c->max_z - c->min_z) * 0.5f;
-                                float extent = half_x + half_z; /* conservative radius */
-                                float near_z = cz_r - extent;
-
-                                if (near_z < -512.0f) {
-                                    /* Entirely behind camera */
-                                    c->visible = false;
-                                } else {
-                                    /* Horizontal frustum test:
-                                     * Is the room's X extent within the
-                                     * frustum at its depth? */
-                                    float far_z = cz_r + extent;
-                                    if (far_z < 1.0f) far_z = 1.0f;
-                                    float frustum_w = far_z * CHUNK_TAN_H + extent;
-                                    if (cx_r > -frustum_w && cx_r < frustum_w) {
-                                        c->visible = true;
-                                    }
-                                }
                             }
                         }
 
