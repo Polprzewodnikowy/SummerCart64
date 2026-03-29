@@ -196,6 +196,75 @@ matrices per room, let T3D handle transform+clip+project on RSP.
 Our CPU would go from spending 40ms on vertex math to spending ~1ms
 building matrices. The RSP does the rest.
 
+### T3D Deep Dive — Migration Blueprint
+
+**Init** (3 lines):
+```c
+rdpq_init();
+t3d_init((T3DInitParams){});
+```
+
+**Vertex format (T3DVertPacked = 32 bytes per 2 vertices)**:
+```
+Offset 0:  Pos A (3× int16 big-endian, ×128 fixed-point scale)
+Offset 6:  Normal A (packed 16-bit: 5-6-5 bit fields)
+Offset 8:  Pos B (3× int16)
+Offset 14: Normal B (packed 16-bit)
+Offset 16: Color A (RGBA8888)
+Offset 20: Color B (RGBA8888)
+Offset 24: UV A (2× uint16, 10.5 fixed point)
+Offset 28: UV B (2× uint16)
+```
+Vertices live in cached RDRAM, flushed once via data_cache_hit_writeback.
+
+**Per-frame render sequence**:
+1. `t3d_screen_clear_depth()` + `rdpq_set_color_image/z_image`
+2. `t3d_frame_start()`
+3. `t3d_light_set_ambient()` / `t3d_light_set_count()`
+4. Build viewport: `t3d_viewport_create()` + camera matrices
+5. `t3d_viewport_attach(viewport)`
+6. For each object: build float matrix → subtract camera pos →
+   `t3d_mat4_to_fixed_3x4()` → `t3d_matrix_push()` → `rspq_block_run(mesh)`
+7. `t3d_matrix_pop()`
+8. `rdpq_detach_show()`
+
+**rspq_block recording** (at load time):
+```c
+rspq_block_begin();
+  t3d_vert_load(vertices, offset, count);  // DMA verts to RSP
+  t3d_tri_draw(i0, i1, i2);               // triangle from RSP cache
+  t3d_tri_sync();                          // flush tri pipe
+  material_apply(transition_mat);          // mid-mesh tex change
+  t3d_matrix_push(&armature[bone_idx]);    // bone via segment
+block = rspq_block_end();
+// Replay: rspq_block_run(block);  // near-zero CPU cost
+```
+
+**Skeleton/bone animation for Lara**:
+- CPU builds float world matrices per bone (`armature_build_pose`)
+- Converts to fixed-point: `t3d_mat4_to_fixed()`
+- Writes to UncachedAddr frame-pool memory
+- Sets segment: `t3d_segment_set(T3D_SEGMENT_SKELETON, pose_fp)`
+- Block references bones via segment-relative addressing
+- Bone attachments (e.g., guns in Lara's hands): chain of 3 matrices
+  pushed to T3D stack: object → bone → local offset
+
+**Camera-relative rendering** (precision trick):
+- Camera position ZEROED in view matrix
+- Camera pos subtracted from each object's model matrix translation
+- Prevents fixed-point overflow for large TR1 world coordinates
+
+**Memory pattern**:
+- Vertex data: cached RDRAM, writeback once at load
+- Transform matrices: per-frame bump allocator (64KB double-buffered)
+- All RSP-visible writes via UncachedAddr()
+
+**What T3D does (RSP)**: vertex transform, clipping, lighting, fog,
+triangle rasterization setup, matrix stack, segment addressing.
+
+**What CPU still does**: frustum culling, bone hierarchy, float→fixed
+conversion, render sorting, animation, camera math, material tracking.
+
 ---
 
 ---
