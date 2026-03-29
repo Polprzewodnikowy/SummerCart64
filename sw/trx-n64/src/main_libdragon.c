@@ -28,6 +28,7 @@
 /* Our game code */
 #include "level/tr_types.h"
 #include "level/tr_level_parse.h"
+#include "lz4_decode.h"
 
 /* -------------------------------------------------------------------
  * Bump allocator
@@ -315,18 +316,27 @@ int main(void) {
                level_sector, level_size, level_compressed, level_flags);
 
         /* Read level data from ROM via PI DMA.
-         * Always read full uncompressed size — the asset packer
-         * stores uncompressed .PHD data despite showing compression stats. */
-        uint32_t read_size = level_size;
+         * If compressed (flags & 1), read compressed bytes and decompress. */
+        bool is_compressed = (level_flags & 1) && level_compressed < level_size;
+        uint32_t read_size = is_compressed ? level_compressed : level_size;
         uint32_t read_bytes = (read_size + 511) & ~511;
-
-        /* Align read size to 16 bytes for DMA */
-        read_bytes = (read_bytes + 15) & ~15;
+        read_bytes = (read_bytes + 15) & ~15;  /* DMA alignment */
 
         n64_mem_init();
-        uint8_t *level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+        /* Allocate space for both compressed + decompressed if needed */
+        uint8_t *read_buf = NULL;
+        uint8_t *level_data = NULL;
+        if (is_compressed) {
+            read_buf = (uint8_t *)n64_mem_alloc(read_bytes + 512);
+            level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
+            printf("  Alloc %u KB compressed + %u KB decompressed... ",
+                   (read_bytes + 512) / 1024, (level_size + 4096) / 1024);
+        } else {
+            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+            read_buf = level_data;
+            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
+        }
 
-        printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
         if (!level_data) {
             printf("FAILED (heap full)\n");
         } else if (level_sector == 0) {
@@ -335,18 +345,30 @@ int main(void) {
 
         if (level_data && level_sector > 0) {
             uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
-            /* Use libdragon's dma_read which handles alignment */
-            dma_read(level_data, cart_addr, read_bytes);
+            dma_read(read_buf, cart_addr, read_bytes);
 
             printf("  Loaded %u KB from ROM.\n", read_bytes / 1024);
             printf("  First bytes: %02x %02x %02x %02x\n",
-                   level_data[0], level_data[1], level_data[2], level_data[3]);
+                   read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
+
+            if (is_compressed) {
+                printf("  Decompressing LZ4: %u -> %u bytes...\n",
+                       level_compressed, level_size);
+                int dec = lz4_decode_block(read_buf, level_data,
+                                           level_compressed, level_size);
+                if (dec < 0) {
+                    printf("  LZ4 FAILED! (error %d)\n", dec);
+                    level_data = NULL;
+                } else {
+                    printf("  Decompressed %d bytes OK\n", dec);
+                    printf("  First bytes: %02x %02x %02x %02x\n",
+                           level_data[0], level_data[1], level_data[2], level_data[3]);
+                }
+            }
 
             /* Parse the .PHD level.
-             * DO NOT reset the heap here! level_data is at heap offset 0.
-             * The parser allocates from the heap too — if we reset, its
-             * allocations overwrite level_data (including texture pages
-             * which are at the BEGINNING of .PHD files). */
+             * The parser allocates from the heap — level_data and
+             * parse allocations coexist in the heap. */
             printf("  Parsing .PHD format...\n");
             tr_parse_result_t res = tr_level_parse(
                 (const uint8_t *)level_data, level_size, &g_level);
@@ -593,16 +615,17 @@ int main(void) {
                 float cam_rot_y = 0, cam_rot_x = 0;  /* yaw + pitch */
 
                 /* Find Lara's start position */
+                float spawn_x = 0, spawn_y = 0, spawn_z = 0, spawn_rot = 0;
                 for (int i = 0; i < g_level.item_count; i++) {
                     if (g_level.items[i].object_id == 0) {
-                        cam_rot_y = (float)g_level.items[i].rotation * 3.14159f / 32768.0f;
-                        /* Start camera slightly behind Lara */
-                        cam_x = (float)g_level.items[i].pos.x - 600.0f * sinf(cam_rot_y);
-                        cam_y = (float)g_level.items[i].pos.y - 768;
-                        cam_z = (float)g_level.items[i].pos.z - 600.0f * cosf(cam_rot_y);
+                        spawn_rot = (float)g_level.items[i].rotation * 3.14159f / 32768.0f;
+                        spawn_x = (float)g_level.items[i].pos.x - 600.0f * sinf(spawn_rot);
+                        spawn_y = (float)g_level.items[i].pos.y - 768;
+                        spawn_z = (float)g_level.items[i].pos.z - 600.0f * cosf(spawn_rot);
                         break;
                     }
                 }
+                cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z; cam_rot_y = spawn_rot;
 
                 /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
@@ -611,6 +634,9 @@ int main(void) {
                 int fps_frames = 0;
                 uint32_t fps_last = TICKS_READ();
                 int fps_display = 0;
+                bool walk_mode = false;
+                bool collision_on = false;
+                int speed_level = 1;
 
                 /* Render loop */
                 render_loop:
@@ -630,10 +656,7 @@ int main(void) {
                     joypad_buttons_t pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
                     /* Controls */
-                    static bool walk_mode = false;
-                    static int speed_level = 1;
                     if (pressed.r) { speed_level++; if (speed_level > 3) speed_level = 0; }
-                    static bool collision_on = false;
                     if (pressed.l) collision_on = !collision_on;
                     float speed_mult[] = { 8.0f, 32.0f, 128.0f, 512.0f };
                     float move_speed = speed_mult[speed_level];
@@ -662,6 +685,12 @@ int main(void) {
                     if (input.btn.d_right) { dx += move_speed * cy; dz -= move_speed * sy; }
                     if (input.btn.d_up) dy -= move_speed;
                     if (input.btn.d_down) dy += move_speed;
+
+                    /* B button: teleport back to spawn */
+                    if (pressed.b) {
+                        cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z;
+                        cam_rot_y = spawn_rot; cam_rot_x = 0;
+                    }
 
                     /* ===== SECTOR COLLISION SYSTEM =====
                      * Get floor/ceiling heights from sector data.
@@ -787,22 +816,34 @@ int main(void) {
                         }
                         lara_room = cam_room;
 
-                        /* Y collision: clamp between floor and ceiling */
+                        /* Y collision: prevent passing through floor/ceiling.
+                         * TR1 Y axis: positive = down. Floor Y > Ceiling Y.
+                         * cam_y is eye height (Lara pos - 768). */
                         int32_t fl, cl;
                         GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, fl, cl);
-                        float floor_limit = (float)fl - 768.0f;
-                        float ceil_limit = (float)cl + 128.0f;
+                        /* Eye offset: camera is ~768 above feet */
+                        float eye_floor = (float)fl - 768.0f;  /* highest cam_y can be (feet on floor) */
+                        float eye_ceil = (float)cl + 128.0f;   /* lowest cam_y can be (head at ceiling) */
 
                         if (collision_on) {
-                            if (cam_y > floor_limit) cam_y = floor_limit;
-                            if (cam_y < ceil_limit) cam_y = ceil_limit;
+                            /* Only clamp if cam_y would pass THROUGH a boundary.
+                             * Don't snap — just prevent going further. */
+                            if (cam_y > eye_floor) cam_y = eye_floor;
+                            if (cam_y < eye_ceil) cam_y = eye_ceil;
                         }
                         if (walk_mode) {
-                            if (cam_y < floor_limit) {
-                                cam_y += 48.0f;
-                                if (cam_y > floor_limit) cam_y = floor_limit;
+                            /* Gravity: slowly pull toward floor */
+                            static float vy = 0;
+                            vy += 16.0f;  /* gravity (positive = downward in TR1 Y) */
+                            cam_y += vy;
+                            if (cam_y > eye_floor) {
+                                cam_y = eye_floor;
+                                vy = 0;
                             }
-                            if (cam_y > floor_limit) cam_y = floor_limit;
+                            if (cam_y < eye_ceil) {
+                                cam_y = eye_ceil;
+                                vy = 0;
+                            }
                         }
                     }
 
@@ -1528,6 +1569,14 @@ int main(void) {
                 printf("Paused. Press START for 3D.\n");
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
                 printf("FPS: %d  Audio: %d samples\n", fps_display, parsed_samples);
+                printf("Room: %d  Coll:%s Walk:%s\n", lara_room, collision_on?"ON":"off", walk_mode?"ON":"off");
+                {
+                    int32_t pfl, pcl;
+                    GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
+                    printf("Sector: floor=%d ceil=%d\n", pfl, pcl);
+                    printf("  eye_floor=%.0f eye_ceil=%.0f\n",
+                           (float)pfl - 768.0f, (float)pcl + 128.0f);
+                }
                 /* Debug: Lara animation info */
                 {
                     tr_object_def_t *dbg_obj = NULL;
