@@ -883,16 +883,17 @@ int main(void) {
                         /* Scale factor: TR1 camera-relative coords can be up to ~15000.
                          * GL fixed-point is s15.16, max +-32767. Scale 1/4 keeps
                          * max values around ~3750 which is well within range. */
-                        #define WORLD_SCALE (1.0f / 4.0f)
+                        #define WORLD_SCALE (1.0f / 256.0f)
 
-                        /* Projection via glFrustum */
-                        float near_p = 4.0f;   /* 16 TR1 units */
-                        float far_p = 8000.0f;  /* 32000 TR1 units */
-                        float aspect = 320.0f / 240.0f;
+                        /* Projection: 60 deg vertical FOV */
+                        float near_p = 0.05f;
+                        float far_p = 200.0f;
+                        float fov_half = 30.0f * 3.14159f / 180.0f;  /* half of 60 deg */
+                        float top = near_p * tanf(fov_half);
+                        float right = top * (320.0f / 240.0f);
                         glMatrixMode(GL_PROJECTION);
                         glLoadIdentity();
-                        glFrustum(-near_p * aspect, near_p * aspect,
-                                  -near_p, near_p, near_p, far_p);
+                        glFrustum(-right, right, -top, top, near_p, far_p);
 
                         glEnable(GL_DEPTH_TEST);
                         glDepthFunc(GL_LESS);
@@ -965,14 +966,21 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW ROOMS via OpenGL RSP T&L ===== */
+                    /* ===== DRAW ROOMS via OpenGL — batched vertex array ===== */
+                    /* Build triangle vertex buffer on CPU, draw with glDrawArrays.
+                     * Max ~3000 triangles = 9000 vertices × 7 floats (xyz + rgba) */
+                    #define MAX_GL_VERTS 9000
+                    static float gl_pos[MAX_GL_VERTS * 3];
+                    static float gl_col[MAX_GL_VERTS * 4];
+                    int gl_vert_count = 0;
+
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room-level cull: skip rooms entirely behind camera */
+                        /* Room-level cull */
                         float rcx = room->x + room->sectors_x * 512.0f - cam_x;
                         float rcz = room->z + room->sectors_z * 512.0f - cam_z;
                         float room_rz = rcx * sy + rcz * cy;
@@ -983,66 +991,72 @@ int main(void) {
                         if (max_faces > 500) max_faces = 500;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
-                            if (face->vertex_count < 3) continue;
+                            int nv = face->vertex_count;
+                            if (nv < 3) continue;
 
-                            uint16_t tex_idx = face->texture & 0x7FFF;
-                            bool is_flat = (face->texture & 0x8000) != 0;
-                            tr_object_texture_t *otex = NULL; /* textures disabled for debug */
+                            /* Triangulate: fan from vertex 0 */
+                            int num_tris = nv - 2;
+                            if (gl_vert_count + num_tris * 3 > MAX_GL_VERTS) goto draw_batch;
 
-                            /* Emit triangle(s) — RSP handles T&L + clipping */
-                            glBegin(GL_TRIANGLE_FAN);
-                            for (int v = 0; v < face->vertex_count; v++) {
+                            /* Transform all face vertices */
+                            float vx[4], vy[4], vz[4], vr[4], vg[4], vb[4];
+                            bool ok = true;
+                            for (int v = 0; v < nv; v++) {
                                 uint16_t vi = face->vertices[v];
-                                if (vi >= room->mesh.vertex_count) break;
+                                if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                /* Vertex color from room lighting */
+                                float wx = room->x + rv->x - cam_x;
+                                float wy = rv->y - cam_y;
+                                float wz = room->z + rv->z - cam_z;
+                                float rx = wx * cy - wz * sy;
+                                float rz_yaw = wx * sy + wz * cy;
+                                float ry = wy * cp - rz_yaw * sp;
+                                float rz = wy * sp + rz_yaw * cp;
+
+                                vx[v] = rx * WORLD_SCALE;
+                                vy[v] = ry * WORLD_SCALE;
+                                vz[v] = -rz * WORLD_SCALE;
+
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 bright = 0.4f + bright * 0.6f;
-                                if (is_water)
-                                    glColor4f(bright * 0.4f, bright * 0.6f, bright, 1.0f);
-                                else if (is_flat) {
-                                    uint8_t ci = tex_idx & 0xFF;
-                                    float fr = (float)g_level.palette[ci*3+0] / 63.0f;
-                                    float fg = (float)g_level.palette[ci*3+1] / 63.0f;
-                                    float fb = (float)g_level.palette[ci*3+2] / 63.0f;
-                                    glColor4f(fr * bright, fg * bright, fb * bright, 1.0f);
-                                } else
-                                    glColor4f(bright, bright, bright, 1.0f);
-
-                                /* Texture coordinates */
-                                if (otex && tex_uv_map) {
-                                    float tu = (float)(otex->uv[v].u >> 8);
-                                    float tv = (float)(otex->uv[v].v >> 8);
-                                    float s = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    float t = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Normalize to [0,1] for GL (our tiles are TEX_TILE_DIM x TEX_TILE_DIM) */
-                                    glTexCoord2f(s / (float)TEX_TILE_DIM, t / (float)TEX_TILE_DIM);
-                                } else {
-                                    glTexCoord2f(0, 0);
-                                }
-
-                                /* Full camera transform on CPU, pass view-space to GL.
-                                 * RSP does projection + clipping only. */
-                                float wx = room->x + rv->x - cam_x;
-                                float wy = rv->y - cam_y;
-                                float wz = room->z + rv->z - cam_z;
-                                /* Yaw rotation */
-                                float rx = wx * cy - wz * sy;
-                                float rz_yaw = wx * sy + wz * cy;
-                                /* Pitch rotation */
-                                float ry = wy * cp - rz_yaw * sp;
-                                float rz = wy * sp + rz_yaw * cp;
-                                /* GL looks down -Z */
-                                glVertex3f(rx * WORLD_SCALE,
-                                           ry * WORLD_SCALE,
-                                           -rz * WORLD_SCALE);
+                                vr[v] = is_water ? bright * 0.4f : bright;
+                                vg[v] = is_water ? bright * 0.6f : bright;
+                                vb[v] = is_water ? bright * 1.0f : bright;
                             }
-                            glEnd();
-                        }  /* end room face loop */
-                    }  /* end room draw loop */
+                            if (!ok) continue;
+
+                            /* Emit triangles (fan: 0-1-2, 0-2-3) */
+                            for (int t = 0; t < num_tris; t++) {
+                                int idx[3] = {0, t+1, t+2};
+                                for (int k = 0; k < 3; k++) {
+                                    int i = idx[k];
+                                    int p = gl_vert_count;
+                                    gl_pos[p*3+0] = vx[i];
+                                    gl_pos[p*3+1] = vy[i];
+                                    gl_pos[p*3+2] = vz[i];
+                                    gl_col[p*4+0] = vr[i];
+                                    gl_col[p*4+1] = vg[i];
+                                    gl_col[p*4+2] = vb[i];
+                                    gl_col[p*4+3] = 1.0f;
+                                    gl_vert_count++;
+                                }
+                            }
+                        }
+                    }
+
+                    draw_batch:
+                    if (gl_vert_count > 0) {
+                        glEnableClientState(GL_VERTEX_ARRAY);
+                        glEnableClientState(GL_COLOR_ARRAY);
+                        glVertexPointer(3, GL_FLOAT, 0, gl_pos);
+                        glColorPointer(4, GL_FLOAT, 0, gl_col);
+                        glDrawArrays(GL_TRIANGLES, 0, gl_vert_count);
+                        glDisableClientState(GL_VERTEX_ARRAY);
+                        glDisableClientState(GL_COLOR_ARRAY);
+                    }
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
