@@ -1300,7 +1300,7 @@ int main(void) {
 
                         int far_last_tex = -1;
                         int far_tris = 0;
-                        int far_rooms_max = far_count < 16 ? far_count : 16;
+                        int far_rooms_max = far_count; /* no room cap — tri budget limits work */
                         #define FAR_TRI_BUDGET   300
                         #define FAR_UPLOAD_BUDGET  8
 
