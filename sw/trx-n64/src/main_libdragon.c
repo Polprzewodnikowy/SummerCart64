@@ -1022,10 +1022,11 @@ int main(void) {
                                     glTexCoord2f(0, 0);
                                 }
 
-                                /* Camera-relative, scaled to fit GL fixed-point */
+                                /* Camera-relative, scaled to fit GL fixed-point.
+                                 * Negate Z: OpenGL looks down -Z, TR1 looks down +Z */
                                 glVertex3f((room->x + rv->x - cam_x) * WORLD_SCALE,
                                            (rv->y - cam_y) * WORLD_SCALE,
-                                           (room->z + rv->z - cam_z) * WORLD_SCALE);
+                                           -(room->z + rv->z - cam_z) * WORLD_SCALE);
                             }
                             glEnd();
                         }  /* end room face loop */
