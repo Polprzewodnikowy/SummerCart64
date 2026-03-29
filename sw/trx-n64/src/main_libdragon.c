@@ -946,15 +946,20 @@ int main(void) {
                 }
                 cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z; cam_rot_y = spawn_rot;
 
+                /* Sector grid accessor — used by room tracking, collision,
+                 * and spawn room resolution.  TR1 layout: X-major order. */
+                #define SECTOR_AT(_room, _lx, _lz) \
+                    (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
+
                 /* Check if camera offset is still within Lara's item room.
-                 * Only search for a different room if it's truly outside. */
+                 * Search portals if outside, then resolve Y via sector
+                 * floor/ceiling to handle vertically stacked rooms. */
                 {
-                    int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
+                    int32_t icx = (int32_t)cam_x, icy = (int32_t)cam_y, icz = (int32_t)cam_z;
                     tr_room_t *lr = &g_level.rooms[lara_room];
                     int32_t rx = icx - lr->x, rz = icz - lr->z;
                     if (!(rx >= 0 && rx < lr->sectors_x * 1024 &&
                           rz >= 0 && rz < lr->sectors_z * 1024)) {
-                        /* Camera outside Lara's room — search portals first */
                         bool sf = false;
                         for (int p = 0; p < lr->portal_count && !sf; p++) {
                             int d = lr->portals[p].room;
@@ -965,6 +970,23 @@ int main(void) {
                                 rz >= 0 && rz < pr->sectors_z * 1024) {
                                 lara_room = d; sf = true;
                             }
+                        }
+                    }
+                    /* Resolve vertical position at spawn */
+                    for (int iter = 0; iter < 8; iter++) {
+                        tr_room_t *rm = &g_level.rooms[lara_room];
+                        if (!rm->sectors) break;
+                        int sx = (icx - rm->x) >> 10, sz = (icz - rm->z) >> 10;
+                        if (sx < 0) sx = 0; if (sx >= rm->sectors_x) sx = rm->sectors_x - 1;
+                        if (sz < 0) sz = 0; if (sz >= rm->sectors_z) sz = rm->sectors_z - 1;
+                        tr_sector_t *s = SECTOR_AT(rm, sx, sz);
+                        int32_t fl = s->floor * 256, cl = s->ceiling * 256;
+                        if (icy > fl && s->pit_room != 255 && s->pit_room < g_level.room_count) {
+                            lara_room = s->pit_room;
+                        } else if (icy < cl && s->sky_room != 255 && s->sky_room < g_level.room_count) {
+                            lara_room = s->sky_room;
+                        } else {
+                            break;
                         }
                     }
                 }
@@ -1043,12 +1065,7 @@ int main(void) {
                     }
 
                     /* ===== SECTOR COLLISION SYSTEM =====
-                     * TR1 sector grid: X-major order.
-                     * Index = x_local * sectors_z + z_local
                      * Floor/ceiling: value * 256 = world Y (positive = down) */
-                    #define SECTOR_AT(_room, _lx, _lz) \
-                        (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
-
                     #define GET_SECTOR_HEIGHTS(wx, wz, wy, out_floor, out_ceil) do { \
                         int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz), _iy=(int32_t)(wy); \
                         int _best_room = lara_room; \
@@ -1176,10 +1193,14 @@ int main(void) {
                         cam_x += dx; cam_y += dy; cam_z += dz;
                     }
 
-                    /* Room tracking */
+                    /* Room tracking — Y-aware using sector floor/ceiling.
+                     * First find room by XZ (current → portals → 2-deep),
+                     * then resolve vertically via pit_room / sky_room so
+                     * overlapping rooms (e.g. cave + area above) are
+                     * disambiguated correctly. */
                     {
                         int cam_room = lara_room;
-                        int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
+                        int32_t icx = (int32_t)cam_x, icy = (int32_t)cam_y, icz = (int32_t)cam_z;
                         tr_room_t *cur = &g_level.rooms[lara_room];
                         int32_t rx = icx - cur->x, rz = icz - cur->z;
                         bool found = (rx>=0 && rx<cur->sectors_x*1024 && rz>=0 && rz<cur->sectors_z*1024);
@@ -1199,6 +1220,26 @@ int main(void) {
                                 }
                             }
                         }
+
+                        /* Resolve vertical: walk sector pit/sky portals
+                         * until camera Y is between floor and ceiling. */
+                        for (int iter = 0; iter < 8; iter++) {
+                            tr_room_t *rm = &g_level.rooms[cam_room];
+                            if (!rm->sectors) break;
+                            int sx = (icx - rm->x) >> 10, sz = (icz - rm->z) >> 10;
+                            if (sx < 0) sx = 0; if (sx >= rm->sectors_x) sx = rm->sectors_x - 1;
+                            if (sz < 0) sz = 0; if (sz >= rm->sectors_z) sz = rm->sectors_z - 1;
+                            tr_sector_t *s = SECTOR_AT(rm, sx, sz);
+                            int32_t fl = s->floor * 256, cl = s->ceiling * 256;
+                            if (icy > fl && s->pit_room != 255 && s->pit_room < g_level.room_count) {
+                                cam_room = s->pit_room;
+                            } else if (icy < cl && s->sky_room != 255 && s->sky_room < g_level.room_count) {
+                                cam_room = s->sky_room;
+                            } else {
+                                break;
+                            }
+                        }
+
                         lara_room = cam_room;
                     }
 
@@ -1495,6 +1536,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
+                        #define NEAR_Z 128.0f
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
@@ -1655,9 +1697,24 @@ int main(void) {
                                 tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
-                                /* CPU transform + project */
-                                float sv[4][9];
+                                /* CPU transform to camera space (pre-projection).
+                                 * cv[v]: rx, ry, rz, r, g, b, ts, tt */
+                                float cv[4][8];
                                 bool visible = true;
+                                bool any_behind = false, all_behind = true;
+
+                                /* Per-room fog (constant across vertices) */
+                                float room_d = (room_idx < g_chunk_count)
+                                    ? g_chunks[room_idx].dist_sq : 0.0f;
+                                float fog = (room_d - 16777216.0f) / 383223784.0f;
+                                if (fog < 0.0f) fog = 0.0f;
+                                if (fog > 0.85f) fog = 0.85f;
+
+                                float rd_uv = room_d;
+                                float uv_s = 1.0f;
+                                if (mip2_buf && rd_uv > CHUNK_VERY_FAR_DIST2) uv_s = 0.25f;
+                                else if (mip1_buf && rd_uv > CHUNK_MID_DIST2) uv_s = 0.5f;
+
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
                                     if (vi >= room->mesh.vertex_count) { visible = false; break; }
@@ -1672,19 +1729,10 @@ int main(void) {
                                     float ry = cy_v * cp - rz_yaw * sp;
                                     float rz = cy_v * sp + rz_yaw * cp;
 
-                                    if (rz < 128.0f) { visible = false; break; }
+                                    if (rz < NEAR_Z) any_behind = true;
+                                    else all_behind = false;
 
-                                    float inv_z = 256.0f / rz;
-                                    float scx = 160.0f + rx * inv_z;
-                                    float scy = 120.0f + ry * inv_z;
-                                    /* Clamp to RDP-safe range. Reject faces with
-                                     * any vertex wildly off-screen (distortion) */
-                                    if (scx < -400 || scx > 720 ||
-                                        scy < -300 || scy > 540) {
-                                        visible = false; break;
-                                    }
-
-                                    /* Lighting (simplified: no per-vertex fog for perf) */
+                                    /* Lighting + fog */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
                                     if (bright < 0.0f) bright = 0.0f;
                                     if (bright > 1.0f) bright = 1.0f;
@@ -1692,46 +1740,82 @@ int main(void) {
                                     float r = is_water ? bright * 0.4f : bright;
                                     float g = is_water ? bright * 0.6f : bright;
                                     float b = is_water ? bright * 1.0f : bright;
-
-                                    /* Simplified fog: per-room, not per-vertex */
-                                    float room_d = (room_idx < g_chunk_count)
-                                        ? g_chunks[room_idx].dist_sq : 0.0f;
-                                    float fog = (room_d - 16777216.0f) / 383223784.0f;
-                                    if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 0.85f) fog = 0.85f;
                                     r = r * (1.0f - fog) + 0.35f * fog;
                                     g = g * (1.0f - fog) + 0.32f * fog;
                                     b = b * (1.0f - fog) + 0.40f * fog;
 
-                                    /* Tex coords scaled for active mip level */
+                                    /* Tex coords */
                                     float ts = 0, tt = 0;
                                     if (room_baked) {
-                                        /* Baked tile: UVs tile across the baked texture.
-                                         * Use face vertex position to generate simple UVs. */
                                         float baked_dim = MIP0_DIM * room_uv_scale;
                                         ts = ((float)(v % 2)) * baked_dim;
                                         tt = ((float)(v / 2)) * baked_dim;
                                     } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        float rd_uv = (room_idx < g_chunk_count)
-                                            ? g_chunks[room_idx].dist_sq : 0.0f;
-                                        float uv_s = 1.0f;
-                                        if (mip2_buf && rd_uv > CHUNK_VERY_FAR_DIST2) uv_s = 0.25f;
-                                        else if (mip1_buf && rd_uv > CHUNK_MID_DIST2) uv_s = 0.5f;
                                         ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * uv_s;
                                         tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * uv_s;
                                     }
 
-                                    sv[v][0] = scx;  sv[v][1] = scy;
-                                    sv[v][2] = r;    sv[v][3] = g;
-                                    sv[v][4] = b;    sv[v][5] = 1.0f;
-                                    sv[v][6] = ts;   sv[v][7] = tt;
-                                    sv[v][8] = 1.0f / rz;
+                                    cv[v][0] = rx;  cv[v][1] = ry;  cv[v][2] = rz;
+                                    cv[v][3] = r;   cv[v][4] = g;   cv[v][5] = b;
+                                    cv[v][6] = ts;  cv[v][7] = tt;
                                 }
-                                if (!visible) continue;
+                                if (!visible || all_behind) continue;
 
-                                int num_tris = nv - 2;
+                                /* Near-plane clip (Sutherland-Hodgman against z=NEAR_Z).
+                                 * Max output: nv+1 verts (tri→4, quad→5). */
+                                float clipped[6][8];
+                                int clip_nv = nv;
+                                if (any_behind) {
+                                    clip_nv = 0;
+                                    for (int i = 0; i < nv; i++) {
+                                        int j = (i + 1) % nv;
+                                        float zi = cv[i][2], zj = cv[j][2];
+                                        bool i_in = (zi >= NEAR_Z), j_in = (zj >= NEAR_Z);
+
+                                        if (i_in) {
+                                            for (int k = 0; k < 8; k++)
+                                                clipped[clip_nv][k] = cv[i][k];
+                                            clip_nv++;
+                                        }
+                                        if (i_in != j_in) {
+                                            /* Edge crosses near plane — interpolate */
+                                            float t = (NEAR_Z - zi) / (zj - zi);
+                                            for (int k = 0; k < 8; k++)
+                                                clipped[clip_nv][k] = cv[i][k] + t * (cv[j][k] - cv[i][k]);
+                                            clip_nv++;
+                                        }
+                                        if (clip_nv >= 6) break;
+                                    }
+                                    if (clip_nv < 3) continue;
+                                } else {
+                                    for (int v = 0; v < nv; v++)
+                                        for (int k = 0; k < 8; k++)
+                                            clipped[v][k] = cv[v][k];
+                                }
+
+                                /* Project clipped vertices to screen */
+                                float sv[6][9];
+                                bool screen_ok = true;
+                                for (int v = 0; v < clip_nv; v++) {
+                                    float rz = clipped[v][2];
+                                    float inv_z = 256.0f / rz;
+                                    float scx = 160.0f + clipped[v][0] * inv_z;
+                                    float scy = 120.0f + clipped[v][1] * inv_z;
+                                    if (scx < -400 || scx > 720 ||
+                                        scy < -300 || scy > 540) {
+                                        screen_ok = false; break;
+                                    }
+                                    sv[v][0] = scx;  sv[v][1] = scy;
+                                    sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
+                                    sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
+                                    sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
+                                    sv[v][8] = inv_z;
+                                }
+                                if (!screen_ok) continue;
+
+                                int num_tris = clip_nv - 2;
                                 for (int tri = 0; tri < num_tris; tri++) {
                                     rdpq_triangle(&TRIFMT_SHADE_TEX,
                                         sv[0], sv[tri+1], sv[tri+2]);
