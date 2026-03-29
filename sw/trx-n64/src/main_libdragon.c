@@ -1425,11 +1425,10 @@ int main(void) {
                     }
                     far_pass_done:
 
-                    /* Wait (blocking) for RSP to drain all far pass commands
-                     * before GL context begins.  This is the one place where
-                     * blocking is worth it — ensures the command buffer is
-                     * fully free for the GL near pass. */
-                    rspq_wait();
+                    /* Flush far pass commands before GL context begins.
+                     * Non-blocking — far pass is now light enough (8 uploads,
+                     * 300 tri cap) that queue backlog is not a risk. */
+                    rspq_flush();
 
                     /* ===== GL NEAR PASS ===== */
                     gl_context_begin();
