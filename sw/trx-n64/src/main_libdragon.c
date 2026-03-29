@@ -710,12 +710,13 @@ int main(void) {
 
                 /* Try to include auto-generated baked offsets header.
                  * If not available, define defaults (no baked data). */
-                #if __has_include("baked_offsets.h")
-                #include "baked_offsets.h"
-                #else
+                /* Baked tile loading disabled — even 24 KB uncached
+                 * pushes RSPQ over the edge.  Bake tool stays in repo
+                 * for when we free uncached headroom (e.g., by reducing
+                 * base texture count or switching to CI4 format).
+                 * On-demand mip (640 bytes) is the stable path. */
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
-                #endif
 
                 int baked_room_count = 0;
                 surface_t *baked_mip0 = NULL; /* 32×32 per room */
