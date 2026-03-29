@@ -885,9 +885,9 @@ int main(void) {
                         #define WORLD_SCALE (1.0f / 32.0f)
 
                         /* Projection: 60 deg vertical FOV.
-                         * Near/far ratio kept tight for 16-bit Z-buffer precision. */
-                        float near_p = 4.0f;    /* ~128 TR1 units */
-                        float far_p = 350.0f;   /* ~11200 TR1 units */
+                         * Near/far balanced for 16-bit Z precision vs draw distance. */
+                        float near_p = 5.0f;     /* ~160 TR1 units */
+                        float far_p = 700.0f;    /* ~22400 TR1 units */
                         float fov_half = 30.0f * 3.14159f / 180.0f;
                         float top = near_p * tanf(fov_half);
                         float right = top * (320.0f / 240.0f);
@@ -902,16 +902,23 @@ int main(void) {
 
                         glEnable(GL_TEXTURE_2D);
                         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-                        glDisable(GL_FOG);  /* Re-enable later */
                         glDisable(GL_LIGHTING);
+
+                        /* Fog to hide far clip pop-in */
+                        glEnable(GL_FOG);
+                        glFogi(GL_FOG_MODE, GL_LINEAR);
+                        glFogf(GL_FOG_START, far_p * 0.5f);
+                        glFogf(GL_FOG_END, far_p * 0.95f);
+                        float fog_color[] = {0, 0, 0, 1};
+                        glFogfv(GL_FOG_COLOR, fog_color);
 
                         /* Create GL texture objects */
                         if (gl_textures) {
                             glGenTextures(num_otex, gl_textures);
                             for (int i = 0; i < num_otex; i++) {
                                 glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
@@ -955,7 +962,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 16;  /* RSP handles more — increase for less pop-in */
+                    int max_rooms = 24;  /* Deep cave needs many rooms visible */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -1018,13 +1025,17 @@ int main(void) {
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
 
-                            /* Per-face distance cull with first vertex */
+                            /* Per-face cull: behind camera + distance */
                             {
                                 uint16_t v0i = face->vertices[0];
                                 if (v0i < room->mesh.vertex_count) {
                                     float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
                                     float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
-                                    if (dx*dx + dz*dz > 144000000.0f) continue; /* ~12K units */
+                                    float d2 = dx*dx + dz*dz;
+                                    if (d2 > 100000000.0f) continue; /* ~10K units */
+                                    /* Behind camera check (dot with forward vector) */
+                                    float dot = dx * sy + dz * cy;
+                                    if (dot < -2048.0f && d2 > 4000000.0f) continue;
                                 }
                             }
 
@@ -1653,10 +1664,18 @@ int main(void) {
                     }
                 }
 
-                /* START pressed — return to console briefly */
-                gl_close();
-                rdpq_close();
-                display_close();
+                /* START pressed — pause. Wait for START without switching to console
+                 * (console_init crashes due to GL memory usage). */
+                {
+                    /* Just wait for START press in a tight loop */
+                    while (1) {
+                        joypad_poll();
+                        if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
+                    }
+                }
+                /* Skip all the console debug output — go straight back to render */
+                goto render_loop;
+                /* Dead code below — kept for reference but never reached */
                 console_init();
                 console_set_render_mode(RENDER_MANUAL);
                 printf("Paused. Press START for 3D.\n");
