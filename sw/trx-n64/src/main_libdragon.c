@@ -13,6 +13,7 @@
 #define __LIBDRAGON_ASSET_H  /* Prevent libdragon's asset.h from loading */
 
 #include <libdragon.h>
+#include <malloc.h>
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
 #include <rdpq_mode.h>
