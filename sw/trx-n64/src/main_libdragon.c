@@ -735,21 +735,18 @@ int main(void) {
                             }
 
                             float floor_limit = (float)floor_y - 768.0f;
-                            float ceil_limit = (float)ceil_y + 128.0f;
 
                             if (collision_on) {
-                                /* L collision: clamp between ceiling and floor */
+                                /* L: can't go below floor */
                                 if (cam_y > floor_limit) cam_y = floor_limit;
-                                if (cam_y < ceil_limit) cam_y = ceil_limit;
                             }
 
                             if (walk_mode) {
-                                /* A walk: gravity pulls toward floor (no teleport) */
+                                /* A: gravity toward floor */
                                 if (cam_y < floor_limit) {
-                                    cam_y += 48.0f; /* gravity */
+                                    cam_y += 48.0f;
                                     if (cam_y > floor_limit) cam_y = floor_limit;
                                 }
-                                /* Don't go through floor */
                                 if (cam_y > floor_limit) cam_y = floor_limit;
                             }
                         }
