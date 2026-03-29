@@ -1312,16 +1312,28 @@ int main(void) {
                      * VISIBILITY: Frustum culling by room AABB
                      *
                      * Rules:
-                     *   1. Current room (lara_room) is ALWAYS visible.
-                     *   2. Other rooms: frustum cull using room AABB.
-                     *   3. Culling decides draw/not-draw.
+                     *   1. Current room is ALWAYS visible.
+                     *   2. Rooms directly connected via portals: ALWAYS visible.
+                     *   3. Other rooms: frustum cull using room AABB.
+                     *   4. Culling decides draw/not-draw.
                      *      LOD decides which representation to draw.
-                     *      These are separate — never let LOD/tier hide
-                     *      geometry that should exist.
                      * =================================================== */
                     #define MAX_DRAW_ROOMS 32
                     int vis_rooms[MAX_DRAW_ROOMS * 2];
                     int vis_count = 0;
+
+                    /* Build connected-room set for rules 1+2 */
+                    bool room_forced[TR_MAX_ROOMS];
+                    memset(room_forced, 0, sizeof(room_forced));
+                    if (lara_room >= 0 && lara_room < g_level.room_count) {
+                        room_forced[lara_room] = true;
+                        tr_room_t *lr = &g_level.rooms[lara_room];
+                        for (int p = 0; p < lr->portal_count; p++) {
+                            int dest = lr->portals[p].room;
+                            if (dest >= 0 && dest < g_level.room_count)
+                                room_forced[dest] = true;
+                        }
+                    }
 
                     for (int ri = 0; ri < g_chunk_count; ri++) {
                         tr_chunk_t *c = &g_chunks[ri];
@@ -1332,8 +1344,8 @@ int main(void) {
                         c->dist_sq = ddx * ddx + ddz * ddz;
                         c->visible = false;
 
-                        /* Rule 1: current room is ALWAYS visible */
-                        if (ri == lara_room) {
+                        /* Rules 1+2: current room + connected rooms always visible */
+                        if (room_forced[ri]) {
                             c->visible = true;
                         } else {
                             /* Per-room distance gate — small rooms cull
