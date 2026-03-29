@@ -1309,18 +1309,13 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Cluster face decimation: look up face_skip from the
-                         * room's cluster.  Near rooms (skip=1) draw all faces.
-                         * Far rooms draw every Nth face to reduce tri count. */
-                        int face_skip = 1;
-                        if (room_idx < g_chunk_count) {
-                            int cid = g_chunks[room_idx].cluster_id;
-                            if (cid >= 0 && cid < g_cluster_count)
-                                face_skip = g_clusters[cid].face_skip;
-                        }
-
+                        /* Draw all faces — face decimation (Phase 3) disabled
+                         * because skipping faces in texture-sorted order causes
+                         * visible holes and broken texture batching.  Cluster
+                         * hierarchy remains active for LOD classification and
+                         * future use with pre-built simplified geometry. */
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f += face_skip) {
+                        for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
@@ -1358,12 +1353,9 @@ int main(void) {
                                 if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                float wx = (float)(room->x + rv->x);
-                                float wy = (float)rv->y;
-                                float wz = (float)(room->z + rv->z);
-                                px[v] = (wx - cam_x) * WORLD_SCALE;
-                                py[v] = -(wy - cam_y) * WORLD_SCALE;
-                                pz[v] = -(wz - cam_z) * WORLD_SCALE;
+                                px[v] = (room->x + rv->x - cam_x) * WORLD_SCALE;
+                                py[v] = -(rv->y - cam_y) * WORLD_SCALE;
+                                pz[v] = -(room->z + rv->z - cam_z) * WORLD_SCALE;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
@@ -1372,40 +1364,6 @@ int main(void) {
                                 float r = is_water ? bright * 0.4f : bright;
                                 float g = is_water ? bright * 0.6f : bright;
                                 float b = is_water ? bright * 1.0f : bright;
-
-                                /* Far pass: blend lighting with RGB fog color.
-                                 * Fog intensity ramps from fog_start to fog_end.
-                                 * Fog color = dark blue-gray cave atmosphere.
-                                 * Near pass: pure lighting (no fog). */
-                                if (pass == 0) {
-                                    /* Distance from camera in XZ */
-                                    float fdx = wx - cam_x, fdz = wz - cam_z;
-                                    float dist = sqrtf(fdx*fdx + fdz*fdz);
-                                    /* Vertical fog gradient: lower = denser fog.
-                                     * TR1 Y-down: larger wy = lower position.
-                                     * Shift fog_factor up for lower vertices. */
-                                    float y_bias = (wy - cam_y) * 0.00005f;
-                                    if (y_bias < 0) y_bias = 0;
-                                    if (y_bias > 0.3f) y_bias = 0.3f;
-                                    #define FOG_START 5120.0f
-                                    #define FOG_END   CHUNK_FAR_WORLD
-                                    float fog = (dist - FOG_START) / (FOG_END - FOG_START) + y_bias;
-                                    if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 1.0f) fog = 1.0f;
-                                    /* RGB fog: dark cave atmosphere */
-                                    #define FOG_R 0.08f
-                                    #define FOG_G 0.10f
-                                    #define FOG_B 0.14f
-                                    r = r * (1.0f - fog) + FOG_R * fog;
-                                    g = g * (1.0f - fog) + FOG_G * fog;
-                                    b = b * (1.0f - fog) + FOG_B * fog;
-                                    #undef FOG_START
-                                    #undef FOG_END
-                                    #undef FOG_R
-                                    #undef FOG_G
-                                    #undef FOG_B
-                                }
-
                                 cr[v] = (uint8_t)(r * 255.0f);
                                 cg[v] = (uint8_t)(g * 255.0f);
                                 cb[v] = (uint8_t)(b * 255.0f);

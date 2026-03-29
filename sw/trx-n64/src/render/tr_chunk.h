@@ -99,4 +99,29 @@ typedef struct {
     int   face_skip;         /* 1 = all faces, 2 = every 2nd, 4 = every 4th */
 } tr_cluster_t;
 
+/* -----------------------------------------------------------------------
+ * Texture residency / per-frame budget
+ *
+ * All object textures are pre-loaded in RDRAM, but binding them to
+ * GL (which triggers TMEM upload on the RDP) is expensive.  The
+ * budget limits how many unique texture binds occur per frame.
+ *
+ * Priority:  near-pass textures bind first; far-pass textures only
+ * if budget remains.  If a far-pass texture can't bind, the face is
+ * rendered with the most recently bound texture (avoids a stall).
+ *
+ * Permanent residency: the last-bound GL texture is always valid,
+ * acting as a fallback. Lowest-LOD tiers draw with whatever texture
+ * is currently active, which at distance is visually acceptable.
+ * --------------------------------------------------------------------- */
+
+#define TEX_BIND_BUDGET_NEAR  96   /* Max unique binds during near pass  */
+#define TEX_BIND_BUDGET_FAR   32   /* Max unique binds during far pass   */
+
+typedef struct {
+    int  binds_this_frame;        /* Counter: resets each pass            */
+    int  budget;                  /* Current pass budget                  */
+    int  last_bound_tex;          /* Last successfully bound texture idx  */
+} tex_budget_t;
+
 #endif /* TR_CHUNK_H */
