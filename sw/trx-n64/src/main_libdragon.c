@@ -673,15 +673,12 @@ int main(void) {
                 uint16_t  *mip1_pixels = NULL;
                 uint16_t  *mip2_pixels = NULL;
 
-                if (tex_tiles && num_otex > 0) {
-                    /* Mip pixels in UNCACHED memory (required for rdpq DMA).
-                     * No GL objects created for mips, so no RSPQ block pressure.
-                     * Surface_t structs can live in cached bump heap. */
-                    mip1_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    mip2_surfs  = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    mip1_pixels = (uint16_t *)malloc_uncached_aligned(64, num_otex * MIP1_BYTES);
-                    mip2_pixels = (uint16_t *)malloc_uncached_aligned(64, num_otex * MIP2_BYTES);
-                }
+                /* Mip allocation disabled — 560 KB uncached for all ~880
+                 * mip textures exceeds available RDRAM alongside base
+                 * textures (~1.7 MB uncached) + framebuffers + RSPQ.
+                 * Far pass uses base 32×32 via rdpq_tex_upload instead.
+                 * Future: generate mips on-demand or for a subset only. */
+                (void)mip1_pixels; (void)mip2_pixels;
 
                 bool mips_ok = (mip1_surfs && mip2_surfs &&
                                 mip1_pixels && mip2_pixels && tex_tiles);
