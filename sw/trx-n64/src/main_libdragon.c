@@ -1218,6 +1218,7 @@ int main(void) {
                 int perf_near_binds = 0;
                 int perf_near_culled = 0;   /* faces back-culled */
                 int perf_near_detail_skip = 0; /* detail faces skipped */
+                int perf_near_faces = 0;    /* total face iterations (including culled) */
                 int perf_vis_total = 0;     /* total visible rooms */
                 int perf_vis_ring1 = 0;     /* ring 1 rooms */
                 int perf_vis_ring2 = 0;     /* ring 2 rooms */
@@ -1226,6 +1227,10 @@ int main(void) {
                 uint32_t perf_far_us = 0;   /* CPU time: far pass */
                 uint32_t perf_near_us = 0;  /* CPU time: near pass */
                 uint32_t perf_rsp_us = 0;   /* RSP sync stall at frame end */
+                uint32_t perf_near_room_us = 0;  /* near sub-timing: rooms */
+                uint32_t perf_near_sm_us = 0;    /* near sub-timing: static meshes */
+                uint32_t perf_near_lara_us = 0;  /* near sub-timing: Lara */
+                uint32_t perf_near_item_us = 0;  /* near sub-timing: items */
 
                 /* Active fog color — lerps toward current room's fog.
                  * Starts at neutral cave fog. */
@@ -1525,11 +1530,15 @@ int main(void) {
 
                         /* === NEAR PASS === */
                         STAT("=== NEAR (CI8 zbuf) ===");
-                        STAT("Rooms:%d  Tris:%d/%d",
-                             perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET);
-                        STAT("Binds:%d/%d  Culled:%d",
-                             perf_near_binds, TEX_BIND_BUDGET_NEAR, perf_near_culled);
-                        STAT("Detail skip: %d", perf_near_detail_skip);
+                        STAT("Rooms:%d  Tris:%d/%d  Faces:%d",
+                             perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET,
+                             perf_near_faces);
+                        STAT("Binds:%d  Culled:%d  DSkip:%d",
+                             perf_near_binds, perf_near_culled,
+                             perf_near_detail_skip);
+                        STAT("Room:%uus SM:%uus Lara:%uus Item:%uus",
+                             perf_near_room_us, perf_near_sm_us,
+                             perf_near_lara_us, perf_near_item_us);
 
                         /* === FAR PASS === */
                         STAT("=== FAR (baked tiles) ===");
@@ -1584,7 +1593,7 @@ int main(void) {
                     perf_far_uploads = 0; perf_far_baked = 0;
                     perf_near_rooms = 0; perf_near_tris = 0;
                     perf_near_binds = 0; perf_near_culled = 0;
-                    perf_near_detail_skip = 0;
+                    perf_near_detail_skip = 0; perf_near_faces = 0;
                     perf_frame_start = TICKS_READ();
 
                     surface_t *disp = display_get();
@@ -2126,8 +2135,9 @@ int main(void) {
                     int near_last_tex = -99; /* force first upload */
                     int near_uploads = 0;
 
-                    /* ===== NEAR PASS: ROOM FACES =====
-                     * CPU transform + near-plane clip + project → rdpq_triangle.
+                    /* ===== NEAR PASS: ROOM FACES ===== */
+                    { uint32_t _nr_t0 = TICKS_READ();
+                    /* CPU transform + near-plane clip + project → rdpq_triangle.
                      * CI8 tiles (1 KB each) with shared pal16 TLUT.
                      * Z-buffer already cleared above. */
                     for (int ri = 0; ri < near_count; ri++) {
@@ -2148,6 +2158,7 @@ int main(void) {
 
                         for (int f = 0; f < room->mesh.face_count; f++) {
                             if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
+                            perf_near_faces++;
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
@@ -2313,8 +2324,12 @@ int main(void) {
                         }
                     }
 
-                    /* ===== NEAR PASS: STATIC MESHES =====
-                     * Z-bias: pull mesh slightly toward camera to win Z-test
+                    perf_near_room_us = (uint32_t)((float)TICKS_DISTANCE(_nr_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end room faces timing */
+
+                    /* ===== NEAR PASS: STATIC MESHES ===== */
+                    { uint32_t _sm_t0 = TICKS_READ();
+                    /* Z-bias: pull mesh slightly toward camera to win Z-test
                      * against coplanar room walls (no glPolygonOffset in RDPQ). */
                     #define SM_Z_BIAS 0.997f
                     for (int ri = 0; ri < near_count; ri++) {
@@ -2455,8 +2470,11 @@ int main(void) {
                         }
                     }
                     #undef SM_Z_BIAS
+                    perf_near_sm_us = (uint32_t)((float)TICKS_DISTANCE(_sm_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end static meshes timing */
 
-                    /* ===== NEAR PASS: LARA (RDPQ — same CPU-project paradigm) ===== */
+                    /* ===== NEAR PASS: LARA ===== */
+                    { uint32_t _la_t0 = TICKS_READ();
                     {
                         static tr_object_def_t *lara_obj = NULL;
                         static tr_item_t *lara_item = NULL;
@@ -2806,7 +2824,11 @@ int main(void) {
                     }
 #endif /* DRAW STATIC OBJECTS disabled */
 
+                    perf_near_lara_us = (uint32_t)((float)TICKS_DISTANCE(_la_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end Lara timing */
+
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
+                    { uint32_t _it_t0 = TICKS_READ();
                     for (int ii = 0; ii < g_level.item_count && ii < 30; ii++) {
                         tr_item_t *item = &g_level.items[ii];
                         if (item->object_id == 0) continue; /* Skip Lara */
@@ -2920,6 +2942,8 @@ int main(void) {
                             }
                         }
                     }
+                    perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end items timing */
 
 #if 0 /* DRAW LARA — superseded by NEAR PASS: LARA (CI8 textures above) */
                     {
