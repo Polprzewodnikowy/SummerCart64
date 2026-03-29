@@ -409,7 +409,15 @@ int main(void) {
                     printf("  Sample[0]: off=%d, hdr=%c%c%c%c\n",
                            off0, w[0], w[1], w[2], w[3]);
                 }
-                printf("\nLEVEL LOADED! Preparing textures...\n");
+                printf("\nPress START to continue...\n");
+                console_render();
+                /* Wait for START press so user can read parse info */
+                while (1) {
+                    joypad_poll();
+                    joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+                    if (bp.start) break;
+                }
+                printf("Preparing textures...\n");
                 console_render();
 
                 /* Pre-convert all object textures to 16x16 RGBA16 at load time.
