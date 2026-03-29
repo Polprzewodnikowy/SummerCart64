@@ -1089,81 +1089,9 @@ int main(void) {
                     rdpq_set_mode_fill(RGBA32(0, 0, 0, 0xFF));
                     rdpq_fill_rectangle(0, 0, 320, 240);
 
-                    /* ===== RDPQ FAR PASS (stub — Phase 2+ will populate) ===== */
-                    /* Far-pass rooms are in rooms_to_draw[near_count..num_draw-1],
-                     * computed below after BFS + frustum cull.  For Phase 1 this
-                     * is an empty placeholder to prove the frame split works. */
-
-                    /* ===== GL NEAR PASS ===== */
-                    gl_context_begin();
-
-                    /* One-time GL state setup on first frame */
-                    if (!gl_setup_done) {
-                        gl_setup_done = true;
-
-                        /* Scale: 1/32 keeps nearby walls (~2000 units) at ~62 GL units. */
-                        #define WORLD_SCALE (1.0f / 32.0f)
-
-                        /* Projection: 60 deg vertical FOV */
-                        float near_p = 4.0f;     /* ~128 TR1 units */
-                        float far_p = 350.0f;    /* ~11200 TR1 units */
-                        float fov_half = 30.0f * 3.14159f / 180.0f;
-                        float top = near_p * tanf(fov_half);
-                        float right = top * (320.0f / 240.0f);
-                        glMatrixMode(GL_PROJECTION);
-                        glLoadIdentity();
-                        glFrustum(-right, right, -top, top, near_p, far_p);
-
-                        glEnable(GL_DEPTH_TEST);
-                        glDepthFunc(GL_LESS);
-                        glDisable(GL_CULL_FACE);
-                        glShadeModel(GL_SMOOTH);
-
-                        glEnable(GL_TEXTURE_2D);
-                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-                        glDisable(GL_LIGHTING);
-                        glDisable(GL_FOG);
-
-                        /* Create GL texture objects (base 32x32) */
-                        if (gl_textures) {
-                            glGenTextures(num_otex, gl_textures);
-                            for (int i = 0; i < num_otex; i++) {
-                                glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
-                            }
-                        }
-                        /* Mip atlas GL objects removed — RSPQ memory exhausted */
-                        if (white_px) {
-                            glGenTextures(1, &gl_white_tex);
-                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
-                        }
-                    }
-
-                    /* Clear depth buffer via GL (color already cleared by rdpq) */
-                    glClear(GL_DEPTH_BUFFER_BIT);
-
-                    /* Camera rotation in modelview — RSP does the rotation!
-                     * Translation done per-vertex on CPU (just 3 subtracts).
-                     * This offloads the expensive sin/cos multiply to RSP. */
-                    glMatrixMode(GL_MODELVIEW);
-                    glLoadIdentity();
-                    /* GL convention: pitch around X, then yaw around Y, negated */
-                    glRotatef(cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
-                    glRotatef(cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
-
-                    /* Precompute pitch rotation */
+                    /* Precompute pitch sin/cos for CPU projection */
                     float sp = sinf(cam_rot_x);
                     float cp = cosf(cam_rot_x);
-
-                    /* Track current texture for batching */
-                    int last_tex_idx = -1;
 
                     /* =====================================================
                      * VISIBILITY: Portal BFS + chunk frustum cull + LOD
@@ -1282,7 +1210,166 @@ int main(void) {
                     for (int i = 0; i < far_count; i++)
                         rooms_to_draw[num_draw++] = far_rooms[i];
 
-                    /* ===== DRAW ROOMS — interleaved vertex array ===== */
+                    /* ===== RDPQ FAR PASS =====
+                     * CPU-projected, flat-shaded triangles via rdpq_triangle.
+                     * Runs OUTSIDE gl_context — no GL objects needed.
+                     * Back-to-front, no Z buffer. */
+                    {
+                        rdpq_set_mode_standard();
+                        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                        rdpq_mode_blender(0);
+
+                        for (int fi = 0; fi < far_count; fi++) {
+                            int room_idx = far_rooms[fi];
+                            if (room_idx < 0 || room_idx >= g_level.room_count) continue;
+                            tr_room_t *room = &g_level.rooms[room_idx];
+                            bool is_water = (room->flags & 1) != 0;
+
+                            /* Face decimation for far pass */
+                            int face_skip = 1;
+                            if (room_idx < g_chunk_count) {
+                                float rd = g_chunks[room_idx].dist_sq;
+                                if (rd > CHUNK_VERY_FAR_DIST2)
+                                    face_skip = 4;
+                                else if (rd > CHUNK_FAR_DIST2 * 1.5f)
+                                    face_skip = 2;
+                            }
+
+                            for (int f = 0; f < room->mesh.face_count; f += face_skip) {
+                                tr_face_t *face = &room->mesh.faces[f];
+                                int nv = face->vertex_count;
+                                if (nv < 3) continue;
+
+                                /* CPU transform + project each vertex */
+                                float sv[4][6]; /* TRIFMT_SHADE: X,Y,R,G,B,A */
+                                bool visible = true;
+                                for (int v = 0; v < nv; v++) {
+                                    uint16_t vi = face->vertices[v];
+                                    if (vi >= room->mesh.vertex_count) { visible = false; break; }
+                                    tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+
+                                    /* Camera-relative position */
+                                    float cx_v = (float)(room->x + rv->x) - cam_x;
+                                    float cy_v = (float)rv->y - cam_y;
+                                    float cz_v = (float)(room->z + rv->z) - cam_z;
+
+                                    /* Yaw rotation */
+                                    float rx = cx_v * cy - cz_v * sy;
+                                    float rz_yaw = cx_v * sy + cz_v * cy;
+
+                                    /* Pitch rotation */
+                                    float ry = cy_v * cp - rz_yaw * sp;
+                                    float rz = cy_v * sp + rz_yaw * cp;
+
+                                    if (rz < 32.0f) { visible = false; break; }
+
+                                    /* Perspective project */
+                                    float inv_z = 256.0f / rz;
+                                    float scx = 160.0f + rx * inv_z;
+                                    float scy = 120.0f + ry * inv_z;
+                                    if (scx < -2048) scx = -2048;
+                                    if (scx > 2048) scx = 2048;
+                                    if (scy < -2048) scy = -2048;
+                                    if (scy > 2048) scy = 2048;
+
+                                    /* Lighting + fog */
+                                    float bright = 1.0f - ((float)rv->light / 8191.0f);
+                                    if (bright < 0.0f) bright = 0.0f;
+                                    if (bright > 1.0f) bright = 1.0f;
+                                    bright = 0.4f + bright * 0.6f;
+                                    float r = is_water ? bright * 0.4f : bright;
+                                    float g = is_water ? bright * 0.6f : bright;
+                                    float b = is_water ? bright * 1.0f : bright;
+
+                                    /* Distance fog */
+                                    float fdx = cx_v, fdz = cz_v;
+                                    float d2 = fdx*fdx + fdz*fdz;
+                                    float fog = (d2 - 26214400.0f) / 99090432.0f;
+                                    float y_bias = cy_v * 0.00004f;
+                                    if (y_bias < 0.0f) y_bias = 0.0f;
+                                    if (y_bias > 0.2f) y_bias = 0.2f;
+                                    fog += y_bias;
+                                    if (fog < 0.0f) fog = 0.0f;
+                                    if (fog > 0.85f) fog = 0.85f;
+                                    r = r * (1.0f - fog) + 0.15f * fog;
+                                    g = g * (1.0f - fog) + 0.13f * fog;
+                                    b = b * (1.0f - fog) + 0.18f * fog;
+
+                                    sv[v][0] = scx;
+                                    sv[v][1] = scy;
+                                    sv[v][2] = r;
+                                    sv[v][3] = g;
+                                    sv[v][4] = b;
+                                    sv[v][5] = 1.0f;
+                                }
+                                if (!visible) continue;
+
+                                /* Submit triangles (fan from vertex 0) */
+                                int num_tris = nv - 2;
+                                for (int tri = 0; tri < num_tris; tri++) {
+                                    rdpq_triangle(&TRIFMT_SHADE,
+                                        sv[0], sv[tri+1], sv[tri+2]);
+                                }
+                            }
+                        }
+                    }
+
+                    /* ===== GL NEAR PASS ===== */
+                    gl_context_begin();
+
+                    /* One-time GL state setup on first frame */
+                    if (!gl_setup_done) {
+                        gl_setup_done = true;
+
+                        #define WORLD_SCALE (1.0f / 32.0f)
+
+                        float near_p = 4.0f;
+                        float far_p = 350.0f;
+                        float fov_half = 30.0f * 3.14159f / 180.0f;
+                        float top = near_p * tanf(fov_half);
+                        float right = top * (320.0f / 240.0f);
+                        glMatrixMode(GL_PROJECTION);
+                        glLoadIdentity();
+                        glFrustum(-right, right, -top, top, near_p, far_p);
+
+                        glEnable(GL_DEPTH_TEST);
+                        glDepthFunc(GL_LESS);
+                        glDisable(GL_CULL_FACE);
+                        glShadeModel(GL_SMOOTH);
+
+                        glEnable(GL_TEXTURE_2D);
+                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                        glDisable(GL_LIGHTING);
+                        glDisable(GL_FOG);
+
+                        if (gl_textures) {
+                            glGenTextures(num_otex, gl_textures);
+                            for (int i = 0; i < num_otex; i++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
+                            }
+                        }
+                        if (white_px) {
+                            glGenTextures(1, &gl_white_tex);
+                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
+                        }
+                    }
+
+                    glClear(GL_DEPTH_BUFFER_BIT);
+
+                    glMatrixMode(GL_MODELVIEW);
+                    glLoadIdentity();
+                    glRotatef(cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
+                    glRotatef(cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
+
+                    /* ===== GL NEAR PASS — interleaved vertex array ===== */
                     /* Interleaved: pos(3f) + color(4ub) + texcoord(2f) = 24 bytes/vert */
                     typedef struct {
                         float x, y, z;
