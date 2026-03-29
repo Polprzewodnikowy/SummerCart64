@@ -561,6 +561,66 @@ UVs are pixel coords × 32 (10.5 fixed point). NOT normalized 0-1.
 
 ---
 
+## HailToDodongo/pyrite64 — Game Engine (libdragon + T3D) ★★
+Source: https://github.com/HailToDodongo/pyrite64
+
+Full N64 game engine + visual editor by the T3D author.
+
+### Borrowable Techniques
+
+1. **BigTex deferred UV rendering** ★★★ (breakthrough for large textures)
+   - Pass 1: RDP renders UV coords as colors into RGBA32 buffer
+     (special UV identity texture + combiner outputs interpolated UV)
+     Material index encoded in prim color R channel
+   - Pass 2: CPU+RSP reads UV buffer, resolves actual texels from
+     large textures in RAM using material+UV lookup
+   - Bypasses 4KB TMEM limit entirely — renders 256×256 textures
+   - Custom BCI format (4-color palette per 4×4 block, like S3TC/DXT1)
+   - RSP ucode for decode + hand-optimized MIPS assembly for CPU path
+   - CPU and RSP interleaved (every 4th slice RSP, rest CPU)
+   - **For TR1**: Could render rooms with full 256×256 texture pages
+     without any TMEM switching. Major quality + perf upgrade.
+   - Files: `n64/engine/src/renderer/pipelineBigTex.cpp`,
+     `n64/engine/src/renderer/bigtex/applyTexture.S`
+
+2. **Draw layer command queuing system**
+   - Objects record draw commands into separate `rspq_queue_t` buffers
+   - Layers played back in order — enables sorting without re-sorting
+   - Triple-buffered (3 queue sets)
+   - **For TR1**: record opaque room geo to layer 0, water/transparent
+     to layer 1, HUD to 2D layer
+   - File: `n64/engine/src/renderer/drawLayer.cpp`
+
+3. **Matrix pool allocator (576 pre-allocated, triple-buffered)**
+   - Bitmap allocator for T3DMat4FP in uncached BSS
+   - Scans for contiguous free bits, fallback to malloc_uncached
+   - `RingMat4FP` triple-buffers to avoid CPU/GPU conflicts
+   - **For TR1 Lara**: pre-allocate bone matrices from pool
+   - File: `n64/engine/src/lib/matrixManager.cpp`
+
+4. **BCI texture compression (4-color per 4×4 block)**
+   - K-means clustering for 4-color palette per block
+   - 2-bit indices per pixel = 0.5 bytes/pixel (vs 2B for RGBA16)
+   - Build tool: `src/build/tools/bci.cpp`
+   - **TR1 textures could be BCI-compressed in ROM** — 4× smaller
+     than RGBA16, decoded at runtime by RSP or CPU
+
+5. **Depth buffer via sbrk_top (no heap fragmentation)**
+   - Allocates z-buffer at TOP of heap via sbrk
+   - Regular heap grows up, z-buffer sits at ceiling
+   - File: `n64/engine/src/lib/memory.cpp`
+
+6. **Object single-allocation packing**
+   - Pre-scan component list, single memalign for object + all components
+   - Zero fragmentation for ECS-style objects
+   - File: `n64/engine/src/scene/sceneLoader.cpp`
+
+### Not Applicable
+- Visual editor (ImGui desktop tool, not runtime)
+- Node-graph scripting
+- Audio manager details
+
+---
+
 ## Future Repos to Investigate
 - libdragon GL internals — RSP overlay for OpenGL vertex processing
-- crashoveride95/n64homebrew — community rendering techniques
