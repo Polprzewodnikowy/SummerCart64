@@ -951,45 +951,12 @@ int main(void) {
                 #define SECTOR_AT(_room, _lx, _lz) \
                     (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
 
-                /* Check if camera offset is still within Lara's item room.
-                 * Search portals if outside, then resolve Y via sector
-                 * floor/ceiling to handle vertically stacked rooms. */
-                {
-                    int32_t icx = (int32_t)cam_x, icy = (int32_t)cam_y, icz = (int32_t)cam_z;
-                    tr_room_t *lr = &g_level.rooms[lara_room];
-                    int32_t rx = icx - lr->x, rz = icz - lr->z;
-                    if (!(rx >= 0 && rx < lr->sectors_x * 1024 &&
-                          rz >= 0 && rz < lr->sectors_z * 1024)) {
-                        bool sf = false;
-                        for (int p = 0; p < lr->portal_count && !sf; p++) {
-                            int d = lr->portals[p].room;
-                            if (d < 0 || d >= g_level.room_count) continue;
-                            tr_room_t *pr = &g_level.rooms[d];
-                            rx = icx - pr->x; rz = icz - pr->z;
-                            if (rx >= 0 && rx < pr->sectors_x * 1024 &&
-                                rz >= 0 && rz < pr->sectors_z * 1024) {
-                                lara_room = d; sf = true;
-                            }
-                        }
-                    }
-                    /* Resolve vertical position at spawn */
-                    for (int iter = 0; iter < 8; iter++) {
-                        tr_room_t *rm = &g_level.rooms[lara_room];
-                        if (!rm->sectors) break;
-                        int sx = (icx - rm->x) >> 10, sz = (icz - rm->z) >> 10;
-                        if (sx < 0) sx = 0; if (sx >= rm->sectors_x) sx = rm->sectors_x - 1;
-                        if (sz < 0) sz = 0; if (sz >= rm->sectors_z) sz = rm->sectors_z - 1;
-                        tr_sector_t *s = SECTOR_AT(rm, sx, sz);
-                        int32_t fl = s->floor * 256, cl = s->ceiling * 256;
-                        if (icy > fl && s->pit_room != 255 && s->pit_room < g_level.room_count) {
-                            lara_room = s->pit_room;
-                        } else if (icy < cl && s->sky_room != 255 && s->sky_room < g_level.room_count) {
-                            lara_room = s->sky_room;
-                        } else {
-                            break;
-                        }
-                    }
-                }
+                /* Keep lara_room as Lara's item room at spawn.
+                 * The camera is offset (600 behind + 768 up) which may
+                 * land in a different room, but portal visibility must
+                 * start from Lara's actual room — matching the original
+                 * TRX engine behavior.  Per-frame tracking will adjust
+                 * as the camera moves. */
 
                 /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
