@@ -1179,22 +1179,39 @@ int main(void) {
                         float ddz = c->cz - cam_z;
                         c->dist_sq = ddx*ddx + ddz*ddz;
 
-                        /* LOD classify with hysteresis.
-                         * Use a wider threshold when transitioning from
-                         * FAR→NEAR to prevent oscillation at the boundary.
-                         * If currently FAR, must come closer (×0.8) to flip.
-                         * If currently NEAR, must go farther (×1.0) to flip. */
-                        float lod_thresh = (c->lod == CHUNK_LOD_FAR)
-                            ? CHUNK_FAR_DIST2 * 0.8f  /* shrink to flip FAR→NEAR */
-                            : CHUNK_FAR_DIST2;         /* normal to flip NEAR→FAR */
-                        if (c->dist_sq < lod_thresh) {
+                        /* LOD classify with overlap band.
+                         *
+                         * Rooms in the overlap zone (0.7×–1.2× FAR threshold)
+                         * are submitted to BOTH passes: far pass draws them
+                         * first as backdrop, near pass overwrites with Z-buffer
+                         * and RSP projection.  This hides the seam between the
+                         * two projection pipelines (CPU float vs RSP fixed-pt).
+                         *
+                         * Outside the band:
+                         *   closer than 0.7× → near only
+                         *   farther than 1.2× → far only
+                         * Inside the band → both passes */
+                        #define LOD_OVERLAP_INNER (CHUNK_FAR_DIST2 * 0.7f)
+                        #define LOD_OVERLAP_OUTER (CHUNK_FAR_DIST2 * 1.2f)
+
+                        if (c->dist_sq < LOD_OVERLAP_INNER) {
+                            /* Clearly near */
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
-                        } else {
+                        } else if (c->dist_sq > LOD_OVERLAP_OUTER) {
+                            /* Clearly far */
                             c->lod = CHUNK_LOD_FAR;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
+                        } else {
+                            /* Overlap band — draw in both passes.
+                             * Far pass draws first, near pass overwrites. */
+                            c->lod = CHUNK_LOD_NEAR; /* near for hysteresis tracking */
+                            if (far_count < MAX_DRAW_ROOMS)
+                                far_rooms[far_count++] = ri;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
                         }
                     }
 
