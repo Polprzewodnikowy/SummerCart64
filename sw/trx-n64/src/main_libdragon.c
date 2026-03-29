@@ -1201,9 +1201,9 @@ int main(void) {
 
                 /* Budget constants — visible to both the render passes and the
                  * pause-screen STAT display (must be defined before both). */
-                #define FAR_TRI_BUDGET      300
+                #define FAR_TRI_BUDGET      400
                 #define FAR_UPLOAD_BUDGET   8
-                #define NEAR_TRI_BUDGET     700
+                #define NEAR_TRI_BUDGET     1400
                 #define NEAR_UPLOAD_BUDGET  48
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
@@ -1936,6 +1936,7 @@ int main(void) {
                             float room_oz = (float)room->z - cam_z;
 
                             for (int f = 0; f < room->mesh.face_count; f++) {
+                                if (far_tris >= FAR_TRI_BUDGET) goto far_pass_done;
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -2146,6 +2147,7 @@ int main(void) {
                         float room_oz = (float)room->z - cam_z;
 
                         for (int f = 0; f < room->mesh.face_count; f++) {
+                            if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
@@ -2308,11 +2310,8 @@ int main(void) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
                             }
-                            if (perf_near_tris >= NEAR_TRI_BUDGET)
-                                goto near_room_pass_done;
                         }
                     }
-                    near_room_pass_done:;
 
                     /* ===== NEAR PASS: STATIC MESHES =====
                      * Z-bias: pull mesh slightly toward camera to win Z-test
@@ -2351,6 +2350,7 @@ int main(void) {
                             float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
 
                             for (int f = 0; f < mesh->face_count && f < 100; f++) {
+                                if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
                                 tr_face_t *face = &mesh->faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -2447,8 +2447,10 @@ int main(void) {
                                 }
                                 if (!proj_ok) continue;
                                 int num_tris = sm_cnv - 2;
-                                for (int tri=0;tri<num_tris;tri++)
+                                for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
+                                    perf_near_tris++;
+                                }
                             }
                         }
                     }
@@ -2532,6 +2534,7 @@ int main(void) {
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
                                 for (int f = 0; f < mesh->face_count; f++) {
+                                    if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
                                     tr_face_t *face = &mesh->faces[f];
                                     int nv = face->vertex_count;
                                     if (nv < 3) continue;
@@ -2600,8 +2603,11 @@ int main(void) {
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
-                                    if (nv == 4)
+                                    perf_near_tris++;
+                                    if (nv == 4) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
+                                        perf_near_tris++;
+                                    }
                                 }
                             }
                         }
@@ -2843,6 +2849,7 @@ int main(void) {
                         float isy = sinf(iyaw), icy = cosf(iyaw);
 
                         for (int f = 0; f < mesh->face_count && f < 50; f++) {
+                            if (perf_near_tris >= NEAR_TRI_BUDGET) goto near_pass_done;
                             tr_face_t *face = &mesh->faces[f];
                             if (face->vertex_count < 3) continue;
                             bool is_flat = (face->texture & 0x8000) != 0;
@@ -2905,9 +2912,12 @@ int main(void) {
                                 sv[v][9] = 1.0f/rz;
                             }
                             if (!vis) continue;
-                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
-                            if (face->vertex_count == 4)
-                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            perf_near_tris++;
+                            if (face->vertex_count == 4) {
+                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
+                                perf_near_tris++;
+                            }
                         }
                     }
 
@@ -3128,6 +3138,7 @@ int main(void) {
                         }
                         rdpq_mode_pop();
                     }}
+                    near_pass_done:
                     /* End near pass — record CPU time, measure RSP stall, detach */
                     rdpq_mode_tlut(TLUT_NONE);
                     {
