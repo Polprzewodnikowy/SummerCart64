@@ -869,7 +869,8 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start button disabled during GL mode (console alloc crashes) */
+                    /* Start button: pause to debug console */
+                    if (pressed.start) break;
 
                     /* Begin frame — OpenGL RSP T&L */
                     surface_t *disp = display_get();
@@ -911,8 +912,8 @@ int main(void) {
                                 glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
                             }
                         }
@@ -954,7 +955,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 5;  /* Texture sort keeps uploads low */
+                    int max_rooms = 16;  /* RSP handles more — increase for less pop-in */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -968,31 +969,33 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW ROOMS via OpenGL — texture-batched ===== */
-                    #define MAX_GL_VERTS 3000
-                    static float gl_pos[MAX_GL_VERTS * 3] __attribute__((aligned(16)));
-                    static float gl_col[MAX_GL_VERTS * 4] __attribute__((aligned(16)));
-                    static float gl_tc[MAX_GL_VERTS * 2] __attribute__((aligned(16)));
-                    int gl_vert_count = 0;
+                    /* ===== DRAW ROOMS — interleaved vertex array ===== */
+                    /* Interleaved: pos(3f) + color(4ub) + texcoord(2f) = 24 bytes/vert */
+                    typedef struct {
+                        float x, y, z;
+                        uint8_t r, g, b, a;
+                        float s, t;
+                    } gl_vert_t;
+                    #define MAX_GL_VERTS 4000
+                    static gl_vert_t gl_verts[MAX_GL_VERTS] __attribute__((aligned(16)));
+                    int gl_vc = 0;
                     int cur_tex = -1;
+                    #define VERT_STRIDE sizeof(gl_vert_t)
 
-                    /* Helper: flush current batch */
-                    #define FLUSH_BATCH() do { \
-                        if (gl_vert_count > 0) { \
-                            data_cache_hit_writeback(gl_pos, gl_vert_count * 3 * sizeof(float)); \
-                            data_cache_hit_writeback(gl_col, gl_vert_count * 4 * sizeof(float)); \
-                            data_cache_hit_writeback(gl_tc, gl_vert_count * 2 * sizeof(float)); \
+                    #define FLUSH_GL() do { \
+                        if (gl_vc > 0) { \
+                            data_cache_hit_writeback(gl_verts, gl_vc * VERT_STRIDE); \
                             glEnableClientState(GL_VERTEX_ARRAY); \
                             glEnableClientState(GL_COLOR_ARRAY); \
                             glEnableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            glVertexPointer(3, GL_FLOAT, 0, gl_pos); \
-                            glColorPointer(4, GL_FLOAT, 0, gl_col); \
-                            glTexCoordPointer(2, GL_FLOAT, 0, gl_tc); \
-                            glDrawArrays(GL_TRIANGLES, 0, gl_vert_count); \
+                            glVertexPointer(3, GL_FLOAT, VERT_STRIDE, &gl_verts[0].x); \
+                            glColorPointer(4, GL_UNSIGNED_BYTE, VERT_STRIDE, &gl_verts[0].r); \
+                            glTexCoordPointer(2, GL_FLOAT, VERT_STRIDE, &gl_verts[0].s); \
+                            glDrawArrays(GL_TRIANGLES, 0, gl_vc); \
                             glDisableClientState(GL_VERTEX_ARRAY); \
                             glDisableClientState(GL_COLOR_ARRAY); \
                             glDisableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            gl_vert_count = 0; \
+                            gl_vc = 0; \
                         } \
                     } while(0)
 
@@ -1002,7 +1005,7 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Room-level cull */
+                        /* Room-level cull: behind camera */
                         float rcx = room->x + room->sectors_x * 512.0f - cam_x;
                         float rcz = room->z + room->sectors_z * 512.0f - cam_z;
                         float room_rz = rcx * sy + rcz * cy;
@@ -1010,24 +1013,32 @@ int main(void) {
                         if (room_rz < -room_radius) continue;
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 400) max_faces = 400;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
 
-                            /* Texture switch? Flush batch */
+                            /* Per-face distance cull with first vertex */
+                            {
+                                uint16_t v0i = face->vertices[0];
+                                if (v0i < room->mesh.vertex_count) {
+                                    float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
+                                    float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
+                                    if (dx*dx + dz*dz > 144000000.0f) continue; /* ~12K units */
+                                }
+                            }
+
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
                             int want_tex;
                             if (is_flat) {
-                                want_tex = -2;  /* white texture */
+                                want_tex = -2;
                             } else if (tex_idx < num_otex && gl_textures) {
                                 want_tex = (int)tex_idx;
                             } else continue;
 
                             if (want_tex != cur_tex) {
-                                FLUSH_BATCH();
+                                FLUSH_GL();
                                 if (want_tex == -2 && gl_white_tex)
                                     glBindTexture(GL_TEXTURE_2D, gl_white_tex);
                                 else if (want_tex >= 0)
@@ -1039,65 +1050,57 @@ int main(void) {
                                 ? &g_level.object_textures[tex_idx] : NULL;
 
                             int num_tris = nv - 2;
-                            if (gl_vert_count + num_tris * 3 > MAX_GL_VERTS) FLUSH_BATCH();
+                            if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
 
-                            /* Build face vertices — just subtract camera pos.
-                             * RSP handles rotation via modelview matrix. */
-                            float vx[4], vy[4], vz[4], vr[4], vg[4], vb[4], vs[4], vt[4];
+                            /* Build per-face vertex data */
+                            float px[4], py[4], pz[4], fs[4], ft[4];
+                            uint8_t cr[4], cg[4], cb[4];
                             bool ok = true;
                             for (int v = 0; v < nv; v++) {
                                 uint16_t vi = face->vertices[v];
                                 if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                /* Camera-relative world pos, scaled. RSP rotates. */
-                                vx[v] = (room->x + rv->x - cam_x) * WORLD_SCALE;
-                                vy[v] = -(rv->y - cam_y) * WORLD_SCALE;  /* Y flip: TR1 down → GL up */
-                                vz[v] = -(room->z + rv->z - cam_z) * WORLD_SCALE;  /* Z flip: TR1 +Z → GL -Z */
+                                px[v] = (room->x + rv->x - cam_x) * WORLD_SCALE;
+                                py[v] = -(rv->y - cam_y) * WORLD_SCALE;
+                                pz[v] = -(room->z + rv->z - cam_z) * WORLD_SCALE;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 bright = 0.4f + bright * 0.6f;
-                                vr[v] = is_water ? bright * 0.4f : bright;
-                                vg[v] = is_water ? bright * 0.6f : bright;
-                                vb[v] = is_water ? bright * 1.0f : bright;
+                                float r = is_water ? bright * 0.4f : bright;
+                                float g = is_water ? bright * 0.6f : bright;
+                                float b = is_water ? bright * 1.0f : bright;
+                                cr[v] = (uint8_t)(r * 255.0f);
+                                cg[v] = (uint8_t)(g * 255.0f);
+                                cb[v] = (uint8_t)(b * 255.0f);
 
-                                /* Texture coordinates normalized to 0-1 */
                                 if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
-                                    float s = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    float t = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    vs[v] = s / (float)TEX_TILE_DIM;
-                                    vt[v] = t / (float)TEX_TILE_DIM;
+                                    fs[v] = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] / (float)TEX_TILE_DIM;
+                                    ft[v] = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] / (float)TEX_TILE_DIM;
                                 } else {
-                                    vs[v] = 0; vt[v] = 0;
+                                    fs[v] = 0; ft[v] = 0;
                                 }
                             }
                             if (!ok) continue;
 
-                            for (int t = 0; t < num_tris; t++) {
-                                int idx[3] = {0, t+1, t+2};
+                            for (int tri = 0; tri < num_tris; tri++) {
+                                int idx[3] = {0, tri+1, tri+2};
                                 for (int k = 0; k < 3; k++) {
                                     int i = idx[k];
-                                    int p = gl_vert_count;
-                                    gl_pos[p*3+0] = vx[i];
-                                    gl_pos[p*3+1] = vy[i];
-                                    gl_pos[p*3+2] = vz[i];
-                                    gl_col[p*4+0] = vr[i];
-                                    gl_col[p*4+1] = vg[i];
-                                    gl_col[p*4+2] = vb[i];
-                                    gl_col[p*4+3] = 1.0f;
-                                    gl_tc[p*2+0] = vs[i];
-                                    gl_tc[p*2+1] = vt[i];
-                                    gl_vert_count++;
+                                    gl_vert_t *vp = &gl_verts[gl_vc++];
+                                    vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
+                                    vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
+                                    vp->s = fs[i]; vp->t = ft[i];
                                 }
                             }
                         }
                     }
-                    FLUSH_BATCH();
-                    #undef FLUSH_BATCH
+                    FLUSH_GL();
+                    #undef FLUSH_GL
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
@@ -1719,6 +1722,7 @@ int main(void) {
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
                 gl_init();
+                gl_setup_done = false;  /* Re-setup GL state + textures on first frame */
                 goto render_loop;
 
             } else {
