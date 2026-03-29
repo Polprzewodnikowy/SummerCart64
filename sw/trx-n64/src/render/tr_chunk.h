@@ -27,13 +27,14 @@
 #define CHUNK_LOD_FAR   2   /* Far detail — RDPQ CPU projection, fog      */
 
 /* Distance thresholds in TR1 world units (squared for cheap comparison).
- * NEAR < 4 sectors, MID 4-7 sectors, FAR > 7 sectors */
-#define CHUNK_NEAR_DIST2  (4096.0f  * 4096.0f)
-#define CHUNK_MID_DIST2   (7168.0f  * 7168.0f)
-#define CHUNK_FAR_DIST2   CHUNK_MID_DIST2  /* alias for compatibility */
+ * 5 tiers: near → mid → far → extra far → extreme far */
+#define CHUNK_NEAR_DIST2      (4096.0f  * 4096.0f)   /* < 4 sectors: GL RGBA16 */
+#define CHUNK_MID_DIST2       (7168.0f  * 7168.0f)    /* 4-7: RDPQ CI8 */
+#define CHUNK_FAR_DIST2       CHUNK_MID_DIST2         /* alias */
+#define CHUNK_XFAR_DIST2      (12288.0f * 12288.0f)   /* 7-12: RDPQ CI4 */
+#define CHUNK_XXFAR_DIST2     (16384.0f * 16384.0f)   /* 12-16: RDPQ IA8 */
+/* > 16 sectors: RDPQ IA4 (extreme fog silhouette) */
 
-/* Far clip distance.  Portal visibility replaces frustum culling,
- * so this only affects the fog ramp endpoint. */
 #define CHUNK_FAR_WORLD   20000.0f
 
 /* -----------------------------------------------------------------------

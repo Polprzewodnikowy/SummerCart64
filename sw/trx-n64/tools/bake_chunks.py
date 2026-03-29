@@ -554,6 +554,61 @@ def quantize_to_ci4(rgba16_pixels, dim):
     return palette, packed
 
 
+def convert_to_ia8(rgba16_pixels, dim):
+    """Convert RGBA16 pixels to IA8: 4-bit intensity + 4-bit alpha.
+    Returns list of uint8 values (1 byte per pixel)."""
+    result = []
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        a1 = px & 1
+        # Luminance: weighted average (approximate)
+        lum = (r5 * 2 + g5 * 5 + b5) // 8  # 0-31 range
+        i4 = min(15, lum >> 1)  # 4-bit intensity (0-15)
+        a4 = 15 if a1 else 0    # 4-bit alpha
+        result.append((i4 << 4) | a4)
+    return result
+
+
+def convert_to_ia4(rgba16_pixels, dim):
+    """Convert RGBA16 pixels to IA4: 3-bit intensity + 1-bit alpha.
+    Returns packed bytes (2 pixels per byte)."""
+    nibbles = []
+    for px in rgba16_pixels:
+        r5 = (px >> 11) & 0x1F
+        g5 = (px >> 6) & 0x1F
+        b5 = (px >> 1) & 0x1F
+        a1 = px & 1
+        lum = (r5 * 2 + g5 * 5 + b5) // 8
+        i3 = min(7, lum >> 2)  # 3-bit intensity (0-7)
+        nibbles.append((i3 << 1) | (1 if a1 else 0))
+    # Pack into bytes (2 nibbles per byte)
+    packed = []
+    for i in range(0, len(nibbles), 2):
+        hi = nibbles[i] & 0xF
+        lo = nibbles[i + 1] & 0xF if i + 1 < len(nibbles) else 0
+        packed.append((hi << 4) | lo)
+    return packed
+
+
+def box_filter_2x_ia8(ia8_pixels, src_dim):
+    """2×2 box filter downsample IA8 pixels."""
+    dst_dim = src_dim // 2
+    out = []
+    for y in range(dst_dim):
+        for x in range(dst_dim):
+            sx, sy = x * 2, y * 2
+            p00 = ia8_pixels[sy * src_dim + sx]
+            p10 = ia8_pixels[sy * src_dim + sx + 1]
+            p01 = ia8_pixels[(sy + 1) * src_dim + sx]
+            p11 = ia8_pixels[(sy + 1) * src_dim + sx + 1]
+            ai = ((p00 >> 4) + (p10 >> 4) + (p01 >> 4) + (p11 >> 4) + 2) >> 2
+            aa = ((p00 & 0xF) + (p10 & 0xF) + (p01 & 0xF) + (p11 & 0xF) + 2) >> 2
+            out.append((ai << 4) | aa)
+    return out
+
+
 def bake_level(phd_path, output_path):
     """Bake all rooms in a TR1 .PHD level file.
 
@@ -578,61 +633,83 @@ def bake_level(phd_path, output_path):
     print(f"  Texture pages: {len(level['tex_pages'])}")
     print(f"  Object textures: {len(level['obj_textures'])}")
 
-    MIP0_DIM = 32
-    MIP1_DIM = 16
-    MIP2_DIM = 8
+    MIP0_DIM = 32   # RGBA16 (near)
+    MIP1_DIM = 16   # CI8 (mid-far)
+    MIP2_DIM = 8    # CI4 (far)
+    MIP3_DIM = 8    # IA8 (extra far)
+    MIP4_DIM = 4    # IA4 (extreme far)
 
     baked_rooms = []
     for ri, room in enumerate(rooms):
         face_count = len(room['quads']) + len(room['tris'])
-        # Generate RGBA16 at all levels first
+        # Generate RGBA16 mip chain
         mip0_rgba = bake_room(room, level['tex_pages'],
                               level['obj_textures'], level['palette'],
                               tile_dim=MIP0_DIM)
         mip1_rgba = box_filter_2x(mip0_rgba, MIP0_DIM)
         mip2_rgba = box_filter_2x(mip1_rgba, MIP1_DIM)
 
-        # Quantize mip1 to CI8, mip2 to CI4
+        # Quantize color mips
         mip1_pal, mip1_idx = quantize_to_ci8(mip1_rgba, MIP1_DIM)
         mip2_pal, mip2_ci4 = quantize_to_ci4(mip2_rgba, MIP2_DIM)
 
-        baked_rooms.append((mip0_rgba, mip1_pal, mip1_idx, mip2_pal, mip2_ci4))
+        # Generate IA mips for fog distance
+        mip3_ia8 = convert_to_ia8(mip2_rgba, MIP2_DIM)  # 8×8 IA8
+        mip3_ia8_4x4 = box_filter_2x_ia8(mip3_ia8, MIP3_DIM)  # downsample to 4×4
+        # Convert 4×4 IA8 to IA4 packed
+        mip4_ia4 = []
+        for i in range(0, len(mip3_ia8_4x4), 2):
+            hi_i = (mip3_ia8_4x4[i] >> 4) & 0xF
+            hi_a = (mip3_ia8_4x4[i] >> 3) & 1
+            hi = ((hi_i >> 1) << 1) | hi_a  # 3-bit I + 1-bit A
+            lo_px = mip3_ia8_4x4[i + 1] if i + 1 < len(mip3_ia8_4x4) else 0
+            lo_i = (lo_px >> 4) & 0xF
+            lo_a = (lo_px >> 3) & 1
+            lo = ((lo_i >> 1) << 1) | lo_a
+            mip4_ia4.append((hi << 4) | lo)
+
+        baked_rooms.append((mip0_rgba, mip1_pal, mip1_idx, mip2_pal, mip2_ci4,
+                            mip3_ia8, mip4_ia4))
         if ri % 5 == 0:
             print(f"  Room {ri}/{len(rooms)} ({face_count} faces)")
 
-    # Write binary output
+    # Write binary output (BAK3 format)
     with open(output_path, 'wb') as f:
-        # Header: BAK2 magic + room count + mip info
-        f.write(b'BAK2')
+        f.write(b'BAK3')
         f.write(struct.pack('<HHHHHH',
                             len(rooms),
-                            3,           # mip_levels
+                            5,           # mip_levels
                             MIP0_DIM,
                             MIP1_DIM,
                             MIP2_DIM,
-                            0))
+                            (MIP3_DIM << 8) | MIP4_DIM))
 
-        # Per-room data
-        for ri, (mip0, m1_pal, m1_idx, m2_pal, m2_ci4) in enumerate(baked_rooms):
+        for ri, (mip0, m1_pal, m1_idx, m2_pal, m2_ci4,
+                 m3_ia8, m4_ia4) in enumerate(baked_rooms):
             # mip0: 32×32 RGBA16
             for px in mip0:
                 f.write(struct.pack('<H', px))
-            # mip1: CI8 palette (256 entries) + indices
+            # mip1: CI8 palette + indices
             for px in m1_pal:
                 f.write(struct.pack('<H', px))
             f.write(bytes(m1_idx))
-            # mip2: CI4 palette (16 entries) + packed nibbles
+            # mip2: CI4 palette + nibbles
             for px in m2_pal:
                 f.write(struct.pack('<H', px))
             f.write(bytes(m2_ci4))
+            # mip3: 8×8 IA8
+            f.write(bytes(m3_ia8))
+            # mip4: 4×4 IA4 packed
+            f.write(bytes(m4_ia4))
 
     per_room = (MIP0_DIM*MIP0_DIM*2 + 256*2 + MIP1_DIM*MIP1_DIM +
-                16*2 + MIP2_DIM*MIP2_DIM//2)
+                16*2 + MIP2_DIM*MIP2_DIM//2 +
+                MIP3_DIM*MIP3_DIM + MIP4_DIM*MIP4_DIM//2)
     total_bytes = 16 + len(rooms) * per_room
     print(f"  Output: {output_path} ({total_bytes} bytes, "
           f"{total_bytes/1024:.1f} KB)")
-    print(f"  Per room: mip0={MIP0_DIM}² RGBA16 + "
-          f"mip1={MIP1_DIM}² CI8 + mip2={MIP2_DIM}² CI4 = "
+    print(f"  Per room: RGBA16={MIP0_DIM}² + CI8={MIP1_DIM}² + "
+          f"CI4={MIP2_DIM}² + IA8={MIP3_DIM}² + IA4={MIP4_DIM}² = "
           f"{per_room} bytes")
 
 
