@@ -880,14 +880,14 @@ int main(void) {
                     if (!gl_setup_done) {
                         gl_setup_done = true;
 
-                        /* Scale: 1/32 keeps nearby walls (~2000 units) at ~62 GL units.
-                         * Max camera-relative (~15000) = ~470 — within s15.16 range. */
+                        /* Scale: 1/32 keeps nearby walls (~2000 units) at ~62 GL units. */
                         #define WORLD_SCALE (1.0f / 32.0f)
 
-                        /* Projection: 60 deg vertical FOV */
-                        float near_p = 2.0f;    /* ~64 TR1 units */
-                        float far_p = 500.0f;   /* ~16000 TR1 units */
-                        float fov_half = 30.0f * 3.14159f / 180.0f;  /* half of 60 deg */
+                        /* Projection: 60 deg vertical FOV.
+                         * Near/far ratio kept tight for 16-bit Z-buffer precision. */
+                        float near_p = 4.0f;    /* ~128 TR1 units */
+                        float far_p = 350.0f;   /* ~11200 TR1 units */
+                        float fov_half = 30.0f * 3.14159f / 180.0f;
                         float top = near_p * tanf(fov_half);
                         float right = top * (320.0f / 240.0f);
                         glMatrixMode(GL_PROJECTION);
@@ -927,11 +927,14 @@ int main(void) {
 
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    /* Identity modelview — we do camera transform on CPU per-vertex
-                     * to avoid GL fixed-point overflow with large TR1 coords.
-                     * RSP handles projection + clipping only. */
+                    /* Camera rotation in modelview — RSP does the rotation!
+                     * Translation done per-vertex on CPU (just 3 subtracts).
+                     * This offloads the expensive sin/cos multiply to RSP. */
                     glMatrixMode(GL_MODELVIEW);
                     glLoadIdentity();
+                    /* GL convention: pitch around X, then yaw around Y, negated */
+                    glRotatef(cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
+                    glRotatef(cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
@@ -1038,7 +1041,8 @@ int main(void) {
                             int num_tris = nv - 2;
                             if (gl_vert_count + num_tris * 3 > MAX_GL_VERTS) FLUSH_BATCH();
 
-                            /* Transform face vertices */
+                            /* Build face vertices — just subtract camera pos.
+                             * RSP handles rotation via modelview matrix. */
                             float vx[4], vy[4], vz[4], vr[4], vg[4], vb[4], vs[4], vt[4];
                             bool ok = true;
                             for (int v = 0; v < nv; v++) {
@@ -1046,17 +1050,10 @@ int main(void) {
                                 if (vi >= room->mesh.vertex_count) { ok = false; break; }
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                float wx = room->x + rv->x - cam_x;
-                                float wy = rv->y - cam_y;
-                                float wz = room->z + rv->z - cam_z;
-                                float rx = wx * cy - wz * sy;
-                                float rz_yaw = wx * sy + wz * cy;
-                                float ry = wy * cp - rz_yaw * sp;
-                                float rz = wy * sp + rz_yaw * cp;
-
-                                vx[v] = rx * WORLD_SCALE;
-                                vy[v] = -ry * WORLD_SCALE;
-                                vz[v] = -rz * WORLD_SCALE;
+                                /* Camera-relative world pos, scaled. RSP rotates. */
+                                vx[v] = (room->x + rv->x - cam_x) * WORLD_SCALE;
+                                vy[v] = -(rv->y - cam_y) * WORLD_SCALE;  /* Y flip: TR1 down → GL up */
+                                vz[v] = -(room->z + rv->z - cam_z) * WORLD_SCALE;  /* Z flip: TR1 +Z → GL -Z */
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
