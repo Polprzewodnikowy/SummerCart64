@@ -902,13 +902,8 @@ int main(void) {
                         glDisable(GL_CULL_FACE);  /* Disable until winding is verified */
                         glShadeModel(GL_SMOOTH);
 
-                        glEnable(GL_FOG);
-                        glFogi(GL_FOG_MODE, GL_LINEAR);
-                        glFogf(GL_FOG_START, 0.0f);
-                        glFogf(GL_FOG_END, 16384.0f);
-                        float fog_color[] = {0, 0, 0, 1};
-                        glFogfv(GL_FOG_COLOR, fog_color);
-                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                        glDisable(GL_TEXTURE_2D);  /* DEBUG: test geometry without textures */
+                        glDisable(GL_FOG);  /* Disable fog too for clarity */
 
                         /* Create GL texture objects */
                         if (gl_textures) {
@@ -993,23 +988,9 @@ int main(void) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
 
-                            /* Bind GL texture */
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
-                            if (!is_flat && tex_idx < num_otex && gl_textures) {
-                                if ((int)tex_idx != last_tex_idx) {
-                                    glBindTexture(GL_TEXTURE_2D, gl_textures[tex_idx]);
-                                    last_tex_idx = (int)tex_idx;
-                                }
-                            } else if (is_flat && gl_white_tex) {
-                                if (last_tex_idx != -2) {
-                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    last_tex_idx = -2;
-                                }
-                            } else continue;
-
-                            tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
-                                ? &g_level.object_textures[tex_idx] : NULL;
+                            tr_object_texture_t *otex = NULL; /* textures disabled for debug */
 
                             /* Emit triangle(s) — RSP handles T&L + clipping */
                             glBegin(GL_TRIANGLE_FAN);
