@@ -899,9 +899,7 @@ int main(void) {
                         glEnable(GL_DEPTH_TEST);
                         glDepthFunc(GL_LESS);
                         glEnable(GL_TEXTURE_2D);
-                        glEnable(GL_CULL_FACE);
-                        glCullFace(GL_BACK);
-                        glFrontFace(GL_CW);
+                        glDisable(GL_CULL_FACE);  /* Disable until winding is verified */
                         glShadeModel(GL_SMOOTH);
 
                         glEnable(GL_FOG);
@@ -1054,8 +1052,10 @@ int main(void) {
                                            room->z + rv->z - cam_z);
                             }
                             glEnd();
-                        }
+                        }  /* end room face loop */
+                    }  /* end room draw loop */
 
+#if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
                         for (int si = 0; si < room->mesh.sprite_count && si < 20; si++) {
                             uint16_t svi = room->mesh.sprite_vertices[si];
@@ -1562,19 +1562,9 @@ int main(void) {
                         }
                         rdpq_mode_pop();
                     }}
+#endif /* phase 2 rdpq renderers */
 
-                    /* FPS display: draw as colored rectangles for digits */
-                    {
-                        /* Simple digit renderer using fill rectangles */
-                        rdpq_set_mode_fill(RGBA32(0xFF, 0xFF, 0x00, 0xFF));
-                        int tens = fps_display / 10;
-                        int ones = fps_display % 10;
-                        /* Draw bar-graph style: each unit = 3px wide block */
-                        for (int d = 0; d < fps_display && d < 30; d++)
-                            rdpq_fill_rectangle(4 + d * 4, 4, 4 + d * 4 + 3, 8);
-                        /* Restore render mode for next frame */
-                    }
-                    (void)0; /* Suppress empty statement warning */
+                    /* FPS display disabled during GL migration */
 
                     /* Show frame */
                     gl_context_end();
