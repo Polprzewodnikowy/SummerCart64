@@ -1297,8 +1297,8 @@ int main(void) {
                         int far_last_tex = -1;
                         int far_uploads = 0;
                         int far_tris = 0;
-                        #define FAR_MAX_UPLOADS  48  /* cap TMEM uploads per frame */
-                        #define FAR_FLUSH_EVERY  50  /* flush RSPQ every N triangles */
+                        #define FAR_MAX_UPLOADS  32  /* cap TMEM uploads per frame */
+                        #define FAR_FLUSH_EVERY  30  /* flush RSPQ every N triangles */
 
                         for (int fi = 0; fi < far_count; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1306,15 +1306,24 @@ int main(void) {
                             tr_room_t *room = &g_level.rooms[room_idx];
                             bool is_water = (room->flags & 1) != 0;
 
+                            /* Per-room mip level decision (used for both
+                             * texture upload AND tex coord scaling) */
+                            float room_dist = (room_idx < g_chunk_count)
+                                ? g_chunks[room_idx].dist_sq : 0.0f;
+                            int room_mip = 0;  /* 0=base 32, 1=mip1 16, 2=mip2 8 */
+                            float mip_uv_scale = 1.0f;
+                            if (mips_ok && room_dist > CHUNK_VERY_FAR_DIST2) {
+                                room_mip = 2; mip_uv_scale = 0.25f;
+                            } else if (mips_ok && room_dist > CHUNK_FAR_DIST2) {
+                                room_mip = 1; mip_uv_scale = 0.5f;
+                            }
+
                             /* Face decimation for far pass */
                             int face_skip = 1;
-                            if (room_idx < g_chunk_count) {
-                                float rd = g_chunks[room_idx].dist_sq;
-                                if (rd > CHUNK_VERY_FAR_DIST2)
-                                    face_skip = 4;
-                                else if (rd > CHUNK_FAR_DIST2 * 1.5f)
-                                    face_skip = 2;
-                            }
+                            if (room_dist > CHUNK_VERY_FAR_DIST2)
+                                face_skip = 4;
+                            else if (room_dist > CHUNK_FAR_DIST2 * 1.5f)
+                                face_skip = 2;
 
                             for (int f = 0; f < room->mesh.face_count; f += face_skip) {
                                 tr_face_t *face = &room->mesh.faces[f];
@@ -1332,12 +1341,10 @@ int main(void) {
                                     if ((int)tex_idx != far_last_tex) {
                                         if (far_uploads < FAR_MAX_UPLOADS) {
                                             rspq_flush();
-                                            /* Mip selection by room distance */
-                                            float rd = (room_idx < g_chunk_count)
-                                                ? g_chunks[room_idx].dist_sq : 0.0f;
-                                            if (mips_ok && rd > CHUNK_VERY_FAR_DIST2)
+                                            /* Upload mip level chosen per-room */
+                                            if (room_mip == 2)
                                                 rdpq_tex_upload(TILE0, &mip2_surfs[tex_idx], NULL);
-                                            else if (mips_ok && rd > CHUNK_FAR_DIST2)
+                                            else if (room_mip == 1)
                                                 rdpq_tex_upload(TILE0, &mip1_surfs[tex_idx], NULL);
                                             else
                                                 rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
@@ -1408,21 +1415,14 @@ int main(void) {
                                     g = g * (1.0f - fog) + 0.13f * fog;
                                     b = b * (1.0f - fog) + 0.18f * fog;
 
-                                    /* Texture coords in pixel space.
-                                     * Scale for mip level: 32→16 = ×0.5, 32→8 = ×0.25 */
+                                    /* Texture coords in pixel space,
+                                     * scaled by mip_uv_scale (per-room, matches upload) */
                                     float ts = 0, tt = 0;
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                        /* Scale for active mip level */
-                                        float rd2 = cx_v*cx_v + cz_v*cz_v;
-                                        if (mips_ok && rd2 > CHUNK_VERY_FAR_DIST2) {
-                                            ts *= 0.25f; tt *= 0.25f;
-                                        } else if (mips_ok && rd2 > CHUNK_FAR_DIST2) {
-                                            ts *= 0.5f; tt *= 0.5f;
-                                        }
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * mip_uv_scale;
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * mip_uv_scale;
                                     }
 
                                     sv[v][0] = scx;
