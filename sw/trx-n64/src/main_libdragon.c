@@ -51,6 +51,38 @@ void *n64_mem_alloc(uint32_t size) {
 uint32_t n64_mem_available(void) { return GAME_HEAP_SIZE - heap_offset; }
 
 /* -------------------------------------------------------------------
+ * In-memory PCM waveform for libdragon mixer
+ * ------------------------------------------------------------------- */
+#include <samplebuffer.h>
+
+typedef struct {
+    waveform_t wave;
+    int16_t *pcm_data;
+} pcm_wave_t;
+
+static void pcm_wave_read(void *ctx, samplebuffer_t *sbuf, int wpos, int wlen, bool seeking) {
+    pcm_wave_t *pw = (pcm_wave_t *)ctx;
+    int16_t *dst = (int16_t *)samplebuffer_append(sbuf, wlen);
+    int avail = pw->wave.len - wpos;
+    if (avail < wlen) wlen = avail;
+    if (wlen > 0)
+        memcpy(dst, pw->pcm_data + wpos, wlen * 2);
+}
+
+static void pcm_wave_init(pcm_wave_t *pw, int16_t *data, int len, int freq) {
+    memset(pw, 0, sizeof(*pw));
+    pw->pcm_data = data;
+    pw->wave.name = "tr1_sfx";
+    pw->wave.bits = 16;
+    pw->wave.channels = 1;
+    pw->wave.frequency = (float)freq;
+    pw->wave.len = len;
+    pw->wave.loop_len = 0;
+    pw->wave.read = pcm_wave_read;
+    pw->wave.ctx = pw;
+}
+
+/* -------------------------------------------------------------------
  * SC64 unlock (needed before asset streaming)
  *
  * The SC64 registers are locked on boot. We unlock them by writing
@@ -1362,20 +1394,31 @@ int main(void) {
                         audio_write_end();
                     }
 
-                    /* Play a random ambient sample occasionally */
+                    /* Play ambient cave sounds periodically */
                     static int ambient_timer = 0;
-                    if (parsed_samples > 0 && ++ambient_timer > 300) {
+                    static int next_sample = 0;
+                    static pcm_wave_t ambient_wave;
+                    if (parsed_samples > 0 && ++ambient_timer > 200) {
                         ambient_timer = 0;
-                        /* Pick a random sample */
-                        int si = ambient_timer % parsed_samples;
-                        for (int s = 0; s < parsed_samples; s++) {
-                            si = (si + 1) % g_level.sample_index_count;
-                            if (sample_pcm[si] && sample_len[si] > 100) break;
+                        /* Find next valid sample */
+                        for (int tries = 0; tries < 64; tries++) {
+                            next_sample = (next_sample + 1) % g_level.sample_index_count;
+                            if (next_sample < 64 && sample_pcm[next_sample] &&
+                                sample_len[next_sample] > 200) break;
                         }
-                        if (si < g_level.sample_index_count &&
-                            sample_pcm[si] && sample_len[si] > 100) {
-                            /* Play via libdragon mixer — need to flush cache first */
-                            data_cache_hit_writeback(sample_pcm[si], sample_len[si] * 2);
+                        if (next_sample < 64 && sample_pcm[next_sample] &&
+                            sample_len[next_sample] > 200) {
+                            /* Flush sample data from cache for DMA */
+                            data_cache_hit_writeback(sample_pcm[next_sample],
+                                                     sample_len[next_sample] * 2);
+                            pcm_wave_init(&ambient_wave, sample_pcm[next_sample],
+                                          sample_len[next_sample],
+                                          sample_rate_arr[next_sample]);
+                            /* Play on channel 0 */
+                            if (!mixer_ch_playing(0)) {
+                                mixer_ch_play(0, &ambient_wave.wave);
+                                mixer_ch_set_vol(0, 0.5f, 0.5f);
+                            }
                         }
                     }
                 }
