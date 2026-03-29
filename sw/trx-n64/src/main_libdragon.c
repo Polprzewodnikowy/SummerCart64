@@ -938,25 +938,33 @@ int main(void) {
                 for (int i = 0; i < g_level.item_count; i++) {
                     if (g_level.items[i].object_id == 0) {
                         spawn_rot = (float)g_level.items[i].rotation * 3.14159f / 32768.0f;
-                        spawn_x = (float)g_level.items[i].pos.x;
+                        spawn_x = (float)g_level.items[i].pos.x - 600.0f * sinf(spawn_rot);
                         spawn_y = (float)g_level.items[i].pos.y - 768;
-                        spawn_z = (float)g_level.items[i].pos.z;
+                        spawn_z = (float)g_level.items[i].pos.z - 600.0f * cosf(spawn_rot);
                         break;
                     }
                 }
                 cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z; cam_rot_y = spawn_rot;
 
-                /* Fix lara_room for camera offset — the camera may be
-                 * in a different room than Lara's item spawn room. */
+                /* Check if camera offset is still within Lara's item room.
+                 * Only search for a different room if it's truly outside. */
                 {
                     int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
-                    for (int _ri = 0; _ri < g_level.room_count; _ri++) {
-                        tr_room_t *_rm = &g_level.rooms[_ri];
-                        int32_t rx = icx - _rm->x, rz = icz - _rm->z;
-                        if (rx >= 0 && rx < _rm->sectors_x * 1024 &&
-                            rz >= 0 && rz < _rm->sectors_z * 1024) {
-                            lara_room = _ri;
-                            break;
+                    tr_room_t *lr = &g_level.rooms[lara_room];
+                    int32_t rx = icx - lr->x, rz = icz - lr->z;
+                    if (!(rx >= 0 && rx < lr->sectors_x * 1024 &&
+                          rz >= 0 && rz < lr->sectors_z * 1024)) {
+                        /* Camera outside Lara's room — search portals first */
+                        bool sf = false;
+                        for (int p = 0; p < lr->portal_count && !sf; p++) {
+                            int d = lr->portals[p].room;
+                            if (d < 0 || d >= g_level.room_count) continue;
+                            tr_room_t *pr = &g_level.rooms[d];
+                            rx = icx - pr->x; rz = icz - pr->z;
+                            if (rx >= 0 && rx < pr->sectors_x * 1024 &&
+                                rz >= 0 && rz < pr->sectors_z * 1024) {
+                                lara_room = d; sf = true;
+                            }
                         }
                     }
                 }
