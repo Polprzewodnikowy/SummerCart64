@@ -925,11 +925,11 @@ int main(void) {
 
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    /* Camera modelview — rotation only, translation done per-vertex */
+                    /* Identity modelview — we do camera transform on CPU per-vertex
+                     * to avoid GL fixed-point overflow with large TR1 coords.
+                     * RSP handles projection + clipping only. */
                     glMatrixMode(GL_MODELVIEW);
                     glLoadIdentity();
-                    glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
-                    glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
@@ -1022,11 +1022,21 @@ int main(void) {
                                     glTexCoord2f(0, 0);
                                 }
 
-                                /* Camera-relative, scaled to fit GL fixed-point.
-                                 * Negate Z: OpenGL looks down -Z, TR1 looks down +Z */
-                                glVertex3f((room->x + rv->x - cam_x) * WORLD_SCALE,
-                                           (rv->y - cam_y) * WORLD_SCALE,
-                                           -(room->z + rv->z - cam_z) * WORLD_SCALE);
+                                /* Full camera transform on CPU, pass view-space to GL.
+                                 * RSP does projection + clipping only. */
+                                float wx = room->x + rv->x - cam_x;
+                                float wy = rv->y - cam_y;
+                                float wz = room->z + rv->z - cam_z;
+                                /* Yaw rotation */
+                                float rx = wx * cy - wz * sy;
+                                float rz_yaw = wx * sy + wz * cy;
+                                /* Pitch rotation */
+                                float ry = wy * cp - rz_yaw * sp;
+                                float rz = wy * sp + rz_yaw * cp;
+                                /* GL looks down -Z */
+                                glVertex3f(rx * WORLD_SCALE,
+                                           ry * WORLD_SCALE,
+                                           -rz * WORLD_SCALE);
                             }
                             glEnd();
                         }  /* end room face loop */
