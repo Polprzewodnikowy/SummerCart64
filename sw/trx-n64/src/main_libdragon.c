@@ -220,6 +220,121 @@ static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
  * Chunk management — builds AABB/sphere for each room once at load
  * ------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------
+ * Face classification — run once after level parse.
+ * Tags each face as ESSENTIAL (never skip) or DETAIL (safe to skip).
+ *
+ * Essential: floors, ceilings, boundary walls, portal-adjacent faces.
+ * Detail: small faces, interior tessellation, decorative geometry.
+ * ------------------------------------------------------------------- */
+static void classify_faces(tr_level_t *level) {
+    for (int ri = 0; ri < level->room_count; ri++) {
+        tr_room_t *room = &level->rooms[ri];
+
+        /* Room AABB for boundary detection (1-sector margin) */
+        float rx_min = (float)room->x + 512.0f;
+        float rx_max = (float)(room->x + room->sectors_x * 1024) - 512.0f;
+        float rz_min = (float)room->z + 512.0f;
+        float rz_max = (float)(room->z + room->sectors_z * 1024) - 512.0f;
+        float ry_floor = (float)room->min_floor;
+        float ry_ceil  = (float)room->max_ceiling;
+
+        /* Collect portal vertex positions for proximity check */
+        float portal_pts[64][3];
+        int portal_pt_count = 0;
+        for (int p = 0; p < room->portal_count && portal_pt_count < 60; p++) {
+            for (int pv = 0; pv < 4 && portal_pt_count < 64; pv++) {
+                portal_pts[portal_pt_count][0] = (float)(room->x + room->portals[p].vertices[pv].x);
+                portal_pts[portal_pt_count][1] = (float)room->portals[p].vertices[pv].y;
+                portal_pts[portal_pt_count][2] = (float)(room->z + room->portals[p].vertices[pv].z);
+                portal_pt_count++;
+            }
+        }
+
+        for (int f = 0; f < room->mesh.face_count; f++) {
+            tr_face_t *face = &room->mesh.faces[f];
+            int nv = face->vertex_count;
+            if (nv < 3) { face->flags = FACE_FLAG_DETAIL; continue; }
+
+            /* Compute face center + approximate normal + area */
+            float cx = 0, cy = 0, cz = 0;
+            for (int v = 0; v < nv; v++) {
+                uint16_t vi = face->vertices[v];
+                if (vi >= room->mesh.vertex_count) continue;
+                tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                cx += (float)(room->x + rv->x);
+                cy += (float)rv->y;
+                cz += (float)(room->z + rv->z);
+            }
+            cx /= nv; cy /= nv; cz /= nv;
+
+            /* Normal from cross product of first two edges */
+            tr_room_vertex_t *v0 = &room->mesh.vertices[face->vertices[0]];
+            tr_room_vertex_t *v1 = &room->mesh.vertices[face->vertices[1]];
+            tr_room_vertex_t *v2 = &room->mesh.vertices[face->vertices[2]];
+            float e1x = v1->x - v0->x, e1y = v1->y - v0->y, e1z = v1->z - v0->z;
+            float e2x = v2->x - v0->x, e2y = v2->y - v0->y, e2z = v2->z - v0->z;
+            float nx = e1y * e2z - e1z * e2y;
+            float ny = e1z * e2x - e1x * e2z;
+            float nz = e1x * e2y - e1y * e2x;
+
+            /* Approximate face area (half cross product magnitude) */
+            float area = 0.5f * sqrtf(nx*nx + ny*ny + nz*nz);
+
+            /* Normalize normal */
+            float nlen = sqrtf(nx*nx + ny*ny + nz*nz);
+            if (nlen > 0.001f) { nx /= nlen; ny /= nlen; nz /= nlen; }
+
+            uint8_t flags = 0;
+
+            /* Floor/ceiling: mostly horizontal (|ny| > 0.7) */
+            if (ny > 0.7f || ny < -0.7f) {
+                if (cy > (ry_floor - 256.0f)) {
+                    flags |= FACE_FLAG_FLOOR | FACE_FLAG_ESSENTIAL;
+                } else if (cy < (ry_ceil + 256.0f)) {
+                    flags |= FACE_FLAG_CEILING | FACE_FLAG_ESSENTIAL;
+                } else {
+                    /* Interior horizontal — essential if large */
+                    if (area > 100000.0f) flags |= FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            /* Wall at room boundary: vertical face near AABB edge */
+            if (fabsf(ny) < 0.3f) {
+                if (cx < rx_min || cx > rx_max ||
+                    cz < rz_min || cz > rz_max) {
+                    flags |= FACE_FLAG_WALL | FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            /* Portal-adjacent: face center within 512 units of any
+             * portal vertex.  These define doorway/opening shapes. */
+            for (int pp = 0; pp < portal_pt_count; pp++) {
+                float pdx = cx - portal_pts[pp][0];
+                float pdy = cy - portal_pts[pp][1];
+                float pdz = cz - portal_pts[pp][2];
+                if (pdx*pdx + pdy*pdy + pdz*pdz < 512.0f * 512.0f) {
+                    flags |= FACE_FLAG_PORTAL_ADJ | FACE_FLAG_ESSENTIAL;
+                    break;
+                }
+            }
+
+            /* Small faces are detail (safe to skip) unless already
+             * marked essential by position/orientation tests. */
+            if (!(flags & FACE_FLAG_ESSENTIAL)) {
+                if (area < 50000.0f) {
+                    flags |= FACE_FLAG_DETAIL;
+                } else {
+                    /* Large interior face — keep it essential */
+                    flags |= FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            face->flags = flags;
+        }
+    }
+}
+
 static void build_chunks(const tr_level_t *level) {
     g_chunk_count = 0;
     for (int i = 0; i < level->room_count && g_chunk_count < TR_MAX_ROOMS; i++) {
@@ -967,7 +1082,8 @@ int main(void) {
                     }
                 }
 
-                /* Build chunk array (one per room) for frustum/LOD queries */
+                /* Classify faces + build chunks/clusters */
+                classify_faces(&g_level);
                 build_chunks(&g_level);
                 build_clusters(&g_level);
                 printf("  %d chunks, %d clusters built.\n",
@@ -2021,26 +2137,28 @@ int main(void) {
                         bool is_water = (room->flags & 1) != 0;
                         perf_near_rooms++;
 
-                        /* Face decimation: skip faces for distant rooms.
-                         * Current room (lara_room): all faces.
-                         * Connected rooms beyond near threshold: skip
-                         * every Nth face based on distance ratio.
-                         * Cap at 2 — never decimate harder than 50%.
-                         * Beyond that, the room should be drawn as IA4
-                         * fog (ring 2) instead of decimated GL. */
-                        int face_skip = 1; /* 1 = all faces */
+                        /* Face decimation: for distant rooms, skip DETAIL
+                         * faces (small/decorative). ESSENTIAL faces (floors,
+                         * walls, portal-adjacent, silhouette) always render.
+                         * Current room: all faces, no skipping. */
+                        bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
                             if (c->dist_sq > c->near_dist2) {
-                                face_skip = 2; /* connected beyond near: every 2nd */
+                                do_decimate = true;
                             }
                         }
 
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f += face_skip) {
+                        for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
+
+                            /* Skip DETAIL faces in distant rooms.
+                             * ESSENTIAL faces always render. */
+                            if (do_decimate && (face->flags & FACE_FLAG_DETAIL))
+                                continue;
 
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
