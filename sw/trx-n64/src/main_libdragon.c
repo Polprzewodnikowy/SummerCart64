@@ -1182,13 +1182,21 @@ int main(void) {
                 int speed_level = 1;
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
+                /* Per-frame performance counters — reset each frame,
+                 * displayed on pause screen for diagnostics. */
                 int perf_far_rooms = 0;
-                int perf_far_faces __attribute__((unused)) = 0;
                 int perf_far_tris = 0;
                 int perf_far_uploads = 0;
                 int perf_near_rooms = 0;
-                int perf_near_faces __attribute__((unused)) = 0;
+                int perf_near_tris = 0;
                 int perf_near_binds = 0;
+                int perf_near_culled = 0;   /* faces back-culled */
+                int perf_near_detail_skip = 0; /* detail faces skipped */
+                int perf_vis_total = 0;     /* total visible rooms */
+                int perf_vis_ring1 = 0;     /* ring 1 rooms */
+                int perf_vis_ring2 = 0;     /* ring 2 rooms */
+                uint32_t perf_frame_start = 0;
+                uint32_t perf_frame_us = 0; /* last frame time in µs */
 
                 /* Active fog color — lerps toward current room's fog.
                  * Starts at neutral cave fog. */
@@ -1429,49 +1437,73 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start: pause with debug overlay */
+                    /* Start: pause with hardware diagnostics */
                     if (pressed.start) {
-                        /* End current GL context so we can draw text */
                         gl_context_end();
-
-                        /* Get the framebuffer we just rendered to and draw text on it */
                         surface_t *pause_disp = display_get();
                         graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                        char buf[80];
+                        int y = 4;
+                        #define STAT(fmt, ...) do { \
+                            snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+                            graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
+                        } while(0)
 
-                        char buf[64];
-                        graphics_draw_text(pause_disp, 8, 8, "PAUSED - Press START");
-                        snprintf(buf, sizeof(buf), "Cam: %.0f, %.0f, %.0f", cam_x, cam_y, cam_z);
-                        graphics_draw_text(pause_disp, 8, 20, buf);
-                        snprintf(buf, sizeof(buf), "FPS: %d  Room: %d", fps_display, lara_room);
-                        graphics_draw_text(pause_disp, 8, 32, buf);
-                        snprintf(buf, sizeof(buf), "Coll: %s", collision_on ? "ON" : "OFF");
-                        graphics_draw_text(pause_disp, 8, 44, buf);
-                        snprintf(buf, sizeof(buf), "Audio: %d samples", parsed_samples);
-                        graphics_draw_text(pause_disp, 8, 56, buf);
+                        /* === TIMING === */
+                        STAT("=== FRAME ===");
+                        STAT("FPS: %d  Frame: %u us", fps_display, perf_frame_us);
+                        float budget_pct = (float)perf_frame_us / 33333.0f * 100.0f;
+                        STAT("Budget: %.0f%% of 30fps", budget_pct);
+
+                        /* === VISIBILITY === */
+                        STAT("=== VISIBILITY ===");
+                        STAT("Room: %d (%s)", lara_room,
+                            lara_room >= 0 && lara_room < g_chunk_count ?
+                            (g_chunks[lara_room].size_class == 0 ? "small" :
+                             g_chunks[lara_room].size_class == 1 ? "medium" :
+                             g_chunks[lara_room].size_class == 2 ? "large" : "open")
+                            : "?");
+                        STAT("Visible: %d (ring1:%d ring2:%d)",
+                             perf_vis_total, perf_vis_ring1, perf_vis_ring2);
+
+                        /* === GL NEAR PASS (main bottleneck) === */
+                        STAT("=== GL NEAR ===");
+                        STAT("Rooms: %d  Tris: %d/%d",
+                             perf_near_rooms, perf_near_tris, GL_TRI_BUDGET);
+                        STAT("Binds: %d/%d", perf_near_binds, TEX_BIND_BUDGET_NEAR);
+                        STAT("Culled: %d  Detail skip: %d",
+                             perf_near_culled, perf_near_detail_skip);
+
+                        /* === RDPQ FAR PASS === */
+                        STAT("=== RDPQ FAR ===");
+                        STAT("Rooms: %d  Tris: %d/%d  Uploads: %d/%d",
+                             perf_far_rooms, perf_far_tris, FAR_TRI_BUDGET,
+                             perf_far_uploads, FAR_UPLOAD_BUDGET);
+
+                        /* === MEMORY === */
+                        STAT("=== MEMORY ===");
+                        uint32_t heap_free = n64_mem_available();
+                        uint32_t heap_used = GAME_HEAP_SIZE - heap_free;
+                        STAT("Heap: %uKB / %uKB (%uKB free)",
+                             heap_used / 1024, GAME_HEAP_SIZE / 1024,
+                             heap_free / 1024);
+
+                        /* === CAMERA === */
+                        STAT("=== CAMERA ===");
+                        STAT("Pos: %.0f, %.0f, %.0f", cam_x, cam_y, cam_z);
                         {
                             int32_t pfl, pcl;
                             GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
-                            snprintf(buf, sizeof(buf), "Floor: %d  Ceil: %d", pfl, pcl);
-                            graphics_draw_text(pause_disp, 8, 68, buf);
+                            STAT("Floor: %d  Ceil: %d", pfl, pcl);
                         }
-                        snprintf(buf, sizeof(buf), "Far: %dr %dt %du",
-                                 perf_far_rooms, perf_far_tris, perf_far_uploads);
-                        graphics_draw_text(pause_disp, 8, 80, buf);
-                        snprintf(buf, sizeof(buf), "Near: %dr %db",
-                                 perf_near_rooms, perf_near_binds);
-                        graphics_draw_text(pause_disp, 8, 92, buf);
-                        snprintf(buf, sizeof(buf), "Heap: %uKB free",
-                                 n64_mem_available() / 1024);
-                        graphics_draw_text(pause_disp, 8, 104, buf);
 
+                        #undef STAT
                         display_show(pause_disp);
 
-                        /* Wait for START to unpause */
                         while (1) {
                             joypad_poll();
                             if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
                         }
-                        /* Resume — next iteration will call display_get + gl_context_begin */
                         continue;
                     }
 
@@ -1488,10 +1520,13 @@ int main(void) {
                      * This split lets the far pass use raw RDPQ texture
                      * uploads without competing for GL object/RSPQ memory. */
                     /* Reset per-frame perf counters */
-                    perf_far_rooms = 0; perf_far_faces = 0;
-                    perf_far_tris = 0;  perf_far_uploads = 0;
-                    perf_near_rooms = 0; perf_near_faces = 0;
-                    perf_near_binds = 0;
+                    /* Reset per-frame counters + start frame timer */
+                    perf_far_rooms = 0; perf_far_tris = 0;
+                    perf_far_uploads = 0;
+                    perf_near_rooms = 0; perf_near_tris = 0;
+                    perf_near_binds = 0; perf_near_culled = 0;
+                    perf_near_detail_skip = 0;
+                    perf_frame_start = TICKS_READ();
 
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
@@ -1657,6 +1692,11 @@ int main(void) {
                             vis_count++;
                         }
                     }
+
+                    /* Track visibility for diagnostics */
+                    perf_vis_ring1 = ring1_end;
+                    perf_vis_ring2 = vis_count - ring1_end;
+                    perf_vis_total = vis_count;
 
                     /* LOD classification.
                      * Ring 1 (current + connected): GL near pass, full textures.
@@ -2157,6 +2197,7 @@ int main(void) {
                         int pass       = 1;
                         int gl_tri_count = 0;
                         #define GL_TRI_BUDGET 600  /* cap total GL tris per frame */
+                        #define TEX_BIND_BUDGET_NEAR 24  /* max texture binds per frame */
 
                     for (int ri = loop_start; ri < loop_end; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -2185,8 +2226,10 @@ int main(void) {
 
                             /* Skip DETAIL faces in distant rooms.
                              * ESSENTIAL faces always render. */
-                            if (do_decimate && (face->flags & FACE_FLAG_DETAIL))
+                            if (do_decimate && (face->flags & FACE_FLAG_DETAIL)) {
+                                perf_near_detail_skip++;
                                 continue;
+                            }
 
                             /* Quick back-cull: check if face center is
                              * behind camera using first vertex (cheap). */
@@ -2197,7 +2240,7 @@ int main(void) {
                                     float fdx = (float)(room->x + rv0->x) - cam_x;
                                     float fdz = (float)(room->z + rv0->z) - cam_z;
                                     float cz0 = fdx * sy + fdz * cy;
-                                    if (cz0 < -1024.0f) continue;
+                                    if (cz0 < -1024.0f) { perf_near_culled++; continue; }
                                 }
                             }
 
@@ -2314,6 +2357,7 @@ int main(void) {
                                     vp->s = fs[i]; vp->t = ft[i];
                                 }
                                 gl_tri_count++;
+                                perf_near_tris++;
                             }
                             if (gl_tri_count >= GL_TRI_BUDGET)
                                 goto gl_room_pass_done;
@@ -3195,6 +3239,13 @@ int main(void) {
                      * queue backlog without blocking the CPU). */
                     gl_context_end();
                     rdpq_detach_show();
+
+                    /* Capture frame time */
+                    {
+                        uint32_t frame_end = TICKS_READ();
+                        uint32_t delta = TICKS_DISTANCE(perf_frame_start, frame_end);
+                        perf_frame_us = (uint32_t)((float)delta / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
 
                     /* Audio: mix and submit to AI */
                     if (audio_can_write()) {
