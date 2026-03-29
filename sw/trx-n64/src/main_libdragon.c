@@ -1342,6 +1342,12 @@ int main(void) {
                         }
                     }
 
+                    /* Flush RSPQ after far pass — drain the command buffer so
+                     * GL near pass has room for its own commands.  Without this,
+                     * frames with many far-pass texture uploads + triangles
+                     * overflow the RSPQ ring buffer when GL adds more. */
+                    rspq_flush();
+
                     /* ===== GL NEAR PASS ===== */
                     gl_context_begin();
 
