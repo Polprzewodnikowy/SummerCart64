@@ -658,10 +658,155 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
-                /* Mip textures removed — creating 3× GL texture objects
-                 * exhausts libdragon's RSPQ block memory.  The base 32x32
-                 * textures are used for all passes; the texture bind budget
-                 * (Phase 5) handles TMEM pressure instead. */
+                /* ---- Atlas-packed mip levels ----
+                 * Instead of 1 GL object per mip tile (OOM at 3× objects),
+                 * pack multiple mip tiles into shared atlas textures:
+                 *   Mip1 (16×16): 4 tiles per 32×32 atlas (2×2 grid)
+                 *   Mip2 (8×8):  16 tiles per 32×32 atlas (4×4 grid)
+                 * This reduces GL object count from ~1760 to ~275.
+                 * Far pass binds the atlas page and remaps UVs to sub-tile. */
+                #define MIP1_DIM       16
+                #define MIP1_PER_ATLAS 4    /* 2×2 in 32×32 */
+                #define MIP1_COLS      2
+                #define MIP2_DIM       8
+                #define MIP2_PER_ATLAS 16   /* 4×4 in 32×32 */
+                #define MIP2_COLS      4
+
+                int num_mip1_atlas = (num_otex + MIP1_PER_ATLAS - 1) / MIP1_PER_ATLAS;
+                int num_mip2_atlas = (num_otex + MIP2_PER_ATLAS - 1) / MIP2_PER_ATLAS;
+
+                /* Per-texture atlas lookup: which atlas page + sub-tile UV offset/scale */
+                typedef struct {
+                    int   atlas_idx;
+                    float u_off, v_off;  /* UV offset of sub-tile in atlas */
+                    float uv_scale;      /* UV scale (0.5 for 2×2, 0.25 for 4×4) */
+                } mip_map_t;
+
+                mip_map_t *mip1_map = (mip_map_t *)n64_mem_alloc(num_otex * sizeof(mip_map_t));
+                mip_map_t *mip2_map = (mip_map_t *)n64_mem_alloc(num_otex * sizeof(mip_map_t));
+
+                /* Atlas pixel buffers */
+                uint16_t *mip1_atlas_px = (uint16_t *)malloc_uncached_aligned(
+                    64, num_mip1_atlas * TEX_TILE_BYTES);
+                uint16_t *mip2_atlas_px = (uint16_t *)malloc_uncached_aligned(
+                    64, num_mip2_atlas * TEX_TILE_BYTES);
+                surface_t *mip1_atlas_surfs = (surface_t *)n64_mem_alloc(
+                    num_mip1_atlas * sizeof(surface_t));
+                surface_t *mip2_atlas_surfs = (surface_t *)n64_mem_alloc(
+                    num_mip2_atlas * sizeof(surface_t));
+                GLuint *gl_mip1_atlas = (GLuint *)n64_mem_alloc(
+                    num_mip1_atlas * sizeof(GLuint));
+                GLuint *gl_mip2_atlas = (GLuint *)n64_mem_alloc(
+                    num_mip2_atlas * sizeof(GLuint));
+
+                bool mips_ok = (mip1_map && mip2_map && mip1_atlas_px &&
+                                mip2_atlas_px && mip1_atlas_surfs &&
+                                mip2_atlas_surfs && gl_mip1_atlas &&
+                                gl_mip2_atlas && tex_tiles);
+
+                if (mips_ok) {
+                    printf("  Building mip atlases: %d×mip1 + %d×mip2...\n",
+                           num_mip1_atlas, num_mip2_atlas);
+
+                    /* Clear atlas pixel buffers */
+                    memset(mip1_atlas_px, 0, num_mip1_atlas * TEX_TILE_BYTES);
+                    memset(mip2_atlas_px, 0, num_mip2_atlas * TEX_TILE_BYTES);
+
+                    for (int i = 0; i < num_otex; i++) {
+                        uint16_t *src32 = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+
+                        /* ---- Mip1: 32→16 box filter, pack into atlas ---- */
+                        {
+                            int atlas_idx = i / MIP1_PER_ATLAS;
+                            int slot = i % MIP1_PER_ATLAS;
+                            int col = slot % MIP1_COLS;
+                            int row = slot / MIP1_COLS;
+                            uint16_t *atlas = mip1_atlas_px +
+                                atlas_idx * TEX_TILE_DIM * TEX_TILE_DIM;
+
+                            /* Box filter 2×2 → 1 texel, write into atlas sub-tile */
+                            for (int y = 0; y < MIP1_DIM; y++) {
+                                for (int x = 0; x < MIP1_DIM; x++) {
+                                    int sx = x*2, sy = y*2;
+                                    uint16_t p00 = src32[sy*TEX_TILE_DIM + sx];
+                                    uint16_t p10 = src32[sy*TEX_TILE_DIM + sx+1];
+                                    uint16_t p01 = src32[(sy+1)*TEX_TILE_DIM + sx];
+                                    uint16_t p11 = src32[(sy+1)*TEX_TILE_DIM + sx+1];
+                                    int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                    int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+
+                                              ((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                    int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+
+                                              ((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                    int aa = (p00|p10|p01|p11) & 1;
+                                    int ax = col * MIP1_DIM + x;
+                                    int ay = row * MIP1_DIM + y;
+                                    atlas[ay * TEX_TILE_DIM + ax] =
+                                        (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                                }
+                            }
+
+                            mip1_map[i].atlas_idx = atlas_idx;
+                            mip1_map[i].u_off = (float)(col * MIP1_DIM) / (float)TEX_TILE_DIM;
+                            mip1_map[i].v_off = (float)(row * MIP1_DIM) / (float)TEX_TILE_DIM;
+                            mip1_map[i].uv_scale = (float)MIP1_DIM / (float)TEX_TILE_DIM;
+                        }
+
+                        /* ---- Mip2: 32→8 box filter (4×4 avg), pack into atlas ---- */
+                        {
+                            int atlas_idx = i / MIP2_PER_ATLAS;
+                            int slot = i % MIP2_PER_ATLAS;
+                            int col = slot % MIP2_COLS;
+                            int row = slot / MIP2_COLS;
+                            uint16_t *atlas = mip2_atlas_px +
+                                atlas_idx * TEX_TILE_DIM * TEX_TILE_DIM;
+
+                            for (int y = 0; y < MIP2_DIM; y++) {
+                                for (int x = 0; x < MIP2_DIM; x++) {
+                                    int sx = x*4, sy = y*4;
+                                    /* 4×4 average */
+                                    int sr=0, sg=0, sb=0, sa=0;
+                                    for (int dy=0; dy<4; dy++)
+                                        for (int dx=0; dx<4; dx++) {
+                                            uint16_t p = src32[(sy+dy)*TEX_TILE_DIM+(sx+dx)];
+                                            sr += p>>11;
+                                            sg += (p>>6)&0x1F;
+                                            sb += (p>>1)&0x1F;
+                                            sa |= p&1;
+                                        }
+                                    sr = (sr+8)>>4; sg = (sg+8)>>4; sb = (sb+8)>>4;
+                                    int ax = col * MIP2_DIM + x;
+                                    int ay = row * MIP2_DIM + y;
+                                    atlas[ay * TEX_TILE_DIM + ax] =
+                                        (sr<<11)|(sg<<6)|(sb<<1)|sa;
+                                }
+                            }
+
+                            mip2_map[i].atlas_idx = atlas_idx;
+                            mip2_map[i].u_off = (float)(col * MIP2_DIM) / (float)TEX_TILE_DIM;
+                            mip2_map[i].v_off = (float)(row * MIP2_DIM) / (float)TEX_TILE_DIM;
+                            mip2_map[i].uv_scale = (float)MIP2_DIM / (float)TEX_TILE_DIM;
+                        }
+                    }
+
+                    /* Create surface_t wrappers for each atlas page */
+                    for (int a = 0; a < num_mip1_atlas; a++) {
+                        mip1_atlas_surfs[a] = surface_make_linear(
+                            mip1_atlas_px + a * TEX_TILE_DIM * TEX_TILE_DIM,
+                            FMT_RGBA16, TEX_TILE_DIM, TEX_TILE_DIM);
+                    }
+                    for (int a = 0; a < num_mip2_atlas; a++) {
+                        mip2_atlas_surfs[a] = surface_make_linear(
+                            mip2_atlas_px + a * TEX_TILE_DIM * TEX_TILE_DIM,
+                            FMT_RGBA16, TEX_TILE_DIM, TEX_TILE_DIM);
+                    }
+
+                    printf("  Mip atlases: %d + %d = %d GL objects (%d KB)\n",
+                           num_mip1_atlas, num_mip2_atlas,
+                           num_mip1_atlas + num_mip2_atlas,
+                           (num_mip1_atlas + num_mip2_atlas) * TEX_TILE_BYTES / 1024);
+                } else {
+                    printf("  Mip atlas alloc failed — far pass uses base textures\n");
+                }
 
                 /* Create a 1x1 solid white texture for flat-colored faces.
                  * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
@@ -1113,7 +1258,29 @@ int main(void) {
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
                             }
                         }
-                        /* Mip GL textures removed — RSPQ block OOM with 3× objects */
+                        /* Mip atlas GL texture objects (much fewer than per-tile) */
+                        if (mips_ok && gl_mip1_atlas) {
+                            glGenTextures(num_mip1_atlas, gl_mip1_atlas);
+                            for (int a = 0; a < num_mip1_atlas; a++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_mip1_atlas[a]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip1_atlas_surfs[a], NULL);
+                            }
+                        }
+                        if (mips_ok && gl_mip2_atlas) {
+                            glGenTextures(num_mip2_atlas, gl_mip2_atlas);
+                            for (int a = 0; a < num_mip2_atlas; a++) {
+                                glBindTexture(GL_TEXTURE_2D, gl_mip2_atlas[a]);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip2_atlas_surfs[a], NULL);
+                            }
+                        }
                         if (white_px) {
                             glGenTextures(1, &gl_white_tex);
                             glBindTexture(GL_TEXTURE_2D, gl_white_tex);
@@ -1367,10 +1534,27 @@ int main(void) {
                                      * whatever texture is currently active */
                                 } else {
                                     FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex)
+                                    if (want_tex == -2 && gl_white_tex) {
                                         glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    else if (want_tex >= 0)
-                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                    } else if (want_tex >= 0) {
+                                        /* Far pass: use atlas mip texture if available.
+                                         * Select mip1 (16×16) or mip2 (8×8) by distance. */
+                                        float rd = (room_idx < g_chunk_count)
+                                            ? g_chunks[room_idx].dist_sq : 0.0f;
+                                        if (pass == 0 && mips_ok &&
+                                            rd > CHUNK_VERY_FAR_DIST2 &&
+                                            mip2_map) {
+                                            int ai = mip2_map[want_tex].atlas_idx;
+                                            glBindTexture(GL_TEXTURE_2D, gl_mip2_atlas[ai]);
+                                        } else if (pass == 0 && mips_ok &&
+                                                   rd > CHUNK_FAR_DIST2 &&
+                                                   mip1_map) {
+                                            int ai = mip1_map[want_tex].atlas_idx;
+                                            glBindTexture(GL_TEXTURE_2D, gl_mip1_atlas[ai]);
+                                        } else {
+                                            glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                        }
+                                    }
                                     tex_bud.binds_this_frame++;
                                     tex_bud.last_bound_tex = want_tex;
                                 }
@@ -1441,10 +1625,32 @@ int main(void) {
                                     float tv = (float)(otex->uv[v].v >> 8);
                                     float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                     float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Normalize to 0-1, inset by half texel to avoid seam bleed */
+                                    /* Normalize to 0-1, inset by half texel */
                                     float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                    fs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                    ft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+                                    float base_s = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+                                    float base_t = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+
+                                    /* Far pass: remap UVs into atlas sub-tile.
+                                     * base_s/t are [0,1] within original tile.
+                                     * Atlas mapping scales + offsets to sub-tile. */
+                                    if (pass == 0 && mips_ok && !is_flat) {
+                                        float room_d = (room_idx < g_chunk_count)
+                                            ? g_chunks[room_idx].dist_sq : 0.0f;
+                                        if (room_d > CHUNK_VERY_FAR_DIST2 && mip2_map) {
+                                            base_s = mip2_map[tex_idx].u_off +
+                                                     base_s * mip2_map[tex_idx].uv_scale;
+                                            base_t = mip2_map[tex_idx].v_off +
+                                                     base_t * mip2_map[tex_idx].uv_scale;
+                                        } else if (room_d > CHUNK_FAR_DIST2 && mip1_map) {
+                                            base_s = mip1_map[tex_idx].u_off +
+                                                     base_s * mip1_map[tex_idx].uv_scale;
+                                            base_t = mip1_map[tex_idx].v_off +
+                                                     base_t * mip1_map[tex_idx].uv_scale;
+                                        }
+                                    }
+
+                                    fs[v] = base_s;
+                                    ft[v] = base_t;
                                 } else {
                                     fs[v] = 0; ft[v] = 0;
                                 }
