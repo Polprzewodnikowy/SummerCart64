@@ -664,17 +664,39 @@ int main(void) {
                     if (input.btn.d_down) dy += move_speed;
 
                     /* ===== SECTOR COLLISION SYSTEM =====
-                     * Helper: get floor/ceiling at a world position */
-                    #define GET_SECTOR_HEIGHTS(wx, wz, out_floor, out_ceil) do { \
+                     * Get floor/ceiling heights from sector data.
+                     * Uses lara_room as primary, follows pit_room/sky_room
+                     * for vertical room stacking. */
+                    #define GET_SECTOR_HEIGHTS(wx, wz, wy, out_floor, out_ceil) do { \
+                        int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz), _iy=(int32_t)(wy); \
+                        /* Start with current room */ \
                         int _best_room = lara_room; \
-                        int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz); \
-                        /* Find room containing this position */ \
-                        for (int _ri = 0; _ri < g_level.room_count; _ri++) { \
-                            tr_room_t *_rm = &g_level.rooms[_ri]; \
-                            int32_t _rx = _ix - _rm->x, _rz = _iz - _rm->z; \
-                            if (_rx >= 0 && _rx < _rm->sectors_x*1024 && \
-                                _rz >= 0 && _rz < _rm->sectors_z*1024) { \
-                                _best_room = _ri; break; \
+                        tr_room_t *_cr = &g_level.rooms[lara_room]; \
+                        int32_t _rx = _ix - _cr->x, _rz = _iz - _cr->z; \
+                        /* If outside current room XZ, search portals first */ \
+                        if (_rx < 0 || _rx >= _cr->sectors_x*1024 || \
+                            _rz < 0 || _rz >= _cr->sectors_z*1024) { \
+                            bool _found = false; \
+                            for (int _p = 0; _p < _cr->portal_count && !_found; _p++) { \
+                                int _d = _cr->portals[_p].room; \
+                                if (_d < 0 || _d >= g_level.room_count) continue; \
+                                tr_room_t *_pr = &g_level.rooms[_d]; \
+                                _rx = _ix - _pr->x; _rz = _iz - _pr->z; \
+                                if (_rx >= 0 && _rx < _pr->sectors_x*1024 && \
+                                    _rz >= 0 && _rz < _pr->sectors_z*1024) { \
+                                    _best_room = _d; _found = true; \
+                                } \
+                            } \
+                            if (!_found) { \
+                                /* Fallback: scan all rooms */ \
+                                for (int _ri = 0; _ri < g_level.room_count; _ri++) { \
+                                    tr_room_t *_rm = &g_level.rooms[_ri]; \
+                                    _rx = _ix - _rm->x; _rz = _iz - _rm->z; \
+                                    if (_rx >= 0 && _rx < _rm->sectors_x*1024 && \
+                                        _rz >= 0 && _rz < _rm->sectors_z*1024) { \
+                                        _best_room = _ri; break; \
+                                    } \
+                                } \
                             } \
                         } \
                         tr_room_t *_r = &g_level.rooms[_best_room]; \
@@ -687,12 +709,26 @@ int main(void) {
                             tr_sector_t *_s = &_r->sectors[_sz * _r->sectors_x + _sx]; \
                             (out_floor) = _s->floor * -256; \
                             (out_ceil) = _s->ceiling * -256; \
-                            if (_s->pit_room!=255 && _s->pit_room<g_level.room_count) { \
-                                tr_room_t *_bl=&g_level.rooms[_s->pit_room]; \
-                                int _bx=(_ix-_bl->x)>>10, _bz=(_iz-_bl->z)>>10; \
-                                if(_bx>=0&&_bx<_bl->sectors_x&&_bz>=0&&_bz<_bl->sectors_z&&_bl->sectors){ \
-                                    int32_t _bf=_bl->sectors[_bz*_bl->sectors_x+_bx].floor*-256; \
-                                    if(_bf>(out_floor))(out_floor)=_bf; \
+                            /* Follow pit_room down if camera is below current floor */ \
+                            if (_s->pit_room != 255 && _s->pit_room < g_level.room_count && \
+                                _iy > (out_floor)) { \
+                                tr_room_t *_bl = &g_level.rooms[_s->pit_room]; \
+                                int _bx = (_ix-_bl->x)>>10, _bz = (_iz-_bl->z)>>10; \
+                                if (_bx>=0 && _bx<_bl->sectors_x && _bz>=0 && _bz<_bl->sectors_z && _bl->sectors) { \
+                                    tr_sector_t *_bs = &_bl->sectors[_bz*_bl->sectors_x+_bx]; \
+                                    (out_floor) = _bs->floor * -256; \
+                                    (out_ceil) = _bs->ceiling * -256; \
+                                } \
+                            } \
+                            /* Follow sky_room up if camera is above current ceiling */ \
+                            if (_s->sky_room != 255 && _s->sky_room < g_level.room_count && \
+                                _iy < (out_ceil)) { \
+                                tr_room_t *_al = &g_level.rooms[_s->sky_room]; \
+                                int _ax = (_ix-_al->x)>>10, _az = (_iz-_al->z)>>10; \
+                                if (_ax>=0 && _ax<_al->sectors_x && _az>=0 && _az<_al->sectors_z && _al->sectors) { \
+                                    tr_sector_t *_as = &_al->sectors[_az*_al->sectors_x+_ax]; \
+                                    (out_floor) = _as->floor * -256; \
+                                    (out_ceil) = _as->ceiling * -256; \
                                 } \
                             } \
                         } else { (out_floor)=0; (out_ceil)=-10000; } \
@@ -701,21 +737,21 @@ int main(void) {
                     if (collision_on && (dx != 0 || dz != 0)) {
                         /* Check if destination sector is walkable */
                         int32_t cur_floor, cur_ceil, dst_floor, dst_ceil;
-                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cur_floor, cur_ceil);
-                        GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, dst_floor, dst_ceil);
+                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, cur_floor, cur_ceil);
+                        GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, cam_y, dst_floor, dst_ceil);
 
                         /* Wall detection: block if destination has no space
-                         * or floor height difference is too large (step > 512) */
+                         * or floor height difference is too large (step > 768) */
                         int32_t gap = dst_floor - dst_ceil;
                         int32_t step = dst_floor - cur_floor;
                         if (gap < 512 || step < -768) {
                             /* Wall — try sliding along X only */
-                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, dst_floor, dst_ceil);
+                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, cam_y, dst_floor, dst_ceil);
                             gap = dst_floor - dst_ceil;
                             step = dst_floor - cur_floor;
                             if (gap < 512 || step < -768) dx = 0;
                             /* Try Z only */
-                            GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, dst_floor, dst_ceil);
+                            GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, cam_y, dst_floor, dst_ceil);
                             gap = dst_floor - dst_ceil;
                             step = dst_floor - cur_floor;
                             if (gap < 512 || step < -768) dz = 0;
@@ -753,7 +789,7 @@ int main(void) {
 
                         /* Y collision: clamp between floor and ceiling */
                         int32_t fl, cl;
-                        GET_SECTOR_HEIGHTS(cam_x, cam_z, fl, cl);
+                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, fl, cl);
                         float floor_limit = (float)fl - 768.0f;
                         float ceil_limit = (float)cl + 128.0f;
 
