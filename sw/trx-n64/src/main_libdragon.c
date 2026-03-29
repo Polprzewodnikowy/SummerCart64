@@ -797,15 +797,16 @@ int main(void) {
 
                 /* Allocate texture pixel data via uncached malloc (not from
                  * the bump heap — it's full with level data + parser allocs).
-                 * Requires expansion pak (8MB) for the extra RDRAM. */
+                 * tex_tiles is temporary — freed after CI8 generation below.
+                 * tex_surfs (RGBA16 surfaces) no longer needed (all rendering
+                 * uses CI8 now), so we skip that allocation entirely. */
                 uint16_t *tex_tiles = (uint16_t *)malloc_uncached_aligned(
                     64, num_otex * TEX_TILE_BYTES);
-                surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
                 /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
                 float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
 
-                if (tex_tiles && tex_surfs && tex_uv_map) {
-                    printf("  Converting %d textures to 16x16 RGBA16...\n", num_otex);
+                if (tex_tiles && tex_uv_map) {
+                    printf("  Converting %d textures to RGBA16 (temp)...\n", num_otex);
                     console_render();
                     for (int i = 0; i < num_otex; i++) {
                         tr_object_texture_t *otex = &g_level.object_textures[i];
@@ -826,13 +827,13 @@ int main(void) {
                         if (tw < 1) tw = 1;
                         if (th < 1) th = 1;
 
-                        /* Store UV mapping */
+                        /* Store UV mapping (used by CI8 generation + render loop) */
                         tex_uv_map[i*4+0] = (float)u0;
                         tex_uv_map[i*4+1] = (float)v0;
                         tex_uv_map[i*4+2] = (float)TEX_TILE_DIM / (float)tw;
                         tex_uv_map[i*4+3] = (float)TEX_TILE_DIM / (float)th;
 
-                        /* Convert CI8 tile to RGBA16, subsample to 16x16.
+                        /* Convert CI8 tile to RGBA16, subsample to TEX_TILE_DIM.
                          * Writing through uncached pointer — goes straight to RDRAM. */
                         if (otex->tex_page < num_tex_pages) {
                             uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
@@ -851,9 +852,6 @@ int main(void) {
                                 tile[p] = 0x8421;
                         }
 
-                        /* Uncached memory — no flush needed */
-                        tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
-                                                           TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
 
@@ -897,24 +895,29 @@ int main(void) {
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
-                printf("  %d/%d textures ready (%d KB). Heap: %u KB left.\n",
+                /* Free RGBA16 tex_tiles — no longer needed (all rendering
+                 * uses CI8 now). This reclaims ~1.8 MB of uncached RDRAM. */
+                if (tex_tiles) {
+                    free_uncached(tex_tiles);
+                    tex_tiles = NULL;
+                    printf("  Freed RGBA16 tex_tiles: %d KB uncached\n",
+                           num_otex * TEX_TILE_BYTES / 1024);
+                }
+
+                printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
-                       num_otex * TEX_TILE_BYTES / 1024,
+                       num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024,
                        n64_mem_available() / 1024);
 
-                /* ---- Memory audit ----
-                 * Print allocation totals so we can track what's consuming
-                 * RDRAM.  Mip textures are NOT allocated — 560 KB uncached
-                 * for all ~880 textures doesn't fit alongside the base
-                 * textures + framebuffers + RSPQ blocks. */
+                /* ---- Memory audit ---- */
                 printf("\n=== MEMORY AUDIT ===\n");
                 printf("  Bump heap:  %u KB used, %u KB free (of %u KB)\n",
                        (GAME_HEAP_SIZE - n64_mem_available()) / 1024,
                        n64_mem_available() / 1024,
                        GAME_HEAP_SIZE / 1024);
-                printf("  Base textures: %d × %dx%d RGBA16 = %d KB (uncached)\n",
+                printf("  CI8 textures: %d × %dx%d CI8 = %d KB (uncached)\n",
                        num_otex, TEX_TILE_DIM, TEX_TILE_DIM,
-                       num_otex * TEX_TILE_BYTES / 1024);
+                       num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024);
                 printf("  Framebuffers: 2 × 320×240 × 16bpp = %d KB\n", 2*320*240*2/1024);
                 printf("  Z-buffer: 320×240 × 16bpp = %d KB\n", 320*240*2/1024);
                 printf("  Tex surfs: %d × %d = %d KB (heap)\n",
