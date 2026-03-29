@@ -198,6 +198,86 @@ building matrices. The RSP does the rest.
 
 ---
 
+---
+
+## mwpenny/portal64-still-alive — Portal on N64 (libultra + F3DEX2) ★★
+Source: https://github.com/mwpenny/portal64-still-alive
+
+### Borrowable Techniques
+
+1. **Doorway frustum narrowing** ★★★ (directly maps to TR1 portals)
+   - For each visible doorway/portal: construct 4 clipping planes from
+     camera position through portal corners → tighter frustum
+   - Recursively visit adjacent rooms with narrowed frustum
+   - Only renders geometry that's actually visible THROUGH the portal
+   - **Our current approach**: mark all connected rooms visible regardless.
+     This technique would reduce visible geometry significantly.
+   - File: `src/levels/static_render.c:119-166`, `src/scene/camera.c:8-52`
+
+2. **Pre-computed room non-visibility bitmask**
+   - `nonVisibleRooms` u64 bitmask per room, baked at build time
+   - Fast bitwise rejection: rooms that can NEVER be seen from a given
+     room are masked out before portal traversal
+   - **TR1 has similar room data** — could generate equivalent masks
+   - File: `tools/level_scripts/room_export.lua`
+
+3. **4-bit twoTone textures** ★★ (massive TMEM savings)
+   - Store wall textures as 4-bit intensity (grayscale)
+   - Use color combiner to lerp between two colors via the texture:
+     `PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT` (cycle 1)
+     `COMBINED × SHADE` (cycle 2)
+   - Result: full-color textured walls at 4bpp instead of 16bpp
+   - A 32×32 4-bit tile = 512 bytes TMEM (vs 2 KB for RGBA16, 1 KB for CI8)
+   - **Could halve our TMEM usage for room textures**
+   - File: `assets/materials/static.skm.yaml`
+
+4. **Per-room BVH with skip pointers (build-time)**
+   - Axis-aligned BVH built at build time, serialized as flat array
+   - `siblingOffset` skip pointers for efficient frustum traversal
+   - O(log n) per-room geometry culling vs our O(n) face loop
+   - File: `tools/level_scripts/static_export.lua:257-317`
+
+5. **Baked vertex lighting from Blender**
+   - Python script bakes ambient volumes + point light contributions
+     directly into vertex colors at build time
+   - Runtime: zero lighting cost — just `SHADE` in combiner
+   - **TR1 has per-vertex light values** — we already use them, but
+     could pre-bake fog+lighting into vertex colors at load time
+   - File: `tools/blender/bake_lighting.py`
+
+6. **Material sort key: (material << 23 | distance)**
+   - Simple integer sort key groups by material first, distance second
+   - Minimizes state changes during rendering
+   - **Applicable to our near pass** — sort faces by texture index
+     to reduce CI8 upload frequency
+   - File: `src/graphics/render_scene.c`
+
+7. **Z-buffer partitioning for nested views (no stencil)**
+   - Splits Z range [0, G_MAXZ] proportionally across portal views
+   - Each view gets its own depth range, preventing Z-fighting
+   - **Could use for our near/far pass Z-fighting at distance transitions**
+   - File: `src/scene/render_plan.c:430-491`
+
+8. **ROM-loaded dynamic assets with pointer fixup**
+   - Models loaded on-demand from ROM via `romCopy()`
+   - Display list pointers patched at load time for VTX/SETTIMG/DL addresses
+   - **Pattern for ROM-streaming TR1 mesh data**
+   - File: `src/scene/dynamic_asset_loader.c`
+
+### Not Applicable
+- F3DEX2 microcode (libultra)
+- Shadow volume rendering (too expensive for TR1 scene complexity)
+- Recursive portal rendering (TR1 portals are one-way doorways, not see-through)
+
+### Key Insight
+The doorway frustum narrowing is the single most impactful visibility
+technique we're missing. Our current "all connected rooms visible"
+approach renders ~3x more geometry than needed. Constructing per-portal
+frustums and only recursing through visible portals would dramatically
+reduce face count before the vertex cache even runs.
+
+---
+
 ## Future Repos to Investigate
 - HailToDodongo/tiny3d (T3D) — libdragon RSP vertex T&L overlay ★ PRIORITY
 - libdragon GL internals — RSP overlay for OpenGL vertex processing
