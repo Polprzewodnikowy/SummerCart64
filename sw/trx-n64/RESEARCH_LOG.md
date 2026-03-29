@@ -97,6 +97,74 @@ Source: https://github.com/lambertjamesd/n64brew2023
 - F3DEX2 vertex pipeline (libultra)
 - Ear-clipping triangulation (we use pre-triangulated TR1 meshes)
 
+### Megatextures Deep Dive — CI8 Cache Blueprint
+
+**Tile cache struct** (`megatexture_tilecache.h`):
+```c
+struct MTTileCacheEntry {
+    u16 newerTile, olderTile;  // doubly-linked LRU list
+    u16 nextHashTile;          // hash chain collision list
+    u16 hashTableIndex;        // which bucket (MT_NO_TILE_INDEX if not hashed)
+    void* romAddress;          // ROM address = identity key
+};
+```
+
+**Hash function**: `(LARGE_PRIME * (romAddr >> 11)) & mask`
+- Right-shift by 11 drops always-zero bits (tiles are 2048-byte aligned)
+- Hash table 2x overprovisioned (reduces collisions)
+
+**Cache lookup** — O(1) average:
+```c
+Gfx* mtTileCacheSearch(cache, romAddress, hashIndex) {
+    int idx = cache->hashTable[hashIndex];
+    while (idx != MT_NO_TILE_INDEX) {
+        if (entries[idx].romAddress == romAddress) {
+            markMostRecent(idx);  // promote in LRU
+            return &tileLoaders[idx * MT_GFX_SIZE];  // pre-built DL
+        }
+        idx = entries[idx].nextHashTile;
+    }
+    return NULL;  // miss
+}
+```
+
+**On cache miss**: evict LRU entry, async DMA from ROM:
+```c
+dmaIoMesg->dramAddr = &tileData[entryIndex * MT_TILE_WORDS];
+dmaIoMesg->devAddr  = (u32)romAddress;
+dmaIoMesg->size     = 2048;  // 32×32 RGBA16
+osEPiStartDma(piHandle, dmaIoMesg, OS_READ);
+```
+- 64-slot circular message queue for async DMA
+- Max 56 DMA transfers per frame (`gMtMaxTileRequestsPerFrame`)
+- All DMAs collected at frame end before RSP submission
+
+**Eviction**: strict LRU with per-frame fence
+- `oldestTileFromFrame[1]` = oldest tile used last frame
+- Won't evict past this fence (prevents evicting active tiles)
+- Two-frame rolling window rotated each frame
+
+**Fallback on miss**: walks up mip chain (coarser LOD) looking for
+any cached tile. Ultimate fallback: `gsSPEndDisplayList` (no-op).
+
+**Pre-built display list per slot** (10 commands, built at init):
+```
+gDPPipeSync → gDPTileSync → gDPSetTextureImage(slot_buffer) →
+gDPSetTile → gDPLoadSync → gDPLoadBlock(1024 texels) →
+gDPPipeSync → gDPSetTile(render) → gDPSetTileSize → gSPEndDisplayList
+```
+Only last 2 commands patched on tile reassignment (shift + offset).
+
+**Our CI8 adaptation**:
+| Megatextures (RGBA16) | Our TR1 CI8 cache |
+|---|---|
+| 2048 entries × 2KB = 4MB | 128 entries × 1KB = 128KB |
+| Hash key = ROM address | Hash key = texture index (0-896) |
+| 10-cmd display list per slot | surface_t per slot (for rdpq_tex_upload) |
+| Coarser LOD fallback | Use last-bound texture (no mipmaps in TR1) |
+| osEPiStartDma (async) | dma_read (libdragon) |
+| osInvalDCache at init | malloc_uncached (no cache issues) |
+
 ---
 
 ## lambertjamesd/n64brew2025 — "Junk Runner 64" (libdragon + T3D) ★★★
