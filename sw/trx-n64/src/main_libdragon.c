@@ -1403,21 +1403,34 @@ int main(void) {
                     }
 
                     /* Ring 2: rooms connected to connected rooms.
-                     * Rendered with IA4 + heavy fog via far pass as a
-                     * void-prevention fallback.  Never see empty space. */
-                    int ring1_end = vis_count; /* mark end of ring 1 */
+                     * Only added if the portal leading to them is
+                     * visible to the camera — no point fogging rooms
+                     * the player can't see. */
+                    int ring1_end = vis_count;
                     for (int vi = 0; vi < ring1_end && vis_count < MAX_DRAW_ROOMS; vi++) {
                         int r1 = vis_rooms[vi];
                         if (r1 < 0 || r1 >= g_level.room_count) continue;
                         tr_room_t *r1r = &g_level.rooms[r1];
                         for (int p = 0; p < r1r->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
-                            int dest = r1r->portals[p].room;
+                            tr_portal_t *portal = &r1r->portals[p];
+                            int dest = portal->room;
                             if (dest < 0 || dest >= g_chunk_count) continue;
                             bool dup = false;
                             for (int vi2 = 0; vi2 < vis_count; vi2++) {
                                 if (vis_rooms[vi2] == dest) { dup = true; break; }
                             }
                             if (dup) continue;
+
+                            /* Only add if portal is in camera view */
+                            int front = 0;
+                            for (int pv = 0; pv < 4; pv++) {
+                                float px = (float)(r1r->x + portal->vertices[pv].x) - cam_x;
+                                float pz = (float)(r1r->z + portal->vertices[pv].z) - cam_z;
+                                float rz_p = px * sy + pz * cy;
+                                if (rz_p > -256.0f) front++;
+                            }
+                            if (front == 0) continue; /* entirely behind camera */
+
                             tr_chunk_t *c = &g_chunks[dest];
                             float ddx = c->cx - cam_x;
                             float ddz = c->cz - cam_z;
