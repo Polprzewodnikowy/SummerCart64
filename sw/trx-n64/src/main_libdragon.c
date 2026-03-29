@@ -688,7 +688,7 @@ int main(void) {
 
         if (is_compressed) {
             uint8_t *comp_buf = (uint8_t *)malloc(read_bytes + 16);
-            level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
+            level_data = (uint8_t *)malloc_uncached_aligned(16, level_size + 4096);
             printf("  Compressed: %u KB -> %u KB\n",
                    level_compressed / 1024, level_size / 1024);
             if (!comp_buf || !level_data) {
@@ -712,8 +712,8 @@ int main(void) {
                 }
             }
         } else {
-            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
-            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
+            level_data = (uint8_t *)malloc_uncached_aligned(16, read_bytes + 4096);
+            printf("  Alloc %u KB (uncached)... ", (read_bytes + 4096) / 1024);
             if (!level_data) {
                 printf("FAILED\n");
             } else if (level_sector > 0) {
@@ -904,8 +904,15 @@ int main(void) {
                            num_otex * TEX_TILE_BYTES / 1024);
                 }
 
-                /* level_data stays in bump heap (can't free).
-                 * tex_pages points into it (zero-copy). */
+                /* Free level_data (uncached RDRAM) — all parsed structures
+                 * are in bump heap, CI8 tiles generated. tex_pages pointed
+                 * into level_data (zero-copy) so null it first. */
+                g_level.tex_pages = NULL;
+                if (level_data) {
+                    free_uncached(level_data);
+                    printf("  Freed level_data (uncached)\n");
+                    level_data = NULL;
+                }
 
                 printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
