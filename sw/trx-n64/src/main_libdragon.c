@@ -1225,7 +1225,7 @@ int main(void) {
                         int far_uploads = 0;
                         int far_tris = 0;
                         #define FAR_MAX_UPLOADS  48  /* cap TMEM uploads per frame */
-                        #define FAR_FLUSH_EVERY 200  /* flush RSPQ every N triangles */
+                        #define FAR_FLUSH_EVERY  50  /* flush RSPQ every N triangles */
 
                         for (int fi = 0; fi < far_count; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1258,15 +1258,16 @@ int main(void) {
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
                                         if (far_uploads < FAR_MAX_UPLOADS) {
+                                            rspq_flush(); /* drain before upload */
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                             far_last_tex = (int)tex_idx;
                                             far_uploads++;
                                         }
-                                        /* else: reuse current texture (fallback) */
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
                                         if (far_uploads < FAR_MAX_UPLOADS) {
+                                            rspq_flush();
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                                             far_last_tex = -2;
                                             far_uploads++;
