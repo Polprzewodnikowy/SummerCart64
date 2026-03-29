@@ -1700,7 +1700,9 @@ int main(void) {
                             float sm_rz = sdx * sy + sdz * cy;
                             if (sm_rz < -1024) continue;
                             float sm_rx = sdx * cy - sdz * sy;
-                            if (sm_rz > 0) { float l = sm_rz * 3.0f; if (sm_rx > l || sm_rx < -l) continue; }
+                            /* Only apply horizontal frustum cull at distance —
+                             * when close, the mesh is visible even if off-center */
+                            if (sm_rz > 1024) { float l = sm_rz * 3.0f; if (sm_rx > l || sm_rx < -l) continue; }
 
                             /* Find static object definition */
                             int mesh_idx = -1;
