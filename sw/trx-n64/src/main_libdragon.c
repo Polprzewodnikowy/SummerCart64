@@ -1167,8 +1167,8 @@ int main(void) {
                      *          Near rooms are placed first in rooms_to_draw[];
                      *          far rooms follow (sorted back-to-front for Phase 2).
                      * =================================================== */
-                    #define MAX_PORTAL_CANDIDATES 128
-                    #define MAX_DRAW_ROOMS        48
+                    #define MAX_PORTAL_CANDIDATES 64
+                    #define MAX_DRAW_ROOMS        32
 
                     int  bfs_candidates[MAX_PORTAL_CANDIDATES];
                     int  bfs_count = 0;
@@ -1300,8 +1300,8 @@ int main(void) {
 
                         int far_last_tex = -1;
                         int far_tris = 0;
-                        int far_rooms_max = far_count < 24 ? far_count : 24;
-                        #define FAR_TRI_BUDGET   500
+                        int far_rooms_max = far_count < 16 ? far_count : 16;
+                        #define FAR_TRI_BUDGET   300
                         #define FAR_UPLOAD_BUDGET  8
 
                         for (int fi = 0; fi < far_rooms_max; fi++) {
