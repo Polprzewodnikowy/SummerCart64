@@ -720,84 +720,79 @@ int main(void) {
                 #endif
 
                 int baked_room_count = 0;
-                /* BAK2 format: per-room CI8 palette+indices, CI4 palette+nibbles */
-                uint8_t  *baked_data = NULL;     /* all baked data (cached heap) */
-                /* Per-room pointers into baked_data */
-                uint16_t **bkd_m1_pal = NULL;    /* mip1 CI8 palette (256 entries) */
-                uint8_t  **bkd_m1_idx = NULL;    /* mip1 CI8 indices (16×16) */
-                surface_t *bkd_m1_surf = NULL;   /* mip1 surface_t */
-                uint16_t **bkd_m2_pal = NULL;    /* mip2 CI4 palette (16 entries) */
-                uint8_t  **bkd_m2_dat = NULL;    /* mip2 CI4 nibbles (8×8/2) */
-                surface_t *bkd_m2_surf = NULL;   /* mip2 surface_t */
+                /* BAK3: 5 mip tiers per room — CI8, CI4, IA8, IA4 */
+                uint8_t   *baked_data = NULL;
+                uint16_t **bkd_m1_pal = NULL;   /* CI8 palette */
+                surface_t *bkd_m1_surf = NULL;  /* 16×16 CI8 */
+                uint16_t **bkd_m2_pal = NULL;   /* CI4 palette */
+                surface_t *bkd_m2_surf = NULL;  /* 8×8 CI4 */
+                surface_t *bkd_m3_surf = NULL;  /* 8×8 IA8 */
+                surface_t *bkd_m4_surf = NULL;  /* 4×4 IA4 */
 
-                /* BAK2 per-room layout:
-                 *   mip0: 32×32 RGBA16 = 2048 bytes (skipped at runtime)
-                 *   mip1_pal: 256 × RGBA16 = 512 bytes
-                 *   mip1_idx: 16×16 CI8 = 256 bytes
-                 *   mip2_pal: 16 × RGBA16 = 32 bytes
-                 *   mip2_dat: 8×8 CI4 packed = 32 bytes
-                 *   Total per room: 2880 bytes */
-                #define BAK2_PER_ROOM   2880
-                #define BAK2_MIP0_SIZE  (32*32*2)     /* 2048 */
-                #define BAK2_M1PAL_SIZE (256*2)       /* 512 */
-                #define BAK2_M1IDX_SIZE (16*16)       /* 256 */
-                #define BAK2_M2PAL_SIZE (16*2)        /* 32 */
-                #define BAK2_M2DAT_SIZE (8*8/2)       /* 32 */
-                /* Offset of mip1 data within each room's block */
-                #define BAK2_M1_OFF     BAK2_MIP0_SIZE
-                /* What we load per room (skip mip0): */
-                #define BAK2_LOAD_PER   (BAK2_M1PAL_SIZE + BAK2_M1IDX_SIZE + BAK2_M2PAL_SIZE + BAK2_M2DAT_SIZE)
+                #define BAK3_PER_ROOM   2952
+                #define BAK3_MIP0_SIZE  (32*32*2)
+                #define BAK3_M1PAL_SZ   (256*2)
+                #define BAK3_M1IDX_SZ   (16*16)
+                #define BAK3_M2PAL_SZ   (16*2)
+                #define BAK3_M2DAT_SZ   (8*8/2)
+                #define BAK3_M3_SZ      (8*8)
+                #define BAK3_M4_SZ      (4*4/2)
+                #define BAK3_SKIP       BAK3_MIP0_SIZE
+                #define BAK3_LOAD_PER   (BAK3_M1PAL_SZ + BAK3_M1IDX_SZ + BAK3_M2PAL_SZ + BAK3_M2DAT_SZ + BAK3_M3_SZ + BAK3_M4_SZ)
 
                 if (BAKED_ROM_OFFSET > 0 && BAKED_ROM_SIZE > BAKED_HEADER_SIZE) {
                     static uint8_t bake_hdr[16] __attribute__((aligned(16)));
                     dma_read(bake_hdr, ROM_CART_BASE + BAKED_ROM_OFFSET, 16);
 
                     if (bake_hdr[0]=='B' && bake_hdr[1]=='A' &&
-                        bake_hdr[2]=='K' && bake_hdr[3]=='2') {
+                        bake_hdr[2]=='K' && bake_hdr[3]=='3') {
                         baked_room_count = bake_hdr[4] | (bake_hdr[5] << 8);
-                        printf("  BAK2 data: %d rooms (CI8+CI4 mips)\n",
+                        printf("  BAK3: %d rooms (CI8+CI4+IA8+IA4)\n",
                                baked_room_count);
 
-                        /* Allocate in cached heap */
-                        int total_load = baked_room_count * BAK2_LOAD_PER;
-                        baked_data = (uint8_t *)n64_mem_alloc(total_load + 64);
+                        int total_load = baked_room_count * BAK3_LOAD_PER;
+                        baked_data  = (uint8_t *)n64_mem_alloc(total_load + 64);
                         bkd_m1_pal  = (uint16_t **)n64_mem_alloc(baked_room_count * sizeof(void*));
-                        bkd_m1_idx  = (uint8_t **)n64_mem_alloc(baked_room_count * sizeof(void*));
                         bkd_m1_surf = (surface_t *)n64_mem_alloc(baked_room_count * sizeof(surface_t));
                         bkd_m2_pal  = (uint16_t **)n64_mem_alloc(baked_room_count * sizeof(void*));
-                        bkd_m2_dat  = (uint8_t **)n64_mem_alloc(baked_room_count * sizeof(void*));
                         bkd_m2_surf = (surface_t *)n64_mem_alloc(baked_room_count * sizeof(surface_t));
+                        bkd_m3_surf = (surface_t *)n64_mem_alloc(baked_room_count * sizeof(surface_t));
+                        bkd_m4_surf = (surface_t *)n64_mem_alloc(baked_room_count * sizeof(surface_t));
 
-                        if (baked_data && bkd_m1_surf && bkd_m2_surf) {
+                        if (baked_data && bkd_m1_surf && bkd_m4_surf) {
                             for (int bi = 0; bi < baked_room_count; bi++) {
-                                /* DMA mip1+mip2 (skip mip0 RGBA16) from ROM */
                                 uint32_t rom_off = ROM_CART_BASE +
                                     BAKED_ROM_OFFSET + BAKED_HEADER_SIZE +
-                                    bi * BAK2_PER_ROOM + BAK2_M1_OFF;
-                                uint8_t *dst = baked_data + bi * BAK2_LOAD_PER;
-                                dma_read(dst, rom_off, BAK2_LOAD_PER);
+                                    bi * BAK3_PER_ROOM + BAK3_SKIP;
+                                uint8_t *d = baked_data + bi * BAK3_LOAD_PER;
+                                dma_read(d, rom_off, BAK3_LOAD_PER);
 
-                                /* Set up pointers into the loaded data */
-                                bkd_m1_pal[bi]  = (uint16_t *)(dst);
-                                bkd_m1_idx[bi]  = dst + BAK2_M1PAL_SIZE;
-                                bkd_m2_pal[bi]  = (uint16_t *)(dst + BAK2_M1PAL_SIZE + BAK2_M1IDX_SIZE);
-                                bkd_m2_dat[bi]  = dst + BAK2_M1PAL_SIZE + BAK2_M1IDX_SIZE + BAK2_M2PAL_SIZE;
-
-                                /* Create surface_t for CI8 and CI4 */
+                                int off = 0;
+                                bkd_m1_pal[bi] = (uint16_t *)(d + off);
+                                off += BAK3_M1PAL_SZ;
                                 bkd_m1_surf[bi] = surface_make_linear(
-                                    bkd_m1_idx[bi], FMT_CI8, MIP1_DIM, MIP1_DIM);
+                                    d + off, FMT_CI8, MIP1_DIM, MIP1_DIM);
+                                off += BAK3_M1IDX_SZ;
+                                bkd_m2_pal[bi] = (uint16_t *)(d + off);
+                                off += BAK3_M2PAL_SZ;
                                 bkd_m2_surf[bi] = surface_make_linear(
-                                    bkd_m2_dat[bi], FMT_CI4, MIP2_DIM, MIP2_DIM);
+                                    d + off, FMT_CI4, MIP2_DIM, MIP2_DIM);
+                                off += BAK3_M2DAT_SZ;
+                                bkd_m3_surf[bi] = surface_make_linear(
+                                    d + off, FMT_IA8, 8, 8);
+                                off += BAK3_M3_SZ;
+                                bkd_m4_surf[bi] = surface_make_linear(
+                                    d + off, FMT_IA4, 4, 4);
                             }
                             data_cache_hit_writeback(baked_data, total_load);
-                            printf("  BAK2 loaded: %d KB cached (CI8+CI4)\n",
+                            printf("  BAK3 loaded: %d KB cached\n",
                                    total_load / 1024);
                         } else {
-                            printf("  BAK2 alloc failed\n");
+                            printf("  BAK3 alloc failed\n");
                             baked_room_count = 0;
                         }
                     } else {
-                        printf("  No BAK2 data in ROM (magic: %c%c%c%c)\n",
+                        printf("  No BAK3 in ROM (got: %c%c%c%c)\n",
                                bake_hdr[0], bake_hdr[1], bake_hdr[2], bake_hdr[3]);
                     }
                 } else {
@@ -1488,16 +1483,28 @@ int main(void) {
                                 float rd = (room_idx < g_chunk_count)
                                     ? g_chunks[room_idx].dist_sq : 0.0f;
                                 rspq_flush();
-                                if (rd > CHUNK_VERY_FAR_DIST2 && bkd_m2_surf) {
-                                    /* CI4 mip2: upload 16-color TLUT + 8×8 CI4 */
+                                if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
+                                    /* IA4 extreme far: 4×4 silhouette, no TLUT */
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
+                                    room_uv_scale = 4.0f / 32.0f;
+                                } else if (rd > CHUNK_XFAR_DIST2 && bkd_m3_surf) {
+                                    /* IA8 extra far: 8×8 grayscale, no TLUT */
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
+                                    room_uv_scale = 8.0f / 32.0f;
+                                } else if (rd > CHUNK_VERY_FAR_DIST2 && bkd_m2_surf) {
+                                    /* CI4 far: 8×8 + 16-color TLUT */
+                                    rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
-                                    room_uv_scale = (float)MIP2_DIM / (float)MIP0_DIM;
+                                    room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_m1_surf) {
-                                    /* CI8 mip1: upload 256-color TLUT + 16×16 CI8 */
+                                    /* CI8 mid-far: 16×16 + 256-color TLUT */
+                                    rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                     rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
-                                    room_uv_scale = (float)MIP1_DIM / (float)MIP0_DIM;
+                                    room_uv_scale = 16.0f / 32.0f;
                                 }
                                 room_baked = true;
                                 far_last_tex = -99;
