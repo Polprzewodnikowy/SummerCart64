@@ -688,7 +688,7 @@ int main(void) {
 
         if (is_compressed) {
             uint8_t *comp_buf = (uint8_t *)malloc(read_bytes + 16);
-            level_data = (uint8_t *)malloc_uncached_aligned(16, level_size + 4096);
+            level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
             printf("  Compressed: %u KB -> %u KB\n",
                    level_compressed / 1024, level_size / 1024);
             if (!comp_buf || !level_data) {
@@ -712,8 +712,8 @@ int main(void) {
                 }
             }
         } else {
-            level_data = (uint8_t *)malloc_uncached_aligned(16, read_bytes + 4096);
-            printf("  Alloc %u KB (uncached)... ", (read_bytes + 4096) / 1024);
+            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
             if (!level_data) {
                 printf("FAILED\n");
             } else if (level_sector > 0) {
@@ -904,10 +904,7 @@ int main(void) {
                            num_otex * TEX_TILE_BYTES / 1024);
                 }
 
-                /* level_data stays allocated (uncached RDRAM).
-                 * free_uncached was causing RSP deadlocks — likely
-                 * corrupting the uncached allocator pool that RSPQ
-                 * uses for DMA buffers. Keep it alive for safety. */
+                /* level_data stays in bump heap — can't free but stable. */
 
                 printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
@@ -2106,8 +2103,8 @@ int main(void) {
                                         sv[0], sv[tri+1], sv[tri+2]);
                                     far_tris++;
                                     perf_far_tris = far_tris;
-                                    if ((far_tris & 15) == 0)
-                                        rspq_wait();
+                                    if ((far_tris & 7) == 0)
+                                        rspq_flush();
                                     if (far_tris >= FAR_TRI_BUDGET)
                                         goto far_pass_done;
                                 }
@@ -2375,7 +2372,7 @@ int main(void) {
                             for (int tri = 0; tri < num_tris; tri++) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
-                                if ((perf_near_tris & 15) == 0) rspq_wait();
+                                if ((perf_near_tris & 7) == 0) rspq_flush();
                             }
                         }
                     }
@@ -2522,7 +2519,7 @@ int main(void) {
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                     perf_near_tris++;
-                                    if ((perf_near_tris & 15) == 0) rspq_wait();
+                                    if ((perf_near_tris & 7) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -2686,7 +2683,7 @@ int main(void) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                         perf_near_tris++;
                                     }
-                                    if ((perf_near_tris & 15) == 0) rspq_wait();
+                                    if ((perf_near_tris & 7) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -3001,7 +2998,7 @@ int main(void) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 perf_near_tris++;
                             }
-                            if ((perf_near_tris & 15) == 0) rspq_wait();
+                            if ((perf_near_tris & 7) == 0) rspq_flush();
                         }
                     }
                     perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
