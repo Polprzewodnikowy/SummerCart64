@@ -2011,8 +2011,24 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
                         perf_near_rooms++;
+
+                        /* Face decimation: skip faces for distant rooms.
+                         * Current room (lara_room): all faces.
+                         * Connected rooms beyond near threshold: skip
+                         * every Nth face based on distance ratio.
+                         * Preserves silhouette, reduces fill + vertex cost. */
+                        int face_skip = 1; /* 1 = all faces */
+                        if (room_idx != lara_room && room_idx < g_chunk_count) {
+                            tr_chunk_t *c = &g_chunks[room_idx];
+                            if (c->dist_sq > c->near_dist2 * 2.0f) {
+                                face_skip = 3; /* far connected: every 3rd */
+                            } else if (c->dist_sq > c->near_dist2) {
+                                face_skip = 2; /* mid connected: every 2nd */
+                            }
+                        }
+
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f++) {
+                        for (int f = 0; f < max_faces; f += face_skip) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
