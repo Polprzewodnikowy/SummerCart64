@@ -1102,9 +1102,12 @@ int main(void) {
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
 
-                    /* Clear before any rendering (outside GL context) */
-                    rdpq_set_mode_fill(RGBA32(0, 0, 0, 0xFF));
-                    rdpq_fill_rectangle(0, 0, 320, 240);
+                    /* Clear color + depth via proper rdpq API.
+                     * Using rdpq_clear instead of manual set_mode_fill +
+                     * fill_rectangle to avoid RDP mode tracking conflicts
+                     * with the subsequent set_mode_standard for the far pass. */
+                    rdpq_clear(RGBA32(0, 0, 0, 0xFF));
+                    rdpq_clear_z(0xFFFC);
 
                     /* Precompute pitch sin/cos for CPU projection */
                     float sp = sinf(cam_rot_x);
@@ -1326,9 +1329,9 @@ int main(void) {
                                     fog += y_bias;
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f;
-                                    r = r * (1.0f - fog) + 0.15f * fog;
-                                    g = g * (1.0f - fog) + 0.13f * fog;
-                                    b = b * (1.0f - fog) + 0.18f * fog;
+                                    r = r * (1.0f - fog) + 0.25f * fog;
+                                    g = g * (1.0f - fog) + 0.22f * fog;
+                                    b = b * (1.0f - fog) + 0.30f * fog;
 
                                     /* Texture coords in pixel space */
                                     float ts = 0, tt = 0;
@@ -1544,9 +1547,9 @@ int main(void) {
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
                                     /* Cave fog: dark blue-gray but visible */
-                                    r = r * (1.0f - fog) + 0.15f * fog;
-                                    g = g * (1.0f - fog) + 0.13f * fog;
-                                    b = b * (1.0f - fog) + 0.18f * fog;
+                                    r = r * (1.0f - fog) + 0.25f * fog;
+                                    g = g * (1.0f - fog) + 0.22f * fog;
+                                    b = b * (1.0f - fog) + 0.30f * fog;
                                 }
 
                                 cr[v] = (uint8_t)(r * 255.0f);
