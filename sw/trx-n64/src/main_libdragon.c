@@ -1189,7 +1189,35 @@ int main(void) {
                         } \
                     } while(0)
 
-                    for (int ri = 0; ri < num_draw; ri++) {
+                    /* ===== DRAW ROOMS — two-pass: far then near =====
+                     *
+                     * Pass 0 (FAR):  Z-buffer OFF, back-to-front sorted.
+                     *   Saves Z bandwidth for distant rooms. Painter's
+                     *   algorithm handles self-occlusion.  These rooms are
+                     *   in rooms_to_draw[near_count .. num_draw-1].
+                     *
+                     * Pass 1 (NEAR): Z-buffer ON, normal rendering.
+                     *   Near rooms are in rooms_to_draw[0 .. near_count-1].
+                     *   Near geometry overwrites far geometry where they
+                     *   overlap on screen — correct by draw order. */
+
+                    for (int pass = 0; pass < 2; pass++) {
+                        int loop_start, loop_end;
+                        if (pass == 0) {
+                            /* FAR PASS */
+                            glDisable(GL_DEPTH_TEST);
+                            glDepthMask(GL_FALSE);
+                            loop_start = near_count;
+                            loop_end   = num_draw;
+                        } else {
+                            /* NEAR PASS */
+                            glEnable(GL_DEPTH_TEST);
+                            glDepthMask(GL_TRUE);
+                            loop_start = 0;
+                            loop_end   = near_count;
+                        }
+
+                    for (int ri = loop_start; ri < loop_end; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
@@ -1279,7 +1307,15 @@ int main(void) {
                         }
                     }
                     FLUSH_GL();
+                    cur_tex = -1;  /* Reset texture state between passes */
+
+                    } /* end pass loop (far / near) */
                     #undef FLUSH_GL
+
+                    /* Ensure Z is back on for any subsequent rendering
+                     * (sprites, items, Lara — still in #if 0 for now). */
+                    glEnable(GL_DEPTH_TEST);
+                    glDepthMask(GL_TRUE);
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
