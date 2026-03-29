@@ -28,12 +28,11 @@
 /* Distance thresholds in TR1 world units (squared for cheap comparison).
  * 1 sector = 1024 units. ~5 sectors near, ~10 sectors = far. */
 #define CHUNK_NEAR_DIST2  (5120.0f  * 5120.0f)
-#define CHUNK_FAR_DIST2   (10240.0f * 10240.0f)
+#define CHUNK_FAR_DIST2   (7168.0f * 7168.0f)   /* ~7 sectors = far */
 
-/* Far clip for frustum culling.  The RDPQ far pass has no Z-buffer,
- * so we can push this well beyond the GL near-pass clip (11200).
- * This controls how far the BFS-visible rooms extend. */
-#define CHUNK_FAR_WORLD   25000.0f
+/* Far clip distance.  Portal visibility replaces frustum culling,
+ * so this only affects the fog ramp endpoint. */
+#define CHUNK_FAR_WORLD   20000.0f
 
 /* -----------------------------------------------------------------------
  * Horizontal frustum constants

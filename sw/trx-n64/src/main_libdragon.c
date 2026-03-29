@@ -321,16 +321,11 @@ static void build_clusters(const tr_level_t *level) {
 }
 
 /*
- * Sphere–frustum test in TR1 world space (horizontal planes only).
- *
- * Uses the camera yaw rotation (sy, cy_ang) to put the sphere into
- * camera-space XZ, then tests four planes: back, far, left, right.
- * Pitch is ignored here; it only matters for top/bottom culling which
- * is less critical for TR1's mostly horizontal rooms.
- *
- * Returns true if the sphere MAY be visible (conservative).
+ * Sphere–frustum test (kept for potential future use but currently
+ * unused — portal visibility replaced it).
  */
-static bool chunk_frustum_visible(const tr_chunk_t *c,
+static bool __attribute__((unused)) chunk_frustum_visible(
+                                  const tr_chunk_t *c,
                                   float cam_x, float cam_z,
                                   float sy, float cy_ang) {
     float dx = c->cx - cam_x;
@@ -847,11 +842,11 @@ int main(void) {
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
                 int perf_far_rooms = 0;
-                int perf_far_faces = 0;
+                int perf_far_faces __attribute__((unused)) = 0;
                 int perf_far_tris = 0;
                 int perf_far_uploads = 0;
                 int perf_near_rooms = 0;
-                int perf_near_faces = 0;
+                int perf_near_faces __attribute__((unused)) = 0;
                 int perf_near_binds = 0;
 
                 /* Render loop */
@@ -1151,63 +1146,116 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Portal BFS + chunk frustum cull + LOD
+                     * VISIBILITY: Portal-clipped traversal + LOD
                      *
-                     * Step 1 — Portal BFS gives us the set of rooms that
-                     *          are physically reachable through open portals.
-                     *          Cap at MAX_PORTAL_CANDIDATES to keep BFS fast.
+                     * Proper TR1 portal visibility: each room carries a
+                     * screen-space clip rect.  Only rooms visible through
+                     * a chain of portals from the camera get drawn.
+                     * Rooms behind walls are automatically excluded.
                      *
-                     * Step 2 — For each BFS candidate, run the sphere–frustum
-                     *          test via the pre-built chunk descriptors.
-                     *          Rooms behind the camera or outside the horizontal
-                     *          FOV are discarded before any geometry work.
-                     *
-                     * Step 3 — Classify surviving rooms into NEAR / FAR LOD
-                     *          based on squared XZ distance to camera.
-                     *          Near rooms are placed first in rooms_to_draw[];
-                     *          far rooms follow (sorted back-to-front for Phase 2).
+                     * Each portal's 4 vertices are projected to screen,
+                     * the bounding rect is intersected with the parent
+                     * room's clip rect.  If non-empty, the destination
+                     * room is added with the clipped rect.
                      * =================================================== */
-                    #define MAX_PORTAL_CANDIDATES 64
-                    #define MAX_DRAW_ROOMS        32
+                    #define MAX_VIS_ROOMS 48
 
-                    int  bfs_candidates[MAX_PORTAL_CANDIDATES];
-                    int  bfs_count = 0;
-                    bool bfs_visited[256];
-                    memset(bfs_visited, 0, sizeof(bfs_visited));
+                    typedef struct {
+                        int16_t room_idx;
+                        int16_t cl, ct, cr, cb; /* clip rect (screen space) */
+                    } vis_entry_t;
 
-                    /* BFS from camera room through portals */
-                    bfs_candidates[bfs_count++] = lara_room;
-                    bfs_visited[lara_room] = true;
-                    for (int bfs_head = 0;
-                         bfs_head < bfs_count && bfs_count < MAX_PORTAL_CANDIDATES; ) {
-                        int ri = bfs_candidates[bfs_head++];
+                    vis_entry_t vis_queue[MAX_VIS_ROOMS];
+                    int vis_count = 0;
+                    bool vis_visited[256];
+                    memset(vis_visited, 0, sizeof(vis_visited));
+
+                    /* Seed: camera room with full viewport */
+                    vis_queue[0].room_idx = lara_room;
+                    vis_queue[0].cl = 0; vis_queue[0].ct = 0;
+                    vis_queue[0].cr = 320; vis_queue[0].cb = 240;
+                    vis_count = 1;
+                    vis_visited[lara_room] = true;
+
+                    for (int qi = 0; qi < vis_count && vis_count < MAX_VIS_ROOMS; qi++) {
+                        int ri = vis_queue[qi].room_idx;
+                        int16_t pcl = vis_queue[qi].cl, pct = vis_queue[qi].ct;
+                        int16_t pcr = vis_queue[qi].cr, pcb = vis_queue[qi].cb;
                         if (ri < 0 || ri >= g_level.room_count) continue;
-                        tr_room_t *broom = &g_level.rooms[ri];
-                        for (int p = 0; p < broom->portal_count &&
-                                        bfs_count < MAX_PORTAL_CANDIDATES; p++) {
-                            int dest = broom->portals[p].room;
-                            if (dest >= 0 && dest < g_level.room_count &&
-                                !bfs_visited[dest]) {
-                                bfs_visited[dest] = true;
-                                bfs_candidates[bfs_count++] = dest;
+                        tr_room_t *room = &g_level.rooms[ri];
+
+                        for (int p = 0; p < room->portal_count &&
+                                        vis_count < MAX_VIS_ROOMS; p++) {
+                            tr_portal_t *portal = &room->portals[p];
+                            int dest = portal->room;
+                            if (dest < 0 || dest >= g_level.room_count) continue;
+                            if (vis_visited[dest]) continue;
+
+                            /* Project portal's 4 vertices to screen space */
+                            int16_t pmin_x = 320, pmin_y = 240;
+                            int16_t pmax_x = 0, pmax_y = 0;
+                            bool portal_behind = true;
+                            for (int pv = 0; pv < 4; pv++) {
+                                float px_w = (float)(room->x + portal->vertices[pv].x);
+                                float py_w = (float)portal->vertices[pv].y;
+                                float pz_w = (float)(room->z + portal->vertices[pv].z);
+                                float cx_p = px_w - cam_x;
+                                float cy_p = py_w - cam_y;
+                                float cz_p = pz_w - cam_z;
+                                float rx_p = cx_p * cy - cz_p * sy;
+                                float rz_yaw = cx_p * sy + cz_p * cy;
+                                float ry_p = cy_p * cp - rz_yaw * sp;
+                                float rz_p = cy_p * sp + rz_yaw * cp;
+                                if (rz_p < 4.0f) continue; /* vertex behind camera */
+                                portal_behind = false;
+                                float inv_z = 256.0f / rz_p;
+                                int16_t sx = (int16_t)(160.0f + rx_p * inv_z);
+                                int16_t sy2 = (int16_t)(120.0f + ry_p * inv_z);
+                                if (sx < 0) sx = 0;
+                                if (sx > 320) sx = 320;
+                                if (sy2 < 0) sy2 = 0;
+                                if (sy2 > 240) sy2 = 240;
+                                if (sx < pmin_x) pmin_x = sx;
+                                if (sx > pmax_x) pmax_x = sx;
+                                if (sy2 < pmin_y) pmin_y = sy2;
+                                if (sy2 > pmax_y) pmax_y = sy2;
+                            }
+                            if (portal_behind) {
+                                /* All portal verts behind camera — widen to full
+                                 * screen since portal wraps around behind us */
+                                pmin_x = 0; pmin_y = 0;
+                                pmax_x = 320; pmax_y = 240;
+                            }
+
+                            /* Clip portal rect against parent's clip rect */
+                            int16_t cl2 = pmin_x > pcl ? pmin_x : pcl;
+                            int16_t ct2 = pmin_y > pct ? pmin_y : pct;
+                            int16_t cr2 = pmax_x < pcr ? pmax_x : pcr;
+                            int16_t cb2 = pmax_y < pcb ? pmax_y : pcb;
+
+                            /* Non-empty clip rect = portal is visible */
+                            if (cl2 < cr2 && ct2 < cb2) {
+                                vis_visited[dest] = true;
+                                vis_queue[vis_count].room_idx = dest;
+                                vis_queue[vis_count].cl = cl2;
+                                vis_queue[vis_count].ct = ct2;
+                                vis_queue[vis_count].cr = cr2;
+                                vis_queue[vis_count].cb = cb2;
+                                vis_count++;
                             }
                         }
                     }
 
-                    /* Frustum cull + LOD classify each BFS candidate */
+                    /* LOD classify visible rooms */
+                    #define MAX_DRAW_ROOMS 32
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
                     int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
 
-                    for (int bi = 0; bi < bfs_count; bi++) {
-                        int ri = bfs_candidates[bi];
+                    for (int vi = 0; vi < vis_count; vi++) {
+                        int ri = vis_queue[vi].room_idx;
                         if (ri < 0 || ri >= g_chunk_count) continue;
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        /* Frustum cull (sphere vs. 4 planes) */
-                        if (!chunk_frustum_visible(c, cam_x, cam_z, sy, cy))
-                            continue;
-
-                        /* XZ squared distance from camera to chunk center */
                         float ddx = c->cx - cam_x;
                         float ddz = c->cz - cam_z;
                         c->dist_sq = ddx*ddx + ddz*ddz;
