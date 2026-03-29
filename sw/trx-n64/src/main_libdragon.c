@@ -652,103 +652,121 @@ int main(void) {
                     float sy = sinf(cam_rot_y);
                     float cy = cosf(cam_rot_y);
 
-                    /* C buttons: move forward/back + strafe */
-                    if (input.btn.c_up) { cam_x += move_speed * sy; cam_z += move_speed * cy; }
-                    if (input.btn.c_down) { cam_x -= move_speed * sy; cam_z -= move_speed * cy; }
-                    if (input.btn.c_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
-                    if (input.btn.c_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+                    /* Compute desired movement */
+                    float dx = 0, dy = 0, dz = 0;
+                    if (input.btn.c_up) { dx += move_speed * sy; dz += move_speed * cy; }
+                    if (input.btn.c_down) { dx -= move_speed * sy; dz -= move_speed * cy; }
+                    if (input.btn.c_left) { dx -= move_speed * cy; dz += move_speed * sy; }
+                    if (input.btn.c_right) { dx += move_speed * cy; dz -= move_speed * sy; }
+                    if (input.btn.d_left) { dx -= move_speed * cy; dz += move_speed * sy; }
+                    if (input.btn.d_right) { dx += move_speed * cy; dz -= move_speed * sy; }
+                    if (input.btn.d_up) dy -= move_speed;
+                    if (input.btn.d_down) dy += move_speed;
 
-                    /* D-pad: up/down = fly, left/right = strafe */
-                    if (input.btn.d_up) cam_y -= move_speed;
-                    if (input.btn.d_down) cam_y += move_speed;
-                    if (input.btn.d_left) { cam_x -= move_speed * cy; cam_z += move_speed * sy; }
-                    if (input.btn.d_right) { cam_x += move_speed * cy; cam_z -= move_speed * sy; }
+                    /* ===== SECTOR COLLISION SYSTEM =====
+                     * Helper: get floor/ceiling at a world position */
+                    #define GET_SECTOR_HEIGHTS(wx, wz, out_floor, out_ceil) do { \
+                        int _best_room = lara_room; \
+                        int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz); \
+                        /* Find room containing this position */ \
+                        for (int _ri = 0; _ri < g_level.room_count; _ri++) { \
+                            tr_room_t *_rm = &g_level.rooms[_ri]; \
+                            int32_t _rx = _ix - _rm->x, _rz = _iz - _rm->z; \
+                            if (_rx >= 0 && _rx < _rm->sectors_x*1024 && \
+                                _rz >= 0 && _rz < _rm->sectors_z*1024) { \
+                                _best_room = _ri; break; \
+                            } \
+                        } \
+                        tr_room_t *_r = &g_level.rooms[_best_room]; \
+                        int _sx = (_ix - _r->x) >> 10, _sz = (_iz - _r->z) >> 10; \
+                        if (_sx < 0) _sx = 0; \
+                        if (_sx >= _r->sectors_x) _sx = _r->sectors_x-1; \
+                        if (_sz < 0) _sz = 0; \
+                        if (_sz >= _r->sectors_z) _sz = _r->sectors_z-1; \
+                        if (_r->sectors) { \
+                            tr_sector_t *_s = &_r->sectors[_sz * _r->sectors_x + _sx]; \
+                            (out_floor) = _s->floor * -256; \
+                            (out_ceil) = _s->ceiling * -256; \
+                            if (_s->pit_room!=255 && _s->pit_room<g_level.room_count) { \
+                                tr_room_t *_bl=&g_level.rooms[_s->pit_room]; \
+                                int _bx=(_ix-_bl->x)>>10, _bz=(_iz-_bl->z)>>10; \
+                                if(_bx>=0&&_bx<_bl->sectors_x&&_bz>=0&&_bz<_bl->sectors_z&&_bl->sectors){ \
+                                    int32_t _bf=_bl->sectors[_bz*_bl->sectors_x+_bx].floor*-256; \
+                                    if(_bf>(out_floor))(out_floor)=_bf; \
+                                } \
+                            } \
+                        } else { (out_floor)=0; (out_ceil)=-10000; } \
+                    } while(0)
 
-                    /* ===== ROOM TRACKING + FLOOR COLLISION =====
-                     * Always track which room the camera is in (for BFS).
-                     * A button toggles walk mode (floor clamping). */
+                    if (collision_on && (dx != 0 || dz != 0)) {
+                        /* Check if destination sector is walkable */
+                        int32_t cur_floor, cur_ceil, dst_floor, dst_ceil;
+                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cur_floor, cur_ceil);
+                        GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, dst_floor, dst_ceil);
+
+                        /* Wall detection: block if destination has no space
+                         * or floor height difference is too large (step > 512) */
+                        int32_t gap = dst_floor - dst_ceil;
+                        int32_t step = dst_floor - cur_floor;
+                        if (gap < 512 || step < -768) {
+                            /* Wall — try sliding along X only */
+                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, dst_floor, dst_ceil);
+                            gap = dst_floor - dst_ceil;
+                            step = dst_floor - cur_floor;
+                            if (gap < 512 || step < -768) dx = 0;
+                            /* Try Z only */
+                            GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, dst_floor, dst_ceil);
+                            gap = dst_floor - dst_ceil;
+                            step = dst_floor - cur_floor;
+                            if (gap < 512 || step < -768) dz = 0;
+                        }
+                    }
+
+                    /* Apply movement */
+                    cam_x += dx; cam_y += dy; cam_z += dz;
+
+                    /* Room tracking */
                     if (pressed.a) walk_mode = !walk_mode;
-
                     {
-                        /* Find which room the camera is in */
                         int cam_room = lara_room;
-                        int32_t icx = (int32_t)cam_x;
-                        int32_t icz = (int32_t)cam_z;
-
-                        /* Check current room, then portals, then 2nd-level portals */
+                        int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
                         tr_room_t *cur = &g_level.rooms[lara_room];
-                        int32_t rx = icx - cur->x;
-                        int32_t rz = icz - cur->z;
-                        bool found = (rx >= 0 && rx < cur->sectors_x * 1024 &&
-                                      rz >= 0 && rz < cur->sectors_z * 1024);
+                        int32_t rx = icx - cur->x, rz = icz - cur->z;
+                        bool found = (rx>=0 && rx<cur->sectors_x*1024 && rz>=0 && rz<cur->sectors_z*1024);
                         if (!found) {
-                            for (int p = 0; p < cur->portal_count && !found; p++) {
-                                int d1 = cur->portals[p].room;
-                                if (d1 < 0 || d1 >= g_level.room_count) continue;
-                                tr_room_t *rm = &g_level.rooms[d1];
-                                rx = icx - rm->x; rz = icz - rm->z;
-                                if (rx >= 0 && rx < rm->sectors_x * 1024 &&
-                                    rz >= 0 && rz < rm->sectors_z * 1024) {
-                                    cam_room = d1; found = true; break;
-                                }
-                                /* Check 2nd-level portals */
-                                for (int q = 0; q < rm->portal_count && !found; q++) {
-                                    int d2 = rm->portals[q].room;
-                                    if (d2 < 0 || d2 >= g_level.room_count) continue;
-                                    tr_room_t *rm2 = &g_level.rooms[d2];
-                                    rx = icx - rm2->x; rz = icz - rm2->z;
-                                    if (rx >= 0 && rx < rm2->sectors_x * 1024 &&
-                                        rz >= 0 && rz < rm2->sectors_z * 1024) {
-                                        cam_room = d2; found = true;
-                                    }
+                            for (int p=0; p<cur->portal_count && !found; p++) {
+                                int d1=cur->portals[p].room;
+                                if(d1<0||d1>=g_level.room_count)continue;
+                                tr_room_t *rm=&g_level.rooms[d1];
+                                rx=icx-rm->x; rz=icz-rm->z;
+                                if(rx>=0&&rx<rm->sectors_x*1024&&rz>=0&&rz<rm->sectors_z*1024){cam_room=d1;found=true;break;}
+                                for(int q=0;q<rm->portal_count&&!found;q++){
+                                    int d2=rm->portals[q].room;
+                                    if(d2<0||d2>=g_level.room_count)continue;
+                                    tr_room_t *rm2=&g_level.rooms[d2];
+                                    rx=icx-rm2->x;rz=icz-rm2->z;
+                                    if(rx>=0&&rx<rm2->sectors_x*1024&&rz>=0&&rz<rm2->sectors_z*1024){cam_room=d2;found=true;}
                                 }
                             }
                         }
-
-                        /* Always update current room for BFS traversal */
                         lara_room = cam_room;
 
-                        /* Floor/ceiling collision + gravity */
-                        tr_room_t *croom = &g_level.rooms[cam_room];
-                        int32_t csx = (icx - croom->x) >> 10;
-                        int32_t csz = (icz - croom->z) >> 10;
-                        if (csx < 0) csx = 0;
-                        if (csx >= croom->sectors_x) csx = croom->sectors_x - 1;
-                        if (csz < 0) csz = 0;
-                        if (csz >= croom->sectors_z) csz = croom->sectors_z - 1;
+                        /* Y collision: clamp between floor and ceiling */
+                        int32_t fl, cl;
+                        GET_SECTOR_HEIGHTS(cam_x, cam_z, fl, cl);
+                        float floor_limit = (float)fl - 768.0f;
+                        float ceil_limit = (float)cl + 128.0f;
 
-                        if (croom->sectors) {
-                            tr_sector_t *sector = &croom->sectors[csz * croom->sectors_x + csx];
-                            int32_t floor_y = sector->floor * -256;
-                            int32_t ceil_y = sector->ceiling * -256;
-
-                            /* Follow pit room for deeper floor */
-                            if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
-                                tr_room_t *below = &g_level.rooms[sector->pit_room];
-                                int32_t bsx = (icx - below->x) >> 10;
-                                int32_t bsz = (icz - below->z) >> 10;
-                                if (bsx >= 0 && bsx < below->sectors_x &&
-                                    bsz >= 0 && bsz < below->sectors_z && below->sectors) {
-                                    int32_t bf = below->sectors[bsz * below->sectors_x + bsx].floor * -256;
-                                    if (bf > floor_y) floor_y = bf;
-                                }
-                            }
-
-                            float floor_limit = (float)floor_y - 768.0f;
-
-                            if (collision_on) {
-                                /* L: can't go below floor */
+                        if (collision_on) {
+                            if (cam_y > floor_limit) cam_y = floor_limit;
+                            if (cam_y < ceil_limit) cam_y = ceil_limit;
+                        }
+                        if (walk_mode) {
+                            if (cam_y < floor_limit) {
+                                cam_y += 48.0f;
                                 if (cam_y > floor_limit) cam_y = floor_limit;
                             }
-
-                            if (walk_mode) {
-                                /* A: gravity toward floor */
-                                if (cam_y < floor_limit) {
-                                    cam_y += 48.0f;
-                                    if (cam_y > floor_limit) cam_y = floor_limit;
-                                }
-                                if (cam_y > floor_limit) cam_y = floor_limit;
-                            }
+                            if (cam_y > floor_limit) cam_y = floor_limit;
                         }
                     }
 
