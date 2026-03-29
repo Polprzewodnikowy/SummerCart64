@@ -1222,6 +1222,10 @@ int main(void) {
                         rdpq_mode_filter(FILTER_BILINEAR);
 
                         int far_last_tex = -1;
+                        int far_uploads = 0;
+                        int far_tris = 0;
+                        #define FAR_MAX_UPLOADS  48  /* cap TMEM uploads per frame */
+                        #define FAR_FLUSH_EVERY 200  /* flush RSPQ every N triangles */
 
                         for (int fi = 0; fi < far_count; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1244,19 +1248,29 @@ int main(void) {
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
 
-                                /* Texture setup — upload to TMEM on change */
+                                /* Texture setup — upload to TMEM on change.
+                                 * Capped at FAR_MAX_UPLOADS per frame to avoid
+                                 * RSPQ overflow.  Faces past the cap use
+                                 * whatever texture is currently loaded. */
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
-                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        far_last_tex = (int)tex_idx;
+                                        if (far_uploads < FAR_MAX_UPLOADS) {
+                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                            far_last_tex = (int)tex_idx;
+                                            far_uploads++;
+                                        }
+                                        /* else: reuse current texture (fallback) */
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
-                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        far_last_tex = -2;
+                                        if (far_uploads < FAR_MAX_UPLOADS) {
+                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                            far_last_tex = -2;
+                                            far_uploads++;
+                                        }
                                     }
                                 } else continue;
 
@@ -1337,6 +1351,9 @@ int main(void) {
                                 for (int tri = 0; tri < num_tris; tri++) {
                                     rdpq_triangle(&TRIFMT_SHADE_TEX,
                                         sv[0], sv[tri+1], sv[tri+2]);
+                                    far_tris++;
+                                    if ((far_tris % FAR_FLUSH_EVERY) == 0)
+                                        rspq_flush();
                                 }
                             }
                         }
@@ -1440,10 +1457,6 @@ int main(void) {
                         int loop_start = 0;
                         int loop_end   = near_count;
                         int pass       = 1;  /* near pass identifier for fog logic */
-                        tex_budget_t tex_bud;
-                        tex_bud.budget = TEX_BIND_BUDGET_NEAR;
-                        tex_bud.binds_this_frame = 0;
-                        tex_bud.last_bound_tex = -1;
 
                     for (int ri = loop_start; ri < loop_end; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -1469,22 +1482,11 @@ int main(void) {
                             } else continue;
 
                             if (want_tex != cur_tex) {
-                                /* Texture bind budget: if exceeded, reuse the
-                                 * last bound texture (visually acceptable at
-                                 * distance; near pass has generous budget). */
-                                if (tex_bud.binds_this_frame >= tex_bud.budget &&
-                                    tex_bud.last_bound_tex >= 0) {
-                                    /* Budget exceeded — skip this bind, use
-                                     * whatever texture is currently active */
-                                } else {
-                                    FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex)
-                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    else if (want_tex >= 0)
-                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                    tex_bud.binds_this_frame++;
-                                    tex_bud.last_bound_tex = want_tex;
-                                }
+                                FLUSH_GL();
+                                if (want_tex == -2 && gl_white_tex)
+                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                else if (want_tex >= 0)
+                                    glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
                                 cur_tex = want_tex;
                             }
 
