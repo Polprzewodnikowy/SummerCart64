@@ -1289,6 +1289,8 @@ int main(void) {
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count < 16 ? far_count : 16;
+                        #define FAR_TRI_BUDGET   300
+                        #define FAR_UPLOAD_BUDGET  8
 
                         for (int fi = 0; fi < far_rooms_max; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1324,6 +1326,8 @@ int main(void) {
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
+                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
+                                            continue; /* skip face, keep current tex */
                                         rspq_flush();
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                         far_last_tex = (int)tex_idx;
@@ -1331,6 +1335,8 @@ int main(void) {
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
+                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
+                                            continue;
                                         rspq_flush();
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                         far_last_tex = -2;
@@ -1411,10 +1417,13 @@ int main(void) {
                                     perf_far_tris = far_tris;
                                     if ((far_tris & 79) == 0)
                                         rspq_flush();
+                                    if (far_tris >= FAR_TRI_BUDGET)
+                                        goto far_pass_done;
                                 }
                             }
                         }
                     }
+                    far_pass_done:
 
                     /* Wait (blocking) for RSP to drain all far pass commands
                      * before GL context begins.  This is the one place where
