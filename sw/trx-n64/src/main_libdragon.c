@@ -541,6 +541,35 @@ int main(void) {
                     console_render();
                 }
 
+                /* Pre-sort room faces by texture for batched uploads.
+                 * Z-buffer handles depth, so spatial order doesn't matter.
+                 * This MASSIVELY reduces texture DMA — the #1 bottleneck. */
+                for (int r = 0; r < g_level.room_count; r++) {
+                    tr_face_t *faces = g_level.rooms[r].mesh.faces;
+                    int fc = g_level.rooms[r].mesh.face_count;
+                    for (int i = 1; i < fc; i++) {
+                        tr_face_t tmp = faces[i];
+                        uint16_t key = tmp.texture & 0x7FFF;
+                        int j = i - 1;
+                        while (j >= 0 && (faces[j].texture & 0x7FFF) > key) {
+                            faces[j + 1] = faces[j];
+                            j--;
+                        }
+                        faces[j + 1] = tmp;
+                    }
+                }
+
+                /* Pre-compute shadow circle points (avoid sinf/cosf per frame) */
+                float shadow_circ[16][2];
+                {
+                    float srad = 120.0f;
+                    for (int p = 0; p < 16; p++) {
+                        float a = (float)p * 6.28318f / 16.0f;
+                        shadow_circ[p][0] = srad * sinf(a);
+                        shadow_circ[p][1] = srad * cosf(a);
+                    }
+                }
+
                 /* ============================================
                  * 3D RENDERING LOOP
                  * ============================================
@@ -741,7 +770,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 4;  /* Balance FPS vs draw distance */
+                    int max_rooms = 5;  /* Texture sort keeps uploads low */
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
@@ -771,10 +800,13 @@ int main(void) {
                         /* Skip if room is entirely behind camera */
                         if (room_rz < -room_radius) continue;
                         /* Skip if room is entirely off to the side */
-                        if (room_rz > 0 && fabsf(room_rx) > room_rz * 2.5f + room_radius) continue;
+                        if (room_rz > 0) {
+                            float lim = room_rz * 2.5f + room_radius;
+                            if (room_rx > lim || room_rx < -lim) continue;
+                        }
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 400) max_faces = 400;
+                        if (max_faces > 500) max_faces = 500;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             if (face->vertex_count < 3) continue;
@@ -797,13 +829,13 @@ int main(void) {
                              * wrong texture data. TODO: render as solid color. */
                             if (!has_tex) continue;
 
-                            /* Quick distance check with first vertex */
+                            /* Quick distance cull with first vertex (squared, no sqrt) */
                             {
                                 uint16_t v0i = face->vertices[0];
                                 if (v0i < room->mesh.vertex_count) {
                                     float dx = room->x + room->mesh.vertices[v0i].x - cam_x;
                                     float dz = room->z + room->mesh.vertices[v0i].z - cam_z;
-                                    if (dx*dx + dz*dz > 16384.0f*16384.0f) continue;
+                                    if (dx*dx + dz*dz > 200000000.0f) continue; /* ~14K units */
                                 }
                             }
 
@@ -965,7 +997,7 @@ int main(void) {
                             float sm_rz = sdx * sy + sdz * cy;
                             if (sm_rz < -1024) continue; /* Behind camera */
                             float sm_rx = sdx * cy - sdz * sy;
-                            if (sm_rz > 0 && fabsf(sm_rx) > sm_rz * 3.0f) continue; /* Off side */
+                            if (sm_rz > 0) { float l=sm_rz*3.0f; if(sm_rx>l||sm_rx<-l) continue; }
 
                             /* Find the static object definition to get mesh_idx */
                             int mesh_idx = -1;
@@ -1067,7 +1099,7 @@ int main(void) {
                     }
 
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
-                    for (int ii = 0; ii < g_level.item_count && ii < 100; ii++) {
+                    for (int ii = 0; ii < g_level.item_count && ii < 30; ii++) {
                         tr_item_t *item = &g_level.items[ii];
                         if (item->object_id == 0) continue; /* Skip Lara */
                         /* Only draw if item is in a visible room */
@@ -1082,7 +1114,7 @@ int main(void) {
                         float item_rz = idx * sy + idz * cy;
                         if (item_rz < -2048) continue;
                         float item_rx = idx * cy - idz * sy;
-                        if (item_rz > 0 && fabsf(item_rx) > item_rz * 3.0f) continue;
+                        if (item_rz > 0) { float l=item_rz*3.0f; if(item_rx>l||item_rx<-l) continue; }
 
                         /* Find object definition for this item */
                         tr_object_def_t *iobj = NULL;
@@ -1214,10 +1246,11 @@ int main(void) {
                                     float dx = bx - (float)rm->lights[li].pos.x;
                                     float dy = by - (float)rm->lights[li].pos.y;
                                     float dz = bz - (float)rm->lights[li].pos.z;
-                                    float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+                                    float dist_sq = dx*dx + dy*dy + dz*dz;
                                     float falloff = (float)rm->lights[li].falloff;
-                                    if (falloff > 0 && dist < falloff)
-                                        light_add += ((float)rm->lights[li].intensity / 8191.0f) * (1.0f - dist / falloff);
+                                    float falloff_sq = falloff * falloff;
+                                    if (falloff > 0 && dist_sq < falloff_sq)
+                                        light_add += ((float)rm->lights[li].intensity / 8191.0f) * (1.0f - dist_sq / falloff_sq);
                                 }
                                 lara_shade = amb + light_add;
                                 if (lara_shade > 1.0f) lara_shade = 1.0f;
@@ -1324,7 +1357,6 @@ int main(void) {
                         float sx_pos = (float)shadow_item->pos.x;
                         float sy_pos = (float)shadow_item->pos.y + 10.0f;
                         float sz_pos = (float)shadow_item->pos.z;
-                        float srad = 120.0f;
 
                         if (white_px && last_tex_idx != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
@@ -1335,19 +1367,13 @@ int main(void) {
                         rdpq_mode_push();
                         rdpq_mode_blender(RDPQ_BLENDER_MULTIPLY);
 
-                        /* 16-point circle */
-                        float circ[16][2];
-                        for (int p = 0; p < 16; p++) {
-                            float a = (float)p * 6.28318f / 16.0f;
-                            circ[p][0] = srad * sinf(a);
-                            circ[p][1] = srad * cosf(a);
-                        }
+                        /* 16-point circle (pre-computed) */
                         float sv_s[16][10];
                         bool vis = true;
                         for (int v = 0; v < 16; v++) {
-                            float wx = sx_pos + circ[v][0];
+                            float wx = sx_pos + shadow_circ[v][0];
                             float wy = sy_pos;
-                            float wz = sz_pos + circ[v][1];
+                            float wz = sz_pos + shadow_circ[v][1];
                             float cx_v=wx-cam_x, cy_v=wy-cam_y, cz_v=wz-cam_z;
                             float rx=cx_v*cy-cz_v*sy;
                             float rz_y=cx_v*sy+cz_v*cy;
