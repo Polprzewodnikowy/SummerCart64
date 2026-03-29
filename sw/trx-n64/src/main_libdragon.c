@@ -658,78 +658,10 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
-                /* ---- Mip levels: 16x16 (level 1) and 8x8 (level 2) ----
-                 * Box-filter downsample from the 32x32 base textures.
-                 * Each mip level gets its own GL texture array so the
-                 * renderer can bind the appropriate level per face. */
-                #define MIP1_DIM 16
-                #define MIP2_DIM 8
-                #define MIP1_BYTES (MIP1_DIM * MIP1_DIM * 2)
-                #define MIP2_BYTES (MIP2_DIM * MIP2_DIM * 2)
-
-                uint16_t *mip1_tiles = NULL;
-                uint16_t *mip2_tiles = NULL;
-                surface_t *mip1_surfs = NULL;
-                surface_t *mip2_surfs = NULL;
-                GLuint *gl_mip1_textures = NULL;
-                GLuint *gl_mip2_textures = NULL;
-
-                if (tex_tiles && num_otex > 0) {
-                    mip1_tiles = (uint16_t *)malloc_uncached_aligned(
-                        64, num_otex * MIP1_BYTES);
-                    mip2_tiles = (uint16_t *)malloc_uncached_aligned(
-                        64, num_otex * MIP2_BYTES);
-                    mip1_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    mip2_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
-                    gl_mip1_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
-                    gl_mip2_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
-                }
-
-                if (mip1_tiles && mip2_tiles && mip1_surfs && mip2_surfs) {
-                    printf("  Generating mip levels (%dx%d, %dx%d)...\n",
-                           MIP1_DIM, MIP1_DIM, MIP2_DIM, MIP2_DIM);
-                    for (int i = 0; i < num_otex; i++) {
-                        uint16_t *src32 = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
-                        uint16_t *dst16 = mip1_tiles + i * MIP1_DIM * MIP1_DIM;
-                        uint16_t *dst8  = mip2_tiles + i * MIP2_DIM * MIP2_DIM;
-
-                        /* 32→16: 2x2 box filter */
-                        for (int y = 0; y < MIP1_DIM; y++) {
-                            for (int x = 0; x < MIP1_DIM; x++) {
-                                int sx = x * 2, sy = y * 2;
-                                /* Average 4 RGBA16 pixels (5-5-5-1 format) */
-                                uint16_t p00 = src32[sy * TEX_TILE_DIM + sx];
-                                uint16_t p10 = src32[sy * TEX_TILE_DIM + sx + 1];
-                                uint16_t p01 = src32[(sy+1) * TEX_TILE_DIM + sx];
-                                uint16_t p11 = src32[(sy+1) * TEX_TILE_DIM + sx + 1];
-                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                int aa = (p00|p10|p01|p11) & 1;
-                                dst16[y * MIP1_DIM + x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                            }
-                        }
-                        /* 16→8: 2x2 box filter from mip1 */
-                        for (int y = 0; y < MIP2_DIM; y++) {
-                            for (int x = 0; x < MIP2_DIM; x++) {
-                                int sx = x * 2, sy = y * 2;
-                                uint16_t p00 = dst16[sy * MIP1_DIM + sx];
-                                uint16_t p10 = dst16[sy * MIP1_DIM + sx + 1];
-                                uint16_t p01 = dst16[(sy+1) * MIP1_DIM + sx];
-                                uint16_t p11 = dst16[(sy+1) * MIP1_DIM + sx + 1];
-                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                int aa = (p00|p10|p01|p11) & 1;
-                                dst8[y * MIP2_DIM + x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                            }
-                        }
-                        mip1_surfs[i] = surface_make_linear(dst16, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
-                        mip2_surfs[i] = surface_make_linear(dst8, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
-                    }
-                    printf("  Mips: %d KB (16x16) + %d KB (8x8)\n",
-                           num_otex * MIP1_BYTES / 1024, num_otex * MIP2_BYTES / 1024);
-                }
+                /* Mip textures removed — creating 3× GL texture objects
+                 * exhausts libdragon's RSPQ block memory.  The base 32x32
+                 * textures are used for all passes; the texture bind budget
+                 * (Phase 5) handles TMEM pressure instead. */
 
                 /* Create a 1x1 solid white texture for flat-colored faces.
                  * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
@@ -1181,29 +1113,7 @@ int main(void) {
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
                             }
                         }
-                        /* Mip level GL texture objects (16x16, 8x8) */
-                        if (gl_mip1_textures && mip1_surfs) {
-                            glGenTextures(num_otex, gl_mip1_textures);
-                            for (int i = 0; i < num_otex; i++) {
-                                glBindTexture(GL_TEXTURE_2D, gl_mip1_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip1_surfs[i], NULL);
-                            }
-                        }
-                        if (gl_mip2_textures && mip2_surfs) {
-                            glGenTextures(num_otex, gl_mip2_textures);
-                            for (int i = 0; i < num_otex; i++) {
-                                glBindTexture(GL_TEXTURE_2D, gl_mip2_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &mip2_surfs[i], NULL);
-                            }
-                        }
+                        /* Mip GL textures removed — RSPQ block OOM with 3× objects */
                         if (white_px) {
                             glGenTextures(1, &gl_white_tex);
                             glBindTexture(GL_TEXTURE_2D, gl_white_tex);
@@ -1457,24 +1367,10 @@ int main(void) {
                                      * whatever texture is currently active */
                                 } else {
                                     FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex) {
+                                    if (want_tex == -2 && gl_white_tex)
                                         glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    } else if (want_tex >= 0) {
-                                        /* Mip selection: choose texture LOD
-                                         * based on room distance from camera.
-                                         * Near pass uses base (32x32).
-                                         * Far pass: 16x16 or 8x8 by distance. */
-                                        float rd = (room_idx < g_chunk_count)
-                                            ? g_chunks[room_idx].dist_sq : 0.0f;
-                                        if (pass == 0 && rd > CHUNK_VERY_FAR_DIST2 &&
-                                            gl_mip2_textures)
-                                            glBindTexture(GL_TEXTURE_2D, gl_mip2_textures[want_tex]);
-                                        else if (pass == 0 && rd > CHUNK_FAR_DIST2 &&
-                                                 gl_mip1_textures)
-                                            glBindTexture(GL_TEXTURE_2D, gl_mip1_textures[want_tex]);
-                                        else
-                                            glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                    }
+                                    else if (want_tex >= 0)
+                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
                                     tex_bud.binds_this_frame++;
                                     tex_bud.last_bound_tex = want_tex;
                                 }
