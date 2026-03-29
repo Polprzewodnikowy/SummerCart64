@@ -269,6 +269,60 @@ conversion, render sorting, animation, camera math, material tracking.
 
 ---
 
+## lambertjamesd/spellcraft — RPG (libdragon + T3D) ★★
+Source: https://github.com/lambertjamesd/spellcraft
+
+Same author as n64brew2025. Confirms T3D patterns with additional techniques.
+
+### Borrowable Techniques (beyond what n64brew2025 already showed)
+
+1. **Sprite/resource reference-counted cache**
+   - Materials, sprites, tmeshes use ref-counted caches
+   - Shared resources across tiles/rooms loaded once
+   - **Applicable to our CI8 texture cache and baked tile management**
+   - File: `src/resource/resource_cache.h`
+
+2. **2D frustum footprint scan for tile visibility**
+   - Projects frustum NDC corners back to world XZ
+   - Builds convex hull, rasterizes row-by-row to find visible tiles
+   - **Much cheaper than per-face frustum tests** — could use for room
+     visibility before doing per-portal checks
+   - File: `src/overworld/overworld_render.c`
+
+3. **Seek-based tile loading from persistent file handle**
+   - Overworld file stays open, tiles loaded via fseek() to offsets
+   - No per-tile file open/close overhead
+   - **Pattern for ROM-streaming room data: keep file handle open,
+     seek to room offset, DMA on demand**
+   - File: `src/overworld/overworld_load.c`
+
+4. **Unload queue with rspq_wait() safety**
+   - Defer freeing tile memory until after `rspq_wait()` confirms
+     RSP is done with it
+   - **We need this for any runtime texture/geometry eviction**
+   - File: `src/overworld/overworld_load.c` (UNLOAD_QUEUE_SIZE=4)
+
+5. **Indoor room management: show/hide up to 4 rooms**
+   - `scene_show_room()` / `scene_hide_room()`, MAX_LOADED_ROOM=4
+   - **Similar to our ring-1 near rooms (current + connected)**
+   - File: `src/scene/scene.c`
+
+### Confirms from n64brew2025
+- T3D vertex pipeline (t3d_vert_load → t3d_tri_draw)
+- rspq_block pre-recording for mesh + material
+- Camera-relative transforms (subtract cam pos from model matrix)
+- Frame bump allocator (64KB double-buffered, UncachedAddr)
+- Build-time vertex optimization (adjacency batching, lifetime tracking)
+- Material sort-key batching (priority, material ptr, type)
+
+### Key Insight
+Every Lambert project using libdragon uses T3D for vertex processing.
+Three projects (n64graphicsdemo, n64brew2023, n64brew2025/spellcraft)
+span libultra→libdragon migration. The libdragon ones ALL use T3D.
+This is the established pattern for 3D on modern libdragon.
+
+---
+
 ## mwpenny/portal64-still-alive — Portal on N64 (libultra + F3DEX2) ★★
 Source: https://github.com/mwpenny/portal64-still-alive
 
