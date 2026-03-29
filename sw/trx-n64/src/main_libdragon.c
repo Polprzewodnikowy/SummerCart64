@@ -1309,29 +1309,39 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Current room + portal-gated connected rooms
+                     * VISIBILITY + STREAMING
                      *
-                     * Rules:
-                     *   1. Current room is ALWAYS visible.
-                     *   2. Connected rooms load ONLY when their portal
-                     *      is visible to the camera. Rooms behind camera
-                     *      or outside the frustum are skipped.
-                     *   3. Culling decides draw/not-draw.
-                     *      LOD decides which representation to draw.
+                     * Render policy (authoritative — never drops geometry):
+                     *   1. Current room: ALWAYS visible.
+                     *   2. Connected rooms: ALWAYS visible.
+                     *
+                     * Streaming policy (portal-driven priority hints):
+                     *   Portal on screen / near center → HIGH priority
+                     *   Portal near frustum edge       → MEDIUM
+                     *   Portal behind camera            → LOW
+                     *   Used for texture tier prewarming, not visibility.
+                     *
+                     * LOD policy: separate from both.
                      * =================================================== */
                     #define MAX_DRAW_ROOMS 16
+                    #define STREAM_PRI_HIGH   2
+                    #define STREAM_PRI_MED    1
+                    #define STREAM_PRI_LOW    0
                     int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
+                    int vis_stream_pri[MAX_DRAW_ROOMS]; /* per-room streaming priority */
 
-                    /* Rule 1: current room — always */
+                    /* Rule 1: current room — always, highest priority */
                     if (lara_room >= 0 && lara_room < g_chunk_count) {
                         g_chunks[lara_room].dist_sq = 0.0f;
                         g_chunks[lara_room].visible = true;
-                        vis_rooms[vis_count++] = lara_room;
+                        vis_rooms[vis_count] = lara_room;
+                        vis_stream_pri[vis_count] = STREAM_PRI_HIGH;
+                        vis_count++;
                     }
 
-                    /* Rule 2: check each portal — only load room if
-                     * the portal opening is in camera view */
+                    /* Rule 2: connected rooms — always visible.
+                     * Portal check sets streaming priority only. */
                     if (lara_room >= 0 && lara_room < g_level.room_count) {
                         tr_room_t *lr = &g_level.rooms[lara_room];
                         for (int p = 0; p < lr->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
@@ -1346,24 +1356,20 @@ int main(void) {
                             }
                             if (dup) continue;
 
-                            /* Test portal visibility: transform portal
-                             * vertices to camera space, check if any part
-                             * is in front of camera and within frustum. */
-                            bool portal_visible = false;
+                            /* Streaming hint: check portal camera visibility
+                             * to set priority (HIGH/MED/LOW). This does NOT
+                             * affect whether the room renders. */
+                            int priority = STREAM_PRI_LOW;
                             int verts_in_front = 0;
                             float pmin_sx = 320, pmax_sx = 0;
 
                             for (int pv = 0; pv < 4; pv++) {
                                 float px = (float)(lr->x + portal->vertices[pv].x) - cam_x;
                                 float pz = (float)(lr->z + portal->vertices[pv].z) - cam_z;
-
-                                /* Rotate to camera space (yaw only — cheap) */
                                 float rz_p = px * sy + pz * cy;
 
                                 if (rz_p > -256.0f) {
-                                    /* In front of (or very near) camera */
                                     verts_in_front++;
-
                                     if (rz_p < 1.0f) rz_p = 1.0f;
                                     float rx_p = px * cy - pz * sy;
                                     float sx_p = 160.0f + rx_p * 256.0f / rz_p;
@@ -1373,27 +1379,26 @@ int main(void) {
                             }
 
                             if (verts_in_front > 0) {
-                                /* Portal has verts in front of camera.
-                                 * If any cross the near plane, be conservative
-                                 * and treat as visible. Otherwise check screen
-                                 * bounds overlap. */
                                 if (verts_in_front < 4) {
-                                    /* Partially behind — conservative: visible */
-                                    portal_visible = true;
-                                } else {
-                                    /* All in front — check screen X overlap */
-                                    portal_visible = (pmax_sx > -32 && pmin_sx < 352);
+                                    /* Crosses near plane — very close */
+                                    priority = STREAM_PRI_HIGH;
+                                } else if (pmax_sx > -32 && pmin_sx < 352) {
+                                    /* On screen */
+                                    priority = STREAM_PRI_HIGH;
+                                } else if (pmax_sx > -128 && pmin_sx < 448) {
+                                    /* Near screen edge */
+                                    priority = STREAM_PRI_MED;
                                 }
                             }
-
-                            if (!portal_visible) continue;
 
                             tr_chunk_t *c = &g_chunks[dest];
                             float ddx = c->cx - cam_x;
                             float ddz = c->cz - cam_z;
                             c->dist_sq = ddx * ddx + ddz * ddz;
                             c->visible = true;
-                            vis_rooms[vis_count++] = dest;
+                            vis_rooms[vis_count] = dest;
+                            vis_stream_pri[vis_count] = priority;
+                            vis_count++;
                         }
                     }
 
