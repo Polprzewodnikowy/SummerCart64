@@ -2377,6 +2377,7 @@ int main(void) {
                             for (int tri = 0; tri < num_tris; tri++) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
+                                if ((perf_near_tris & 63) == 0) rspq_flush();
                             }
                         }
                     }
@@ -2525,6 +2526,7 @@ int main(void) {
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                     perf_near_tris++;
+                                    if ((perf_near_tris & 63) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -2690,6 +2692,7 @@ int main(void) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                         perf_near_tris++;
                                     }
+                                    if ((perf_near_tris & 63) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -3006,6 +3009,7 @@ int main(void) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 perf_near_tris++;
                             }
+                            if ((perf_near_tris & 63) == 0) rspq_flush();
                         }
                     }
                     perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
