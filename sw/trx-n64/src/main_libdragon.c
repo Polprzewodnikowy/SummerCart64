@@ -316,59 +316,55 @@ int main(void) {
                level_sector, level_size, level_compressed, level_flags);
 
         /* Read level data from ROM via PI DMA.
-         * If compressed (flags & 1), read compressed bytes and decompress. */
+         * If compressed (flags & 1), read compressed bytes, decompress,
+         * then free the compressed buffer. */
         bool is_compressed = (level_flags & 1) && level_compressed < level_size;
         uint32_t read_size = is_compressed ? level_compressed : level_size;
         uint32_t read_bytes = (read_size + 511) & ~511;
         read_bytes = (read_bytes + 15) & ~15;  /* DMA alignment */
 
         n64_mem_init();
-        /* Allocate space for both compressed + decompressed if needed */
-        uint8_t *read_buf = NULL;
         uint8_t *level_data = NULL;
+
         if (is_compressed) {
-            read_buf = (uint8_t *)n64_mem_alloc(read_bytes + 512);
+            /* Use system malloc for temp compressed buffer (freed after decompress) */
+            uint8_t *comp_buf = (uint8_t *)malloc(read_bytes + 16);
             level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
-            printf("  Alloc %u KB compressed + %u KB decompressed... ",
-                   (read_bytes + 512) / 1024, (level_size + 4096) / 1024);
-        } else {
-            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
-            read_buf = level_data;
-            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
-        }
-
-        if (!level_data) {
-            printf("FAILED (heap full)\n");
-        } else if (level_sector == 0) {
-            printf("asset not found in index\n");
-        }
-
-        if (level_data && level_sector > 0) {
-            uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
-            dma_read(read_buf, cart_addr, read_bytes);
-
-            printf("  Loaded %u KB from ROM.\n", read_bytes / 1024);
-            printf("  First bytes: %02x %02x %02x %02x\n",
-                   read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
-
-            if (is_compressed) {
-                printf("  Decompressing LZ4: %u -> %u bytes...\n",
-                       level_compressed, level_size);
-                int dec = lz4_decode_block(read_buf, level_data,
+            printf("  Compressed: %u KB -> %u KB\n",
+                   level_compressed / 1024, level_size / 1024);
+            if (!comp_buf || !level_data) {
+                printf("  ALLOC FAILED (comp=%p level=%p)\n", comp_buf, level_data);
+                if (comp_buf) free(comp_buf);
+                level_data = NULL;
+            } else if (level_sector > 0) {
+                uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
+                dma_read(comp_buf, cart_addr, read_bytes);
+                printf("  Loaded %u KB, first: %02x %02x %02x %02x\n",
+                       read_bytes / 1024,
+                       comp_buf[0], comp_buf[1], comp_buf[2], comp_buf[3]);
+                int dec = lz4_decode_block(comp_buf, level_data,
                                            level_compressed, level_size);
+                free(comp_buf);  /* Release compressed buffer immediately */
                 if (dec < 0) {
-                    printf("  LZ4 FAILED! (error %d)\n", dec);
+                    printf("  LZ4 FAILED (error %d)\n", dec);
                     level_data = NULL;
                 } else {
                     printf("  Decompressed %d bytes OK\n", dec);
-                    printf("  First bytes: %02x %02x %02x %02x\n",
-                           level_data[0], level_data[1], level_data[2], level_data[3]);
                 }
             }
+        } else {
+            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
+            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
+            if (!level_data) {
+                printf("FAILED\n");
+            } else if (level_sector > 0) {
+                uint32_t cart_addr = ASSET_CART_ADDR + level_sector * 512;
+                dma_read(level_data, cart_addr, read_bytes);
+                printf("  Loaded %u KB\n", read_bytes / 1024);
+            }
+        }
 
-            /* Parse the .PHD level.
-             * The parser allocates from the heap — level_data and
-             * parse allocations coexist in the heap. */
+        if (level_data && level_sector > 0) {
             printf("  Parsing .PHD format...\n");
             tr_parse_result_t res = tr_level_parse(
                 (const uint8_t *)level_data, level_size, &g_level);
@@ -643,8 +639,7 @@ int main(void) {
                 int fps_frames = 0;
                 uint32_t fps_last = TICKS_READ();
                 int fps_display = 0;
-                bool walk_mode = false;
-                bool collision_on = false;
+                bool collision_on = false;  /* L = tcl toggle */
                 int speed_level = 1;
 
                 /* Render loop */
@@ -702,16 +697,17 @@ int main(void) {
                     }
 
                     /* ===== SECTOR COLLISION SYSTEM =====
-                     * Get floor/ceiling heights from sector data.
-                     * Uses lara_room as primary, follows pit_room/sky_room
-                     * for vertical room stacking. */
+                     * TR1 sector grid: X-major order.
+                     * Index = x_local * sectors_z + z_local
+                     * Floor/ceiling: value * 256 = world Y (positive = down) */
+                    #define SECTOR_AT(_room, _lx, _lz) \
+                        (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
+
                     #define GET_SECTOR_HEIGHTS(wx, wz, wy, out_floor, out_ceil) do { \
                         int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz), _iy=(int32_t)(wy); \
-                        /* Start with current room */ \
                         int _best_room = lara_room; \
                         tr_room_t *_cr = &g_level.rooms[lara_room]; \
                         int32_t _rx = _ix - _cr->x, _rz = _iz - _cr->z; \
-                        /* If outside current room XZ, search portals first */ \
                         if (_rx < 0 || _rx >= _cr->sectors_x*1024 || \
                             _rz < 0 || _rz >= _cr->sectors_z*1024) { \
                             bool _found = false; \
@@ -726,7 +722,6 @@ int main(void) {
                                 } \
                             } \
                             if (!_found) { \
-                                /* Fallback: scan all rooms */ \
                                 for (int _ri = 0; _ri < g_level.room_count; _ri++) { \
                                     tr_room_t *_rm = &g_level.rooms[_ri]; \
                                     _rx = _ix - _rm->x; _rz = _iz - _rm->z; \
@@ -744,63 +739,73 @@ int main(void) {
                         if (_sz < 0) _sz = 0; \
                         if (_sz >= _r->sectors_z) _sz = _r->sectors_z-1; \
                         if (_r->sectors) { \
-                            tr_sector_t *_s = &_r->sectors[_sz * _r->sectors_x + _sx]; \
+                            tr_sector_t *_s = SECTOR_AT(_r, _sx, _sz); \
                             (out_floor) = _s->floor * 256; \
                             (out_ceil) = _s->ceiling * 256; \
-                            /* Follow pit_room down if camera is below current floor */ \
                             if (_s->pit_room != 255 && _s->pit_room < g_level.room_count && \
                                 _iy > (out_floor)) { \
                                 tr_room_t *_bl = &g_level.rooms[_s->pit_room]; \
                                 int _bx = (_ix-_bl->x)>>10, _bz = (_iz-_bl->z)>>10; \
                                 if (_bx>=0 && _bx<_bl->sectors_x && _bz>=0 && _bz<_bl->sectors_z && _bl->sectors) { \
-                                    tr_sector_t *_bs = &_bl->sectors[_bz*_bl->sectors_x+_bx]; \
-                                    (out_floor) = _bs->floor * 256; \
-                                    (out_ceil) = _bs->ceiling * 256; \
+                                    (out_floor) = SECTOR_AT(_bl,_bx,_bz)->floor * 256; \
+                                    (out_ceil) = SECTOR_AT(_bl,_bx,_bz)->ceiling * 256; \
                                 } \
                             } \
-                            /* Follow sky_room up if camera is above current ceiling */ \
                             if (_s->sky_room != 255 && _s->sky_room < g_level.room_count && \
                                 _iy < (out_ceil)) { \
                                 tr_room_t *_al = &g_level.rooms[_s->sky_room]; \
                                 int _ax = (_ix-_al->x)>>10, _az = (_iz-_al->z)>>10; \
                                 if (_ax>=0 && _ax<_al->sectors_x && _az>=0 && _az<_al->sectors_z && _al->sectors) { \
-                                    tr_sector_t *_as = &_al->sectors[_az*_al->sectors_x+_ax]; \
-                                    (out_floor) = _as->floor * 256; \
-                                    (out_ceil) = _as->ceiling * 256; \
+                                    (out_floor) = SECTOR_AT(_al,_ax,_az)->floor * 256; \
+                                    (out_ceil) = SECTOR_AT(_al,_ax,_az)->ceiling * 256; \
                                 } \
                             } \
                         } else { (out_floor)=0; (out_ceil)=-10000; } \
                     } while(0)
 
-                    if (collision_on && (dx != 0 || dz != 0)) {
-                        /* Check if destination sector is walkable */
-                        int32_t cur_floor, cur_ceil, dst_floor, dst_ceil;
-                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, cur_floor, cur_ceil);
-                        GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, cam_y, dst_floor, dst_ceil);
+                    if (collision_on) {
+                        /* TCL mode: wall + floor + ceiling collision.
+                         * D-pad up/down disabled, gravity pulls to floor. */
+                        dy = 0;  /* no manual Y movement in collision mode */
+                        static float vy = 0;
+                        vy += 16.0f;  /* gravity */
 
-                        /* Wall detection: block if destination has no space
-                         * or floor height difference is too large (step > 768) */
-                        int32_t gap = dst_floor - dst_ceil;
-                        int32_t step = dst_floor - cur_floor;
-                        if (gap < 512 || step < -768) {
-                            /* Wall — try sliding along X only */
-                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, cam_y, dst_floor, dst_ceil);
-                            gap = dst_floor - dst_ceil;
-                            step = dst_floor - cur_floor;
-                            if (gap < 512 || step < -768) dx = 0;
-                            /* Try Z only */
-                            GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, cam_y, dst_floor, dst_ceil);
-                            gap = dst_floor - dst_ceil;
-                            step = dst_floor - cur_floor;
-                            if (gap < 512 || step < -768) dz = 0;
+                        if (dx != 0 || dz != 0) {
+                            int32_t cur_floor, cur_ceil, dst_floor, dst_ceil;
+                            GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, cur_floor, cur_ceil);
+                            GET_SECTOR_HEIGHTS(cam_x + dx, cam_z + dz, cam_y, dst_floor, dst_ceil);
+                            int32_t gap = dst_floor - dst_ceil;
+                            int32_t step = dst_floor - cur_floor;
+                            if (gap < 512 || step < -768) {
+                                /* Try X only */
+                                GET_SECTOR_HEIGHTS(cam_x + dx, cam_z, cam_y, dst_floor, dst_ceil);
+                                gap = dst_floor - dst_ceil;
+                                step = dst_floor - cur_floor;
+                                if (gap < 512 || step < -768) dx = 0;
+                                /* Try Z only */
+                                GET_SECTOR_HEIGHTS(cam_x, cam_z + dz, cam_y, dst_floor, dst_ceil);
+                                gap = dst_floor - dst_ceil;
+                                step = dst_floor - cur_floor;
+                                if (gap < 512 || step < -768) dz = 0;
+                            }
                         }
+
+                        cam_x += dx; cam_z += dz;
+                        cam_y += vy;
+
+                        /* Clamp to floor/ceiling after movement */
+                        int32_t fl, cl;
+                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, fl, cl);
+                        float eye_floor = (float)fl - 768.0f;
+                        float eye_ceil = (float)cl + 128.0f;
+                        if (cam_y > eye_floor) { cam_y = eye_floor; vy = 0; }
+                        if (cam_y < eye_ceil) { cam_y = eye_ceil; vy = 0; }
+                    } else {
+                        /* Noclip: free fly, no restrictions */
+                        cam_x += dx; cam_y += dy; cam_z += dz;
                     }
 
-                    /* Apply movement */
-                    cam_x += dx; cam_y += dy; cam_z += dz;
-
                     /* Room tracking */
-                    if (pressed.a) walk_mode = !walk_mode;
                     {
                         int cam_room = lara_room;
                         int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
@@ -824,36 +829,6 @@ int main(void) {
                             }
                         }
                         lara_room = cam_room;
-
-                        /* Y collision: prevent passing through floor/ceiling.
-                         * TR1 Y axis: positive = down. Floor Y > Ceiling Y.
-                         * cam_y is eye height (Lara pos - 768). */
-                        int32_t fl, cl;
-                        GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, fl, cl);
-                        /* Eye offset: camera is ~768 above feet */
-                        float eye_floor = (float)fl - 768.0f;  /* highest cam_y can be (feet on floor) */
-                        float eye_ceil = (float)cl + 128.0f;   /* lowest cam_y can be (head at ceiling) */
-
-                        if (collision_on) {
-                            /* Only clamp if cam_y would pass THROUGH a boundary.
-                             * Don't snap — just prevent going further. */
-                            if (cam_y > eye_floor) cam_y = eye_floor;
-                            if (cam_y < eye_ceil) cam_y = eye_ceil;
-                        }
-                        if (walk_mode) {
-                            /* Gravity: slowly pull toward floor */
-                            static float vy = 0;
-                            vy += 16.0f;  /* gravity (positive = downward in TR1 Y) */
-                            cam_y += vy;
-                            if (cam_y > eye_floor) {
-                                cam_y = eye_floor;
-                                vy = 0;
-                            }
-                            if (cam_y < eye_ceil) {
-                                cam_y = eye_ceil;
-                                vy = 0;
-                            }
-                        }
                     }
 
                     /* Start button: return to console */
@@ -1578,7 +1553,7 @@ int main(void) {
                 printf("Paused. Press START for 3D.\n");
                 printf("Camera: %.0f, %.0f, %.0f\n", cam_x, cam_y, cam_z);
                 printf("FPS: %d  Audio: %d samples\n", fps_display, parsed_samples);
-                printf("Room: %d  Coll:%s Walk:%s\n", lara_room, collision_on?"ON":"off", walk_mode?"ON":"off");
+                printf("Room: %d  Collision: %s\n", lara_room, collision_on?"ON (tcl)":"OFF (noclip)");
                 {
                     int32_t pfl, pcl;
                     GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
