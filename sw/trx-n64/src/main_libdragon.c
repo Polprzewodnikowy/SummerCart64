@@ -923,13 +923,21 @@ int main(void) {
 
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    /* Set camera modelview matrix — rotation only.
-                     * Translation is done per-vertex on CPU to avoid
-                     * fixed-point overflow with large TR1 world coords. */
+                    /* Camera modelview — rotation only, translation done per-vertex */
                     glMatrixMode(GL_MODELVIEW);
                     glLoadIdentity();
                     glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
                     glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
+
+                    /* DEBUG: test triangle to verify GL pipeline works */
+                    glBegin(GL_TRIANGLES);
+                    glColor4f(1, 0, 0, 1);
+                    glVertex3f(-2, -1, -5);
+                    glColor4f(0, 1, 0, 1);
+                    glVertex3f( 2, -1, -5);
+                    glColor4f(0, 0, 1, 1);
+                    glVertex3f( 0,  2, -5);
+                    glEnd();
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
