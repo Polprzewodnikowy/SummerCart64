@@ -1194,8 +1194,8 @@ int main(void) {
                             tr_room_t *rm = &g_level.rooms[cam_room];
                             if (!rm->sectors) break;
                             int sx = (icx - rm->x) >> 10, sz = (icz - rm->z) >> 10;
-                            if (sx < 0) sx = 0; if (sx >= rm->sectors_x) sx = rm->sectors_x - 1;
-                            if (sz < 0) sz = 0; if (sz >= rm->sectors_z) sz = rm->sectors_z - 1;
+                            if (sx < 0) { sx = 0; } if (sx >= rm->sectors_x) { sx = rm->sectors_x - 1; }
+                            if (sz < 0) { sz = 0; } if (sz >= rm->sectors_z) { sz = rm->sectors_z - 1; }
                             tr_sector_t *s = SECTOR_AT(rm, sx, sz);
                             int32_t fl = s->floor * 256, cl = s->ceiling * 256;
                             if (icy > fl && s->pit_room != 255 && s->pit_room < g_level.room_count) {
