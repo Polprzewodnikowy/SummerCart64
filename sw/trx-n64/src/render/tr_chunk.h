@@ -65,6 +65,9 @@ typedef struct {
     float min_y, max_y;      /* TR1 Y: positive = down                    */
     float min_z, max_z;
 
+    /* Per-room draw distance (computed once at load) */
+    float max_draw_dist2;    /* Squared max draw distance based on size   */
+
     /* Updated per frame */
     int   lod;               /* CHUNK_LOD_NEAR or CHUNK_LOD_FAR           */
     float dist_sq;           /* Squared XZ distance from camera           */

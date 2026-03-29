@@ -249,6 +249,17 @@ static void build_chunks(const tr_level_t *level) {
         float dz = c->max_z - c->min_z;
         c->radius = sqrtf(dx*dx + dy*dy + dz*dz) * 0.5f;
 
+        /* Per-room max draw distance based on room size.
+         * Larger rooms stay visible further. Scale the largest
+         * XZ dimension by a multiplier — a room should be drawable
+         * until it would be just a few pixels on screen.
+         * Clamp to [CHUNK_MID_DIST2 .. CHUNK_XXFAR_DIST2]. */
+        float max_dim = dx > dz ? dx : dz;
+        float draw_dist = max_dim * 8.0f;  /* 8× largest dimension */
+        if (draw_dist < 7168.0f) draw_dist = 7168.0f;   /* min: ~7 sectors */
+        if (draw_dist > 16384.0f) draw_dist = 16384.0f;  /* max: ~16 sectors */
+        c->max_draw_dist2 = draw_dist * draw_dist;
+
         c->lod        = CHUNK_LOD_NEAR;
         c->dist_sq    = 0.0f;
         c->visible    = false;
@@ -1307,10 +1318,6 @@ int main(void) {
                     int vis_rooms[MAX_DRAW_ROOMS * 2];
                     int vis_count = 0;
 
-                    /* Max draw distance squared — rooms beyond this are
-                     * not drawn at all.  Keeps memory bounded on N64. */
-                    #define MAX_DRAW_DIST2 (CHUNK_XXFAR_DIST2)
-
                     for (int ri = 0; ri < g_chunk_count; ri++) {
                         tr_chunk_t *c = &g_chunks[ri];
 
@@ -1324,8 +1331,9 @@ int main(void) {
                         if (ri == lara_room) {
                             c->visible = true;
                         } else {
-                            /* Distance gate first — hard cutoff */
-                            if (c->dist_sq > MAX_DRAW_DIST2) {
+                            /* Per-room distance gate — small rooms cull
+                             * earlier, large rooms stay visible further */
+                            if (c->dist_sq > c->max_draw_dist2) {
                                 continue;
                             }
 
