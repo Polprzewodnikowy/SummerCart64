@@ -1309,39 +1309,85 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Current room + portal-connected rooms
+                     * VISIBILITY: Current room + portal-gated connected rooms
                      *
                      * Rules:
                      *   1. Current room is ALWAYS visible.
-                     *   2. Rooms directly connected via portals: ALWAYS visible.
-                     *   3. Nothing else — indoor caves only need rooms
-                     *      reachable through openings.
-                     *   4. Culling decides draw/not-draw.
+                     *   2. Connected rooms load ONLY when their portal
+                     *      is visible to the camera. Rooms behind camera
+                     *      or outside the frustum are skipped.
+                     *   3. Culling decides draw/not-draw.
                      *      LOD decides which representation to draw.
                      * =================================================== */
                     #define MAX_DRAW_ROOMS 16
                     int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
 
-                    /* Rule 1: current room */
+                    /* Rule 1: current room — always */
                     if (lara_room >= 0 && lara_room < g_chunk_count) {
                         g_chunks[lara_room].dist_sq = 0.0f;
                         g_chunks[lara_room].visible = true;
                         vis_rooms[vis_count++] = lara_room;
                     }
 
-                    /* Rule 2: portal-connected rooms */
+                    /* Rule 2: check each portal — only load room if
+                     * the portal opening is in camera view */
                     if (lara_room >= 0 && lara_room < g_level.room_count) {
                         tr_room_t *lr = &g_level.rooms[lara_room];
                         for (int p = 0; p < lr->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
-                            int dest = lr->portals[p].room;
+                            tr_portal_t *portal = &lr->portals[p];
+                            int dest = portal->room;
                             if (dest < 0 || dest >= g_chunk_count) continue;
+
                             /* Avoid duplicates */
                             bool dup = false;
                             for (int vi = 0; vi < vis_count; vi++) {
                                 if (vis_rooms[vi] == dest) { dup = true; break; }
                             }
                             if (dup) continue;
+
+                            /* Test portal visibility: transform portal
+                             * vertices to camera space, check if any part
+                             * is in front of camera and within frustum. */
+                            bool portal_visible = false;
+                            int verts_in_front = 0;
+                            float pmin_sx = 320, pmax_sx = 0;
+
+                            for (int pv = 0; pv < 4; pv++) {
+                                float px = (float)(lr->x + portal->vertices[pv].x) - cam_x;
+                                float pz = (float)(lr->z + portal->vertices[pv].z) - cam_z;
+
+                                /* Rotate to camera space (yaw only — cheap) */
+                                float rz_p = px * sy + pz * cy;
+
+                                if (rz_p > -256.0f) {
+                                    /* In front of (or very near) camera */
+                                    verts_in_front++;
+
+                                    if (rz_p < 1.0f) rz_p = 1.0f;
+                                    float rx_p = px * cy - pz * sy;
+                                    float sx_p = 160.0f + rx_p * 256.0f / rz_p;
+                                    if (sx_p < pmin_sx) pmin_sx = sx_p;
+                                    if (sx_p > pmax_sx) pmax_sx = sx_p;
+                                }
+                            }
+
+                            if (verts_in_front > 0) {
+                                /* Portal has verts in front of camera.
+                                 * If any cross the near plane, be conservative
+                                 * and treat as visible. Otherwise check screen
+                                 * bounds overlap. */
+                                if (verts_in_front < 4) {
+                                    /* Partially behind — conservative: visible */
+                                    portal_visible = true;
+                                } else {
+                                    /* All in front — check screen X overlap */
+                                    portal_visible = (pmax_sx > -32 && pmin_sx < 352);
+                                }
+                            }
+
+                            if (!portal_visible) continue;
+
                             tr_chunk_t *c = &g_chunks[dest];
                             float ddx = c->cx - cam_x;
                             float ddz = c->cz - cam_z;
