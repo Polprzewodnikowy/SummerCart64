@@ -63,9 +63,9 @@ typedef struct {
     uint16_t floor_data_idx;   /* Index into floor data array */
     int16_t  box;              /* Pathfinding box index */
     uint8_t  pit_room;         /* Room below (255 = none) */
-    int8_t   floor;            /* Floor height (× -256 = world units) */
+    int8_t   floor;            /* Floor height (× 256 = world Y) */
     uint8_t  sky_room;         /* Room above (255 = none) */
-    int8_t   ceiling;          /* Ceiling height (× -256 = world units) */
+    int8_t   ceiling;          /* Ceiling height (× 256 = world Y) */
 } tr_sector_t;
 
 /* -------------------------------------------------------------------

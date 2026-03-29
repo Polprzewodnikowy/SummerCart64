@@ -401,10 +401,19 @@ int main(void) {
                        (int)g_level.tex_page_count);
                 printf("  Anims:    %d\n", (int)g_level.anim_count);
                 printf("  Lara:     room %d\n", lara_room);
-                printf("  Heap:     %u KB used\n\n",
+                printf("  Heap:     %u KB used\n",
                        (GAME_HEAP_SIZE - n64_mem_available()) / 1024);
-
-                printf("LEVEL LOADED! Preparing textures...\n");
+                printf("  Sound:    details=%d indices=%d data=%d bytes\n",
+                       (int)g_level.sound_detail_count,
+                       (int)g_level.sample_index_count,
+                       (int)g_level.sample_data_size);
+                if (g_level.sample_data && g_level.sample_index_count > 0) {
+                    int32_t off0 = g_level.sample_indices[0];
+                    uint8_t *w = g_level.sample_data + off0;
+                    printf("  Sample[0]: off=%d, hdr=%c%c%c%c\n",
+                           off0, w[0], w[1], w[2], w[3]);
+                }
+                printf("\nLEVEL LOADED! Preparing textures...\n");
                 console_render();
 
                 /* Pre-convert all object textures to 16x16 RGBA16 at load time.
@@ -736,8 +745,8 @@ int main(void) {
                         if (_sz >= _r->sectors_z) _sz = _r->sectors_z-1; \
                         if (_r->sectors) { \
                             tr_sector_t *_s = &_r->sectors[_sz * _r->sectors_x + _sx]; \
-                            (out_floor) = _s->floor * -256; \
-                            (out_ceil) = _s->ceiling * -256; \
+                            (out_floor) = _s->floor * 256; \
+                            (out_ceil) = _s->ceiling * 256; \
                             /* Follow pit_room down if camera is below current floor */ \
                             if (_s->pit_room != 255 && _s->pit_room < g_level.room_count && \
                                 _iy > (out_floor)) { \
@@ -745,8 +754,8 @@ int main(void) {
                                 int _bx = (_ix-_bl->x)>>10, _bz = (_iz-_bl->z)>>10; \
                                 if (_bx>=0 && _bx<_bl->sectors_x && _bz>=0 && _bz<_bl->sectors_z && _bl->sectors) { \
                                     tr_sector_t *_bs = &_bl->sectors[_bz*_bl->sectors_x+_bx]; \
-                                    (out_floor) = _bs->floor * -256; \
-                                    (out_ceil) = _bs->ceiling * -256; \
+                                    (out_floor) = _bs->floor * 256; \
+                                    (out_ceil) = _bs->ceiling * 256; \
                                 } \
                             } \
                             /* Follow sky_room up if camera is above current ceiling */ \
@@ -756,8 +765,8 @@ int main(void) {
                                 int _ax = (_ix-_al->x)>>10, _az = (_iz-_al->z)>>10; \
                                 if (_ax>=0 && _ax<_al->sectors_x && _az>=0 && _az<_al->sectors_z && _al->sectors) { \
                                     tr_sector_t *_as = &_al->sectors[_az*_al->sectors_x+_ax]; \
-                                    (out_floor) = _as->floor * -256; \
-                                    (out_ceil) = _as->ceiling * -256; \
+                                    (out_floor) = _as->floor * 256; \
+                                    (out_ceil) = _as->ceiling * 256; \
                                 } \
                             } \
                         } else { (out_floor)=0; (out_ceil)=-10000; } \
