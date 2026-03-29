@@ -708,34 +708,49 @@ int main(void) {
                         /* Always update current room for BFS traversal */
                         lara_room = cam_room;
 
-                        /* Floor clamping (walk mode only) */
-                        if (walk_mode && collision_on) {
-                            tr_room_t *room = &g_level.rooms[cam_room];
-                            int32_t sx = (icx - room->x) >> 10;
-                            int32_t sz = (icz - room->z) >> 10;
-                            if (sx < 0) sx = 0;
-                            if (sx >= room->sectors_x) sx = room->sectors_x - 1;
-                            if (sz < 0) sz = 0;
-                            if (sz >= room->sectors_z) sz = room->sectors_z - 1;
+                        /* Floor/ceiling collision + gravity */
+                        tr_room_t *croom = &g_level.rooms[cam_room];
+                        int32_t csx = (icx - croom->x) >> 10;
+                        int32_t csz = (icz - croom->z) >> 10;
+                        if (csx < 0) csx = 0;
+                        if (csx >= croom->sectors_x) csx = croom->sectors_x - 1;
+                        if (csz < 0) csz = 0;
+                        if (csz >= croom->sectors_z) csz = croom->sectors_z - 1;
 
-                            if (room->sectors) {
-                                tr_sector_t *sector = &room->sectors[sz * room->sectors_x + sx];
-                                int32_t floor_y = sector->floor * -256;
+                        if (croom->sectors) {
+                            tr_sector_t *sector = &croom->sectors[csz * croom->sectors_x + csx];
+                            int32_t floor_y = sector->floor * -256;
+                            int32_t ceil_y = sector->ceiling * -256;
 
-                                if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
-                                    tr_room_t *below = &g_level.rooms[sector->pit_room];
-                                    int32_t bx = (icx - below->x) >> 10;
-                                    int32_t bz = (icz - below->z) >> 10;
-                                    if (bx >= 0 && bx < below->sectors_x &&
-                                        bz >= 0 && bz < below->sectors_z && below->sectors) {
-                                        tr_sector_t *bs = &below->sectors[bz * below->sectors_x + bx];
-                                        int32_t bf = bs->floor * -256;
-                                        if (bf > floor_y) floor_y = bf;
-                                    }
+                            /* Follow pit room for deeper floor */
+                            if (sector->pit_room != 255 && sector->pit_room < g_level.room_count) {
+                                tr_room_t *below = &g_level.rooms[sector->pit_room];
+                                int32_t bsx = (icx - below->x) >> 10;
+                                int32_t bsz = (icz - below->z) >> 10;
+                                if (bsx >= 0 && bsx < below->sectors_x &&
+                                    bsz >= 0 && bsz < below->sectors_z && below->sectors) {
+                                    int32_t bf = below->sectors[bsz * below->sectors_x + bsx].floor * -256;
+                                    if (bf > floor_y) floor_y = bf;
                                 }
+                            }
 
-                                /* Gravity: always walk on floor */
-                                cam_y = (float)floor_y - 768.0f;
+                            float floor_limit = (float)floor_y - 768.0f;
+                            float ceil_limit = (float)ceil_y + 128.0f;
+
+                            if (collision_on) {
+                                /* L collision: clamp between ceiling and floor */
+                                if (cam_y > floor_limit) cam_y = floor_limit;
+                                if (cam_y < ceil_limit) cam_y = ceil_limit;
+                            }
+
+                            if (walk_mode) {
+                                /* A walk: gravity pulls toward floor (no teleport) */
+                                if (cam_y < floor_limit) {
+                                    cam_y += 48.0f; /* gravity */
+                                    if (cam_y > floor_limit) cam_y = floor_limit;
+                                }
+                                /* Don't go through floor */
+                                if (cam_y > floor_limit) cam_y = floor_limit;
                             }
                         }
                     }
