@@ -708,15 +708,16 @@ int main(void) {
                 #define BAKED_LOAD_PER_ROOM (MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
                 #define BAKED_HEADER_SIZE 16
 
-                /* Try to include auto-generated baked offsets header.
-                 * If not available, define defaults (no baked data). */
-                /* Baked tile loading disabled — even 24 KB uncached
-                 * pushes RSPQ over the edge.  Bake tool stays in repo
-                 * for when we free uncached headroom (e.g., by reducing
-                 * base texture count or switching to CI4 format).
-                 * On-demand mip (640 bytes) is the stable path. */
+                /* Baked RGBA16 tile offsets from ROM.
+                 * Pixels loaded into CACHED heap (not uncached) to avoid
+                 * competing with RSPQ block memory. Cache written back
+                 * once after DMA so rdpq_tex_upload reads correct data. */
+                #if __has_include("baked_offsets.h")
+                #include "baked_offsets.h"
+                #else
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
+                #endif
 
                 int baked_room_count = 0;
                 surface_t *baked_mip0 = NULL; /* 32×32 per room */
@@ -738,9 +739,10 @@ int main(void) {
 
                         /* Only load mip1+mip2 per room (24 KB total, not 100 KB).
                          * Skip mip0 (32×32) to preserve uncached RDRAM for RSPQ. */
+                        /* Use cached heap — doesn't compete with RSPQ.
+                         * Writeback cache after DMA so RDP reads correct data. */
                         int total_baked = baked_room_count * BAKED_LOAD_PER_ROOM;
-                        baked_pixels = (uint16_t *)malloc_uncached_aligned(
-                            64, total_baked);
+                        baked_pixels = (uint16_t *)n64_mem_alloc(total_baked + 64);
                         baked_mip1 = (surface_t *)n64_mem_alloc(
                             baked_room_count * sizeof(surface_t));
                         baked_mip2 = (surface_t *)n64_mem_alloc(
@@ -765,7 +767,11 @@ int main(void) {
                                     (uint16_t *)(dst + MIP1_DIM*MIP1_DIM*2),
                                     FMT_RGBA16, MIP2_DIM, MIP2_DIM);
                             }
-                            printf("  Baked loaded: %d KB (mip1+mip2 only)\n",
+                            /* Writeback entire baked region — DMA wrote to
+                             * RDRAM but CPU cache may have stale entries.
+                             * After this, rdpq_tex_upload reads correct data. */
+                            data_cache_hit_writeback(baked_pixels, total_baked);
+                            printf("  Baked loaded: %d KB (mip1+mip2, cached heap)\n",
                                    total_baked / 1024);
                         } else {
                             printf("  Baked alloc failed\n");
