@@ -2161,14 +2161,8 @@ int main(void) {
 
                     /* FPS display disabled during GL migration */
 
-                    /* Drain graphics pipeline before presenting.
-                     * Without this, the CPU produces draw commands faster
-                     * than RSP/RDP can consume them, causing command queue
-                     * backlog that eventually OOMs.  glFinish() blocks until
-                     * all queued RSP+RDP work is complete. */
-                    glFinish();
-
-                    /* Show frame */
+                    /* Show frame (no glFinish — upload/tri caps prevent
+                     * queue backlog without blocking the CPU). */
                     gl_context_end();
                     rdpq_detach_show();
 
