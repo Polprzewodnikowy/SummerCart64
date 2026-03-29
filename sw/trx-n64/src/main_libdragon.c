@@ -1397,15 +1397,16 @@ int main(void) {
                                     float ry = cy_v * cp - rz_yaw * sp;
                                     float rz = cy_v * sp + rz_yaw * cp;
 
-                                    if (rz < 32.0f) { visible = false; break; }
+                                    if (rz < 64.0f) { visible = false; break; }
 
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + rx * inv_z;
                                     float scy = 120.0f + ry * inv_z;
-                                    if (scx < -2048) scx = -2048;
-                                    if (scx > 2048) scx = 2048;
-                                    if (scy < -2048) scy = -2048;
-                                    if (scy > 2048) scy = 2048;
+                                    /* Tight clamp — RDP can't handle extreme coords */
+                                    if (scx < -512 || scx > 832 ||
+                                        scy < -512 || scy > 752) {
+                                        visible = false; break;
+                                    }
 
                                     /* Lighting (simplified: no per-vertex fog for perf) */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
