@@ -254,8 +254,13 @@ static void build_chunks(const tr_level_t *level) {
          * XZ dimension by a multiplier — a room should be drawable
          * until it would be just a few pixels on screen.
          * Clamp to [CHUNK_MID_DIST2 .. CHUNK_XXFAR_DIST2]. */
+        /* Per-room max draw distance from size + connectivity.
+         * Larger rooms and rooms with more portals (junction areas)
+         * stay visible further. */
         float max_dim = dx > dz ? dx : dz;
-        float draw_dist = max_dim * 8.0f;  /* 8× largest dimension */
+        float draw_dist = max_dim * 8.0f;
+        /* Boost for connected rooms: each portal adds ~1 sector */
+        draw_dist += r->portal_count * 1024.0f;
         if (draw_dist < 7168.0f) draw_dist = 7168.0f;   /* min: ~7 sectors */
         if (draw_dist > 16384.0f) draw_dist = 16384.0f;  /* max: ~16 sectors */
         c->max_draw_dist2 = draw_dist * draw_dist;
