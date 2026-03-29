@@ -1239,9 +1239,7 @@ int main(void) {
                         rdpq_mode_filter(FILTER_BILINEAR);
 
                         int far_last_tex = -1;
-                        int far_uploads = 0;
                         int far_tris = 0;
-                        #define FAR_MAX_UPLOADS  24  /* cap TMEM uploads per frame */
                         #define FAR_FLUSH_EVERY  20  /* flush RSPQ every N triangles */
 
                         for (int fi = 0; fi < far_count; fi++) {
@@ -1274,21 +1272,15 @@ int main(void) {
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
-                                        if (far_uploads < FAR_MAX_UPLOADS) {
-                                            rspq_flush();
-                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                            far_last_tex = (int)tex_idx;
-                                            far_uploads++;
-                                        }
+                                        rspq_flush();
+                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        far_last_tex = (int)tex_idx;
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
-                                        if (far_uploads < FAR_MAX_UPLOADS) {
-                                            rspq_flush();
-                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            far_last_tex = -2;
-                                            far_uploads++;
-                                        }
+                                        rspq_flush();
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                        far_last_tex = -2;
                                     }
                                 } else continue;
 
