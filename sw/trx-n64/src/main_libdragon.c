@@ -956,8 +956,8 @@ int main(void) {
                                 glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
                                 glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
                             }
                         }
@@ -1129,10 +1129,10 @@ int main(void) {
                                     float tv = (float)(otex->uv[v].v >> 8);
                                     float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                     float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Pass pixel-space coords directly — libdragon GL
-                                     * with glSurfaceTexImageN64 may expect pixel coords */
-                                    fs[v] = s_px;
-                                    ft[v] = t_px;
+                                    /* Normalize to 0-1, inset by half texel to avoid seam bleed */
+                                    float half_t = 0.5f / (float)TEX_TILE_DIM;
+                                    fs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+                                    ft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
                                 } else {
                                     fs[v] = 0; ft[v] = 0;
                                 }
