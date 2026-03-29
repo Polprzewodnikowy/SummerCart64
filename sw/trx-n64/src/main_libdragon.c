@@ -904,15 +904,10 @@ int main(void) {
                            num_otex * TEX_TILE_BYTES / 1024);
                 }
 
-                /* Free level_data (uncached RDRAM) — all parsed structures
-                 * are in bump heap, CI8 tiles generated. tex_pages pointed
-                 * into level_data (zero-copy) so null it first. */
-                g_level.tex_pages = NULL;
-                if (level_data) {
-                    free_uncached(level_data);
-                    printf("  Freed level_data (uncached)\n");
-                    level_data = NULL;
-                }
+                /* level_data stays allocated (uncached RDRAM).
+                 * free_uncached was causing RSP deadlocks — likely
+                 * corrupting the uncached allocator pool that RSPQ
+                 * uses for DMA buffers. Keep it alive for safety. */
 
                 printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
@@ -2111,8 +2106,8 @@ int main(void) {
                                         sv[0], sv[tri+1], sv[tri+2]);
                                     far_tris++;
                                     perf_far_tris = far_tris;
-                                    if ((far_tris & 127) == 0)  /* flush every 128 tris */
-                                        rspq_flush();
+                                    if ((far_tris & 15) == 0)
+                                        rspq_wait();
                                     if (far_tris >= FAR_TRI_BUDGET)
                                         goto far_pass_done;
                                 }
@@ -2380,7 +2375,7 @@ int main(void) {
                             for (int tri = 0; tri < num_tris; tri++) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                 perf_near_tris++;
-                                if ((perf_near_tris & 31) == 0) rspq_flush();
+                                if ((perf_near_tris & 15) == 0) rspq_wait();
                             }
                         }
                     }
@@ -2527,7 +2522,7 @@ int main(void) {
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
                                     perf_near_tris++;
-                                    if ((perf_near_tris & 31) == 0) rspq_flush();
+                                    if ((perf_near_tris & 15) == 0) rspq_wait();
                                 }
                             }
                         }
@@ -2691,7 +2686,7 @@ int main(void) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                         perf_near_tris++;
                                     }
-                                    if ((perf_near_tris & 31) == 0) rspq_flush();
+                                    if ((perf_near_tris & 15) == 0) rspq_wait();
                                 }
                             }
                         }
@@ -3006,7 +3001,7 @@ int main(void) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
                                 perf_near_tris++;
                             }
-                            if ((perf_near_tris & 31) == 0) rspq_flush();
+                            if ((perf_near_tris & 15) == 0) rspq_wait();
                         }
                     }
                     perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
