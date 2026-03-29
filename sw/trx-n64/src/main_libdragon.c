@@ -1416,11 +1416,11 @@ int main(void) {
                         }
                     }
 
-                    /* Flush (non-blocking) far pass commands to RSP before
-                     * GL context begins.  Using flush not wait to avoid
-                     * stalling the CPU — the RSPQ ring buffer is large
-                     * enough to hold both passes with periodic flushes. */
-                    rspq_flush();
+                    /* Wait (blocking) for RSP to drain all far pass commands
+                     * before GL context begins.  This is the one place where
+                     * blocking is worth it — ensures the command buffer is
+                     * fully free for the GL near pass. */
+                    rspq_wait();
 
                     /* ===== GL NEAR PASS ===== */
                     gl_context_begin();
