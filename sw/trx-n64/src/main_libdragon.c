@@ -1680,6 +1680,123 @@ int main(void) {
                     }
                     FLUSH_GL();
 
+                    /* ===== GL STATIC MESHES (near rooms only) ===== */
+                    for (int ri = 0; ri < near_count; ri++) {
+                        int room_idx = rooms_to_draw[ri];
+                        if (room_idx < 0 || room_idx >= g_level.room_count) continue;
+                        tr_room_t *room = &g_level.rooms[room_idx];
+
+                        for (int si = 0; si < room->static_mesh_count; si++) {
+                            tr_room_static_mesh_t *sm = &room->static_meshes[si];
+
+                            /* Quick frustum cull */
+                            float sdx = (float)sm->pos.x - cam_x;
+                            float sdz = (float)sm->pos.z - cam_z;
+                            float sm_rz = sdx * sy + sdz * cy;
+                            if (sm_rz < -1024) continue;
+                            float sm_rx = sdx * cy - sdz * sy;
+                            if (sm_rz > 0) { float l = sm_rz * 3.0f; if (sm_rx > l || sm_rx < -l) continue; }
+
+                            /* Find static object definition */
+                            int mesh_idx = -1;
+                            for (int oi = 0; oi < g_level.static_object_count; oi++) {
+                                if (g_level.static_objects[oi].object_id == sm->static_mesh_id) {
+                                    if (!(g_level.static_objects[oi].flags & 2)) break;
+                                    mesh_idx = g_level.static_objects[oi].mesh_idx;
+                                    break;
+                                }
+                            }
+                            if (mesh_idx < 0 || mesh_idx >= g_level.mesh_count) continue;
+                            tr_object_mesh_t *mesh = &g_level.meshes[mesh_idx];
+
+                            float sm_bright = 1.0f - (float)sm->shade / 8191.0f;
+                            if (sm_bright < 0.1f) sm_bright = 0.1f;
+                            if (sm_bright > 1.0f) sm_bright = 1.0f;
+
+                            float sm_yaw = (float)sm->rotation * 3.14159f / 32768.0f;
+                            float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
+
+                            for (int f = 0; f < mesh->face_count && f < 100; f++) {
+                                tr_face_t *face = &mesh->faces[f];
+                                int nv = face->vertex_count;
+                                if (nv < 3) continue;
+
+                                uint16_t tex_idx = face->texture & 0x7FFF;
+                                bool is_flat = (face->texture & 0x8000) != 0;
+                                int want_tex;
+                                if (is_flat) {
+                                    want_tex = -2;
+                                } else if (tex_idx < num_otex && gl_textures) {
+                                    want_tex = (int)tex_idx;
+                                } else continue;
+
+                                if (want_tex != cur_tex) {
+                                    FLUSH_GL();
+                                    if (want_tex == -2 && gl_white_tex)
+                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                    else if (want_tex >= 0)
+                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                    cur_tex = want_tex;
+                                }
+
+                                tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                    ? &g_level.object_textures[tex_idx] : NULL;
+
+                                int num_tris = nv - 2;
+                                if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
+
+                                float px[4], py[4], pz[4], fs[4], ft[4];
+                                uint8_t cr[4], cg[4], cb[4];
+                                bool ok = true;
+                                for (int v = 0; v < nv; v++) {
+                                    uint16_t vi = face->vertices[v];
+                                    if (vi >= mesh->vertex_count) { ok = false; break; }
+
+                                    /* Local → world: rotate by yaw + translate */
+                                    float lx = (float)mesh->vertices[vi].x;
+                                    float lz = (float)mesh->vertices[vi].z;
+                                    float wx = (float)sm->pos.x + lx * sm_cy_r - lz * sm_sy_r;
+                                    float wy = (float)sm->pos.y + (float)mesh->vertices[vi].y;
+                                    float wz = (float)sm->pos.z + lx * sm_sy_r + lz * sm_cy_r;
+
+                                    /* Camera-relative (CPU subtract, RSP rotates) */
+                                    px[v] = (wx - cam_x) * WORLD_SCALE;
+                                    py[v] = -(wy - cam_y) * WORLD_SCALE;
+                                    pz[v] = -(wz - cam_z) * WORLD_SCALE;
+
+                                    cr[v] = (uint8_t)(sm_bright * 255.0f);
+                                    cg[v] = cr[v];
+                                    cb[v] = cr[v];
+
+                                    if (otex && tex_uv_map) {
+                                        float tu = (float)(otex->uv[v].u >> 8);
+                                        float tv = (float)(otex->uv[v].v >> 8);
+                                        float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                        float half_t = 0.5f / (float)TEX_TILE_DIM;
+                                        fs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+                                        ft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
+                                    } else {
+                                        fs[v] = 0; ft[v] = 0;
+                                    }
+                                }
+                                if (!ok) continue;
+
+                                for (int tri = 0; tri < num_tris; tri++) {
+                                    int idx[3] = {0, tri+1, tri+2};
+                                    for (int k = 0; k < 3; k++) {
+                                        int i = idx[k];
+                                        gl_vert_t *vp = &gl_verts[gl_vc++];
+                                        vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
+                                        vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
+                                        vp->s = fs[i]; vp->t = ft[i];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    FLUSH_GL();
+
                     } /* end GL near pass */
                     #undef FLUSH_GL
 
