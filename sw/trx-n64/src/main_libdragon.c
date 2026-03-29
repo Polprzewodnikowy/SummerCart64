@@ -1211,13 +1211,17 @@ int main(void) {
                         rooms_to_draw[num_draw++] = far_rooms[i];
 
                     /* ===== RDPQ FAR PASS =====
-                     * CPU-projected, flat-shaded triangles via rdpq_triangle.
-                     * Runs OUTSIDE gl_context — no GL objects needed.
-                     * Back-to-front, no Z buffer. */
+                     * CPU-projected, textured + shaded triangles via rdpq.
+                     * Runs OUTSIDE gl_context — uses rdpq_tex_upload for TMEM.
+                     * Back-to-front, no Z buffer.  Faces sorted by texture
+                     * (from load-time sort) so we batch by texture group. */
                     {
                         rdpq_set_mode_standard();
-                        rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                        rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
                         rdpq_mode_blender(0);
+                        rdpq_mode_filter(FILTER_BILINEAR);
+
+                        int far_last_tex = -1;
 
                         for (int fi = 0; fi < far_count; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1240,30 +1244,44 @@ int main(void) {
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
 
+                                /* Texture setup — upload to TMEM on change */
+                                uint16_t tex_idx = face->texture & 0x7FFF;
+                                bool is_flat = (face->texture & 0x8000) != 0;
+
+                                if (!is_flat && tex_idx < num_otex && tex_surfs) {
+                                    if ((int)tex_idx != far_last_tex) {
+                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        far_last_tex = (int)tex_idx;
+                                    }
+                                } else if (is_flat) {
+                                    if (white_px && far_last_tex != -2) {
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                        far_last_tex = -2;
+                                    }
+                                } else continue;
+
+                                tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                    ? &g_level.object_textures[tex_idx] : NULL;
+
                                 /* CPU transform + project each vertex */
-                                float sv[4][6]; /* TRIFMT_SHADE: X,Y,R,G,B,A */
+                                float sv[4][9]; /* TRIFMT_SHADE_TEX: X,Y,R,G,B,A,S,T,INV_W */
                                 bool visible = true;
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
                                     if (vi >= room->mesh.vertex_count) { visible = false; break; }
                                     tr_room_vertex_t *rv = &room->mesh.vertices[vi];
 
-                                    /* Camera-relative position */
                                     float cx_v = (float)(room->x + rv->x) - cam_x;
                                     float cy_v = (float)rv->y - cam_y;
                                     float cz_v = (float)(room->z + rv->z) - cam_z;
 
-                                    /* Yaw rotation */
                                     float rx = cx_v * cy - cz_v * sy;
                                     float rz_yaw = cx_v * sy + cz_v * cy;
-
-                                    /* Pitch rotation */
                                     float ry = cy_v * cp - rz_yaw * sp;
                                     float rz = cy_v * sp + rz_yaw * cp;
 
                                     if (rz < 32.0f) { visible = false; break; }
 
-                                    /* Perspective project */
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + rx * inv_z;
                                     float scy = 120.0f + ry * inv_z;
@@ -1272,7 +1290,7 @@ int main(void) {
                                     if (scy < -2048) scy = -2048;
                                     if (scy > 2048) scy = 2048;
 
-                                    /* Lighting + fog */
+                                    /* Lighting */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
                                     if (bright < 0.0f) bright = 0.0f;
                                     if (bright > 1.0f) bright = 1.0f;
@@ -1282,8 +1300,7 @@ int main(void) {
                                     float b = is_water ? bright * 1.0f : bright;
 
                                     /* Distance fog */
-                                    float fdx = cx_v, fdz = cz_v;
-                                    float d2 = fdx*fdx + fdz*fdz;
+                                    float d2 = cx_v*cx_v + cz_v*cz_v;
                                     float fog = (d2 - 26214400.0f) / 99090432.0f;
                                     float y_bias = cy_v * 0.00004f;
                                     if (y_bias < 0.0f) y_bias = 0.0f;
@@ -1295,19 +1312,30 @@ int main(void) {
                                     g = g * (1.0f - fog) + 0.13f * fog;
                                     b = b * (1.0f - fog) + 0.18f * fog;
 
+                                    /* Texture coords in pixel space */
+                                    float ts = 0, tt = 0;
+                                    if (otex && tex_uv_map) {
+                                        float tu = (float)(otex->uv[v].u >> 8);
+                                        float tv = (float)(otex->uv[v].v >> 8);
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    }
+
                                     sv[v][0] = scx;
                                     sv[v][1] = scy;
                                     sv[v][2] = r;
                                     sv[v][3] = g;
                                     sv[v][4] = b;
                                     sv[v][5] = 1.0f;
+                                    sv[v][6] = ts;
+                                    sv[v][7] = tt;
+                                    sv[v][8] = 1.0f / rz;
                                 }
                                 if (!visible) continue;
 
-                                /* Submit triangles (fan from vertex 0) */
                                 int num_tris = nv - 2;
                                 for (int tri = 0; tri < num_tris; tri++) {
-                                    rdpq_triangle(&TRIFMT_SHADE,
+                                    rdpq_triangle(&TRIFMT_SHADE_TEX,
                                         sv[0], sv[tri+1], sv[tri+2]);
                                 }
                             }
