@@ -1402,39 +1402,27 @@ int main(void) {
                         }
                     }
 
-                    /* Rule 3: LOD classification — separate from culling.
-                     * Culling decided visibility above.
-                     * LOD decides which rendering path (GL near vs RDPQ far). */
+                    /* LOD classification.
+                     * With current+connected visibility, all rooms are
+                     * nearby.  Route everything through GL near pass
+                     * (correct per-face textures).  Far pass disabled
+                     * until baked texture mapping is fixed. */
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
                     int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
-
-                    #define LOD_MID_FAR_INNER (CHUNK_MID_DIST2 * 0.85f)
-                    #define LOD_MID_FAR_OUTER (CHUNK_MID_DIST2 * 1.1f)
 
                     for (int vi = 0; vi < vis_count; vi++) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
+                        /* All visible rooms go through GL near pass.
+                         * Apply fog for rooms beyond NEAR distance. */
                         if (c->dist_sq < CHUNK_NEAR_DIST2) {
                             c->lod = CHUNK_LOD_NEAR;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
-                        } else if (c->dist_sq < LOD_MID_FAR_INNER) {
-                            c->lod = CHUNK_LOD_MID;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
-                        } else if (c->dist_sq > LOD_MID_FAR_OUTER) {
-                            c->lod = CHUNK_LOD_FAR;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
                         } else {
-                            /* Mid/far overlap — both passes */
-                            c->lod = CHUNK_LOD_MID;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
+                            c->lod = CHUNK_LOD_MID; /* GL with fog */
                         }
+                        if (near_count < MAX_DRAW_ROOMS)
+                            near_rooms[near_count++] = ri;
                     }
 
                     /* Update cluster face_skip based on cluster-center distance.
