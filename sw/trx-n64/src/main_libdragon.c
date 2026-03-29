@@ -689,22 +689,102 @@ int main(void) {
                  * Instead of pre-allocating mips for all 880 textures,
                  * box-filter on-the-fly for the ~8 uploads per frame.
                  * Only 512 bytes uncached — negligible memory cost. */
-                /* On-demand mip buffers (Lambert technique):
-                 * Two reusable buffers for 16×16 and 8×8 mip generation.
-                 * Box-filtered from 32×32 base on each upload.
-                 * LOD selection based on projected screen area.
-                 * 512 + 128 = 640 bytes uncached total. */
+                /* ---- Pre-baked room tiles (Lambert-style) ----
+                 * Load per-room baked textures from ROM if available.
+                 * Each room has 3 mip levels: 32×32, 16×16, 8×8.
+                 * Far pass uploads pre-baked tile = zero runtime filtering.
+                 *
+                 * Falls back to on-demand box filtering if baked data
+                 * is not in ROM (for development without full pipeline). */
+                #define MIP0_DIM 32
                 #define MIP1_DIM 16
                 #define MIP2_DIM 8
-                uint16_t *mip1_buf = (uint16_t *)malloc_uncached_aligned(
-                    64, MIP1_DIM * MIP1_DIM * 2);
-                uint16_t *mip2_buf = (uint16_t *)malloc_uncached_aligned(
-                    64, MIP2_DIM * MIP2_DIM * 2);
+                #define BAKED_BYTES_PER_ROOM (MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
+                #define BAKED_HEADER_SIZE 16
+
+                /* Try to include auto-generated baked offsets header.
+                 * If not available, define defaults (no baked data). */
+                #if __has_include("baked_offsets.h")
+                #include "baked_offsets.h"
+                #else
+                #define BAKED_ROM_OFFSET 0u
+                #define BAKED_ROM_SIZE   0u
+                #endif
+
+                int baked_room_count = 0;
+                surface_t *baked_mip0 = NULL; /* 32×32 per room */
+                surface_t *baked_mip1 = NULL; /* 16×16 per room */
+                surface_t *baked_mip2 = NULL; /* 8×8 per room */
+                uint16_t  *baked_pixels = NULL;
+
+                if (BAKED_ROM_OFFSET > 0 && BAKED_ROM_SIZE > BAKED_HEADER_SIZE) {
+                    /* Read baked header from ROM */
+                    static uint8_t bake_hdr[16] __attribute__((aligned(16)));
+                    dma_read(bake_hdr, ROM_CART_BASE + BAKED_ROM_OFFSET, 16);
+
+                    if (bake_hdr[0]=='B' && bake_hdr[1]=='A' &&
+                        bake_hdr[2]=='K' && bake_hdr[3]=='E') {
+                        baked_room_count = bake_hdr[4] | (bake_hdr[5] << 8);
+                        int bake_mips = bake_hdr[6] | (bake_hdr[7] << 8);
+                        printf("  Baked data: %d rooms, %d mips\n",
+                               baked_room_count, bake_mips);
+
+                        /* Allocate uncached memory for baked pixel data */
+                        int total_baked = baked_room_count * BAKED_BYTES_PER_ROOM;
+                        baked_pixels = (uint16_t *)malloc_uncached_aligned(
+                            64, total_baked);
+                        baked_mip0 = (surface_t *)n64_mem_alloc(
+                            baked_room_count * sizeof(surface_t));
+                        baked_mip1 = (surface_t *)n64_mem_alloc(
+                            baked_room_count * sizeof(surface_t));
+                        baked_mip2 = (surface_t *)n64_mem_alloc(
+                            baked_room_count * sizeof(surface_t));
+
+                        if (baked_pixels && baked_mip0 && baked_mip1 && baked_mip2) {
+                            /* DMA all baked pixel data from ROM */
+                            dma_read(baked_pixels,
+                                     ROM_CART_BASE + BAKED_ROM_OFFSET + BAKED_HEADER_SIZE,
+                                     total_baked);
+
+                            /* Create surface_t wrappers for each room's mips */
+                            for (int bi = 0; bi < baked_room_count; bi++) {
+                                uint8_t *base = (uint8_t *)baked_pixels +
+                                    bi * BAKED_BYTES_PER_ROOM;
+                                baked_mip0[bi] = surface_make_linear(
+                                    (uint16_t *)base, FMT_RGBA16, MIP0_DIM, MIP0_DIM);
+                                baked_mip1[bi] = surface_make_linear(
+                                    (uint16_t *)(base + MIP0_DIM*MIP0_DIM*2),
+                                    FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                                baked_mip2[bi] = surface_make_linear(
+                                    (uint16_t *)(base + MIP0_DIM*MIP0_DIM*2 + MIP1_DIM*MIP1_DIM*2),
+                                    FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                            }
+                            printf("  Baked loaded: %d KB from ROM\n",
+                                   total_baked / 1024);
+                        } else {
+                            printf("  Baked alloc failed\n");
+                            baked_room_count = 0;
+                        }
+                    } else {
+                        printf("  No baked data in ROM (bad magic)\n");
+                    }
+                } else {
+                    printf("  No baked data in ROM\n");
+                }
+
+                /* Fallback: on-demand mip buffers (used when no baked data) */
+                uint16_t *mip1_buf = NULL, *mip2_buf = NULL;
                 surface_t mip1_surf = {0}, mip2_surf = {0};
-                if (mip1_buf)
-                    mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
-                if (mip2_buf)
-                    mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                if (baked_room_count == 0) {
+                    mip1_buf = (uint16_t *)malloc_uncached_aligned(
+                        64, MIP1_DIM * MIP1_DIM * 2);
+                    mip2_buf = (uint16_t *)malloc_uncached_aligned(
+                        64, MIP2_DIM * MIP2_DIM * 2);
+                    if (mip1_buf)
+                        mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                    if (mip2_buf)
+                        mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
+                }
 
                 /* GL texture objects — created after gl_init() */
                 GLuint *gl_textures = NULL;
@@ -1365,6 +1445,30 @@ int main(void) {
                             int room_idx = far_rooms[fi];
                             if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                             tr_room_t *room = &g_level.rooms[room_idx];
+
+                            /* Pre-baked room tile: upload once per room.
+                             * Choose mip level by distance.  When baked data
+                             * is available, this replaces ALL per-face uploads
+                             * for this room — one upload instead of many. */
+                            bool room_baked = false;
+                            float room_uv_scale = 1.0f;
+                            if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                float rd = (room_idx < g_chunk_count)
+                                    ? g_chunks[room_idx].dist_sq : 0.0f;
+                                rspq_flush();
+                                if (rd > CHUNK_VERY_FAR_DIST2 && baked_mip2) {
+                                    rdpq_tex_upload(TILE0, &baked_mip2[room_idx], NULL);
+                                    room_uv_scale = (float)MIP2_DIM / (float)MIP0_DIM;
+                                } else if (rd > CHUNK_MID_DIST2 && baked_mip1) {
+                                    rdpq_tex_upload(TILE0, &baked_mip1[room_idx], NULL);
+                                    room_uv_scale = (float)MIP1_DIM / (float)MIP0_DIM;
+                                } else if (baked_mip0) {
+                                    rdpq_tex_upload(TILE0, &baked_mip0[room_idx], NULL);
+                                }
+                                room_baked = true;
+                                far_last_tex = -99; /* force re-check if fallback */
+                                perf_far_uploads++;
+                            }
                             bool is_water = (room->flags & 1) != 0;
                             perf_far_rooms++;
 
@@ -1389,9 +1493,10 @@ int main(void) {
                                     }
                                 }
 
-                                /* Texture upload on change (non-blocking flush) */
+                                /* Texture: skip per-face upload if room has baked tile */
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
+                                if (room_baked) goto far_skip_upload;
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
@@ -1467,6 +1572,7 @@ int main(void) {
                                     }
                                 } else continue;
 
+                                far_skip_upload:;
                                 tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
@@ -1520,10 +1626,15 @@ int main(void) {
 
                                     /* Tex coords scaled for active mip level */
                                     float ts = 0, tt = 0;
-                                    if (otex && tex_uv_map) {
+                                    if (room_baked) {
+                                        /* Baked tile: UVs tile across the baked texture.
+                                         * Use face vertex position to generate simple UVs. */
+                                        float baked_dim = MIP0_DIM * room_uv_scale;
+                                        ts = ((float)(v % 2)) * baked_dim;
+                                        tt = ((float)(v / 2)) * baked_dim;
+                                    } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        /* UV scale: 1.0 for 32×32, 0.5 for 16×16, 0.25 for 8×8 */
                                         float rd_uv = (room_idx < g_chunk_count)
                                             ? g_chunks[room_idx].dist_sq : 0.0f;
                                         float uv_s = 1.0f;

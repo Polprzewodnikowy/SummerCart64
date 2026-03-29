@@ -1,7 +1,7 @@
 N64_INST = /opt/libdragon
 include $(N64_INST)/include/n64.mk
 
-CFLAGS += -Isrc -I../asset_streaming/src -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations
+CFLAGS += -Isrc -I../asset_streaming/src -I$(BUILD_DIR) -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations
 # Add -DN64_EMULATOR_MODE for ares testing (skips SC64 register access)
 # Remove this flag when building for real SC64 hardware
 CFLAGS += -DN64_EMULATOR_MODE
@@ -19,6 +19,16 @@ BAKE_DIR = $(BUILD_DIR)/baked
 
 all: trx-n64.z64
 .PHONY: all
+
+# Full ROM with baked data: bake → build → combine
+fullrom: $(BUILD_DIR)/level1.baked trx-n64.z64
+	@echo "Building full ROM with baked chunk data..."
+	python3 tools/build_full_rom.py trx-n64.z64 \
+		$$(ls ../asset_streaming/build/tr1_assets.bin 2>/dev/null || ls build/tr1_assets.bin 2>/dev/null || echo "MISSING_ASSETS") \
+		$(BUILD_DIR)/trx-n64-full.z64 \
+		$(BUILD_DIR)/level1.baked
+	@echo "Full ROM: $(BUILD_DIR)/trx-n64-full.z64"
+.PHONY: fullrom
 
 # Bake chunk textures for all available levels
 bake: $(BAKE_DIR)
