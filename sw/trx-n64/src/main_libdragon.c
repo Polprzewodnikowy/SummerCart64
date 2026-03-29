@@ -935,12 +935,13 @@ int main(void) {
 
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    /* Set camera modelview matrix */
+                    /* Set camera modelview matrix — rotation only.
+                     * Translation is done per-vertex on CPU to avoid
+                     * fixed-point overflow with large TR1 world coords. */
                     glMatrixMode(GL_MODELVIEW);
                     glLoadIdentity();
                     glRotatef(-cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
                     glRotatef(-cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
-                    glTranslatef(-cam_x, -cam_y, -cam_z);
 
                     /* Precompute pitch rotation */
                     float sp = sinf(cam_rot_x);
@@ -1047,8 +1048,10 @@ int main(void) {
                                     glTexCoord2f(0, 0);
                                 }
 
-                                /* World-space position — RSP does the rest */
-                                glVertex3f(room->x + rv->x, rv->y, room->z + rv->z);
+                                /* Camera-relative position — avoids fixed-point overflow */
+                                glVertex3f(room->x + rv->x - cam_x,
+                                           rv->y - cam_y,
+                                           room->z + rv->z - cam_z);
                             }
                             glEnd();
                         }
