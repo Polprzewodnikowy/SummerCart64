@@ -211,7 +211,7 @@ static int          g_cluster_count = 0;
 #define CACHE_BASE      ((uint8_t *)0xB1000000)
 #define CACHE_SIZE      (3 * 1024 * 1024)
 #define SLOT_SIZE       (512 * 1024)
-static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
+/* staging[512KB] removed — was never referenced */
 
 /* -------------------------------------------------------------------
  * Chunk management — builds AABB/sphere for each room once at load
@@ -686,9 +686,10 @@ int main(void) {
         uint8_t *level_data = NULL;
 
         if (is_compressed) {
-            /* Use system malloc for temp compressed buffer (freed after decompress) */
+            /* Both buffers via system malloc (not bump heap) so we
+             * can free level_data after parsing + CI8 generation. */
             uint8_t *comp_buf = (uint8_t *)malloc(read_bytes + 16);
-            level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
+            level_data = (uint8_t *)malloc(level_size + 4096);
             printf("  Compressed: %u KB -> %u KB\n",
                    level_compressed / 1024, level_size / 1024);
             if (!comp_buf || !level_data) {
@@ -712,8 +713,8 @@ int main(void) {
                 }
             }
         } else {
-            level_data = (uint8_t *)n64_mem_alloc(read_bytes + 4096);
-            printf("  Alloc %u KB... ", (read_bytes + 4096) / 1024);
+            level_data = (uint8_t *)malloc(read_bytes + 4096);
+            printf("  Alloc %u KB (system malloc)... ", (read_bytes + 4096) / 1024);
             if (!level_data) {
                 printf("FAILED\n");
             } else if (level_sector > 0) {
@@ -904,8 +905,16 @@ int main(void) {
                            num_otex * TEX_TILE_BYTES / 1024);
                 }
 
-                /* tex_pages now points directly into level_data (zero-copy).
-                 * Saves ~704 KB of heap that was previously a memcpy. */
+                /* Free level_data — all structures were parsed into bump
+                 * heap, CI8 tiles generated, tex_pages no longer needed.
+                 * Reclaims ~1-2 MB of system malloc space. */
+                g_level.tex_pages = NULL; /* was pointing into level_data */
+                if (level_data) {
+                    printf("  Freed level_data: %u KB (system malloc)\n",
+                           (level_size + 4096) / 1024);
+                    free(level_data);
+                    level_data = NULL;
+                }
 
                 printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
@@ -2484,8 +2493,10 @@ int main(void) {
                                     float inv_z=256.0f/rz;
                                     float scx=160.0f+sm_cl[v][0]*inv_z;
                                     float scy=120.0f+sm_cl[v][1]*inv_z;
-                                    if(scx<-2048)scx=-2048; if(scx>2048)scx=2048;
-                                    if(scy<-2048)scy=-2048; if(scy>2048)scy=2048;
+                                    if (scx < -2048) scx = -2048;
+                                    if (scx >  2048) scx =  2048;
+                                    if (scy < -2048) scy = -2048;
+                                    if (scy >  2048) scy =  2048;
                                     sv[v][0]=scx; sv[v][1]=scy;
                                     sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
