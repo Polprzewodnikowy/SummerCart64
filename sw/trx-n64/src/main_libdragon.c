@@ -335,6 +335,31 @@ static void classify_faces(tr_level_t *level) {
     }
 }
 
+/* Sort room faces by texture index (insertion sort — small arrays).
+ * Groups same-texture faces together to minimize GL bind changes.
+ * Run once after classify_faces. */
+static void sort_faces_by_texture(tr_level_t *level) {
+    for (int ri = 0; ri < level->room_count; ri++) {
+        tr_room_t *room = &level->rooms[ri];
+        int n = room->mesh.face_count;
+        tr_face_t *faces = room->mesh.faces;
+        if (!faces || n < 2) continue;
+
+        /* Insertion sort by texture index — stable, in-place,
+         * good for small N (TR1 rooms: ~50-400 faces) */
+        for (int i = 1; i < n; i++) {
+            tr_face_t key = faces[i];
+            uint16_t key_tex = key.texture & 0x7FFF;
+            int j = i - 1;
+            while (j >= 0 && (faces[j].texture & 0x7FFF) > key_tex) {
+                faces[j + 1] = faces[j];
+                j--;
+            }
+            faces[j + 1] = key;
+        }
+    }
+}
+
 static void build_chunks(const tr_level_t *level) {
     g_chunk_count = 0;
     for (int i = 0; i < level->room_count && g_chunk_count < TR_MAX_ROOMS; i++) {
@@ -1082,8 +1107,9 @@ int main(void) {
                     }
                 }
 
-                /* Classify faces + build chunks/clusters */
+                /* Classify faces, sort by texture, build chunks/clusters */
                 classify_faces(&g_level);
+                sort_faces_by_texture(&g_level);
                 build_chunks(&g_level);
                 build_clusters(&g_level);
                 printf("  %d chunks, %d clusters built.\n",
@@ -2160,6 +2186,19 @@ int main(void) {
                             if (do_decimate && (face->flags & FACE_FLAG_DETAIL))
                                 continue;
 
+                            /* Quick back-cull: check if face center is
+                             * behind camera using first vertex (cheap). */
+                            {
+                                uint16_t v0i = face->vertices[0];
+                                if (v0i < room->mesh.vertex_count) {
+                                    tr_room_vertex_t *rv0 = &room->mesh.vertices[v0i];
+                                    float fdx = (float)(room->x + rv0->x) - cam_x;
+                                    float fdz = (float)(room->z + rv0->z) - cam_z;
+                                    float cz0 = fdx * sy + fdz * cy;
+                                    if (cz0 < -1024.0f) continue;
+                                }
+                            }
+
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
                             int want_tex;
@@ -2170,13 +2209,19 @@ int main(void) {
                             } else continue;
 
                             if (want_tex != cur_tex) {
-                                FLUSH_GL();
-                                if (want_tex == -2 && gl_white_tex)
-                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                else if (want_tex >= 0)
-                                    glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                cur_tex = want_tex;
-                                perf_near_binds++;
+                                /* Texture bind budget: limit state changes
+                                 * per frame.  When exceeded, keep drawing
+                                 * with last-bound texture (never skip). */
+                                if (perf_near_binds < TEX_BIND_BUDGET_NEAR) {
+                                    FLUSH_GL();
+                                    if (want_tex == -2 && gl_white_tex)
+                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                    else if (want_tex >= 0)
+                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                    cur_tex = want_tex;
+                                    perf_near_binds++;
+                                }
+                                /* Budget exceeded: render with cur_tex */
                             }
 
                             tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
