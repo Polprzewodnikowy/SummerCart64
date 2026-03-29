@@ -20,13 +20,14 @@ BAKE_DIR = $(BUILD_DIR)/baked
 all: trx-n64.z64
 .PHONY: all
 
-# Full ROM with baked data: bake → build → combine
-fullrom: $(BUILD_DIR)/level1.baked trx-n64.z64
-	@echo "Building full ROM with baked chunk data..."
+# Full ROM with baked data + CI8 tiles: bake → build → combine
+fullrom: $(BUILD_DIR)/level1.baked $(BUILD_DIR)/level1.ci8tiles trx-n64.z64
+	@echo "Building full ROM with baked chunk data + CI8 tiles..."
 	python3 tools/build_full_rom.py trx-n64.z64 \
 		$$(ls ../asset_streaming/build/tr1_assets.bin 2>/dev/null || ls build/tr1_assets.bin 2>/dev/null || echo "MISSING_ASSETS") \
 		$(BUILD_DIR)/trx-n64-full.z64 \
-		$(BUILD_DIR)/level1.baked
+		$(BUILD_DIR)/level1.baked \
+		$(BUILD_DIR)/level1.ci8tiles
 	@echo "Full ROM: $(BUILD_DIR)/trx-n64-full.z64"
 .PHONY: fullrom
 
@@ -45,6 +46,10 @@ $(BAKE_DIR):
 # Auto-bake Level 1 before building ROM (always available for testing)
 $(BUILD_DIR)/level1.baked: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_chunks.py | $(BAKE_DIR)
 	python3 tools/bake_chunks.py $< $@
+
+# CI8 texture tiles — pre-baked for ROM streaming cache
+$(BUILD_DIR)/level1.ci8tiles: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_ci8_tiles.py | $(BAKE_DIR)
+	python3 tools/bake_ci8_tiles.py $< $@
 
 # Build depends on baked data
 $(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)
