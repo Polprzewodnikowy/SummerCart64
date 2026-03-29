@@ -640,6 +640,7 @@ int main(void) {
                 /* Close console, init display + OpenGL for RSP T&L */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
+                rdpq_init();
                 gl_init();
 
                 /* GL setup: perspective projection, depth test, fog */
@@ -1612,6 +1613,7 @@ int main(void) {
 
                 /* START pressed — return to console briefly */
                 gl_close();
+                rdpq_close();
                 display_close();
                 console_init();
                 console_set_render_mode(RENDER_MANUAL);
@@ -1673,10 +1675,11 @@ int main(void) {
                     if (p2.start) break;
                 }
 
-                /* Re-init display and rdpq for 3D */
+                /* Re-init display and GL for 3D */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
+                gl_init();
                 goto render_loop;
 
             } else {
