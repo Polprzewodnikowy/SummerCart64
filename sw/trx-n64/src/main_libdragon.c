@@ -1248,17 +1248,11 @@ int main(void) {
                             tr_room_t *room = &g_level.rooms[room_idx];
                             bool is_water = (room->flags & 1) != 0;
 
-                            /* Per-room distance for face decimation */
-                            float room_dist = (room_idx < g_chunk_count)
-                                ? g_chunks[room_idx].dist_sq : 0.0f;
-
-                            int face_skip = 1;
-                            if (room_dist > CHUNK_VERY_FAR_DIST2)
-                                face_skip = 4;
-                            else if (room_dist > CHUNK_FAR_DIST2 * 1.5f)
-                                face_skip = 2;
-
-                            for (int f = 0; f < room->mesh.face_count; f += face_skip) {
+                            /* Draw all faces — face decimation disabled because
+                             * skipping faces in texture-sorted order creates
+                             * visible black holes.  RSPQ pressure is managed
+                             * by periodic rspq_flush instead. */
+                            for (int f = 0; f < room->mesh.face_count; f++) {
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -1272,13 +1266,13 @@ int main(void) {
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
-                                        rspq_flush();
+                                        rspq_wait(); /* block until RSP drains */
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                         far_last_tex = (int)tex_idx;
                                     }
                                 } else if (is_flat) {
                                     if (white_px && far_last_tex != -2) {
-                                        rspq_flush();
+                                        rspq_wait();
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                         far_last_tex = -2;
                                     }
@@ -1363,17 +1357,16 @@ int main(void) {
                                         sv[0], sv[tri+1], sv[tri+2]);
                                     far_tris++;
                                     if ((far_tris % FAR_FLUSH_EVERY) == 0)
-                                        rspq_flush();
+                                        rspq_wait();
                                 }
                             }
                         }
                     }
 
-                    /* Flush RSPQ after far pass — drain the command buffer so
-                     * GL near pass has room for its own commands.  Without this,
-                     * frames with many far-pass texture uploads + triangles
-                     * overflow the RSPQ ring buffer when GL adds more. */
-                    rspq_flush();
+                    /* Wait for RSP to fully drain far pass commands before
+                     * GL near pass begins.  rspq_wait blocks until complete,
+                     * guaranteeing the command buffer is fully free. */
+                    rspq_wait();
 
                     /* ===== GL NEAR PASS ===== */
                     gl_context_begin();
