@@ -885,8 +885,8 @@ int main(void) {
                         #define WORLD_SCALE (1.0f / 32.0f)
 
                         /* Projection: 60 deg vertical FOV */
-                        float near_p = 0.5f;    /* ~16 TR1 units */
-                        float far_p = 600.0f;   /* ~19200 TR1 units */
+                        float near_p = 2.0f;    /* ~64 TR1 units */
+                        float far_p = 500.0f;   /* ~16000 TR1 units */
                         float fov_half = 30.0f * 3.14159f / 180.0f;  /* half of 60 deg */
                         float top = near_p * tanf(fov_half);
                         float right = top * (320.0f / 240.0f);
@@ -899,9 +899,9 @@ int main(void) {
                         glDisable(GL_CULL_FACE);
                         glShadeModel(GL_SMOOTH);
 
-                        /* DEBUG: no textures, no fog — just vertex colors */
-                        glDisable(GL_TEXTURE_2D);
-                        glDisable(GL_FOG);
+                        glEnable(GL_TEXTURE_2D);
+                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                        glDisable(GL_FOG);  /* Re-enable later */
                         glDisable(GL_LIGHTING);
 
                         /* Create GL texture objects */
@@ -965,11 +965,33 @@ int main(void) {
                         }
                     }
 
-                    /* ===== DRAW ROOMS via OpenGL — batched vertex array ===== */
-                    #define MAX_GL_VERTS 6000
+                    /* ===== DRAW ROOMS via OpenGL — texture-batched ===== */
+                    #define MAX_GL_VERTS 3000
                     static float gl_pos[MAX_GL_VERTS * 3] __attribute__((aligned(16)));
                     static float gl_col[MAX_GL_VERTS * 4] __attribute__((aligned(16)));
+                    static float gl_tc[MAX_GL_VERTS * 2] __attribute__((aligned(16)));
                     int gl_vert_count = 0;
+                    int cur_tex = -1;
+
+                    /* Helper: flush current batch */
+                    #define FLUSH_BATCH() do { \
+                        if (gl_vert_count > 0) { \
+                            data_cache_hit_writeback(gl_pos, gl_vert_count * 3 * sizeof(float)); \
+                            data_cache_hit_writeback(gl_col, gl_vert_count * 4 * sizeof(float)); \
+                            data_cache_hit_writeback(gl_tc, gl_vert_count * 2 * sizeof(float)); \
+                            glEnableClientState(GL_VERTEX_ARRAY); \
+                            glEnableClientState(GL_COLOR_ARRAY); \
+                            glEnableClientState(GL_TEXTURE_COORD_ARRAY); \
+                            glVertexPointer(3, GL_FLOAT, 0, gl_pos); \
+                            glColorPointer(4, GL_FLOAT, 0, gl_col); \
+                            glTexCoordPointer(2, GL_FLOAT, 0, gl_tc); \
+                            glDrawArrays(GL_TRIANGLES, 0, gl_vert_count); \
+                            glDisableClientState(GL_VERTEX_ARRAY); \
+                            glDisableClientState(GL_COLOR_ARRAY); \
+                            glDisableClientState(GL_TEXTURE_COORD_ARRAY); \
+                            gl_vert_count = 0; \
+                        } \
+                    } while(0)
 
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
@@ -985,18 +1007,39 @@ int main(void) {
                         if (room_rz < -room_radius) continue;
 
                         int max_faces = room->mesh.face_count;
-                        if (max_faces > 300) max_faces = 300;
+                        if (max_faces > 400) max_faces = 400;
                         for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
 
-                            /* Triangulate: fan from vertex 0 */
-                            int num_tris = nv - 2;
-                            if (gl_vert_count + num_tris * 3 > MAX_GL_VERTS) goto draw_batch;
+                            /* Texture switch? Flush batch */
+                            uint16_t tex_idx = face->texture & 0x7FFF;
+                            bool is_flat = (face->texture & 0x8000) != 0;
+                            int want_tex;
+                            if (is_flat) {
+                                want_tex = -2;  /* white texture */
+                            } else if (tex_idx < num_otex && gl_textures) {
+                                want_tex = (int)tex_idx;
+                            } else continue;
 
-                            /* Transform all face vertices */
-                            float vx[4], vy[4], vz[4], vr[4], vg[4], vb[4];
+                            if (want_tex != cur_tex) {
+                                FLUSH_BATCH();
+                                if (want_tex == -2 && gl_white_tex)
+                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                                else if (want_tex >= 0)
+                                    glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
+                                cur_tex = want_tex;
+                            }
+
+                            tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                ? &g_level.object_textures[tex_idx] : NULL;
+
+                            int num_tris = nv - 2;
+                            if (gl_vert_count + num_tris * 3 > MAX_GL_VERTS) FLUSH_BATCH();
+
+                            /* Transform face vertices */
+                            float vx[4], vy[4], vz[4], vr[4], vg[4], vb[4], vs[4], vt[4];
                             bool ok = true;
                             for (int v = 0; v < nv; v++) {
                                 uint16_t vi = face->vertices[v];
@@ -1012,7 +1055,7 @@ int main(void) {
                                 float rz = wy * sp + rz_yaw * cp;
 
                                 vx[v] = rx * WORLD_SCALE;
-                                vy[v] = -ry * WORLD_SCALE;  /* Negate Y: TR1 Y-down → GL Y-up */
+                                vy[v] = -ry * WORLD_SCALE;
                                 vz[v] = -rz * WORLD_SCALE;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
@@ -1022,10 +1065,21 @@ int main(void) {
                                 vr[v] = is_water ? bright * 0.4f : bright;
                                 vg[v] = is_water ? bright * 0.6f : bright;
                                 vb[v] = is_water ? bright * 1.0f : bright;
+
+                                /* Texture coordinates normalized to 0-1 */
+                                if (otex && tex_uv_map) {
+                                    float tu = (float)(otex->uv[v].u >> 8);
+                                    float tv = (float)(otex->uv[v].v >> 8);
+                                    float s = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    float t = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    vs[v] = s / (float)TEX_TILE_DIM;
+                                    vt[v] = t / (float)TEX_TILE_DIM;
+                                } else {
+                                    vs[v] = 0; vt[v] = 0;
+                                }
                             }
                             if (!ok) continue;
 
-                            /* Emit triangles (fan: 0-1-2, 0-2-3) */
                             for (int t = 0; t < num_tris; t++) {
                                 int idx[3] = {0, t+1, t+2};
                                 for (int k = 0; k < 3; k++) {
@@ -1038,26 +1092,15 @@ int main(void) {
                                     gl_col[p*4+1] = vg[i];
                                     gl_col[p*4+2] = vb[i];
                                     gl_col[p*4+3] = 1.0f;
+                                    gl_tc[p*2+0] = vs[i];
+                                    gl_tc[p*2+1] = vt[i];
                                     gl_vert_count++;
                                 }
                             }
                         }
                     }
-
-                    draw_batch:
-                    if (gl_vert_count > 0) {
-                        /* Flush CPU cache so RSP can DMA the vertex data */
-                        data_cache_hit_writeback(gl_pos, gl_vert_count * 3 * sizeof(float));
-                        data_cache_hit_writeback(gl_col, gl_vert_count * 4 * sizeof(float));
-
-                        glEnableClientState(GL_VERTEX_ARRAY);
-                        glEnableClientState(GL_COLOR_ARRAY);
-                        glVertexPointer(3, GL_FLOAT, 0, gl_pos);
-                        glColorPointer(4, GL_FLOAT, 0, gl_col);
-                        glDrawArrays(GL_TRIANGLES, 0, gl_vert_count);
-                        glDisableClientState(GL_VERTEX_ARRAY);
-                        glDisableClientState(GL_COLOR_ARRAY);
-                    }
+                    FLUSH_BATCH();
+                    #undef FLUSH_BATCH
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
