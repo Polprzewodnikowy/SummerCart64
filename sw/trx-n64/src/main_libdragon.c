@@ -1402,11 +1402,37 @@ int main(void) {
                         }
                     }
 
+                    /* Ring 2: rooms connected to connected rooms.
+                     * Rendered with IA4 + heavy fog via far pass as a
+                     * void-prevention fallback.  Never see empty space. */
+                    int ring1_end = vis_count; /* mark end of ring 1 */
+                    for (int vi = 0; vi < ring1_end && vis_count < MAX_DRAW_ROOMS; vi++) {
+                        int r1 = vis_rooms[vi];
+                        if (r1 < 0 || r1 >= g_level.room_count) continue;
+                        tr_room_t *r1r = &g_level.rooms[r1];
+                        for (int p = 0; p < r1r->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
+                            int dest = r1r->portals[p].room;
+                            if (dest < 0 || dest >= g_chunk_count) continue;
+                            bool dup = false;
+                            for (int vi2 = 0; vi2 < vis_count; vi2++) {
+                                if (vis_rooms[vi2] == dest) { dup = true; break; }
+                            }
+                            if (dup) continue;
+                            tr_chunk_t *c = &g_chunks[dest];
+                            float ddx = c->cx - cam_x;
+                            float ddz = c->cz - cam_z;
+                            c->dist_sq = ddx * ddx + ddz * ddz;
+                            c->visible = true;
+                            vis_rooms[vis_count] = dest;
+                            vis_stream_pri[vis_count] = STREAM_PRI_LOW;
+                            vis_count++;
+                        }
+                    }
+
                     /* LOD classification.
-                     * With current+connected visibility, all rooms are
-                     * nearby.  Route everything through GL near pass
-                     * (correct per-face textures).  Far pass disabled
-                     * until baked texture mapping is fixed. */
+                     * Ring 1 (current + connected): GL near pass, full textures.
+                     * Ring 2 (connected-to-connected): RDPQ far pass, IA4 + fog.
+                     * Rule: never see void — ring 2 fills the gaps. */
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
                     int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
 
@@ -1414,15 +1440,21 @@ int main(void) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        /* All visible rooms go through GL near pass.
-                         * Apply fog for rooms beyond NEAR distance. */
-                        if (c->dist_sq < CHUNK_NEAR_DIST2) {
-                            c->lod = CHUNK_LOD_NEAR;
+                        if (vi < ring1_end) {
+                            /* Ring 1: GL near pass with proper textures */
+                            if (c->dist_sq < CHUNK_NEAR_DIST2) {
+                                c->lod = CHUNK_LOD_NEAR;
+                            } else {
+                                c->lod = CHUNK_LOD_MID;
+                            }
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
                         } else {
-                            c->lod = CHUNK_LOD_MID; /* GL with fog */
+                            /* Ring 2: RDPQ far pass, IA4 fog fallback */
+                            c->lod = CHUNK_LOD_FAR;
+                            if (far_count < MAX_DRAW_ROOMS)
+                                far_rooms[far_count++] = ri;
                         }
-                        if (near_count < MAX_DRAW_ROOMS)
-                            near_rooms[near_count++] = ri;
                     }
 
                     /* Update cluster face_skip based on cluster-center distance.
@@ -1496,10 +1528,13 @@ int main(void) {
                             if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 float rd = (room_idx < g_chunk_count)
                                     ? g_chunks[room_idx].dist_sq : 0.0f;
-                                /* Only use baked tiles for rooms clearly in FAR zone.
-                                 * Rooms in the overlap band (also drawn by GL near
-                                 * pass) should use per-face textures, not baked. */
-                                if (rd < CHUNK_MID_DIST2) goto skip_baked;
+                                bool is_ring2 = (room_idx < g_chunk_count &&
+                                    g_chunks[room_idx].lod == CHUNK_LOD_FAR);
+                                /* Ring 2 rooms always use baked IA4 as void fallback.
+                                 * Other rooms: only bake in FAR zone. */
+                                if (!is_ring2 && rd < CHUNK_MID_DIST2) goto skip_baked;
+                                /* Ring 2: force IA4 tier (cheapest, fog-blended) */
+                                if (is_ring2) rd = CHUNK_XXFAR_DIST2 + 1.0f;
                                 rspq_flush();
                                 if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
                                     /* IA4 extreme far: 4×4 silhouette, no TLUT */
@@ -1643,12 +1678,20 @@ int main(void) {
                                 bool visible = true;
                                 bool any_behind = false, all_behind = true;
 
-                                /* Per-room fog (constant across vertices) */
+                                /* Per-room fog (constant across vertices).
+                                 * Ring 2 (void-prevention) rooms get heavy
+                                 * fog so they blend into the background. */
                                 float room_d = (room_idx < g_chunk_count)
                                     ? g_chunks[room_idx].dist_sq : 0.0f;
                                 float fog = (room_d - 16777216.0f) / 383223784.0f;
                                 if (fog < 0.0f) fog = 0.0f;
                                 if (fog > 0.85f) fog = 0.85f;
+                                /* Ring 2 rooms: minimum 60% fog */
+                                if (room_idx < g_chunk_count &&
+                                    g_chunks[room_idx].lod == CHUNK_LOD_FAR &&
+                                    fog < 0.6f) {
+                                    fog = 0.6f;
+                                }
 
                                 float rd_uv = room_d;
                                 float uv_s = 1.0f;
