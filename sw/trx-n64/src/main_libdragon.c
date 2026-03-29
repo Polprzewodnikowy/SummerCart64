@@ -1309,13 +1309,19 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Draw all faces — face decimation (Phase 3) disabled
-                         * because skipping faces in texture-sorted order causes
-                         * visible holes and broken texture batching.  Cluster
-                         * hierarchy remains active for LOD classification and
-                         * future use with pre-built simplified geometry. */
+                        /* Face decimation: only for far pass (pass==0).
+                         * Near-pass rooms always draw all faces.
+                         * Far-pass rooms skip every Nth face based on cluster
+                         * distance to reduce triangle count at distance. */
+                        int face_skip = 1;
+                        if (pass == 0 && room_idx < g_chunk_count) {
+                            int cid = g_chunks[room_idx].cluster_id;
+                            if (cid >= 0 && cid < g_cluster_count)
+                                face_skip = g_clusters[cid].face_skip;
+                        }
+
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f++) {
+                        for (int f = 0; f < max_faces; f += face_skip) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
