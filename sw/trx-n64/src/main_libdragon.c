@@ -1109,7 +1109,8 @@ int main(void) {
                     /* Clear to fog color (not black) so sub-pixel gaps
                      * between triangles blend in instead of showing stark
                      * black seams.  Matches the far-pass fog target color. */
-                    rdpq_clear(RGBA32(64, 56, 77, 0xFF));
+                    /* Clear to fog color so gaps/undrawn areas blend in */
+                    rdpq_clear(RGBA32(89, 82, 102, 0xFF));
                     rdpq_clear_z(0xFFFC);
 
                     /* Precompute pitch sin/cos for CPU projection */
@@ -1325,16 +1326,16 @@ int main(void) {
 
                                     /* Distance fog */
                                     float d2 = cx_v*cx_v + cz_v*cz_v;
-                                    float fog = (d2 - 26214400.0f) / 99090432.0f;
+                                    float fog = (d2 - 26214400.0f) / 598785600.0f;
                                     float y_bias = cy_v * 0.00004f;
                                     if (y_bias < 0.0f) y_bias = 0.0f;
                                     if (y_bias > 0.2f) y_bias = 0.2f;
                                     fog += y_bias;
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f;
-                                    r = r * (1.0f - fog) + 0.25f * fog;
-                                    g = g * (1.0f - fog) + 0.22f * fog;
-                                    b = b * (1.0f - fog) + 0.30f * fog;
+                                    r = r * (1.0f - fog) + 0.35f * fog;
+                                    g = g * (1.0f - fog) + 0.32f * fog;
+                                    b = b * (1.0f - fog) + 0.40f * fog;
 
                                     /* Texture coords in pixel space */
                                     float ts = 0, tt = 0;
@@ -1540,8 +1541,8 @@ int main(void) {
                                     float d2 = fdx*fdx + fdz*fdz;
                                     /* Quadratic ramp: fog ∝ dist², visually close to linear */
                                     float fog = (d2 - 26214400.0f) / (99090432.0f);
-                                    /* 26214400 = 5120² (start), 125304832 = 11200² (end)
-                                     * divisor = end² - start² = 99090432 */
+                                    /* 26214400 = 5120² (start), 625000000 = 25000² (end)
+                                     * divisor = end² - start² = 598785600 */
                                     /* Vertical bias: lower = more fog (TR1 Y-down) */
                                     float y_bias = (vy_w - cam_y) * 0.00004f;
                                     if (y_bias < 0.0f) y_bias = 0.0f;
@@ -1550,9 +1551,9 @@ int main(void) {
                                     if (fog < 0.0f) fog = 0.0f;
                                     if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
                                     /* Cave fog: dark blue-gray but visible */
-                                    r = r * (1.0f - fog) + 0.25f * fog;
-                                    g = g * (1.0f - fog) + 0.22f * fog;
-                                    b = b * (1.0f - fog) + 0.30f * fog;
+                                    r = r * (1.0f - fog) + 0.35f * fog;
+                                    g = g * (1.0f - fog) + 0.32f * fog;
+                                    b = b * (1.0f - fog) + 0.40f * fog;
                                 }
 
                                 cr[v] = (uint8_t)(r * 255.0f);

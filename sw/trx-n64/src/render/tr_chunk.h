@@ -30,8 +30,10 @@
 #define CHUNK_NEAR_DIST2  (5120.0f  * 5120.0f)
 #define CHUNK_FAR_DIST2   (10240.0f * 10240.0f)
 
-/* Far clip distance matching glFrustum far_p / WORLD_SCALE (350 * 32). */
-#define CHUNK_FAR_WORLD   11200.0f
+/* Far clip for frustum culling.  The RDPQ far pass has no Z-buffer,
+ * so we can push this well beyond the GL near-pass clip (11200).
+ * This controls how far the BFS-visible rooms extend. */
+#define CHUNK_FAR_WORLD   25000.0f
 
 /* -----------------------------------------------------------------------
  * Horizontal frustum constants
