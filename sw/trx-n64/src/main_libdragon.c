@@ -689,13 +689,22 @@ int main(void) {
                  * Instead of pre-allocating mips for all 880 textures,
                  * box-filter on-the-fly for the ~8 uploads per frame.
                  * Only 512 bytes uncached — negligible memory cost. */
-                #define MIP_DIM 16
-                uint16_t *mip_buf = (uint16_t *)malloc_uncached_aligned(
-                    64, MIP_DIM * MIP_DIM * 2);
-                surface_t mip_surf = {0};
-                if (mip_buf) {
-                    mip_surf = surface_make_linear(mip_buf, FMT_RGBA16, MIP_DIM, MIP_DIM);
-                }
+                /* On-demand mip buffers (Lambert technique):
+                 * Two reusable buffers for 16×16 and 8×8 mip generation.
+                 * Box-filtered from 32×32 base on each upload.
+                 * LOD selection based on projected screen area.
+                 * 512 + 128 = 640 bytes uncached total. */
+                #define MIP1_DIM 16
+                #define MIP2_DIM 8
+                uint16_t *mip1_buf = (uint16_t *)malloc_uncached_aligned(
+                    64, MIP1_DIM * MIP1_DIM * 2);
+                uint16_t *mip2_buf = (uint16_t *)malloc_uncached_aligned(
+                    64, MIP2_DIM * MIP2_DIM * 2);
+                surface_t mip1_surf = {0}, mip2_surf = {0};
+                if (mip1_buf)
+                    mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
+                if (mip2_buf)
+                    mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
 
                 /* GL texture objects — created after gl_init() */
                 GLuint *gl_textures = NULL;
@@ -1386,29 +1395,62 @@ int main(void) {
 
                                 if (!is_flat && tex_idx < num_otex && tex_surfs) {
                                     if ((int)tex_idx != far_last_tex) {
-                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
-                                            continue; /* skip face, keep current tex */
+                                        /* Lambert LOD: choose mip from projected size.
+                                         * Estimate screen area from room distance.
+                                         * lod ≈ 1/2 * log2(screenPixelArea)
+                                         * Simplified: use room dist_sq thresholds. */
+                                        float rd = (room_idx < g_chunk_count)
+                                            ? g_chunks[room_idx].dist_sq : 0.0f;
+                                        /* mip_level: 0=32×32, 1=16×16, 2=8×8 */
+                                        int mip_level = 0;
+                                        if (rd > CHUNK_VERY_FAR_DIST2) mip_level = 2;
+                                        else if (rd > CHUNK_MID_DIST2) mip_level = 1;
+
+                                        /* Fallback chain (Lambert):
+                                         * If upload budget exceeded, try lower mip.
+                                         * If still over budget, skip face. */
+                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET) {
+                                            if (mip_level < 2) mip_level = 2; /* try 8×8 */
+                                            else continue; /* already lowest, skip */
+                                        }
+
                                         rspq_flush();
-                                        /* On-demand mip: box-filter 32→16 into
-                                         * reusable buffer, upload the 16×16 mip.
-                                         * 4× smaller TMEM transfer (512 vs 2048 bytes). */
-                                        if (mip_buf) {
-                                            uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
-                                            for (int my = 0; my < MIP_DIM; my++)
-                                                for (int mx = 0; mx < MIP_DIM; mx++) {
-                                                    int sx = mx*2, sy2 = my*2;
-                                                    uint16_t p00 = src[sy2*TEX_TILE_DIM+sx];
-                                                    uint16_t p10 = src[sy2*TEX_TILE_DIM+sx+1];
-                                                    uint16_t p01 = src[(sy2+1)*TEX_TILE_DIM+sx];
-                                                    uint16_t p11 = src[(sy2+1)*TEX_TILE_DIM+sx+1];
+                                        uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
+
+                                        if (mip_level == 2 && mip2_buf) {
+                                            /* 32→8: 4×4 box filter */
+                                            for (int my = 0; my < MIP2_DIM; my++)
+                                                for (int mx = 0; mx < MIP2_DIM; mx++) {
+                                                    int bx = mx*4, by = my*4;
+                                                    int sr=0,sg=0,sb=0,sa=0;
+                                                    for (int dy=0;dy<4;dy++)
+                                                        for (int dx=0;dx<4;dx++) {
+                                                            uint16_t p = src[(by+dy)*TEX_TILE_DIM+(bx+dx)];
+                                                            sr+=p>>11; sg+=(p>>6)&0x1F;
+                                                            sb+=(p>>1)&0x1F; sa|=p&1;
+                                                        }
+                                                    mip2_buf[my*MIP2_DIM+mx] =
+                                                        (((sr+8)>>4)<<11)|(((sg+8)>>4)<<6)|(((sb+8)>>4)<<1)|sa;
+                                                }
+                                            rdpq_tex_upload(TILE0, &mip2_surf, NULL);
+                                        } else if (mip_level == 1 && mip1_buf) {
+                                            /* 32→16: 2×2 box filter */
+                                            for (int my = 0; my < MIP1_DIM; my++)
+                                                for (int mx = 0; mx < MIP1_DIM; mx++) {
+                                                    int bx = mx*2, by = my*2;
+                                                    uint16_t p00 = src[by*TEX_TILE_DIM+bx];
+                                                    uint16_t p10 = src[by*TEX_TILE_DIM+bx+1];
+                                                    uint16_t p01 = src[(by+1)*TEX_TILE_DIM+bx];
+                                                    uint16_t p11 = src[(by+1)*TEX_TILE_DIM+bx+1];
                                                     int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
                                                     int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
                                                     int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
                                                     int aa = (p00|p10|p01|p11)&1;
-                                                    mip_buf[my*MIP_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                                                    mip1_buf[my*MIP1_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
                                                 }
-                                            rdpq_tex_upload(TILE0, &mip_surf, NULL);
+                                            rdpq_tex_upload(TILE0, &mip1_surf, NULL);
                                         } else {
+                                            /* Level 0: full 32×32 base */
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                         }
                                         far_last_tex = (int)tex_idx;
@@ -1476,12 +1518,17 @@ int main(void) {
                                     g = g * (1.0f - fog) + 0.32f * fog;
                                     b = b * (1.0f - fog) + 0.40f * fog;
 
+                                    /* Tex coords scaled for active mip level */
                                     float ts = 0, tt = 0;
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        /* Scale by 0.5 for 16×16 mip (pixel-space coords) */
-                                        float uv_s = mip_buf ? 0.5f : 1.0f;
+                                        /* UV scale: 1.0 for 32×32, 0.5 for 16×16, 0.25 for 8×8 */
+                                        float rd_uv = (room_idx < g_chunk_count)
+                                            ? g_chunks[room_idx].dist_sq : 0.0f;
+                                        float uv_s = 1.0f;
+                                        if (mip2_buf && rd_uv > CHUNK_VERY_FAR_DIST2) uv_s = 0.25f;
+                                        else if (mip1_buf && rd_uv > CHUNK_MID_DIST2) uv_s = 0.5f;
                                         ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * uv_s;
                                         tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * uv_s;
                                     }
