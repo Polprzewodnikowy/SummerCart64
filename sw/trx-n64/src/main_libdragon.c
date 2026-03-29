@@ -1745,6 +1745,10 @@ int main(void) {
                     /* Flush far pass commands before GL context begins.
                      * Non-blocking — far pass is now light enough (8 uploads,
                      * 300 tri cap) that queue backlog is not a risk. */
+                    /* Reset RDPQ state before entering GL — the far pass
+                     * may have set TLUT mode for CI8/CI4 textures which
+                     * could corrupt GL's RGBA16 texture interpretation. */
+                    rdpq_mode_tlut(TLUT_NONE);
                     rspq_flush();
 
                     /* ===== GL NEAR PASS ===== */
