@@ -904,6 +904,9 @@ int main(void) {
                            num_otex * TEX_TILE_BYTES / 1024);
                 }
 
+                /* tex_pages now points directly into level_data (zero-copy).
+                 * Saves ~704 KB of heap that was previously a memcpy. */
+
                 printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
                        num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024,
@@ -2076,25 +2079,26 @@ int main(void) {
                                             clipped[v][k] = cv[v][k];
                                 }
 
-                                /* Project to screen */
+                                /* Project to screen — clamp, don't reject.
+                                 * Let RDP scissor handle off-screen tris;
+                                 * rejecting per-vertex was too aggressive
+                                 * for large faces near screen edges. */
                                 float sv[6][9];
-                                bool screen_ok = true;
                                 for (int v = 0; v < clip_nv; v++) {
                                     float rz = clipped[v][2];
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + clipped[v][0] * inv_z;
                                     float scy = 120.0f + clipped[v][1] * inv_z;
-                                    if (scx < -400 || scx > 720 ||
-                                        scy < -300 || scy > 540) {
-                                        screen_ok = false; break;
-                                    }
+                                    if (scx < -2048) scx = -2048;
+                                    if (scx >  2048) scx =  2048;
+                                    if (scy < -2048) scy = -2048;
+                                    if (scy >  2048) scy =  2048;
                                     sv[v][0] = scx;  sv[v][1] = scy;
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
                                     sv[v][8] = inv_z;
                                 }
-                                if (!screen_ok) continue;
 
                                 int num_tris = clip_nv - 2;
                                 for (int tri = 0; tri < num_tris; tri++) {
@@ -2324,15 +2328,17 @@ int main(void) {
                                     for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
                             }
 
-                            /* Project */
+                            /* Project — clamp, don't reject */
                             float sv[6][10];
-                            bool screen_ok = true;
                             for (int v = 0; v < clip_nv; v++) {
                                 float rz = clipped[v][2];
                                 float inv_z = 256.0f / rz;
                                 float scx = 160.0f + clipped[v][0] * inv_z;
                                 float scy = 120.0f + clipped[v][1] * inv_z;
-                                if (scx<-400||scx>720||scy<-300||scy>540) { screen_ok=false; break; }
+                                if (scx < -2048) scx = -2048;
+                                if (scx >  2048) scx =  2048;
+                                if (scy < -2048) scy = -2048;
+                                if (scy >  2048) scy =  2048;
                                 sv[v][0]=scx;   sv[v][1]=scy;
                                 sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f) sv[v][2]=1.0f;
                                 sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
@@ -2340,7 +2346,6 @@ int main(void) {
                                 sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
                                 sv[v][9]=inv_z;
                             }
-                            if (!screen_ok) continue;
 
                             int num_tris = clip_nv - 2;
                             for (int tri = 0; tri < num_tris; tri++) {
@@ -2474,13 +2479,13 @@ int main(void) {
                                     if(sm_cnv<3) continue;
                                 } else { for(int i=0;i<nv;i++) for(int k=0;k<8;k++) sm_cl[i][k]=sm_cv[i][k]; }
 
-                                bool proj_ok = true;
                                 for (int v=0;v<sm_cnv;v++) {
                                     float rz=sm_cl[v][2];
                                     float inv_z=256.0f/rz;
                                     float scx=160.0f+sm_cl[v][0]*inv_z;
                                     float scy=120.0f+sm_cl[v][1]*inv_z;
-                                    if(scx<-400||scx>720||scy<-300||scy>540){proj_ok=false;break;}
+                                    if(scx<-2048)scx=-2048; if(scx>2048)scx=2048;
+                                    if(scy<-2048)scy=-2048; if(scy>2048)scy=2048;
                                     sv[v][0]=scx; sv[v][1]=scy;
                                     sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
@@ -2488,7 +2493,6 @@ int main(void) {
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
                                     sv[v][9]=inv_z;
                                 }
-                                if (!proj_ok) continue;
                                 int num_tris = sm_cnv - 2;
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
@@ -2580,8 +2584,8 @@ int main(void) {
                                 tr_object_mesh_t *mesh = &g_level.meshes[gmi];
 
                                 for (int f = 0; f < mesh->face_count; f++) {
-                                    if (perf_near_tris >= NEAR_TRI_BUDGET ||
-                                        perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
+                                    /* Lara exempt from face budget — she's fixed cost
+                                     * (~6ms) and must always render completely. */
                                     perf_near_faces++;
                                     tr_face_t *face = &mesh->faces[f];
                                     int nv = face->vertex_count;
@@ -2629,7 +2633,9 @@ int main(void) {
                                         float rz_yaw=cx_v*sy+cz_v*cy;
                                         float ry=cy_v*cp-rz_yaw*sp;
                                         float rz=cy_v*sp+rz_yaw*cp;
-                                        if (rz < 32.0f) { vis = false; break; }
+                                        /* Clamp z instead of reject — prevents
+                                         * head/close mesh faces from vanishing */
+                                        if (rz < 4.0f) rz = 4.0f;
 
                                         float inv_z=256.0f/rz;
                                         float scx2=160.0f+rx*inv_z, scy2=120.0f+ry*inv_z;
