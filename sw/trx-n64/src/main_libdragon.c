@@ -13,9 +13,6 @@
 #define __LIBDRAGON_ASSET_H  /* Prevent libdragon's asset.h from loading */
 
 #include <libdragon.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/gl_integration.h>
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
 #include <rdpq_mode.h>
@@ -1051,23 +1048,8 @@ int main(void) {
                     printf("  No baked data in ROM\n");
                 }
 
-                /* Fallback: on-demand mip buffers (used when no baked data) */
-                uint16_t *mip1_buf = NULL, *mip2_buf = NULL;
-                surface_t mip1_surf = {0}, mip2_surf = {0};
-                if (baked_room_count == 0) {
-                    mip1_buf = (uint16_t *)malloc_uncached_aligned(
-                        64, MIP1_DIM * MIP1_DIM * 2);
-                    mip2_buf = (uint16_t *)malloc_uncached_aligned(
-                        64, MIP2_DIM * MIP2_DIM * 2);
-                    if (mip1_buf)
-                        mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
-                    if (mip2_buf)
-                        mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
-                }
-
-                /* GL texture objects — stubbed; GL is kept linked but not used
-                 * for rendering.  Near pass now uses custom RDPQ + CI8. */
-                (void)0; /* gl_textures / gl_white_tex removed */
+                /* CPU mip buffers removed — far pass now uses baked room tiles
+                 * as the default for all far rooms (no per-face mip generation). */
 
                 /* ============================================
                  * AUDIO INIT
@@ -1172,13 +1154,10 @@ int main(void) {
                  * Flat-shaded room triangles via rdpq.
                  */
 
-                /* Close console, init display.  GL is initialised as a stub
-                 * (keeps the pipeline linked) but never entered in the hot path.
-                 * All geometry now goes through custom RDPQ. */
+                /* Close console, init display.  Pure RDPQ pipeline — no GL. */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
-                gl_init();  /* stub — not used for rendering */
                 bool has_zbuf = true;  /* all passes use z-buffer */
 
                 /* Camera state */
@@ -1842,41 +1821,49 @@ int main(void) {
                             if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                             tr_room_t *room = &g_level.rooms[room_idx];
 
-                            /* Pre-baked room tile: upload once per room.
-                             * Choose mip level by distance.  When baked data
-                             * is available, this replaces ALL per-face uploads
-                             * for this room — one upload instead of many. */
-                            bool room_baked = false;
+                            /* ---- Per-room constants (hoisted out of face loop) ---- */
+                            float room_d = (room_idx < g_chunk_count)
+                                ? g_chunks[room_idx].dist_sq : 0.0f;
+                            bool is_ring2 = (room_idx < g_chunk_count &&
+                                g_chunks[room_idx].lod == CHUNK_LOD_FAR);
+
+                            /* Fog factor — constant for all faces in this room */
+                            float fog = (room_d - 16777216.0f) / 383223784.0f;
+                            if (fog < 0.0f) fog = 0.0f;
+                            if (fog > 0.85f) fog = 0.85f;
+                            if (is_ring2 && fog < 0.6f) fog = 0.6f;
+                            float fog_scale  = 1.0f - fog;
+                            float fog_add_r  = active_fog_r * fog;
+                            float fog_add_g  = active_fog_g * fog;
+                            float fog_add_b  = active_fog_b * fog;
+
+                            /* UV scale for baked tile mapping */
                             float room_uv_scale = 1.0f;
+                            if (room_d > CHUNK_VERY_FAR_DIST2) room_uv_scale = 8.0f / 32.0f;
+                            else if (room_d > CHUNK_MID_DIST2)  room_uv_scale = 16.0f / 32.0f;
+
+                            /* Baked room tile — DEFAULT for all far rooms.
+                             * Tier chosen by distance.  Ring 2 always gets IA4.
+                             * No per-face uploads happen when room_baked=true. */
+                            bool room_baked = false;
                             if (baked_room_count > 0 && room_idx < baked_room_count) {
-                                float rd = (room_idx < g_chunk_count)
-                                    ? g_chunks[room_idx].dist_sq : 0.0f;
-                                bool is_ring2 = (room_idx < g_chunk_count &&
-                                    g_chunks[room_idx].lod == CHUNK_LOD_FAR);
-                                /* Ring 2 rooms always use baked IA4 as void fallback.
-                                 * Other rooms: only bake in FAR zone. */
-                                if (!is_ring2 && rd < CHUNK_MID_DIST2) goto skip_baked;
-                                /* Ring 2: force IA4 tier (cheapest, fog-blended) */
-                                if (is_ring2) rd = CHUNK_XXFAR_DIST2 + 1.0f;
+                                float rd = is_ring2 ? (CHUNK_XXFAR_DIST2 + 1.0f) : room_d;
                                 rspq_flush();
                                 if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
-                                    /* IA4 extreme far: 4×4 silhouette, no TLUT */
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
                                 } else if (rd > CHUNK_XFAR_DIST2 && bkd_m3_surf) {
-                                    /* IA8 extra far: 8×8 grayscale, no TLUT */
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
                                 } else if (rd > CHUNK_VERY_FAR_DIST2 && bkd_m2_surf) {
-                                    /* CI4 far: 8×8 + 16-color TLUT */
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_m1_surf) {
-                                    /* CI8 mid-far: 16×16 + 256-color TLUT */
+                                    /* Finest tier — used for close far-rooms too */
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                     rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
@@ -1886,7 +1873,21 @@ int main(void) {
                                 far_last_tex = -99;
                                 perf_far_uploads++;
                             }
-                            skip_baked:;
+                            /* Non-baked fallback: flat faces use white_surf (uploaded
+                             * on demand below); textured faces use last-bound tile. */
+
+                            /* Sphere-in-front test: skip near-plane clip for rooms
+                             * whose bounding sphere is entirely in front of z=NEAR_Z. */
+                            bool room_no_clip = false;
+                            if (room_idx < g_chunk_count) {
+                                tr_chunk_t *ck = &g_chunks[room_idx];
+                                float cxr = ck->cx - cam_x, czr = ck->cz - cam_z;
+                                float cyr = ck->cy - cam_y;
+                                float rz_c = cxr * sy + czr * cy;
+                                float rz_sphere = cyr * sp + rz_c * cp;
+                                if (rz_sphere - ck->radius > NEAR_Z) room_no_clip = true;
+                            }
+
                             bool is_water = (room->flags & 1) != 0;
                             perf_far_rooms++;
 
@@ -1911,115 +1912,31 @@ int main(void) {
                                     }
                                 }
 
-                                /* Texture: skip per-face upload if room has baked tile */
+                                /* Texture: baked rooms skip all per-face uploads.
+                                 * Non-baked: flat → white_surf on change; textured →
+                                 * use last-bound tile (avoid RGBA16 per-face cost). */
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
-                                if (room_baked) goto far_skip_upload;
-
-                                if (!is_flat && tex_idx < num_otex && tex_surfs) {
-                                    if ((int)tex_idx != far_last_tex) {
-                                        /* Lambert LOD: choose mip from projected size.
-                                         * Estimate screen area from room distance.
-                                         * lod ≈ 1/2 * log2(screenPixelArea)
-                                         * Simplified: use room dist_sq thresholds. */
-                                        float rd = (room_idx < g_chunk_count)
-                                            ? g_chunks[room_idx].dist_sq : 0.0f;
-                                        /* mip_level: 0=32×32, 1=16×16, 2=8×8 */
-                                        int mip_level = 0;
-                                        if (rd > CHUNK_VERY_FAR_DIST2) mip_level = 2;
-                                        else if (rd > CHUNK_MID_DIST2) mip_level = 1;
-
-                                        /* Fallback chain (Lambert):
-                                         * If upload budget exceeded, try lower mip.
-                                         * If still over budget, use last-bound texture
-                                         * (never skip geometry due to budget). */
-                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET) {
-                                            if (mip_level < 2) mip_level = 2; /* try 8×8 */
-                                            else goto far_skip_upload; /* use last-bound tex */
+                                if (!room_baked) {
+                                    if (is_flat) {
+                                        if (white_px && far_last_tex != -2) {
+                                            rspq_flush();
+                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                            far_last_tex = -2;
+                                            perf_far_uploads++;
                                         }
-
-                                        rspq_flush();
-                                        uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
-
-                                        if (mip_level == 2 && mip2_buf) {
-                                            /* 32→8: 4×4 box filter */
-                                            for (int my = 0; my < MIP2_DIM; my++)
-                                                for (int mx = 0; mx < MIP2_DIM; mx++) {
-                                                    int bx = mx*4, by = my*4;
-                                                    int sr=0,sg=0,sb=0,sa=0;
-                                                    for (int dy=0;dy<4;dy++)
-                                                        for (int dx=0;dx<4;dx++) {
-                                                            uint16_t p = src[(by+dy)*TEX_TILE_DIM+(bx+dx)];
-                                                            sr+=p>>11; sg+=(p>>6)&0x1F;
-                                                            sb+=(p>>1)&0x1F; sa|=p&1;
-                                                        }
-                                                    mip2_buf[my*MIP2_DIM+mx] =
-                                                        (((sr+8)>>4)<<11)|(((sg+8)>>4)<<6)|(((sb+8)>>4)<<1)|sa;
-                                                }
-                                            rdpq_tex_upload(TILE0, &mip2_surf, NULL);
-                                        } else if (mip_level == 1 && mip1_buf) {
-                                            /* 32→16: 2×2 box filter */
-                                            for (int my = 0; my < MIP1_DIM; my++)
-                                                for (int mx = 0; mx < MIP1_DIM; mx++) {
-                                                    int bx = mx*2, by = my*2;
-                                                    uint16_t p00 = src[by*TEX_TILE_DIM+bx];
-                                                    uint16_t p10 = src[by*TEX_TILE_DIM+bx+1];
-                                                    uint16_t p01 = src[(by+1)*TEX_TILE_DIM+bx];
-                                                    uint16_t p11 = src[(by+1)*TEX_TILE_DIM+bx+1];
-                                                    int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                                    int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                                    int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                                    int aa = (p00|p10|p01|p11)&1;
-                                                    mip1_buf[my*MIP1_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                                                }
-                                            rdpq_tex_upload(TILE0, &mip1_surf, NULL);
-                                        } else {
-                                            /* Level 0: full 32×32 base */
-                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        }
-                                        far_last_tex = (int)tex_idx;
-                                        perf_far_uploads++;
                                     }
-                                } else if (is_flat) {
-                                    if (white_px && far_last_tex != -2) {
-                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
-                                            goto far_skip_upload; /* use last-bound tex */
-                                        rspq_flush();
-                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        far_last_tex = -2;
-                                        perf_far_uploads++;
-                                    }
-                                } else continue;
+                                    /* Non-baked textured: use last-bound (no RGBA16 upload) */
+                                }
 
-                                far_skip_upload:;
-                                tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                tr_object_texture_t *otex = (!is_flat && !room_baked &&
+                                    tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
-                                /* CPU transform to camera space (pre-projection).
-                                 * cv[v]: rx, ry, rz, r, g, b, ts, tt */
+                                /* CPU transform — fog constants pre-hoisted to room level */
                                 float cv[4][8];
                                 bool visible = true;
                                 bool any_behind = false, all_behind = true;
-
-                                /* Per-room fog (constant across vertices).
-                                 * Ring 2 (void-prevention) rooms get heavy
-                                 * fog so they blend into the background. */
-                                float room_d = (room_idx < g_chunk_count)
-                                    ? g_chunks[room_idx].dist_sq : 0.0f;
-                                float fog = (room_d - 16777216.0f) / 383223784.0f;
-                                if (fog < 0.0f) fog = 0.0f;
-                                if (fog > 0.85f) fog = 0.85f;
-                                /* Ring 2 rooms: minimum 60% fog */
-                                if (room_idx < g_chunk_count &&
-                                    g_chunks[room_idx].lod == CHUNK_LOD_FAR &&
-                                    fog < 0.6f) {
-                                    fog = 0.6f;
-                                }
-
-                                float rd_uv = room_d;
-                                float uv_s = 1.0f;
-                                if (mip2_buf && rd_uv > CHUNK_VERY_FAR_DIST2) uv_s = 0.25f;
-                                else if (mip1_buf && rd_uv > CHUNK_MID_DIST2) uv_s = 0.5f;
 
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
@@ -2038,17 +1955,14 @@ int main(void) {
                                     if (rz < NEAR_Z) any_behind = true;
                                     else all_behind = false;
 
-                                    /* Lighting + fog */
+                                    /* Per-vertex light + fog (constants from room scope) */
                                     float bright = 1.0f - ((float)rv->light / 8191.0f);
                                     if (bright < 0.0f) bright = 0.0f;
                                     if (bright > 1.0f) bright = 1.0f;
                                     bright = 0.4f + bright * 0.6f;
-                                    float r = is_water ? bright * 0.4f : bright;
-                                    float g = is_water ? bright * 0.6f : bright;
-                                    float b = is_water ? bright * 1.0f : bright;
-                                    r = r * (1.0f - fog) + active_fog_r * fog;
-                                    g = g * (1.0f - fog) + active_fog_g * fog;
-                                    b = b * (1.0f - fog) + active_fog_b * fog;
+                                    float r = (is_water ? bright * 0.4f : bright) * fog_scale + fog_add_r;
+                                    float g = (is_water ? bright * 0.6f : bright) * fog_scale + fog_add_g;
+                                    float b = (is_water ? bright * 1.0f : bright) * fog_scale + fog_add_b;
 
                                     /* Tex coords */
                                     float ts = 0, tt = 0;
@@ -2059,8 +1973,8 @@ int main(void) {
                                     } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * uv_s;
-                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * uv_s;
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                     }
 
                                     cv[v][0] = rx;  cv[v][1] = ry;  cv[v][2] = rz;
@@ -2069,24 +1983,22 @@ int main(void) {
                                 }
                                 if (!visible || all_behind) continue;
 
-                                /* Near-plane clip (Sutherland-Hodgman against z=NEAR_Z).
-                                 * Max output: nv+1 verts (tri→4, quad→5). */
+                                /* Near-plane clip (Sutherland-Hodgman, z=NEAR_Z).
+                                 * Skipped for rooms whose sphere is fully in front. */
                                 float clipped[6][8];
                                 int clip_nv = nv;
-                                if (any_behind) {
+                                if (!room_no_clip && any_behind) {
                                     clip_nv = 0;
                                     for (int i = 0; i < nv; i++) {
                                         int j = (i + 1) % nv;
                                         float zi = cv[i][2], zj = cv[j][2];
                                         bool i_in = (zi >= NEAR_Z), j_in = (zj >= NEAR_Z);
-
                                         if (i_in) {
                                             for (int k = 0; k < 8; k++)
                                                 clipped[clip_nv][k] = cv[i][k];
                                             clip_nv++;
                                         }
                                         if (i_in != j_in) {
-                                            /* Edge crosses near plane — interpolate */
                                             float t = (NEAR_Z - zi) / (zj - zi);
                                             for (int k = 0; k < 8; k++)
                                                 clipped[clip_nv][k] = cv[i][k] + t * (cv[j][k] - cv[i][k]);
@@ -2101,7 +2013,7 @@ int main(void) {
                                             clipped[v][k] = cv[v][k];
                                 }
 
-                                /* Project clipped vertices to screen */
+                                /* Project to screen */
                                 float sv[6][9];
                                 bool screen_ok = true;
                                 for (int v = 0; v < clip_nv; v++) {
@@ -2127,7 +2039,7 @@ int main(void) {
                                         sv[0], sv[tri+1], sv[tri+2]);
                                     far_tris++;
                                     perf_far_tris = far_tris;
-                                    if ((far_tris & 79) == 0)
+                                    if ((far_tris & 127) == 0)  /* flush every 128 tris */
                                         rspq_flush();
                                     if (far_tris >= FAR_TRI_BUDGET)
                                         goto far_pass_done;
@@ -2623,8 +2535,10 @@ int main(void) {
 
                                         float inv_z=256.0f/rz;
                                         float scx2=160.0f+rx*inv_z, scy2=120.0f+ry*inv_z;
-                                        if(scx2<-2048)scx2=-2048; if(scx2>2048)scx2=2048;
-                                        if(scy2<-2048)scy2=-2048; if(scy2>2048)scy2=2048;
+                                        if(scx2<-2048) scx2=-2048;
+                                        if(scx2>2048)  scx2=2048;
+                                        if(scy2<-2048) scy2=-2048;
+                                        if(scy2>2048)  scy2=2048;
                                         sv[v][0]=scx2; sv[v][1]=scy2;
                                         sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
                                         sv[v][3]=l_fr; sv[v][4]=l_fg; sv[v][5]=l_fb;
