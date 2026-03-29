@@ -1070,9 +1070,31 @@ int main(void) {
                         continue;
                     }
 
-                    /* Begin frame — OpenGL RSP T&L */
+                    /* ===== BEGIN FRAME =====
+                     * Frame order:
+                     *   1. rdpq_attach (framebuffer + zbuf)
+                     *   2. rdpq_clear (color + depth)
+                     *   3. RDPQ far pass (outside GL — future, empty stub now)
+                     *   4. gl_context_begin()
+                     *   5. GL near pass (existing RSP T&L pipeline)
+                     *   6. gl_context_end()
+                     *   7. rdpq_detach_show()
+                     *
+                     * This split lets the far pass use raw RDPQ texture
+                     * uploads without competing for GL object/RSPQ memory. */
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
+
+                    /* Clear before any rendering (outside GL context) */
+                    rdpq_set_mode_fill(RGBA32(0, 0, 0, 0xFF));
+                    rdpq_fill_rectangle(0, 0, 320, 240);
+
+                    /* ===== RDPQ FAR PASS (stub — Phase 2+ will populate) ===== */
+                    /* Far-pass rooms are in rooms_to_draw[near_count..num_draw-1],
+                     * computed below after BFS + frustum cull.  For Phase 1 this
+                     * is an empty placeholder to prove the frame split works. */
+
+                    /* ===== GL NEAR PASS ===== */
                     gl_context_begin();
 
                     /* One-time GL state setup on first frame */
@@ -1124,7 +1146,8 @@ int main(void) {
                         }
                     }
 
-                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    /* Clear depth buffer via GL (color already cleared by rdpq) */
+                    glClear(GL_DEPTH_BUFFER_BIT);
 
                     /* Camera rotation in modelview — RSP does the rotation!
                      * Translation done per-vertex on CPU (just 3 subtracts).
@@ -1289,36 +1312,15 @@ int main(void) {
                         } \
                     } while(0)
 
-                    /* ===== DRAW ROOMS — two-pass: far then near =====
-                     *
-                     * Pass 0 (FAR):  Z-buffer OFF, back-to-front sorted.
-                     *   Saves Z bandwidth for distant rooms. Painter's
-                     *   algorithm handles self-occlusion.  These rooms are
-                     *   in rooms_to_draw[near_count .. num_draw-1].
-                     *
-                     * Pass 1 (NEAR): Z-buffer ON, normal rendering.
-                     *   Near rooms are in rooms_to_draw[0 .. near_count-1].
-                     *   Near geometry overwrites far geometry where they
-                     *   overlap on screen — correct by draw order. */
-
-                    for (int pass = 0; pass < 2; pass++) {
-                        int loop_start, loop_end;
+                    /* ===== GL NEAR PASS ONLY =====
+                     * Far pass moved to RDPQ (before gl_context_begin).
+                     * Near rooms are in rooms_to_draw[0 .. near_count-1]. */
+                    {
+                        int loop_start = 0;
+                        int loop_end   = near_count;
+                        int pass       = 1;  /* near pass identifier for fog logic */
                         tex_budget_t tex_bud;
-                        if (pass == 0) {
-                            /* FAR PASS */
-                            glDisable(GL_DEPTH_TEST);
-                            glDepthMask(GL_FALSE);
-                            loop_start = near_count;
-                            loop_end   = num_draw;
-                            tex_bud.budget = TEX_BIND_BUDGET_FAR;
-                        } else {
-                            /* NEAR PASS */
-                            glEnable(GL_DEPTH_TEST);
-                            glDepthMask(GL_TRUE);
-                            loop_start = 0;
-                            loop_end   = near_count;
-                            tex_bud.budget = TEX_BIND_BUDGET_NEAR;
-                        }
+                        tex_bud.budget = TEX_BIND_BUDGET_NEAR;
                         tex_bud.binds_this_frame = 0;
                         tex_bud.last_bound_tex = -1;
 
@@ -1328,23 +1330,10 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
 
-                        /* Face decimation: only for far pass (pass==0).
-                         * Uses per-room distance (not cluster center) so rooms
-                         * get full detail as soon as they're individually close.
-                         * Threshold is generous: rooms go full-detail well before
-                         * they'd transition to the near pass. */
-                        int face_skip = 1;
-                        if (pass == 0 && room_idx < g_chunk_count) {
-                            float rd = g_chunks[room_idx].dist_sq;
-                            if (rd > CHUNK_VERY_FAR_DIST2)
-                                face_skip = 4;
-                            else if (rd > CHUNK_FAR_DIST2 * 1.5f)
-                                face_skip = 2;
-                            /* else face_skip stays 1 — room is close enough */
-                        }
-
+                        /* Near pass: draw all faces (face decimation is far-pass only,
+                         * which now runs in the RDPQ path). */
                         int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f += face_skip) {
+                        for (int f = 0; f < max_faces; f++) {
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
@@ -1468,15 +1457,9 @@ int main(void) {
                         }
                     }
                     FLUSH_GL();
-                    cur_tex = -1;  /* Reset texture state between passes */
 
-                    } /* end pass loop (far / near) */
+                    } /* end GL near pass */
                     #undef FLUSH_GL
-
-                    /* Ensure Z is back on for any subsequent rendering
-                     * (sprites, items, Lara — still in #if 0 for now). */
-                    glEnable(GL_DEPTH_TEST);
-                    glDepthMask(GL_TRUE);
 
 #if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
