@@ -517,29 +517,11 @@ int main(void) {
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
                 }
 
-                /* Create GL texture objects from our surface_t array */
+                /* GL texture objects — created after gl_init() */
                 GLuint *gl_textures = NULL;
                 GLuint gl_white_tex = 0;
                 if (num_otex > 0 && tex_surfs) {
                     gl_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
-                    if (gl_textures) {
-                        glGenTextures(num_otex, gl_textures);
-                        for (int i = 0; i < num_otex; i++) {
-                            glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
-                        }
-                    }
-                }
-                if (white_px) {
-                    glGenTextures(1, &gl_white_tex);
-                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                    glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
                 }
 
                 /* ============================================
@@ -681,6 +663,26 @@ int main(void) {
                 glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
                 bool has_zbuf = true;  /* GL manages zbuf internally */
+
+                /* Create GL texture objects (must be after gl_init) */
+                if (gl_textures) {
+                    glGenTextures(num_otex, gl_textures);
+                    for (int i = 0; i < num_otex; i++) {
+                        glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                        glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
+                    }
+                }
+                if (white_px) {
+                    glGenTextures(1, &gl_white_tex);
+                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                    glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
+                }
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
