@@ -658,81 +658,28 @@ int main(void) {
                        num_otex * TEX_TILE_BYTES / 1024,
                        n64_mem_available() / 1024);
 
-                /* ---- RDPQ mip surfaces for far pass ----
-                 * No GL objects needed — just surface_t wrappers for
-                 * rdpq_tex_upload.  Uses regular heap (cached RDRAM),
-                 * not uncached, so no RSPQ block pressure.
-                 * Mip1 = 16×16, Mip2 = 8×8, box-filtered from 32×32 base. */
-                #define MIP1_DIM 16
-                #define MIP2_DIM 8
-                #define MIP1_BYTES (MIP1_DIM * MIP1_DIM * 2)
-                #define MIP2_BYTES (MIP2_DIM * MIP2_DIM * 2)
-
-                surface_t *mip1_surfs = NULL;
-                surface_t *mip2_surfs = NULL;
-                uint16_t  *mip1_pixels = NULL;
-                uint16_t  *mip2_pixels = NULL;
-
-                /* Mip allocation disabled — 560 KB uncached for all ~880
-                 * mip textures exceeds available RDRAM alongside base
-                 * textures (~1.7 MB uncached) + framebuffers + RSPQ.
-                 * Far pass uses base 32×32 via rdpq_tex_upload instead.
-                 * Future: generate mips on-demand or for a subset only. */
-                (void)mip1_pixels; (void)mip2_pixels;
-
-                bool mips_ok = (mip1_surfs && mip2_surfs &&
-                                mip1_pixels && mip2_pixels && tex_tiles);
-
-                if (mips_ok) {
-                    printf("  Generating mip surfaces (%dx%d + %dx%d)...\n",
-                           MIP1_DIM, MIP1_DIM, MIP2_DIM, MIP2_DIM);
-                    for (int i = 0; i < num_otex; i++) {
-                        uint16_t *src = tex_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
-                        uint16_t *d16 = mip1_pixels + i * MIP1_DIM * MIP1_DIM;
-                        uint16_t *d8  = mip2_pixels + i * MIP2_DIM * MIP2_DIM;
-
-                        /* 32→16: 2×2 box filter */
-                        for (int y = 0; y < MIP1_DIM; y++)
-                            for (int x = 0; x < MIP1_DIM; x++) {
-                                int sx = x*2, sy_m = y*2;
-                                uint16_t p00 = src[sy_m*TEX_TILE_DIM + sx];
-                                uint16_t p10 = src[sy_m*TEX_TILE_DIM + sx+1];
-                                uint16_t p01 = src[(sy_m+1)*TEX_TILE_DIM + sx];
-                                uint16_t p11 = src[(sy_m+1)*TEX_TILE_DIM + sx+1];
-                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+
-                                          ((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+
-                                          ((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                int aa = (p00|p10|p01|p11) & 1;
-                                d16[y*MIP1_DIM+x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                            }
-                        /* 16→8: 2×2 box filter from mip1 */
-                        for (int y = 0; y < MIP2_DIM; y++)
-                            for (int x = 0; x < MIP2_DIM; x++) {
-                                int sx = x*2, sy_m = y*2;
-                                uint16_t p00 = d16[sy_m*MIP1_DIM + sx];
-                                uint16_t p10 = d16[sy_m*MIP1_DIM + sx+1];
-                                uint16_t p01 = d16[(sy_m+1)*MIP1_DIM + sx];
-                                uint16_t p11 = d16[(sy_m+1)*MIP1_DIM + sx+1];
-                                int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+
-                                          ((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+
-                                          ((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                int aa = (p00|p10|p01|p11) & 1;
-                                d8[y*MIP2_DIM+x] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                            }
-
-                        mip1_surfs[i] = surface_make_linear(d16, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
-                        mip2_surfs[i] = surface_make_linear(d8, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
-                    }
-                    /* Uncached memory — no cache flush needed */
-                    printf("  Mips ready: %d KB (16x16) + %d KB (8x8)\n",
-                           num_otex * MIP1_BYTES / 1024, num_otex * MIP2_BYTES / 1024);
-                } else {
-                    printf("  Mip alloc failed — far pass uses base 32x32\n");
-                }
+                /* ---- Memory audit ----
+                 * Print allocation totals so we can track what's consuming
+                 * RDRAM.  Mip textures are NOT allocated — 560 KB uncached
+                 * for all ~880 textures doesn't fit alongside the base
+                 * textures + framebuffers + RSPQ blocks. */
+                printf("\n=== MEMORY AUDIT ===\n");
+                printf("  Bump heap:  %u KB used, %u KB free (of %u KB)\n",
+                       (GAME_HEAP_SIZE - n64_mem_available()) / 1024,
+                       n64_mem_available() / 1024,
+                       GAME_HEAP_SIZE / 1024);
+                printf("  Base textures: %d × %dx%d RGBA16 = %d KB (uncached)\n",
+                       num_otex, TEX_TILE_DIM, TEX_TILE_DIM,
+                       num_otex * TEX_TILE_BYTES / 1024);
+                printf("  Framebuffers: 2 × 320×240 × 16bpp = %d KB\n", 2*320*240*2/1024);
+                printf("  Z-buffer: 320×240 × 16bpp = %d KB\n", 320*240*2/1024);
+                printf("  Tex surfs: %d × %d = %d KB (heap)\n",
+                       num_otex, (int)sizeof(surface_t),
+                       (int)(num_otex * sizeof(surface_t)) / 1024);
+                printf("  UV map: %d KB (heap)\n",
+                       (int)(num_otex * 4 * sizeof(float)) / 1024);
+                printf("====================\n\n");
+                console_render();
 
                 /* Create a 1x1 solid white texture for flat-colored faces.
                  * When uploaded, TEX0 = white, so TEX0 * SHADE = SHADE. */
@@ -1294,8 +1241,8 @@ int main(void) {
                         int far_last_tex = -1;
                         int far_uploads = 0;
                         int far_tris = 0;
-                        #define FAR_MAX_UPLOADS  32  /* cap TMEM uploads per frame */
-                        #define FAR_FLUSH_EVERY  30  /* flush RSPQ every N triangles */
+                        #define FAR_MAX_UPLOADS  24  /* cap TMEM uploads per frame */
+                        #define FAR_FLUSH_EVERY  20  /* flush RSPQ every N triangles */
 
                         for (int fi = 0; fi < far_count; fi++) {
                             int room_idx = far_rooms[fi];
@@ -1303,19 +1250,10 @@ int main(void) {
                             tr_room_t *room = &g_level.rooms[room_idx];
                             bool is_water = (room->flags & 1) != 0;
 
-                            /* Per-room mip level decision (used for both
-                             * texture upload AND tex coord scaling) */
+                            /* Per-room distance for face decimation */
                             float room_dist = (room_idx < g_chunk_count)
                                 ? g_chunks[room_idx].dist_sq : 0.0f;
-                            int room_mip = 0;  /* 0=base 32, 1=mip1 16, 2=mip2 8 */
-                            float mip_uv_scale = 1.0f;
-                            if (mips_ok && room_dist > CHUNK_VERY_FAR_DIST2) {
-                                room_mip = 2; mip_uv_scale = 0.25f;
-                            } else if (mips_ok && room_dist > CHUNK_FAR_DIST2) {
-                                room_mip = 1; mip_uv_scale = 0.5f;
-                            }
 
-                            /* Face decimation for far pass */
                             int face_skip = 1;
                             if (room_dist > CHUNK_VERY_FAR_DIST2)
                                 face_skip = 4;
@@ -1338,13 +1276,7 @@ int main(void) {
                                     if ((int)tex_idx != far_last_tex) {
                                         if (far_uploads < FAR_MAX_UPLOADS) {
                                             rspq_flush();
-                                            /* Upload mip level chosen per-room */
-                                            if (room_mip == 2)
-                                                rdpq_tex_upload(TILE0, &mip2_surfs[tex_idx], NULL);
-                                            else if (room_mip == 1)
-                                                rdpq_tex_upload(TILE0, &mip1_surfs[tex_idx], NULL);
-                                            else
-                                                rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
                                             far_last_tex = (int)tex_idx;
                                             far_uploads++;
                                         }
@@ -1412,14 +1344,13 @@ int main(void) {
                                     g = g * (1.0f - fog) + 0.13f * fog;
                                     b = b * (1.0f - fog) + 0.18f * fog;
 
-                                    /* Texture coords in pixel space,
-                                     * scaled by mip_uv_scale (per-room, matches upload) */
+                                    /* Texture coords in pixel space */
                                     float ts = 0, tt = 0;
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * mip_uv_scale;
-                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * mip_uv_scale;
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                     }
 
                                     sv[v][0] = scx;
