@@ -1293,8 +1293,15 @@ int main(void) {
                         float ddz = c->cz - cam_z;
                         c->dist_sq = ddx*ddx + ddz*ddz;
 
-                        /* LOD classify */
-                        if (c->dist_sq < CHUNK_FAR_DIST2) {
+                        /* LOD classify with hysteresis.
+                         * Use a wider threshold when transitioning from
+                         * FAR→NEAR to prevent oscillation at the boundary.
+                         * If currently FAR, must come closer (×0.8) to flip.
+                         * If currently NEAR, must go farther (×1.0) to flip. */
+                        float lod_thresh = (c->lod == CHUNK_LOD_FAR)
+                            ? CHUNK_FAR_DIST2 * 0.8f  /* shrink to flip FAR→NEAR */
+                            : CHUNK_FAR_DIST2;         /* normal to flip NEAR→FAR */
+                        if (c->dist_sq < lod_thresh) {
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
