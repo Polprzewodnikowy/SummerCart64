@@ -1863,6 +1863,11 @@ int main(void) {
                     for (int i = 0; i < far_count; i++)
                         rooms_to_draw[num_draw++] = far_rooms[i];
 
+                    /* Shared vertex cache — used by both far and near passes.
+                     * Transform all room vertices once per room, reuse for faces. */
+                    #define VTX_CACHE_MAX 600
+                    static struct { float rx, ry, rz, r, g, b; } vtx_cache[VTX_CACHE_MAX];
+
                     uint32_t perf_far_t0 = TICKS_READ(); /* start far pass timer */
 
                     /* ===== RDPQ FAR PASS (performance-optimized) =====
@@ -1961,35 +1966,45 @@ int main(void) {
                             perf_far_rooms++;
                             if (room_baked) perf_far_baked++;
 
-                            /* Pre-compute room origin offset (avoid per-vertex int→float) */
+                            /* ---- Far pass vertex cache ---- */
                             float room_ox = (float)room->x - cam_x;
                             float room_oz = (float)room->z - cam_z;
 
+                            int far_nv = room->mesh.vertex_count;
+                            if (far_nv > VTX_CACHE_MAX) far_nv = VTX_CACHE_MAX;
+                            for (int vi = 0; vi < far_nv; vi++) {
+                                tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                float cx_v = room_ox + rv->x;
+                                float cy_v = (float)rv->y - cam_y;
+                                float cz_v = room_oz + rv->z;
+                                float rx = cx_v * cy - cz_v * sy;
+                                float rz_yaw = cx_v * sy + cz_v * cy;
+                                vtx_cache[vi].rx = rx;
+                                vtx_cache[vi].ry = cy_v * cp - rz_yaw * sp;
+                                vtx_cache[vi].rz = cy_v * sp + rz_yaw * cp;
+
+                                float bright = 1.0f - ((float)rv->light / 8191.0f);
+                                if (bright < 0.0f) bright = 0.0f;
+                                if (bright > 1.0f) bright = 1.0f;
+                                bright = 0.4f + bright * 0.6f;
+                                vtx_cache[vi].r = (is_water ? bright * 0.4f : bright) * fog_scale + fog_add_r;
+                                vtx_cache[vi].g = (is_water ? bright * 0.6f : bright) * fog_scale + fog_add_g;
+                                vtx_cache[vi].b = (is_water ? bright * 1.0f : bright) * fog_scale + fog_add_b;
+                            }
+
                             for (int f = 0; f < room->mesh.face_count; f++) {
                                 if (far_tris >= FAR_TRI_BUDGET) goto far_pass_done;
-                                /* Baked rooms: skip every other face — the baked
-                                 * tile provides visual coverage, geometry is just
-                                 * for silhouette shape. Halves face transforms. */
                                 if (room_baked && (f & 1)) continue;
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
 
-                                /* Quick centroid back-cull: check if face center
-                                 * is behind camera using first vertex only (cheap). */
+                                /* Back-cull from cache */
                                 {
                                     uint16_t v0i = face->vertices[0];
-                                    if (v0i < room->mesh.vertex_count) {
-                                        tr_room_vertex_t *rv0 = &room->mesh.vertices[v0i];
-                                        float cz0 = (room_ox + rv0->x) * sy +
-                                                     (room_oz + rv0->z) * cy;
-                                        if (cz0 < -512.0f) continue; /* behind camera */
-                                    }
+                                    if (v0i < far_nv && vtx_cache[v0i].rz < -512.0f) continue;
                                 }
 
-                                /* Texture: baked rooms skip all per-face uploads.
-                                 * Non-baked: flat → white_surf on change; textured →
-                                 * use last-bound tile (avoid RGBA16 per-face cost). */
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
                                 if (!room_baked) {
@@ -2001,45 +2016,32 @@ int main(void) {
                                             perf_far_uploads++;
                                         }
                                     }
-                                    /* Non-baked textured: use last-bound (no RGBA16 upload) */
                                 }
 
                                 tr_object_texture_t *otex = (!is_flat && !room_baked &&
                                     tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
-                                /* CPU transform — fog constants pre-hoisted to room level */
+                                /* Look up cached vertices */
                                 float cv[4][8];
                                 bool visible = true;
                                 bool any_behind = false, all_behind = true;
 
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
-                                    if (vi >= room->mesh.vertex_count) { visible = false; break; }
-                                    tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                    if (vi >= far_nv) { visible = false; break; }
 
-                                    float cx_v = room_ox + rv->x;
-                                    float cy_v = (float)rv->y - cam_y;
-                                    float cz_v = room_oz + rv->z;
+                                    cv[v][0] = vtx_cache[vi].rx;
+                                    cv[v][1] = vtx_cache[vi].ry;
+                                    cv[v][2] = vtx_cache[vi].rz;
 
-                                    float rx = cx_v * cy - cz_v * sy;
-                                    float rz_yaw = cx_v * sy + cz_v * cy;
-                                    float ry = cy_v * cp - rz_yaw * sp;
-                                    float rz = cy_v * sp + rz_yaw * cp;
-
-                                    if (rz < NEAR_Z) any_behind = true;
+                                    if (cv[v][2] < NEAR_Z) any_behind = true;
                                     else all_behind = false;
 
-                                    /* Per-vertex light + fog (constants from room scope) */
-                                    float bright = 1.0f - ((float)rv->light / 8191.0f);
-                                    if (bright < 0.0f) bright = 0.0f;
-                                    if (bright > 1.0f) bright = 1.0f;
-                                    bright = 0.4f + bright * 0.6f;
-                                    float r = (is_water ? bright * 0.4f : bright) * fog_scale + fog_add_r;
-                                    float g = (is_water ? bright * 0.6f : bright) * fog_scale + fog_add_g;
-                                    float b = (is_water ? bright * 1.0f : bright) * fog_scale + fog_add_b;
+                                    cv[v][3] = vtx_cache[vi].r;
+                                    cv[v][4] = vtx_cache[vi].g;
+                                    cv[v][5] = vtx_cache[vi].b;
 
-                                    /* Tex coords */
                                     float ts = 0, tt = 0;
                                     if (room_baked) {
                                         float baked_dim = MIP0_DIM * room_uv_scale;
@@ -2051,10 +2053,7 @@ int main(void) {
                                         ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                         tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                     }
-
-                                    cv[v][0] = rx;  cv[v][1] = ry;  cv[v][2] = rz;
-                                    cv[v][3] = r;   cv[v][4] = g;   cv[v][5] = b;
-                                    cv[v][6] = ts;  cv[v][7] = tt;
+                                    cv[v][6] = ts; cv[v][7] = tt;
                                 }
                                 if (!visible || all_behind) continue;
 
@@ -2194,6 +2193,59 @@ int main(void) {
                         float room_ox = (float)room->x - cam_x;
                         float room_oz = (float)room->z - cam_z;
 
+                        /* ---- Vertex cache: transform all room vertices once ---- */
+                        int nv_room = room->mesh.vertex_count;
+                        if (nv_room > VTX_CACHE_MAX) nv_room = VTX_CACHE_MAX;
+
+                        /* Per-room fog constants (hoisted from per-vertex) */
+                        bool room_has_fog = (room_idx != lara_room &&
+                            room_idx < g_chunk_count &&
+                            g_chunks[room_idx].lod >= CHUNK_LOD_MID);
+                        float fog_start = 0, fog_inv_range = 0;
+                        if (room_has_fog) {
+                            fog_start = g_chunks[room_idx].fog_start_dist2;
+                            float fog_range = g_chunks[room_idx].max_draw_dist2 - fog_start;
+                            if (fog_range < 1.0f) fog_range = 1.0f;
+                            fog_inv_range = 1.0f / fog_range;
+                        }
+
+                        for (int vi = 0; vi < nv_room; vi++) {
+                            tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                            float cx_v = room_ox + rv->x;
+                            float cy_v = (float)rv->y - cam_y;
+                            float cz_v = room_oz + rv->z;
+                            float rx = cx_v * cy - cz_v * sy;
+                            float rz_yaw = cx_v * sy + cz_v * cy;
+                            vtx_cache[vi].rx = rx;
+                            vtx_cache[vi].ry = cy_v * cp - rz_yaw * sp;
+                            vtx_cache[vi].rz = cy_v * sp + rz_yaw * cp;
+
+                            float bright = 1.0f - ((float)rv->light / 8191.0f);
+                            if (bright < 0.0f) bright = 0.0f;
+                            if (bright > 1.0f) bright = 1.0f;
+                            bright = 0.4f + bright * 0.6f;
+                            float r = is_water ? bright * 0.4f : bright;
+                            float g = is_water ? bright * 0.6f : bright;
+                            float b = is_water ? bright * 1.0f : bright;
+
+                            if (room_has_fog) {
+                                float vx_w = room->x + rv->x;
+                                float vz_w = room->z + rv->z;
+                                float d2 = (vx_w-cam_x)*(vx_w-cam_x) + (vz_w-cam_z)*(vz_w-cam_z);
+                                float fog = (d2 - fog_start) * fog_inv_range;
+                                if (fog < 0.0f) fog = 0.0f;
+                                if (fog > 0.85f) fog = 0.85f;
+                                float inv_fog = 1.0f - fog;
+                                r = r * inv_fog + active_fog_r * fog;
+                                g = g * inv_fog + active_fog_g * fog;
+                                b = b * inv_fog + active_fog_b * fog;
+                            }
+                            vtx_cache[vi].r = r;
+                            vtx_cache[vi].g = g;
+                            vtx_cache[vi].b = b;
+                        }
+
+                        /* ---- Face loop: index into cached vertices ---- */
                         for (int f = 0; f < room->mesh.face_count; f++) {
                             if (perf_near_tris >= NEAR_TRI_BUDGET ||
                                 perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
@@ -2207,22 +2259,18 @@ int main(void) {
                                 continue;
                             }
 
-                            /* Back-cull using first vertex */
+                            /* Back-cull: check first vertex rz from cache */
                             {
                                 uint16_t v0i = face->vertices[0];
-                                if (v0i < room->mesh.vertex_count) {
-                                    tr_room_vertex_t *rv0 = &room->mesh.vertices[v0i];
-                                    float cz0 = (room_ox + rv0->x) * sy + (room_oz + rv0->z) * cy;
-                                    if (cz0 < -1024.0f) { perf_near_culled++; continue; }
+                                if (v0i < nv_room && vtx_cache[v0i].rz < -1024.0f) {
+                                    perf_near_culled++; continue;
                                 }
                             }
 
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
 
-                            /* Texture upload on change.
-                             * CI8 for textured faces (1 KB), white_surf (RGBA16)
-                             * for flat — TLUT mode is harmless for RGBA16 tiles. */
+                            /* Texture upload on change */
                             if (!is_flat && tex_idx < num_otex && ci8_surfs) {
                                 if ((int)tex_idx != near_last_tex &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
@@ -2247,50 +2295,27 @@ int main(void) {
                             tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                 ? &g_level.object_textures[tex_idx] : NULL;
 
-                            /* CPU camera transform */
+                            /* Look up cached vertices — no per-face transform */
                             float cv[4][8];
                             bool any_behind = false, all_behind = true;
                             bool ok = true;
                             for (int v = 0; v < nv; v++) {
                                 uint16_t vi = face->vertices[v];
-                                if (vi >= room->mesh.vertex_count) { ok = false; break; }
-                                tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                if (vi >= nv_room) { ok = false; break; }
 
-                                float cx_v = room_ox + rv->x;
-                                float cy_v = (float)rv->y - cam_y;
-                                float cz_v = room_oz + rv->z;
-                                float rx = cx_v * cy - cz_v * sy;
-                                float rz_yaw = cx_v * sy + cz_v * cy;
-                                float ry = cy_v * cp - rz_yaw * sp;
-                                float rz = cy_v * sp + rz_yaw * cp;
+                                cv[v][0] = vtx_cache[vi].rx;
+                                cv[v][1] = vtx_cache[vi].ry;
+                                cv[v][2] = vtx_cache[vi].rz;
 
-                                if (rz < NEAR_Z) any_behind = true; else all_behind = false;
+                                if (cv[v][2] < NEAR_Z) any_behind = true;
+                                else all_behind = false;
 
-                                float bright = 1.0f - ((float)rv->light / 8191.0f);
-                                if (bright < 0.0f) bright = 0.0f;
-                                if (bright > 1.0f) bright = 1.0f;
-                                bright = 0.4f + bright * 0.6f;
-                                float r = is_water ? bright * 0.4f : bright;
-                                float g = is_water ? bright * 0.6f : bright;
-                                float b = is_water ? bright * 1.0f : bright;
+                                /* Color from cache (already lit + fogged) */
+                                float r = vtx_cache[vi].r;
+                                float g = vtx_cache[vi].g;
+                                float b = vtx_cache[vi].b;
 
-                                /* Fog for distant connected rooms */
-                                if (room_idx != lara_room && room_idx < g_chunk_count &&
-                                    g_chunks[room_idx].lod >= CHUNK_LOD_MID) {
-                                    float vx_w = room->x + rv->x;
-                                    float vz_w = room->z + rv->z;
-                                    float d2 = (vx_w-cam_x)*(vx_w-cam_x) + (vz_w-cam_z)*(vz_w-cam_z);
-                                    float fog_start = g_chunks[room_idx].fog_start_dist2;
-                                    float fog_range = g_chunks[room_idx].max_draw_dist2 - fog_start;
-                                    if (fog_range < 1.0f) fog_range = 1.0f;
-                                    float fog = (d2 - fog_start) / fog_range;
-                                    if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 0.85f) fog = 0.85f;
-                                    r = r * (1.0f - fog) + active_fog_r * fog;
-                                    g = g * (1.0f - fog) + active_fog_g * fog;
-                                    b = b * (1.0f - fog) + active_fog_b * fog;
-                                }
-
+                                /* UV: still per-face (face-specific tex coords) */
                                 float ts = 0, tt = 0;
                                 if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
@@ -2298,16 +2323,17 @@ int main(void) {
                                     ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
                                     tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
                                 } else if (is_flat) {
-                                    /* Flat color: pack into rgb vertex, white tex */
                                     uint8_t ci = tex_idx & 0xFF;
                                     r = (float)g_level.palette[ci*3+0] / 63.0f;
                                     g = (float)g_level.palette[ci*3+1] / 63.0f;
                                     b = (float)g_level.palette[ci*3+2] / 63.0f;
                                 }
 
-                                cv[v][0] = rx;  cv[v][1] = ry;  cv[v][2] = rz;
-                                cv[v][3] = r;   cv[v][4] = g;   cv[v][5] = b;
-                                cv[v][6] = ts;  cv[v][7] = tt;
+                                cv[v][0] = vtx_cache[vi].rx;
+                                cv[v][1] = vtx_cache[vi].ry;
+                                cv[v][2] = vtx_cache[vi].rz;
+                                cv[v][3] = r; cv[v][4] = g; cv[v][5] = b;
+                                cv[v][6] = ts; cv[v][7] = tt;
                             }
                             if (!ok || all_behind) continue;
 
