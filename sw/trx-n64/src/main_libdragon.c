@@ -991,7 +991,7 @@ int main(void) {
                     rooms_to_draw[num_draw++] = lara_room;
                     room_drawn[lara_room] = true;
                     int queue_head = 0;
-                    int max_rooms = 8;
+                    int max_rooms = 12;
                     while (queue_head < num_draw && num_draw < max_rooms) {
                         int ri = rooms_to_draw[queue_head++];
                         if (ri < 0 || ri >= g_level.room_count) continue;
