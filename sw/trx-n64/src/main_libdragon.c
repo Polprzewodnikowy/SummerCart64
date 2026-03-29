@@ -690,6 +690,18 @@ int main(void) {
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
                 }
 
+                /* On-demand mip buffer — one reusable 16×16 RGBA16 surface.
+                 * Instead of pre-allocating mips for all 880 textures,
+                 * box-filter on-the-fly for the ~8 uploads per frame.
+                 * Only 512 bytes uncached — negligible memory cost. */
+                #define MIP_DIM 16
+                uint16_t *mip_buf = (uint16_t *)malloc_uncached_aligned(
+                    64, MIP_DIM * MIP_DIM * 2);
+                surface_t mip_surf = {0};
+                if (mip_buf) {
+                    mip_surf = surface_make_linear(mip_buf, FMT_RGBA16, MIP_DIM, MIP_DIM);
+                }
+
                 /* GL texture objects — created after gl_init() */
                 GLuint *gl_textures = NULL;
                 GLuint gl_white_tex = 0;
@@ -1329,7 +1341,28 @@ int main(void) {
                                         if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
                                             continue; /* skip face, keep current tex */
                                         rspq_flush();
-                                        rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        /* On-demand mip: box-filter 32→16 into
+                                         * reusable buffer, upload the 16×16 mip.
+                                         * 4× smaller TMEM transfer (512 vs 2048 bytes). */
+                                        if (mip_buf) {
+                                            uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
+                                            for (int my = 0; my < MIP_DIM; my++)
+                                                for (int mx = 0; mx < MIP_DIM; mx++) {
+                                                    int sx = mx*2, sy2 = my*2;
+                                                    uint16_t p00 = src[sy2*TEX_TILE_DIM+sx];
+                                                    uint16_t p10 = src[sy2*TEX_TILE_DIM+sx+1];
+                                                    uint16_t p01 = src[(sy2+1)*TEX_TILE_DIM+sx];
+                                                    uint16_t p11 = src[(sy2+1)*TEX_TILE_DIM+sx+1];
+                                                    int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
+                                                    int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
+                                                    int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
+                                                    int aa = (p00|p10|p01|p11)&1;
+                                                    mip_buf[my*MIP_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
+                                                }
+                                            rdpq_tex_upload(TILE0, &mip_surf, NULL);
+                                        } else {
+                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
+                                        }
                                         far_last_tex = (int)tex_idx;
                                         perf_far_uploads++;
                                     }
@@ -1397,8 +1430,10 @@ int main(void) {
                                     if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
-                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                        /* Scale by 0.5 for 16×16 mip (pixel-space coords) */
+                                        float uv_s = mip_buf ? 0.5f : 1.0f;
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * uv_s;
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * uv_s;
                                     }
 
                                     sv[v][0] = scx;  sv[v][1] = scy;
