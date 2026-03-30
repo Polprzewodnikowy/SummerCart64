@@ -2439,6 +2439,10 @@ int main(void) {
                     /* CPU transform + near-plane clip + project → rdpq_triangle.
                      * CI8 tiles (1 KB each) with shared pal16 TLUT.
                      * Z-buffer already cleared above. */
+                    /* Fallback state persists across rooms — once budget fires,
+                     * ALL remaining near rooms use baked tiles instead of CI8. */
+                    bool near_fallback_active = false;
+
                     for (int ri = 0; ri < near_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
@@ -2450,6 +2454,27 @@ int main(void) {
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
                             if (c->dist_sq > c->near_dist2) do_decimate = true;
+                        }
+
+                        /* If already in fallback mode, upload this room's baked tile */
+                        if (near_fallback_active &&
+                            baked_room_count > 0 && room_idx < baked_room_count) {
+                            float rd = (room_idx < g_chunk_count) ? g_chunks[room_idx].dist_sq : 0;
+                            rdpq_mode_tlut(TLUT_NONE);
+                            if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
+                            } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
+                                rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
+                            } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
+                                rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
+                            } else if (bkd_m1_surf) {
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
+                                rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
+                            }
+                            near_last_tex = -99;
                         }
 
                         float room_ox = (float)room->x - cam_x;
@@ -2509,8 +2534,40 @@ int main(void) {
 
                         /* ---- Face loop: index into cached vertices ---- */
                         for (int f = 0; f < room->mesh.face_count; f++) {
-                            if (perf_near_tris >= NEAR_TRI_BUDGET ||
-                                perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
+                            /* Check budget — switch to fallback instead of goto */
+                            if (!near_fallback_active &&
+                                (perf_near_tris >= NEAR_TRI_BUDGET ||
+                                 perf_near_faces >= NEAR_FACE_BUDGET)) {
+                                near_fallback_active = true;
+                                /* Upload this room's baked tile as fallback.
+                                 * Pick tier by room distance. */
+                                if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                    float rd = g_chunks[room_idx].dist_sq;
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                        rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
+                                    } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
+                                        rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
+                                    } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
+                                        rdpq_mode_tlut(TLUT_RGBA16);
+                                        rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
+                                        rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
+                                    } else if (bkd_m1_surf) {
+                                        rdpq_mode_tlut(TLUT_RGBA16);
+                                        rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
+                                        rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
+                                    } else if (white_px) {
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    }
+                                    near_last_tex = -99;
+                                } else if (white_px) {
+                                    /* No baked data — use white as last resort */
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    near_last_tex = -2;
+                                }
+                            }
+
                             perf_near_faces++;
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
@@ -2532,9 +2589,11 @@ int main(void) {
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
 
-                            /* Texture upload on change (skip when debug dist colors active) */
-                            if (g_debug_dist_colors) {
-                                /* debug: keep solid green, skip all uploads */
+                            /* Texture upload on change.
+                             * In fallback mode: skip per-face uploads, use baked tile.
+                             * In debug mode: keep solid green. */
+                            if (near_fallback_active || g_debug_dist_colors) {
+                                /* fallback/debug: use whatever tile is already bound */
                             } else if (!is_flat && tex_idx < num_otex && ci8_surfs) {
                                 if ((int)tex_idx != near_last_tex &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
@@ -2577,9 +2636,14 @@ int main(void) {
                                 float g = vtx_cache[vi].g;
                                 float b = vtx_cache[vi].b;
 
-                                /* UV: still per-face (face-specific tex coords) */
+                                /* UV computation */
                                 float ts = 0, tt = 0;
-                                if (otex && tex_uv_map) {
+                                if (near_fallback_active) {
+                                    /* Fallback: baked tile UV (same as far pass) */
+                                    float baked_dim = 16.0f; /* CI8 16×16 default */
+                                    ts = ((float)(v % 2)) * baked_dim;
+                                    tt = ((float)(v / 2)) * baked_dim;
+                                } else if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
                                     ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
