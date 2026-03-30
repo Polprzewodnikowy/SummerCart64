@@ -2182,17 +2182,21 @@ int main(void) {
                              * Tier chosen by distance.  Ring 2 always gets IA4.
                              * No per-face uploads happen when room_baked=true. */
                             bool room_baked = false;
-                            if (baked_room_count > 0 && room_idx < baked_room_count) {
-                                float rd = is_ring2 ? (g_dist_xxfar_sq + 1.0f) : room_d;
+                            float rd = is_ring2 ? (g_dist_xxfar_sq + 1.0f) : room_d;
+
+                            /* Debug colors: apply to ALL far rooms regardless of baked status */
+                            if (g_debug_dist_colors && dbg_tier_px) {
                                 rspq_flush();
-                                if (g_debug_dist_colors && dbg_tier_px) {
-                                    /* Debug: solid color per distance tier */
-                                    rdpq_mode_tlut(TLUT_NONE);
-                                    int tier = (rd > g_dist_xxfar_sq) ? 4 :
-                                               (rd > g_dist_xfar_sq)  ? 3 :
-                                               (rd > g_dist_vfar_sq) ? 2 : 1;
-                                    rdpq_tex_upload(TILE0, &dbg_tier_surf[tier], NULL);
-                                } else if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                rdpq_mode_tlut(TLUT_NONE);
+                                int tier = (rd > g_dist_xxfar_sq) ? 4 :
+                                           (rd > g_dist_xfar_sq)  ? 3 :
+                                           (rd > g_dist_vfar_sq) ? 2 : 1;
+                                rdpq_tex_upload(TILE0, &dbg_tier_surf[tier], NULL);
+                                room_baked = true;
+                                far_last_tex = -99;
+                            } else if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                rspq_flush();
+                                if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
