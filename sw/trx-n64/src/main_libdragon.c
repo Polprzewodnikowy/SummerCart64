@@ -2211,7 +2211,7 @@ int main(void) {
                                  * Skipped for rooms whose sphere is fully in front. */
                                 float clipped[6][8];
                                 int clip_nv = nv;
-                                if (!room_no_clip && any_behind) {
+                                if (any_behind) {
                                     clip_nv = 0;
                                     for (int i = 0; i < nv; i++) {
                                         int j = (i + 1) % nv;
@@ -2255,7 +2255,7 @@ int main(void) {
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    sv[v][8] = inv_z;
+                                    sv[v][8] = 1.0f / rz;
                                 }
 
                                 int num_tris = clip_nv - 2;
@@ -2484,10 +2484,14 @@ int main(void) {
                             }
                             if (!ok || all_behind) continue;
 
-                            /* Near-plane clip (skip if room sphere is fully in front) */
+                            /* Near-plane clip — ALWAYS clip if any vertex is behind,
+                             * even if the sphere test said the room is in front.
+                             * The sphere is approximate; individual vertices can
+                             * still be behind NEAR_Z, causing wild perspective
+                             * distortion (texture swimming) if not clipped. */
                             float clipped[6][8];
                             int clip_nv = nv;
-                            if (!near_no_clip && any_behind) {
+                            if (any_behind) {
                                 clip_nv = 0;
                                 for (int i = 0; i < nv; i++) {
                                     int j = (i + 1) % nv;
@@ -2526,7 +2530,7 @@ int main(void) {
                                 sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
                                 sv[v][5]=clipped[v][5]; sv[v][6]=1.0f;
                                 sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
-                                sv[v][9]=inv_z;
+                                sv[v][9]=1.0f/rz; /* perspective W: must be 1/z, not 256/z */
                             }
 
                             int num_tris = clip_nv - 2;
@@ -2674,7 +2678,7 @@ int main(void) {
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
                                     sv[v][6]=1.0f;
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
-                                    sv[v][9]=inv_z;
+                                    sv[v][9]=1.0f/rz;
                                 }
                                 int num_tris = sm_cnv - 2;
                                 for (int tri=0;tri<num_tris;tri++) {
