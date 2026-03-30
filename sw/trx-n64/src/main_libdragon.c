@@ -1209,13 +1209,51 @@ int main(void) {
                 bool collision_on = false;  /* L = tcl toggle */
                 int speed_level = 1;
 
-                /* Budget constants — visible to both the render passes and the
-                 * pause-screen STAT display (must be defined before both). */
-                #define FAR_TRI_BUDGET      200
-                #define FAR_UPLOAD_BUDGET   8
-                #define NEAR_TRI_BUDGET     1400
-                #define NEAR_FACE_BUDGET    600  /* cap total face iterations (including culled) */
-                #define NEAR_UPLOAD_BUDGET  48
+                /* ============================================================
+                 * BUDGET SYSTEM — 2-tier: global + per-room
+                 *
+                 * Global budgets are the defaults (adjustable via pause menu).
+                 * Per-room budgets override globals but are clamped to never
+                 * exceed the global max. A per-room value of -1 means "use global."
+                 * Effective budget = (per_room >= 0) ? min(per_room, global) : global
+                 *
+                 * Shippable: per-room budgets can be tuned in-game and exported
+                 * as a per-level budget table for final builds.
+                 * ============================================================ */
+
+                /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
+                int g_far_tri_budget      = 200;
+                int g_far_upload_budget    = 8;
+                int g_near_tri_budget      = 1400;
+                int g_near_face_budget     = 600;
+                int g_near_upload_budget    = 48;
+
+                /* Per-room budget overrides (-1 = inherit global) */
+                #define ROOM_BUDGET_INHERIT (-1)
+                typedef struct {
+                    int16_t near_face_budget;
+                    int16_t near_tri_budget;
+                    int16_t far_tri_budget;
+                } room_budget_t;
+                static room_budget_t room_budgets[256]; /* up to 256 rooms */
+                /* Initialize all to inherit */
+                for (int i = 0; i < 256; i++) {
+                    room_budgets[i].near_face_budget = ROOM_BUDGET_INHERIT;
+                    room_budgets[i].near_tri_budget  = ROOM_BUDGET_INHERIT;
+                    room_budgets[i].far_tri_budget   = ROOM_BUDGET_INHERIT;
+                }
+
+                /* Effective budget helpers — computed per frame from current room */
+                #define EFF_BUDGET(per_room, global) \
+                    ((per_room) >= 0 ? ((per_room) < (global) ? (per_room) : (global)) : (global))
+                int eff_near_face_budget, eff_near_tri_budget, eff_far_tri_budget;
+
+                /* Legacy #defines for code that still references them (pause display) */
+                #define FAR_TRI_BUDGET      eff_far_tri_budget
+                #define FAR_UPLOAD_BUDGET   g_far_upload_budget
+                #define NEAR_TRI_BUDGET     eff_near_tri_budget
+                #define NEAR_FACE_BUDGET    eff_near_face_budget
+                #define NEAR_UPLOAD_BUDGET  g_near_upload_budget
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
                 /* Per-frame performance counters — reset each frame,
@@ -1481,110 +1519,202 @@ int main(void) {
                         lara_room = cam_room;
                     }
 
-                    /* Start: pause with hardware diagnostics */
+                    /* ============================================================
+                     * PAUSE MENU — Multi-page diagnostics + budget sliders
+                     *
+                     * Page 0: Hardware diagnostics (read-only)
+                     * Page 1: Global budget sliders (adjustable)
+                     * Page 2: Per-room budget sliders (adjustable, clamped to global)
+                     *
+                     * Navigation: L=prev page  R=next page  Start=unpause
+                     * On slider pages: D-up/D-down=select  D-left/D-right=adjust
+                     * ============================================================ */
                     if (pressed.start) {
-                        /* No rdpq_attach yet — just grab a fresh display surface */
-                        surface_t *pause_disp = display_get();
-                        graphics_set_color(0xFFFFFFFF, 0x000000C0);
-                        char buf[80];
-                        int y = 4;
-                        #define STAT(fmt, ...) do { \
-                            snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
-                            graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
-                        } while(0)
+                        static int pause_page = 0;
+                        static int slider_sel = 0; /* selected slider index */
 
-                        /* ============================================================
-                         * Hardware diagnostics — START/PAUSE overlay.
-                         * Columns: left side uses 8..155 px, right 160..312 px.
-                         * Two-column layout via separate x-coordinate per section.
-                         * ============================================================ */
+                        bool paused = true;
+                        while (paused) {
+                            surface_t *pause_disp = display_get();
+                            graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                            char buf[80];
+                            int y = 4;
+                            #define STAT(fmt, ...) do { \
+                                snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+                                graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
+                            } while(0)
+                            #define STAT_HL(sel, idx, fmt, ...) do { \
+                                if ((sel) == (idx)) graphics_set_color(0x00FF00FF, 0x000000C0); \
+                                snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+                                graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
+                                if ((sel) == (idx)) graphics_set_color(0xFFFFFFFF, 0x000000C0); \
+                            } while(0)
 
-                        /* === CPU TIMING === */
-                        STAT("=== CPU ===");
-                        STAT("FPS: %d  Frame: %u us", fps_display, perf_frame_us);
-                        {
-                            float budget_pct = (float)perf_frame_us / 33333.0f * 100.0f;
-                            uint32_t other_us = perf_frame_us > perf_far_us + perf_near_us
-                                ? perf_frame_us - perf_far_us - perf_near_us : 0;
-                            STAT("Budget: %.0f%%  far:%uus near:%uus",
-                                 budget_pct, perf_far_us, perf_near_us);
-                            STAT("Vis+misc: %u us", other_us);
-                        }
+                            /* Page header */
+                            STAT("=== PAUSE [L<] Page %d/2 [>R] ===", pause_page);
 
-                        /* === RSP / RDP === */
-                        STAT("=== RSP/RDP ===");
-                        /* RSP stall: time CPU waited for RSP at frame end.
-                         * Low (~0) = CPU-bound.  High = RSP/RDP-bound. */
-                        STAT("RSP stall: %u us  (%s)",
-                             perf_rsp_us,
-                             perf_rsp_us > 4000 ? "RDP-BOUND" :
-                             perf_rsp_us > 1000 ? "RSP-bound" : "CPU-bound");
-                        /* RDP load estimate: far+near tris × ~24 RDP cycles/tri
-                         * at 62.5 MHz → max ~2.6M tris/s at 30fps.
-                         * This is a rough lower-bound (texturing/blending costs more). */
-                        {
-                            int total_tris = perf_far_tris + perf_near_tris;
-                            float rdp_est = (float)total_tris / 2604.0f; /* % of 30fps budget */
-                            STAT("RDP tris: %d  Load est: %.0f%%", total_tris, rdp_est);
-                        }
+                            if (pause_page == 0) {
+                                /* ---- PAGE 0: DIAGNOSTICS ---- */
+                                STAT("FPS:%d Frame:%uus (%.0f%%)",
+                                     fps_display, perf_frame_us,
+                                     (float)perf_frame_us / 33333.0f * 100.0f);
+                                {
+                                    uint32_t other_us = perf_frame_us > perf_far_us + perf_near_us
+                                        ? perf_frame_us - perf_far_us - perf_near_us : 0;
+                                    STAT("Far:%uus Near:%uus Misc:%uus",
+                                         perf_far_us, perf_near_us, other_us);
+                                }
+                                STAT("RSP stall:%uus (%s)", perf_rsp_us,
+                                     perf_rsp_us > 4000 ? "RDP" :
+                                     perf_rsp_us > 1000 ? "RSP" : "CPU");
+                                STAT("Room:%d Vis:%d r1:%d r2:%d",
+                                     lara_room, perf_vis_total,
+                                     perf_vis_ring1, perf_vis_ring2);
+                                STAT("--- NEAR ---");
+                                STAT("Tris:%d/%d Faces:%d/%d",
+                                     perf_near_tris, NEAR_TRI_BUDGET,
+                                     perf_near_faces, NEAR_FACE_BUDGET);
+                                STAT("Binds:%d Cull:%d DSkip:%d",
+                                     perf_near_binds, perf_near_culled,
+                                     perf_near_detail_skip);
+                                STAT("Rm:%uus SM:%uus La:%uus It:%uus",
+                                     perf_near_room_us, perf_near_sm_us,
+                                     perf_near_lara_us, perf_near_item_us);
+                                STAT("--- FAR ---");
+                                STAT("Rooms:%d Bk:%d Tri:%d/%d Up:%d/%d",
+                                     perf_far_rooms, perf_far_baked,
+                                     perf_far_tris, FAR_TRI_BUDGET,
+                                     perf_far_uploads, FAR_UPLOAD_BUDGET);
+                                STAT("--- MEM ---");
+                                {
+                                    uint32_t hf = n64_mem_available();
+                                    STAT("Heap:%uKB/%uKB free:%uKB",
+                                         (GAME_HEAP_SIZE-hf)/1024,
+                                         GAME_HEAP_SIZE/1024, hf/1024);
+                                }
+                                STAT("Pos:%.0f %.0f %.0f", cam_x, cam_y, cam_z);
 
-                        /* === VISIBILITY === */
-                        STAT("=== VISIBILITY ===");
-                        STAT("Room: %d (%s)", lara_room,
-                            lara_room >= 0 && lara_room < g_chunk_count ?
-                            (g_chunks[lara_room].size_class == 0 ? "small" :
-                             g_chunks[lara_room].size_class == 1 ? "medium" :
-                             g_chunks[lara_room].size_class == 2 ? "large" : "open")
-                            : "?");
-                        STAT("Visible: %d  ring1:%d ring2:%d",
-                             perf_vis_total, perf_vis_ring1, perf_vis_ring2);
+                            } else if (pause_page == 1) {
+                                /* ---- PAGE 1: GLOBAL BUDGET SLIDERS ---- */
+                                STAT("=== GLOBAL BUDGETS ===");
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Near Face Budget: %d", g_near_face_budget);
+                                STAT_HL(slider_sel, 1, "Near Tri Budget:  %d", g_near_tri_budget);
+                                STAT_HL(slider_sel, 2, "Near Upload Cap:  %d", g_near_upload_budget);
+                                STAT_HL(slider_sel, 3, "Far Tri Budget:   %d", g_far_tri_budget);
+                                STAT_HL(slider_sel, 4, "Far Upload Cap:   %d", g_far_upload_budget);
+                                STAT("");
+                                STAT("Effective this room (%d):", lara_room);
+                                STAT(" Face:%d Tri:%d FarTri:%d",
+                                     eff_near_face_budget, eff_near_tri_budget,
+                                     eff_far_tri_budget);
 
-                        /* === NEAR PASS === */
-                        STAT("=== NEAR (CI8 zbuf) ===");
-                        STAT("Rooms:%d  Tris:%d/%d  Faces:%d/%d",
-                             perf_near_rooms, perf_near_tris, NEAR_TRI_BUDGET,
-                             perf_near_faces, NEAR_FACE_BUDGET);
-                        STAT("Binds:%d  Culled:%d  DSkip:%d",
-                             perf_near_binds, perf_near_culled,
-                             perf_near_detail_skip);
-                        STAT("Room:%uus SM:%uus Lara:%uus Item:%uus",
-                             perf_near_room_us, perf_near_sm_us,
-                             perf_near_lara_us, perf_near_item_us);
+                            } else if (pause_page == 2) {
+                                /* ---- PAGE 2: PER-ROOM BUDGET SLIDERS ---- */
+                                int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                                STAT("=== ROOM %d BUDGETS ===", ri);
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("(-1 = inherit global)");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Near Face: %d (global:%d)",
+                                        (int)room_budgets[ri].near_face_budget, g_near_face_budget);
+                                STAT_HL(slider_sel, 1, "Near Tri:  %d (global:%d)",
+                                        (int)room_budgets[ri].near_tri_budget, g_near_tri_budget);
+                                STAT_HL(slider_sel, 2, "Far Tri:   %d (global:%d)",
+                                        (int)room_budgets[ri].far_tri_budget, g_far_tri_budget);
+                                STAT("");
+                                STAT("Effective: Face:%d Tri:%d FarTri:%d",
+                                     EFF_BUDGET(room_budgets[ri].near_face_budget, g_near_face_budget),
+                                     EFF_BUDGET(room_budgets[ri].near_tri_budget, g_near_tri_budget),
+                                     EFF_BUDGET(room_budgets[ri].far_tri_budget, g_far_tri_budget));
+                                STAT("");
+                                STAT("Room size: %s",
+                                     ri < g_chunk_count ?
+                                     (g_chunks[ri].size_class == 0 ? "small" :
+                                      g_chunks[ri].size_class == 1 ? "medium" :
+                                      g_chunks[ri].size_class == 2 ? "large" : "open") : "?");
+                            }
 
-                        /* === FAR PASS === */
-                        STAT("=== FAR (baked tiles) ===");
-                        STAT("Rooms:%d  Baked:%d  Tris:%d/%d",
-                             perf_far_rooms, perf_far_baked,
-                             perf_far_tris, FAR_TRI_BUDGET);
-                        STAT("Uploads:%d/%d  No-baked:%d",
-                             perf_far_uploads, FAR_UPLOAD_BUDGET,
-                             perf_far_rooms - perf_far_baked);
+                            #undef STAT
+                            #undef STAT_HL
+                            display_show(pause_disp);
 
-                        /* === MEMORY === */
-                        STAT("=== MEMORY ===");
-                        {
-                            uint32_t heap_free = n64_mem_available();
-                            uint32_t heap_used = GAME_HEAP_SIZE - heap_free;
-                            STAT("Heap: %uKB/%uKB  free:%uKB",
-                                 heap_used / 1024, GAME_HEAP_SIZE / 1024,
-                                 heap_free / 1024);
-                        }
-
-                        /* === CAMERA === */
-                        STAT("=== CAMERA ===");
-                        STAT("Pos: %.0f %.0f %.0f", cam_x, cam_y, cam_z);
-                        {
-                            int32_t pfl, pcl;
-                            GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
-                            STAT("Floor: %d  Ceil: %d", pfl, pcl);
-                        }
-
-                        #undef STAT
-                        display_show(pause_disp);
-
-                        while (1) {
+                            /* Input handling */
                             joypad_poll();
-                            if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
+                            joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+
+                            /* Page navigation */
+                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 2) pause_page = 2; }
+                            if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
+                            if (bp.start) { paused = false; }
+
+                            /* Slider navigation + adjustment */
+                            if (pause_page == 1) {
+                                int max_sel = 4;
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                int delta = 0;
+                                if (bp.d_right) delta = 50;
+                                if (bp.d_left)  delta = -50;
+
+                                if (delta) {
+                                    switch (slider_sel) {
+                                        case 0: g_near_face_budget += delta;
+                                                if (g_near_face_budget < 50)  g_near_face_budget = 50;
+                                                if (g_near_face_budget > 5000) g_near_face_budget = 5000;
+                                                break;
+                                        case 1: g_near_tri_budget += delta;
+                                                if (g_near_tri_budget < 50)   g_near_tri_budget = 50;
+                                                if (g_near_tri_budget > 5000)  g_near_tri_budget = 5000;
+                                                break;
+                                        case 2: g_near_upload_budget += delta / 10;
+                                                if (g_near_upload_budget < 4)  g_near_upload_budget = 4;
+                                                if (g_near_upload_budget > 128) g_near_upload_budget = 128;
+                                                break;
+                                        case 3: g_far_tri_budget += delta;
+                                                if (g_far_tri_budget < 50)    g_far_tri_budget = 50;
+                                                if (g_far_tri_budget > 2000)   g_far_tri_budget = 2000;
+                                                break;
+                                        case 4: g_far_upload_budget += delta / 10;
+                                                if (g_far_upload_budget < 2)   g_far_upload_budget = 2;
+                                                if (g_far_upload_budget > 32)   g_far_upload_budget = 32;
+                                                break;
+                                    }
+                                }
+                            } else if (pause_page == 2) {
+                                int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                                int max_sel = 2;
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                int delta = 0;
+                                if (bp.d_right) delta = 50;
+                                if (bp.d_left)  delta = -50;
+
+                                if (delta) {
+                                    int16_t *target = NULL;
+                                    int gmax = 0;
+                                    switch (slider_sel) {
+                                        case 0: target = &room_budgets[ri].near_face_budget;
+                                                gmax = g_near_face_budget; break;
+                                        case 1: target = &room_budgets[ri].near_tri_budget;
+                                                gmax = g_near_tri_budget; break;
+                                        case 2: target = &room_budgets[ri].far_tri_budget;
+                                                gmax = g_far_tri_budget; break;
+                                    }
+                                    if (target) {
+                                        int val = (int)*target + delta;
+                                        /* -1 = inherit; below -1 wraps to inherit */
+                                        if (val < -1) val = -1;
+                                        if (val > gmax) val = gmax;
+                                        /* Snap to -1 if close to 0 from below */
+                                        if (val >= 0 && val < 50) val = 50;
+                                        *target = (int16_t)val;
+                                    }
+                                }
+                            }
                         }
                         continue;
                     }
@@ -1598,7 +1728,14 @@ int main(void) {
                      *   5. rdpq_detach_show()
                      *
                      * All geometry uses pure RDPQ.  No GL. */
-                    /* Reset per-frame perf counters */
+                    /* Compute effective budgets for this frame's room */
+                    {
+                        int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                        eff_near_face_budget = EFF_BUDGET(room_budgets[ri].near_face_budget, g_near_face_budget);
+                        eff_near_tri_budget  = EFF_BUDGET(room_budgets[ri].near_tri_budget,  g_near_tri_budget);
+                        eff_far_tri_budget   = EFF_BUDGET(room_budgets[ri].far_tri_budget,   g_far_tri_budget);
+                    }
+
                     /* Reset per-frame counters + start frame timer */
                     perf_far_rooms = 0; perf_far_tris = 0;
                     perf_far_uploads = 0; perf_far_baked = 0;
