@@ -1,19 +1,24 @@
 /*
- * t3d_hle.c — T3D/rspq HLE core: command parsing and state tracking
+ * t3d_hle.c — T3D/rspq HLE: command parsing, validation, telemetry
  *
- * Tier 1: Telemetry — parse and log all T3D commands
- * Tier 2: Shadow — also render via host GL
- * Tier 3: Replace — skip RSP/RDP entirely for known paths
+ * Tier 1: Parse and log all T3D commands with strict validation.
+ * Output is machine-readable (one structured line per event).
+ *
+ * Output format:
+ *   T3D_CMD <name> <key=value ...>
+ *   T3D_FRAME frame=N cmds=N t3d=N tris=N verts=N ...
+ *   T3D_DETECT event=<type> overlay=N confidence=N
+ *   T3D_WARN msg="..." addr=0xNNNN
+ *   T3D_ERR msg="..." addr=0xNNNN
  */
 
 #include "t3d_hle.h"
-#include <stdio.h>
 #include <string.h>
-#include <math.h>
 
 /* ----------------------------------------------------------------
- * Command names (for telemetry logging)
+ * Command metadata
  * ---------------------------------------------------------------- */
+
 static const char *cmd_names[T3D_CMD_COUNT] = {
     [T3D_CMD_TRI_DRAW]     = "TRI_DRAW",
     [T3D_CMD_SCREEN_SIZE]  = "SCREEN_SIZE",
@@ -30,291 +35,515 @@ static const char *cmd_names[T3D_CMD_COUNT] = {
     [T3D_CMD_TRI_SEQ]      = "TRI_SEQ",
 };
 
+/* Command sizes in 32-bit words. 0 = variable/unknown. */
+static const int cmd_word_counts[T3D_CMD_COUNT] = {
+    [T3D_CMD_TRI_DRAW]     = 1,
+    [T3D_CMD_SCREEN_SIZE]  = 5,
+    [T3D_CMD_MATRIX_STACK] = 2,
+    [T3D_CMD_SET_WORD]     = 2,
+    [T3D_CMD_VERT_LOAD]    = 3,
+    [T3D_CMD_LIGHT_SET]    = 4,
+    [T3D_CMD_DRAWFLAGS]    = 1,
+    [T3D_CMD_PROJ_SET]     = 2,
+    [T3D_CMD_FOG_RANGE]    = 2,
+    [T3D_CMD_FOG_STATE]    = 1,
+    [T3D_CMD_TRI_SYNC]     = 1,
+    [T3D_CMD_TRI_STRIP]    = 2,
+    [T3D_CMD_TRI_SEQ]      = 2,
+};
+
 const char *t3d_hle_cmd_name(int cmd_id) {
     if (cmd_id >= 0 && cmd_id < T3D_CMD_COUNT) return cmd_names[cmd_id];
     return "UNKNOWN";
 }
 
 /* ----------------------------------------------------------------
+ * Logging helpers (machine-readable to log_fp)
+ * ---------------------------------------------------------------- */
+
+#define LOG(state, tag, fmt, ...) \
+    fprintf((state)->log_fp, tag " " fmt "\n", ##__VA_ARGS__)
+
+#define LOG_CMD(state, cmd, fmt, ...) \
+    do { if ((state)->verbose) \
+        fprintf((state)->log_fp, "T3D_CMD %s " fmt "\n", \
+                t3d_hle_cmd_name(cmd), ##__VA_ARGS__); \
+    } while(0)
+
+#define LOG_WARN(state, fmt, ...) \
+    do { (state)->frame.warnings++; \
+        fprintf((state)->log_fp, "T3D_WARN " fmt "\n", ##__VA_ARGS__); \
+    } while(0)
+
+#define LOG_ERR(state, fmt, ...) \
+    do { (state)->frame.errors++; \
+        fprintf((state)->log_fp, "T3D_ERR " fmt "\n", ##__VA_ARGS__); \
+    } while(0)
+
+/* ----------------------------------------------------------------
+ * Read helpers with validation
+ * ---------------------------------------------------------------- */
+
+static inline uint32_t rd32(const uint8_t *rdram, uint32_t rdram_size, uint32_t addr) {
+    return t3d_hle_read32(rdram, rdram_size, addr);
+}
+
+static inline bool addr_valid(uint32_t addr, uint32_t rdram_size) {
+    return (addr & 0x1FFFFFFF) + 3 < rdram_size;
+}
+
+/* ----------------------------------------------------------------
  * Initialization
  * ---------------------------------------------------------------- */
+
 void t3d_hle_init(T3DHLEState *state, int mode) {
     memset(state, 0, sizeof(*state));
     state->mode = mode;
     state->enabled = true;
-    state->t3d_overlay_id = -1;
-    state->rdpq_overlay_id = -1;
-    state->detected = false;
-    state->mtx_depth = 0;
+    state->verbose = (mode == 0); /* verbose by default in telemetry */
+    state->log_fp = stderr;
+    state->detect.overlay_id = -1;
+    state->detect.confidence = 0;
+    state->detect.confirmed = false;
 
-    /* Identity matrices */
-    for (int s = 0; s < T3D_HLE_MTX_STACK; s++) {
-        for (int i = 0; i < 4; i++)
-            state->model_mtx[s][i][i] = 1.0f;
-    }
-    for (int i = 0; i < 4; i++)
-        state->proj_mtx[i][i] = 1.0f;
+    LOG(state, "T3D_INIT", "mode=%d tier=%s",
+        mode, mode == 0 ? "telemetry" : mode == 1 ? "shadow" : "replace");
+}
 
-    fprintf(stderr, "[T3D-HLE] Initialized (mode=%d: %s)\n", mode,
-            mode == 0 ? "telemetry" : mode == 1 ? "shadow" : "replace");
+void t3d_hle_set_verbose(T3DHLEState *state, bool verbose) {
+    state->verbose = verbose;
+}
+
+void t3d_hle_set_log(T3DHLEState *state, FILE *fp) {
+    state->log_fp = fp ? fp : stderr;
 }
 
 /* ----------------------------------------------------------------
- * Overlay detection
+ * Overlay detection — multi-signal confidence scoring
  *
- * rspq overlays are identified by their IMEM code signature.
- * T3D's overlay text starts with a known pattern. We also detect
- * the overlay ID at runtime by watching rspq CALL/DMA commands
- * that reference overlay table entries.
- *
- * Simpler approach: watch for T3D_CMD patterns in the command
- * stream. If overlay N issues commands matching T3D's known
- * command set (VERT_LOAD with valid RDRAM addresses, TRI_DRAW
- * with valid vertex indices, SCREEN_SIZE with 320/240), we
- * fingerprint it as T3D.
+ * We observe commands from each non-zero overlay ID. When a command
+ * matches a known T3D signature (SCREEN_SIZE params, VERT_LOAD with
+ * valid RDRAM, TRI_DRAW indices, etc.), we increment confidence for
+ * that overlay. Once confidence crosses the threshold, we lock it in.
  * ---------------------------------------------------------------- */
 
-/* Known rspq overlay text signatures (first 8 bytes of overlay code) */
-static const uint8_t t3d_sig[] = {
-    /* rsp_tiny3d text segment starts with specific instructions.
-     * We match a hash of the first 64 bytes instead of exact bytes
-     * to handle minor version differences. */
-};
+static void detect_signal(T3DHLEState *state, int ovl_id, const char *signal) {
+    T3DHLEDetection *d = &state->detect;
 
-bool t3d_hle_detect_ucode(T3DHLEState *state,
-                          const uint8_t *imem, uint32_t size) {
-    /* For now, detection happens via command pattern matching
-     * rather than IMEM signature. See process_command(). */
-    (void)imem; (void)size;
-    return false;
-}
+    /* If already confirmed for a different overlay, ignore */
+    if (d->confirmed && d->overlay_id != ovl_id) return;
 
-/* ----------------------------------------------------------------
- * Command processing — the core of Tier 1
- *
- * Called when we observe rspq commands in RDRAM. Parses the
- * overlay_id and cmd_id, updates internal state, and logs.
- * ---------------------------------------------------------------- */
+    /* First signal sets candidate overlay */
+    if (d->overlay_id == -1) {
+        d->overlay_id = ovl_id;
+        LOG(state, "T3D_DETECT", "event=candidate overlay=%d signal=%s", ovl_id, signal);
+    }
 
-/* rspq command sizes (in 32-bit words) for T3D commands.
- * Derived from T3D's rspq overlay descriptor table. */
-static const int t3d_cmd_sizes[T3D_CMD_COUNT] = {
-    [T3D_CMD_TRI_DRAW]     = 1,  /* packed indices in word 0 */
-    [T3D_CMD_SCREEN_SIZE]  = 5,  /* guardband, offset, scale, depth */
-    [T3D_CMD_MATRIX_STACK] = 2,  /* address + flags */
-    [T3D_CMD_SET_WORD]     = 2,  /* dmem addr + value */
-    [T3D_CMD_VERT_LOAD]    = 3,  /* size, rdram addr, offsets */
-    [T3D_CMD_LIGHT_SET]    = 4,  /* color + direction */
-    [T3D_CMD_DRAWFLAGS]    = 1,  /* flags in args */
-    [T3D_CMD_PROJ_SET]     = 2,  /* address */
-    [T3D_CMD_FOG_RANGE]    = 1,  /* packed range */
-    [T3D_CMD_FOG_STATE]    = 1,  /* enable/disable */
-    [T3D_CMD_TRI_SYNC]     = 1,  /* no args */
-    [T3D_CMD_TRI_STRIP]    = 2,  /* indices packed */
-    [T3D_CMD_TRI_SEQ]      = 2,  /* indices packed */
-};
+    /* Only count signals for the candidate */
+    if (d->overlay_id != ovl_id) return;
 
-static void log_command(T3DHLEState *state, int ovl_id, int cmd_id,
-                        const uint32_t *words, int nwords) {
-    if (state->mode > 0) return; /* Only log in telemetry mode */
+    d->confidence++;
+    LOG(state, "T3D_DETECT", "event=signal overlay=%d signal=%s confidence=%d/%d",
+        ovl_id, signal, d->confidence, T3D_DETECT_CONFIDENCE_THRESHOLD);
 
-    if (ovl_id == state->t3d_overlay_id && cmd_id < T3D_CMD_COUNT) {
-        fprintf(stderr, "[T3D] %s", t3d_hle_cmd_name(cmd_id));
-        for (int i = 0; i < nwords && i < 4; i++)
-            fprintf(stderr, " %08X", words[i]);
-        fprintf(stderr, "\n");
+    if (!d->confirmed && d->confidence >= T3D_DETECT_CONFIDENCE_THRESHOLD) {
+        d->confirmed = true;
+        LOG(state, "T3D_DETECT", "event=confirmed overlay=%d confidence=%d",
+            ovl_id, d->confidence);
     }
 }
 
-static void handle_t3d_vert_load(T3DHLEState *state,
-                                 const uint8_t *rdram,
-                                 const uint32_t *words) {
-    /* Word 0: [ovl_id|cmd_id|input_size(24)]
-     * Word 1: RDRAM physical address of T3DVertPacked array
-     * Word 2: [dest_offset(16)|input_offset(16)] */
-    uint32_t input_size = RSPQ_ARGS(words[0]);
-    uint32_t rdram_addr = words[1] & 0x00FFFFFF; /* Physical addr mask */
-    uint16_t dest_off   = (words[2] >> 16) & 0xFFFF;
-    uint16_t input_off  = words[2] & 0xFFFF;
+/* ----------------------------------------------------------------
+ * Command handlers
+ * ---------------------------------------------------------------- */
 
-    /* Calculate number of vertices (each T3DVertPacked holds 2 verts) */
+static int handle_vert_load(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t w2 = rd32(rdram, rdram_size, cmd_addr + 8);
+
+    uint32_t input_size = RSPQ_ARGS(w0);
+    uint32_t phys_addr = w1 & 0x1FFFFFFF;
+    uint16_t dest_off  = (w2 >> 16) & 0xFFFF;
+    uint16_t input_off = w2 & 0xFFFF;
+
     int num_packed = input_size / 32;
     int num_verts = num_packed * 2;
-    if (num_verts > T3D_HLE_MAX_VERTS) num_verts = T3D_HLE_MAX_VERTS;
 
-    /* Read vertex data from emulated RDRAM */
+    /* Validate */
+    if (num_verts > T3D_HLE_MAX_VERTS) {
+        LOG_WARN(state, "msg=\"VERT_LOAD count exceeds max\" count=%d max=%d addr=0x%08X",
+                 num_verts, T3D_HLE_MAX_VERTS, phys_addr);
+        num_verts = T3D_HLE_MAX_VERTS;
+        num_packed = num_verts / 2;
+    }
+    if (num_verts == 0) {
+        LOG_WARN(state, "msg=\"VERT_LOAD zero vertices\" input_size=%u addr=0x%08X",
+                 input_size, phys_addr);
+        return 3;
+    }
+    if (!addr_valid(phys_addr, rdram_size) ||
+        !addr_valid(phys_addr + num_packed * 32 - 1, rdram_size)) {
+        LOG_ERR(state, "msg=\"VERT_LOAD addr out of RDRAM\" addr=0x%08X size=%u rdram_size=%u",
+                phys_addr, num_packed * 32, rdram_size);
+        return 3;
+    }
+
+    /* Read vertex data from RDRAM (big-endian) */
     for (int i = 0; i < num_packed; i++) {
-        uint32_t addr = rdram_addr + i * 32;
-        T3DVertPacked_HLE packed;
-        memcpy(&packed, rdram + (addr & 0x007FFFFF), sizeof(packed));
-
-        /* Byte-swap from big-endian N64 to host */
+        uint32_t a = phys_addr + i * 32;
         int vi = i * 2;
+
         if (vi < T3D_HLE_MAX_VERTS) {
-            state->verts[vi].pos[0] = (float)(int16_t)__builtin_bswap16(packed.posA[0]);
-            state->verts[vi].pos[1] = (float)(int16_t)__builtin_bswap16(packed.posA[1]);
-            state->verts[vi].pos[2] = (float)(int16_t)__builtin_bswap16(packed.posA[2]);
-            state->verts[vi].uv[0]  = (float)(int16_t)__builtin_bswap16(packed.uvA[0]);
-            state->verts[vi].uv[1]  = (float)(int16_t)__builtin_bswap16(packed.uvA[1]);
-            state->verts[vi].rgba[0] = packed.rgbaA[0];
-            state->verts[vi].rgba[1] = packed.rgbaA[1];
-            state->verts[vi].rgba[2] = packed.rgbaA[2];
-            state->verts[vi].rgba[3] = packed.rgbaA[3];
+            T3DHLEVertex *v = &state->verts[vi];
+            v->pos[0] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 0);
+            v->pos[1] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 2);
+            v->pos[2] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 4);
+            v->packed_normal = t3d_hle_read16(rdram, rdram_size, a + 6);
+            v->uv[0]  = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 16);
+            v->uv[1]  = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 18);
+            v->rgba[0] = t3d_hle_read8(rdram, rdram_size, a + 20);
+            v->rgba[1] = t3d_hle_read8(rdram, rdram_size, a + 21);
+            v->rgba[2] = t3d_hle_read8(rdram, rdram_size, a + 22);
+            v->rgba[3] = t3d_hle_read8(rdram, rdram_size, a + 23);
         }
         if (vi + 1 < T3D_HLE_MAX_VERTS) {
-            state->verts[vi+1].pos[0] = (float)(int16_t)__builtin_bswap16(packed.posB[0]);
-            state->verts[vi+1].pos[1] = (float)(int16_t)__builtin_bswap16(packed.posB[1]);
-            state->verts[vi+1].pos[2] = (float)(int16_t)__builtin_bswap16(packed.posB[2]);
-            state->verts[vi+1].uv[0]  = (float)(int16_t)__builtin_bswap16(packed.uvB[0]);
-            state->verts[vi+1].uv[1]  = (float)(int16_t)__builtin_bswap16(packed.uvB[1]);
-            state->verts[vi+1].rgba[0] = packed.rgbaB[0];
-            state->verts[vi+1].rgba[1] = packed.rgbaB[1];
-            state->verts[vi+1].rgba[2] = packed.rgbaB[2];
-            state->verts[vi+1].rgba[3] = packed.rgbaB[3];
+            T3DHLEVertex *v = &state->verts[vi + 1];
+            v->pos[0] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 8);
+            v->pos[1] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 10);
+            v->pos[2] = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 12);
+            v->packed_normal = t3d_hle_read16(rdram, rdram_size, a + 14);
+            v->uv[0]  = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 24);
+            v->uv[1]  = (float)(int16_t)t3d_hle_read16(rdram, rdram_size, a + 26);
+            v->rgba[0] = t3d_hle_read8(rdram, rdram_size, a + 28);
+            v->rgba[1] = t3d_hle_read8(rdram, rdram_size, a + 29);
+            v->rgba[2] = t3d_hle_read8(rdram, rdram_size, a + 30);
+            v->rgba[3] = t3d_hle_read8(rdram, rdram_size, a + 31);
         }
     }
     state->vert_count = num_verts;
+    state->frame.verts_loaded += num_verts;
+
+    LOG_CMD(state, T3D_CMD_VERT_LOAD,
+            "addr=0x%08X verts=%d dest_off=%u input_off=%u",
+            phys_addr, num_verts, dest_off, input_off);
+
+    return 3; /* 3 words consumed */
 }
 
-static void handle_t3d_tri_draw(T3DHLEState *state,
-                                const uint32_t *words) {
-    /* Word 0: [ovl_id|cmd_id|v0(8)|v1(8)|v2(8)] */
-    uint32_t args = RSPQ_ARGS(words[0]);
+static int handle_tri_draw(T3DHLEState *state, uint32_t w0) {
+    /* Indices packed in the 24-bit arg: v0(8) v1(8) v2(8) */
+    uint32_t args = RSPQ_ARGS(w0);
     int v0 = (args >> 16) & 0xFF;
     int v1 = (args >>  8) & 0xFF;
     int v2 = (args >>  0) & 0xFF;
 
-    if (v0 >= state->vert_count || v1 >= state->vert_count || v2 >= state->vert_count)
-        return;
-
-    state->tris_drawn++;
-
-    /* In replace mode, this is where we'd issue GL draw calls */
-    if (state->mode == 2) {
-        /* TODO: Tier 3 — glDrawArrays or equivalent */
+    /* Validate indices */
+    if (v0 >= state->vert_count || v1 >= state->vert_count || v2 >= state->vert_count) {
+        state->frame.tris_invalid++;
+        LOG_WARN(state, "msg=\"TRI_DRAW bad index\" v0=%d v1=%d v2=%d vert_count=%d",
+                 v0, v1, v2, state->vert_count);
+        return 1;
     }
+    /* Degenerate triangle check */
+    if (v0 == v1 || v1 == v2 || v0 == v2) {
+        state->frame.tris_invalid++;
+        return 1; /* silently skip degenerate */
+    }
+
+    state->frame.tris_drawn++;
+    LOG_CMD(state, T3D_CMD_TRI_DRAW, "v0=%d v1=%d v2=%d", v0, v1, v2);
+    return 1;
 }
 
-static void handle_t3d_drawflags(T3DHLEState *state,
-                                 const uint32_t *words) {
-    state->draw_flags = RSPQ_ARGS(words[0]);
+static int handle_screen_size(T3DHLEState *state,
+                              const uint8_t *rdram, uint32_t rdram_size,
+                              uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t w2 = rd32(rdram, rdram_size, cmd_addr + 8);
+    uint32_t w3 = rd32(rdram, rdram_size, cmd_addr + 12);
+    uint32_t w4 = rd32(rdram, rdram_size, cmd_addr + 16);
+
+    /* w3: screen scale (x<<16 | y) */
+    /* w2: screen offset (x<<17 | y<<1) */
+    /* For now, extract approximate viewport from offset */
+    int16_t off_x = (w2 >> 17) & 0x7FFF;
+    int16_t off_y = (w2 >> 1) & 0xFFFF;
+
+    LOG_CMD(state, T3D_CMD_SCREEN_SIZE,
+            "guardband=0x%08X offset=0x%08X scale=0x%08X depth=0x%08X",
+            w1, w2, w3, w4);
+
+    state->frame.state_changes++;
+    return 5;
 }
 
-static void handle_t3d_matrix_set(T3DHLEState *state,
-                                  const uint8_t *rdram,
-                                  const uint32_t *words) {
-    /* Word 0: [ovl_id|cmd_id|flags(24)]
-     * Word 1: RDRAM address of T3DMat4FP (64 bytes, fixed-point)
-     *
-     * Flags:
-     *   bit 0: multiply with parent (1) or replace (0)
-     *   bit 1: push (1) or set (0)
-     *   bit 2: pop direction */
-    uint32_t flags = RSPQ_ARGS(words[0]);
-    uint32_t mtx_addr = words[1] & 0x00FFFFFF;
-
-    /* Read fixed-point matrix from RDRAM and convert to float.
-     * T3DMat4FP is 16x int16_t integer + 16x uint16_t fraction = 64 bytes.
-     * Layout: first 32 bytes = integer parts, next 32 bytes = fraction parts */
-    /* TODO: Implement fixed-point to float matrix conversion */
-
-    (void)flags; (void)mtx_addr; (void)rdram;
+static int handle_drawflags(T3DHLEState *state, uint32_t w0) {
+    state->draw_flags = RSPQ_ARGS(w0);
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_DRAWFLAGS,
+            "flags=0x%06X depth=%d textured=%d shaded=%d cull_front=%d cull_back=%d",
+            state->draw_flags,
+            !!(state->draw_flags & T3D_FLAG_DEPTH),
+            !!(state->draw_flags & T3D_FLAG_TEXTURED),
+            !!(state->draw_flags & T3D_FLAG_SHADED),
+            !!(state->draw_flags & T3D_FLAG_CULL_FRONT),
+            !!(state->draw_flags & T3D_FLAG_CULL_BACK));
+    return 1;
 }
 
-static void handle_t3d_screen_size(T3DHLEState *state,
-                                   const uint32_t *words) {
-    /* Word 1: guardband scale + UV gen offset
-     * Word 2: screen offset (x<<17 | y<<1)
-     * Word 3: screen scale (x<<16 | y)
-     * Word 4: depth + W scale */
-    /* TODO: Extract viewport dimensions */
-    (void)words;
-    state->screen_width = 320.0f;  /* Default */
-    state->screen_height = 240.0f;
+static int handle_matrix_stack(T3DHLEState *state,
+                               const uint8_t *rdram, uint32_t rdram_size,
+                               uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t flags = RSPQ_ARGS(w0);
+    uint32_t mtx_addr = w1 & 0x1FFFFFFF;
+
+    bool multiply = !!(flags & 1);
+    bool push = !!(flags & 2);
+
+    /* Validate matrix address */
+    if (mtx_addr != 0 && !addr_valid(mtx_addr + 63, rdram_size)) {
+        LOG_WARN(state, "msg=\"MATRIX_STACK addr out of RDRAM\" addr=0x%08X", mtx_addr);
+    }
+
+    state->frame.matrix_ops++;
+    LOG_CMD(state, T3D_CMD_MATRIX_STACK,
+            "addr=0x%08X flags=0x%06X multiply=%d push=%d",
+            mtx_addr, flags, multiply, push);
+    return 2;
 }
 
-bool t3d_hle_process_command(T3DHLEState *state,
-                             const uint8_t *rdram,
-                             uint32_t cmd_addr) {
-    if (!state->enabled) return false;
+static int handle_proj_set(T3DHLEState *state,
+                           const uint8_t *rdram, uint32_t rdram_size,
+                           uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t mtx_addr = w1 & 0x1FFFFFFF;
 
-    uint32_t w0 = t3d_hle_read32(rdram, cmd_addr);
+    if (!addr_valid(mtx_addr + 63, rdram_size)) {
+        LOG_WARN(state, "msg=\"PROJ_SET addr out of RDRAM\" addr=0x%08X", mtx_addr);
+    }
+
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_PROJ_SET, "addr=0x%08X", mtx_addr);
+    return 2;
+}
+
+static int handle_set_word(T3DHLEState *state,
+                           const uint8_t *rdram, uint32_t rdram_size,
+                           uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t dmem_addr = RSPQ_ARGS(w0);
+    uint32_t value = w1;
+
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_SET_WORD, "dmem=0x%06X value=0x%08X", dmem_addr, value);
+    return 2;
+}
+
+static int handle_light_set(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t w2 = rd32(rdram, rdram_size, cmd_addr + 8);
+    uint32_t w3 = rd32(rdram, rdram_size, cmd_addr + 12);
+
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_LIGHT_SET,
+            "w0=0x%08X w1=0x%08X w2=0x%08X w3=0x%08X", w0, w1, w2, w3);
+    return 4;
+}
+
+static int handle_fog_range(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_FOG_RANGE, "w0=0x%08X w1=0x%08X", w0, w1);
+    return 2;
+}
+
+static int handle_fog_state(T3DHLEState *state, uint32_t w0) {
+    uint32_t flags = RSPQ_ARGS(w0);
+    state->fog_enabled = !!(flags & 1);
+    state->frame.state_changes++;
+    LOG_CMD(state, T3D_CMD_FOG_STATE, "enabled=%d", state->fog_enabled);
+    return 1;
+}
+
+static int handle_tri_sync(T3DHLEState *state) {
+    state->frame.drawcalls++;
+    LOG_CMD(state, T3D_CMD_TRI_SYNC, "drawcall=%u", state->frame.drawcalls);
+    return 1;
+}
+
+static int handle_tri_strip(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    /* TODO: decode strip indices from packed words */
+    state->frame.cmds_unsupported++;
+    LOG_CMD(state, T3D_CMD_TRI_STRIP, "w0=0x%08X w1=0x%08X", w0, w1);
+    return 2;
+}
+
+static int handle_tri_seq(T3DHLEState *state,
+                          const uint8_t *rdram, uint32_t rdram_size,
+                          uint32_t cmd_addr, uint32_t w0) {
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    /* TODO: decode sequential tri indices from packed words */
+    state->frame.cmds_unsupported++;
+    LOG_CMD(state, T3D_CMD_TRI_SEQ, "w0=0x%08X w1=0x%08X", w0, w1);
+    return 2;
+}
+
+/* ----------------------------------------------------------------
+ * Main command processor
+ * ---------------------------------------------------------------- */
+
+int t3d_hle_process_command(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr) {
+    if (!state->enabled) return 0;
+
+    /* Bounds check */
+    if (!addr_valid(cmd_addr, rdram_size)) {
+        LOG_ERR(state, "msg=\"cmd_addr out of RDRAM\" addr=0x%08X", cmd_addr);
+        return 0;
+    }
+
+    uint32_t w0 = rd32(rdram, rdram_size, cmd_addr);
     int ovl_id = RSPQ_OVL_ID(w0);
     int cmd_id = RSPQ_CMD_ID(w0);
 
-    /* Overlay detection via pattern matching.
-     * If we see SCREEN_SIZE with reasonable values followed by
-     * VERT_LOAD with valid RDRAM addresses, fingerprint as T3D. */
-    if (!state->detected && ovl_id > 0 && ovl_id < 16) {
-        if (cmd_id == T3D_CMD_SCREEN_SIZE) {
-            /* Tentatively mark this overlay as T3D */
-            state->t3d_overlay_id = ovl_id;
-            state->detected = true;
-            fprintf(stderr, "[T3D-HLE] Detected T3D overlay ID: %d\n", ovl_id);
+    state->frame.cmds_total++;
+
+    /* Internal rspq commands (overlay 0) — count but don't process */
+    if (ovl_id == 0) {
+        state->frame.cmds_rspq++;
+        return 0; /* let ares handle these */
+    }
+
+    /* Detection: accumulate signals from command patterns */
+    T3DHLEDetection *d = &state->detect;
+    if (!d->confirmed) {
+        /* Only consider as T3D candidate if cmd_id is in valid range
+         * and the overlay matches our candidate (or we have none yet) */
+        if (cmd_id < T3D_CMD_COUNT && (d->overlay_id == -1 || d->overlay_id == ovl_id)) {
+            switch (cmd_id) {
+            case T3D_CMD_SCREEN_SIZE:
+                if (!d->saw_screen_size) { d->saw_screen_size = true; detect_signal(state, ovl_id, "SCREEN_SIZE"); }
+                break;
+            case T3D_CMD_VERT_LOAD: {
+                /* Extra validation: word 1 should be a valid RDRAM address */
+                uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+                uint32_t pa = w1 & 0x1FFFFFFF;
+                if (pa > 0 && pa < rdram_size) {
+                    if (!d->saw_vert_load) { d->saw_vert_load = true; detect_signal(state, ovl_id, "VERT_LOAD_valid_addr"); }
+                }
+                break;
+            }
+            case T3D_CMD_TRI_DRAW:
+                if (!d->saw_tri_draw) { d->saw_tri_draw = true; detect_signal(state, ovl_id, "TRI_DRAW"); }
+                break;
+            case T3D_CMD_DRAWFLAGS:
+                if (!d->saw_drawflags) { d->saw_drawflags = true; detect_signal(state, ovl_id, "DRAWFLAGS"); }
+                break;
+            case T3D_CMD_MATRIX_STACK:
+                if (!d->saw_matrix_stack) { d->saw_matrix_stack = true; detect_signal(state, ovl_id, "MATRIX_STACK"); }
+                break;
+            case T3D_CMD_PROJ_SET:
+                if (!d->saw_proj_set) { d->saw_proj_set = true; detect_signal(state, ovl_id, "PROJ_SET"); }
+                break;
+            }
         }
     }
 
-    /* Not our overlay — skip */
-    if (ovl_id != state->t3d_overlay_id) return false;
+    /* If this overlay isn't our confirmed or candidate T3D, skip */
+    if (d->overlay_id != ovl_id) {
+        state->frame.cmds_other++;
+        return 0;
+    }
 
-    /* Read additional command words */
-    int nwords = (cmd_id < T3D_CMD_COUNT) ? t3d_cmd_sizes[cmd_id] : 1;
-    uint32_t words[16];
-    words[0] = w0;
-    for (int i = 1; i < nwords && i < 16; i++)
-        words[i] = t3d_hle_read32(rdram, cmd_addr + i * 4);
+    /* Even if not yet confirmed, process commands from candidate overlay
+     * (telemetry mode — we want to see everything) */
+    state->frame.cmds_t3d++;
+    state->total_cmds++;
 
-    state->cmds_intercepted++;
+    /* Validate command ID range */
+    if (cmd_id >= T3D_CMD_COUNT) {
+        LOG_WARN(state, "msg=\"unknown T3D cmd\" cmd_id=%d overlay=%d addr=0x%08X",
+                 cmd_id, ovl_id, cmd_addr);
+        state->frame.cmds_unsupported++;
+        return 1; /* assume 1 word, caller should handle gracefully */
+    }
 
-    /* Log in telemetry mode */
-    log_command(state, ovl_id, cmd_id, words, nwords);
+    /* Validate we can read the full command */
+    int expected_words = cmd_word_counts[cmd_id];
+    if (expected_words > 1 && !addr_valid(cmd_addr + (expected_words - 1) * 4, rdram_size)) {
+        LOG_ERR(state, "msg=\"cmd extends past RDRAM\" cmd=%s words=%d addr=0x%08X",
+                t3d_hle_cmd_name(cmd_id), expected_words, cmd_addr);
+        return 1;
+    }
 
     /* Dispatch */
     switch (cmd_id) {
-        case T3D_CMD_VERT_LOAD:
-            handle_t3d_vert_load(state, rdram, words);
-            break;
-        case T3D_CMD_TRI_DRAW:
-            handle_t3d_tri_draw(state, words);
-            break;
-        case T3D_CMD_DRAWFLAGS:
-            handle_t3d_drawflags(state, words);
-            break;
-        case T3D_CMD_MATRIX_STACK:
-            handle_t3d_matrix_set(state, rdram, words);
-            break;
-        case T3D_CMD_SCREEN_SIZE:
-            handle_t3d_screen_size(state, words);
-            break;
-        case T3D_CMD_TRI_SYNC:
-            /* Flush pending triangles to GL */
-            break;
-        case T3D_CMD_PROJ_SET:
-        case T3D_CMD_LIGHT_SET:
-        case T3D_CMD_SET_WORD:
-        case T3D_CMD_FOG_RANGE:
-        case T3D_CMD_FOG_STATE:
-        case T3D_CMD_TRI_STRIP:
-        case T3D_CMD_TRI_SEQ:
-            /* TODO: implement remaining commands */
-            break;
+    case T3D_CMD_VERT_LOAD:    return handle_vert_load(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_TRI_DRAW:     return handle_tri_draw(state, w0);
+    case T3D_CMD_SCREEN_SIZE:  return handle_screen_size(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_DRAWFLAGS:    return handle_drawflags(state, w0);
+    case T3D_CMD_MATRIX_STACK: return handle_matrix_stack(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_PROJ_SET:     return handle_proj_set(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_SET_WORD:     return handle_set_word(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_LIGHT_SET:    return handle_light_set(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_FOG_RANGE:    return handle_fog_range(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_FOG_STATE:    return handle_fog_state(state, w0);
+    case T3D_CMD_TRI_SYNC:     return handle_tri_sync(state);
+    case T3D_CMD_TRI_STRIP:    return handle_tri_strip(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_TRI_SEQ:      return handle_tri_seq(state, rdram, rdram_size, cmd_addr, w0);
+    default:
+        state->frame.cmds_unsupported++;
+        return expected_words > 0 ? expected_words : 1;
     }
-
-    /* In replace mode (Tier 3), return true to tell ares to skip RSP */
-    return (state->mode == 2);
 }
 
-void t3d_hle_frame_end(T3DHLEState *state) {
-    state->frames++;
+/* ----------------------------------------------------------------
+ * Frame end — emit machine-readable summary
+ * ---------------------------------------------------------------- */
 
-    /* Print stats every 60 frames */
-    if ((state->frames % 60) == 0) {
-        fprintf(stderr, "[T3D-HLE] Frame %llu: %llu cmds, %llu tris "
-                "(overlay=%d, mode=%d)\n",
-                (unsigned long long)state->frames,
-                (unsigned long long)state->cmds_intercepted,
-                (unsigned long long)state->tris_drawn,
-                state->t3d_overlay_id,
-                state->mode);
-    }
+void t3d_hle_frame_end(T3DHLEState *state) {
+    T3DHLEFrameStats *f = &state->frame;
+
+    state->total_frames++;
+    state->total_tris += f->tris_drawn;
+
+    fprintf(state->log_fp,
+            "T3D_FRAME frame=%llu cmds=%u t3d=%u rspq=%u other=%u unsup=%u "
+            "verts=%u tris=%u tris_invalid=%u tris_strip=%u tris_seq=%u "
+            "drawcalls=%u mtx_ops=%u state_chg=%u warn=%u err=%u "
+            "overlay=%d confirmed=%d\n",
+            (unsigned long long)state->total_frames,
+            f->cmds_total, f->cmds_t3d, f->cmds_rspq, f->cmds_other,
+            f->cmds_unsupported,
+            f->verts_loaded, f->tris_drawn, f->tris_invalid,
+            f->tris_strip, f->tris_seq,
+            f->drawcalls, f->matrix_ops, f->state_changes,
+            f->warnings, f->errors,
+            state->detect.overlay_id, state->detect.confirmed);
+
+    /* Reset per-frame counters */
+    memset(f, 0, sizeof(*f));
+}
+
+/* ----------------------------------------------------------------
+ * Query
+ * ---------------------------------------------------------------- */
+
+bool t3d_hle_is_detected(const T3DHLEState *state) {
+    return state->detect.confirmed;
+}
+
+int t3d_hle_overlay_id(const T3DHLEState *state) {
+    return state->detect.overlay_id;
 }

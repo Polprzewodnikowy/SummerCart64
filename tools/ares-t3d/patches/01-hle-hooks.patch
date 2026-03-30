@@ -1,0 +1,70 @@
+diff --git a/ares/n64/n64.hpp b/ares/n64/n64.hpp
+--- a/ares/n64/n64.hpp
++++ b/ares/n64/n64.hpp
+@@ -33,6 +33,10 @@
+   #endif
+ #endif
+
++#if defined(T3D_HLE)
++  #include <t3d_hle.h>
++#endif
++
+ // Include the GB core, we can use its cartridge emulation for Transfer Pak
+ #if defined(CORE_GB)
+ #include <gb/gb.hpp>
+diff --git a/ares/n64/rsp/dma.cpp b/ares/n64/rsp/dma.cpp
+--- a/ares/n64/rsp/dma.cpp
++++ b/ares/n64/rsp/dma.cpp
+@@ -39,6 +39,27 @@ auto RSP::dmaTransferStep() -> void {
+         dma.current.dramAddress += 8;
+         dma.current.pbusAddress += 8;
+     }
++
++    #if defined(T3D_HLE)
++    /* T3D HLE: observe DMA transfers for overlay detection and
++     * command buffer ingestion.
++     *
++     * pbusRegion=0 → DMEM (command data, vertex data, overlay tables)
++     * pbusRegion=1 → IMEM (microcode — used for overlay fingerprinting)
++     *
++     * We compute the original start addresses by subtracting the
++     * transferred length (addresses were incremented by the loop above).
++     */
++    {
++      u32 xfer_len = dma.current.length + 8;
++      u32 orig_dram = dma.current.dramAddress - xfer_len;
++      u32 orig_pbus = dma.current.pbusAddress - xfer_len;
++      u32 region = dma.current.pbusRegion;
++      t3d_hle_on_rsp_dma(orig_dram, orig_pbus, xfer_len, region,
++                          rdram.ram.data, rdram.ram.size(),
++                          region ? imem.data : dmem.data);
++    }
++    #endif
+   }
+   if(dma.busy.write) {
+     for(u32 i = 0; i <= dma.current.length; i += 8) {
+diff --git a/ares/n64/vi/vi.cpp b/ares/n64/vi/vi.cpp
+--- a/ares/n64/vi/vi.cpp
++++ b/ares/n64/vi/vi.cpp
+@@ -91,6 +91,9 @@ auto VI::main() -> void {
+         #endif
+         refreshed = true;
+         screen->frame();
++        #if defined(T3D_HLE)
++        t3d_hle_on_vblank();
++        #endif
+       }
+
+       if(io.halfLinesPerField.bit(0)) { // progressive
+diff --git a/ares/n64/system/system.cpp b/ares/n64/system/system.cpp
+--- a/ares/n64/system/system.cpp
++++ b/ares/n64/system/system.cpp
+@@ -146,6 +146,10 @@ auto System::load(Node::System& root, string name) -> bool {
+   _vulkanNeedsLoad = true;
+
++  #if defined(T3D_HLE)
++  t3d_hle_system_init(rdram.ram.data, rdram.ram.size());
++  #endif
++
+   return true;
+ }
