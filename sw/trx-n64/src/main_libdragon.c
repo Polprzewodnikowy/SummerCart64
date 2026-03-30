@@ -2244,11 +2244,12 @@ int main(void) {
                                 room_baked = true;
                                 far_last_tex = -99;
                             } else if (far_tier == 1) {
-                                /* MidFar: use CI8 per-face textures (like near pass)
-                                 * but with fog applied via vertex colors.
-                                 * room_baked stays false → face loop uses per-face uploads */
-                                rdpq_mode_tlut(TLUT_RGBA16);
-                                rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
+                                /* MidFar: solid color test to verify geometry renders */
+                                rspq_flush();
+                                rdpq_mode_tlut(TLUT_NONE);
+                                if (dbg_tier_px)
+                                    rdpq_tex_upload(TILE0, &dbg_tier_surf[1], NULL); /* cyan */
+                                room_baked = true; /* use baked UV path so faces draw */
                                 far_last_tex = -99;
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 /* Far/XFar/XXFar: use baked tiles */
