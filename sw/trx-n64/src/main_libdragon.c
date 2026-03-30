@@ -2202,13 +2202,14 @@ int main(void) {
                             cl->face_skip = 4;       /* very far: every 4th */
                     }
 
-                    /* Bubble-sort far rooms back-to-front (prep for Phase 2 baked pass).
-                     * Small list so insertion sort is fine. */
+                    /* Sort baked rooms front-to-back (closest first).
+                     * Ensures close rooms render before budget fires.
+                     * Z-fighting possible without zbuf but acceptable. */
                     for (int i = 1; i < bkd_count; i++) {
                         int key = bkd_rooms[i];
                         float key_d = g_chunks[key].dist_sq;
                         int j = i - 1;
-                        while (j >= 0 && g_chunks[bkd_rooms[j]].dist_sq < key_d) {
+                        while (j >= 0 && g_chunks[bkd_rooms[j]].dist_sq > key_d) {
                             bkd_rooms[j + 1] = bkd_rooms[j];
                             j--;
                         }
