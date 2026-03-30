@@ -1757,7 +1757,7 @@ int main(void) {
                                 STAT(" %.0f-%.0f  YELLOW Far", edit_dist_vfar, edit_dist_xfar);
                                 STAT(" %.0f-%.0f  ORANGE XFar", edit_dist_xfar, edit_dist_xxfar);
                                 STAT(" >%.0f       RED    XXFar", edit_dist_xxfar);
-                            }
+                                }
 
                             } else if (pause_page == 4) {
                                 /* ---- PAGE 4: ROOM VISIBILITY DUMP ---- */
