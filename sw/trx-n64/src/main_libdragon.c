@@ -1246,7 +1246,7 @@ int main(void) {
                 /* Effective budget helpers — computed per frame from current room */
                 #define EFF_BUDGET(per_room, global) \
                     ((per_room) >= 0 ? ((per_room) < (global) ? (per_room) : (global)) : (global))
-                int eff_near_face_budget, eff_near_tri_budget, eff_far_tri_budget;
+                int eff_near_face_budget = 600, eff_near_tri_budget = 1400, eff_far_tri_budget = 200;
 
                 /* Legacy #defines for code that still references them (pause display) */
                 #define FAR_TRI_BUDGET      eff_far_tri_budget
