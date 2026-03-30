@@ -1069,7 +1069,7 @@ int main(void) {
                  * and rspq_block_run(). Moves ~40ms of CPU work to RSP.
                  * ============================================================ */
                 #define T3D_LARA_MAX_MESHES 15
-                #define T3D_LARA_MAX_VERTS  80 /* max verts per mesh */
+                #define T3D_LARA_MAX_VERTS  70 /* T3D vertex buffer limit */
                 T3DVertPacked *t3d_lara_verts[T3D_LARA_MAX_MESHES] = {0};
                 rspq_block_t  *t3d_lara_blocks[T3D_LARA_MAX_MESHES] = {0};
                 int t3d_lara_vert_counts[T3D_LARA_MAX_MESHES] = {0};
@@ -1082,12 +1082,13 @@ int main(void) {
                 static int t3d_frame_pool_idx = 0;
                 static int t3d_frame_pool_pos = 0;
 
-                static void *t3d_frame_alloc(int bytes) {
-                    bytes = (bytes + 15) & ~15; /* 16-byte align */
-                    void *ptr = &t3d_frame_pool_mem[t3d_frame_pool_idx][t3d_frame_pool_pos / 8];
-                    t3d_frame_pool_pos += bytes;
-                    return ptr;
-                }
+                /* t3d_frame_alloc defined as macro to avoid nested function */
+                #define t3d_frame_alloc(bytes) ({ \
+                    int _b = ((bytes) + 15) & ~15; \
+                    void *_p = &t3d_frame_pool_mem[t3d_frame_pool_idx][t3d_frame_pool_pos / 8]; \
+                    t3d_frame_pool_pos += _b; \
+                    _p; \
+                })
 
                 /* Find Lara's object definition */
                 {
@@ -1145,8 +1146,13 @@ int main(void) {
 
                             /* Record rspq_block for this mesh */
                             rspq_block_begin();
+                            rdpq_set_mode_standard();
+                            rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                            rdpq_mode_zbuf(true, true);
+                            t3d_state_set_drawflags(T3D_FLAG_DEPTH | T3D_FLAG_SHADED);
                             t3d_vert_load(vp, 0, nv);
-                            /* Draw all faces as triangles */
+                            /* Draw all faces as triangles.
+                             * TR1 uses CW winding, T3D expects CCW — swap v1/v2. */
                             for (int f = 0; f < mesh->face_count; f++) {
                                 tr_face_t *face = &mesh->faces[f];
                                 if (face->vertex_count < 3) continue;
@@ -1154,11 +1160,11 @@ int main(void) {
                                 uint16_t v1 = face->vertices[1];
                                 uint16_t v2 = face->vertices[2];
                                 if (v0 >= nv || v1 >= nv || v2 >= nv) continue;
-                                t3d_tri_draw(v0, v1, v2);
+                                t3d_tri_draw(v0, v2, v1);
                                 if (face->vertex_count == 4) {
                                     uint16_t v3 = face->vertices[3];
                                     if (v3 < nv)
-                                        t3d_tri_draw(v0, v2, v3);
+                                        t3d_tri_draw(v0, v3, v2);
                                 }
                             }
                             t3d_tri_sync();
@@ -1166,6 +1172,8 @@ int main(void) {
                         }
 
                         t3d_lara_ready = true;
+                        (void)t3d_lara_verts; /* used at load time only */
+                        (void)t3d_lara_mesh_count;
                         printf("  T3D Lara: %d meshes converted\n", mc);
                     }
                 }
@@ -3128,8 +3136,12 @@ int main(void) {
                      * (camera-relative rendering for fixed-point precision). */
                     {
                         T3DVec3 cam_eye = {{0, 0, 0}};
-                        T3DVec3 cam_fwd = {{sinf(cam_rot_y), 0, cosf(cam_rot_y)}};
-                        T3DVec3 cam_tgt = {{cam_fwd.v[0], sinf(cam_rot_x), cam_fwd.v[2]}};
+                        float cp_t = cosf(cam_rot_x);
+                        T3DVec3 cam_tgt = {{
+                            sinf(cam_rot_y) * cp_t,
+                            sinf(cam_rot_x),
+                            cosf(cam_rot_y) * cp_t
+                        }};
                         T3DVec3 cam_up = {{0, 1, 0}};
                         t3d_viewport_look_at(&t3d_vp, &cam_eye, &cam_tgt, &cam_up);
                     }
@@ -3717,6 +3729,11 @@ int main(void) {
                              * CPU: builds per-bone world matrix (same bone traversal)
                              * RSP: vertex transform + clipping + triangle rasterization
                              * Cost: ~1-4ms vs ~40ms CPU-projected */
+                            static bool t3d_lara_once = false;
+                            if (!t3d_lara_once) {
+                                printf("T3D Lara: rendering %d meshes via RSP\n", lara_obj->mesh_count);
+                                t3d_lara_once = true;
+                            }
 
                             int mc = lara_obj->mesh_count;
                             if (mc > T3D_LARA_MAX_MESHES) mc = T3D_LARA_MAX_MESHES;
@@ -3745,7 +3762,8 @@ int main(void) {
                             if (lara_room >= 0 && lara_room < g_level.room_count) {
                                 tr_room_t *rm = &g_level.rooms[lara_room];
                                 float amb = 1.0f - (float)rm->ambient / 8191.0f;
-                                if (amb < 0) amb = 0; if (amb > 1) amb = 1;
+                                if (amb < 0) amb = 0;
+                                if (amb > 1) amb = 1;
                                 float light_add = 0;
                                 for (int li = 0; li < rm->light_count; li++) {
                                     float ldx = bx - (float)rm->lights[li].pos.x;
