@@ -1814,26 +1814,26 @@ int main(void) {
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 float fdelta = 0;
-                                if (bh.d_right) fdelta = 512.0f;
-                                if (bh.d_left)  fdelta = -512.0f;
+                                if (bh.d_right) fdelta = 256.0f;
+                                if (bh.d_left)  fdelta = -256.0f;
 
                                 if (fdelta != 0) {
                                     float *t[] = { &edit_dist_mid, &edit_dist_vfar,
                                                    &edit_dist_xfar, &edit_dist_xxfar };
                                     *t[slider_sel] += fdelta;
-                                    /* Clamp to absolute range */
-                                    if (*t[slider_sel] < 1024.0f) *t[slider_sel] = 1024.0f;
-                                    if (*t[slider_sel] > 32768.0f) *t[slider_sel] = 32768.0f;
+                                    /* Clamp: min 256 (quarter room), max 65536 */
+                                    if (*t[slider_sel] < 256.0f)  *t[slider_sel] = 256.0f;
+                                    if (*t[slider_sel] > 65536.0f) *t[slider_sel] = 65536.0f;
                                     /* Enforce monotonic: mid < vfar < xfar < xxfar.
-                                     * Push neighbors apart by 512 minimum gap. */
+                                     * Push neighbors apart by 256 minimum gap. */
                                     for (int k = slider_sel; k < 3; k++)
-                                        if (*t[k+1] <= *t[k]) *t[k+1] = *t[k] + 512.0f;
+                                        if (*t[k+1] <= *t[k]) *t[k+1] = *t[k] + 256.0f;
                                     for (int k = slider_sel; k > 0; k--)
-                                        if (*t[k-1] >= *t[k]) *t[k-1] = *t[k] - 512.0f;
+                                        if (*t[k-1] >= *t[k]) *t[k-1] = *t[k] - 256.0f;
                                     /* Re-clamp after push */
                                     for (int k = 0; k < 4; k++) {
-                                        if (*t[k] < 1024.0f) *t[k] = 1024.0f;
-                                        if (*t[k] > 32768.0f) *t[k] = 32768.0f;
+                                        if (*t[k] < 256.0f)  *t[k] = 256.0f;
+                                        if (*t[k] > 65536.0f) *t[k] = 65536.0f;
                                     }
                                 }
                             }
