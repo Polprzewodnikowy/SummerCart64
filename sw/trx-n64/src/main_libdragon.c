@@ -1662,10 +1662,10 @@ int main(void) {
                                      perf_near_room_us, perf_near_sm_us,
                                      perf_near_lara_us, perf_near_item_us);
                                 STAT("--- FAR ---");
-                                STAT("Rooms:%d Bk:%d Tri:%d/%d Up:%d/%d",
+                                STAT("Rooms:%d Bk:%d/%d Tri:%d/%d",
                                      perf_far_rooms, perf_far_baked,
-                                     perf_far_tris, FAR_TRI_BUDGET,
-                                     perf_far_uploads, FAR_UPLOAD_BUDGET);
+                                     baked_room_count,
+                                     perf_far_tris, FAR_TRI_BUDGET);
                                 STAT("--- MEM ---");
                                 {
                                     uint32_t hf = n64_mem_available();
@@ -2216,27 +2216,37 @@ int main(void) {
                              * (is_ring2 override removed — distance-based tiers now) */
                             float rd = room_d;
 
-                            /* Debug colors: apply to ALL far rooms regardless of baked status */
+                            /* Determine far tier by distance */
+                            int far_tier = (rd > g_dist_xxfar_sq) ? 4 :
+                                           (rd > g_dist_xfar_sq)  ? 3 :
+                                           (rd > g_dist_vfar_sq)  ? 2 : 1;
+
+                            /* Debug colors: apply to ALL far rooms */
                             if (g_debug_dist_colors && dbg_tier_px) {
                                 rspq_flush();
                                 rdpq_mode_tlut(TLUT_NONE);
-                                int tier = (rd > g_dist_xxfar_sq) ? 4 :
-                                           (rd > g_dist_xfar_sq)  ? 3 :
-                                           (rd > g_dist_vfar_sq) ? 2 : 1;
-                                rdpq_tex_upload(TILE0, &dbg_tier_surf[tier], NULL);
+                                rdpq_tex_upload(TILE0, &dbg_tier_surf[far_tier], NULL);
                                 room_baked = true;
                                 far_last_tex = -99;
+                            } else if (far_tier == 1) {
+                                /* MidFar: use CI8 per-face textures (like near pass)
+                                 * but with fog applied via vertex colors.
+                                 * room_baked stays false → face loop uses per-face uploads */
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
+                                far_last_tex = -99;
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                /* Far/XFar/XXFar: use baked tiles */
                                 rspq_flush();
-                                if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                if (far_tier >= 4 && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
-                                } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
+                                } else if (far_tier >= 3 && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
-                                } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
+                                } else if (far_tier >= 2 && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
@@ -2302,13 +2312,22 @@ int main(void) {
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
                                 if (!room_baked) {
-                                    if (is_flat) {
+                                    /* MidFar / non-baked: CI8 per-face textures with fog */
+                                    if (!is_flat && tex_idx < num_otex && ci8_surfs) {
+                                        if ((int)tex_idx != far_last_tex) {
+                                            if (far_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                            rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                            far_last_tex = (int)tex_idx;
+                                            perf_far_uploads++;
+                                        }
+                                    } else if (is_flat) {
                                         if (white_px && far_last_tex != -2) {
+                                            rdpq_mode_tlut(TLUT_NONE);
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
                                             far_last_tex = -2;
                                             perf_far_uploads++;
                                         }
-                                    }
+                                    } else continue;
                                 }
 
                                 tr_object_texture_t *otex = (!is_flat && !room_baked &&
