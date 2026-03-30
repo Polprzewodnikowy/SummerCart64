@@ -2031,44 +2031,51 @@ int main(void) {
                         }
                     }
 
-                    /* Ring 2: rooms connected to connected rooms.
-                     * Only added if the portal leading to them is
-                     * visible to the camera — no point fogging rooms
-                     * the player can't see. */
+                    /* Extended ring: recurse through portals up to N hops deep.
+                     * Each hop adds rooms connected to the previous ring.
+                     * Only adds rooms whose portal has at least 1 vertex
+                     * in front of the camera. Fills the void between near
+                     * and the farthest visible rooms. */
                     int ring1_end = vis_count;
-                    for (int vi = 0; vi < ring1_end && vis_count < MAX_DRAW_ROOMS; vi++) {
-                        int r1 = vis_rooms[vi];
-                        if (r1 < 0 || r1 >= g_level.room_count) continue;
-                        tr_room_t *r1r = &g_level.rooms[r1];
-                        for (int p = 0; p < r1r->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
-                            tr_portal_t *portal = &r1r->portals[p];
-                            int dest = portal->room;
-                            if (dest < 0 || dest >= g_chunk_count) continue;
-                            bool dup = false;
-                            for (int vi2 = 0; vi2 < vis_count; vi2++) {
-                                if (vis_rooms[vi2] == dest) { dup = true; break; }
-                            }
-                            if (dup) continue;
+                    #define MAX_RING_DEPTH 5
+                    int ring_start = 0; /* start of current ring's rooms in vis_rooms */
+                    for (int ring = 0; ring < MAX_RING_DEPTH && vis_count < MAX_DRAW_ROOMS; ring++) {
+                        int ring_end = vis_count;
+                        for (int vi = ring_start; vi < ring_end && vis_count < MAX_DRAW_ROOMS; vi++) {
+                            int r1 = vis_rooms[vi];
+                            if (r1 < 0 || r1 >= g_level.room_count) continue;
+                            tr_room_t *r1r = &g_level.rooms[r1];
+                            for (int p = 0; p < r1r->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
+                                tr_portal_t *portal = &r1r->portals[p];
+                                int dest = portal->room;
+                                if (dest < 0 || dest >= g_chunk_count) continue;
+                                bool dup = false;
+                                for (int vi2 = 0; vi2 < vis_count; vi2++) {
+                                    if (vis_rooms[vi2] == dest) { dup = true; break; }
+                                }
+                                if (dup) continue;
 
-                            /* Only add if portal is in camera view */
-                            int front = 0;
-                            for (int pv = 0; pv < 4; pv++) {
-                                float px = (float)(r1r->x + portal->vertices[pv].x) - cam_x;
-                                float pz = (float)(r1r->z + portal->vertices[pv].z) - cam_z;
-                                float rz_p = px * sy + pz * cy;
-                                if (rz_p > -256.0f) front++;
-                            }
-                            if (front == 0) continue; /* entirely behind camera */
+                                /* Only add if portal has at least 1 vertex in front */
+                                int front = 0;
+                                for (int pv = 0; pv < 4; pv++) {
+                                    float px = (float)(r1r->x + portal->vertices[pv].x) - cam_x;
+                                    float pz = (float)(r1r->z + portal->vertices[pv].z) - cam_z;
+                                    float rz_p = px * sy + pz * cy;
+                                    if (rz_p > -256.0f) front++;
+                                }
+                                if (front == 0) continue;
 
-                            tr_chunk_t *c = &g_chunks[dest];
-                            float ddx = c->cx - cam_x;
-                            float ddz = c->cz - cam_z;
-                            c->dist_sq = ddx * ddx + ddz * ddz;
-                            c->visible = true;
-                            vis_rooms[vis_count] = dest;
-                            vis_stream_pri[vis_count] = STREAM_PRI_LOW;
-                            vis_count++;
+                                tr_chunk_t *c = &g_chunks[dest];
+                                float ddx = c->cx - cam_x;
+                                float ddz = c->cz - cam_z;
+                                c->dist_sq = ddx * ddx + ddz * ddz;
+                                c->visible = true;
+                                vis_rooms[vis_count] = dest;
+                                vis_stream_pri[vis_count] = STREAM_PRI_LOW;
+                                vis_count++;
+                            }
                         }
+                        ring_start = ring_end; /* next ring starts where this one ended */
                     }
 
                     /* Track visibility for diagnostics */
