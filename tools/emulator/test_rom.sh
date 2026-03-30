@@ -203,6 +203,42 @@ sleep 2
 echo "  Captured: gameplay_post.png"
 
 # ----------------------------------------------------------------
+# PHASE 6: PERFORMANCE DATA
+# ----------------------------------------------------------------
+echo ""
+echo "[PHASE 6] Parsing performance data..."
+
+# Parse PERF| lines from debug log
+if grep -q "^PERF|" "$LOG" 2>/dev/null; then
+    "$SCRIPT_DIR/parse_perf.sh" "$LOG" | tee "$OUTDIR/perf_summary.txt"
+    echo "PERF_DATA: found" >> "$REPORT"
+
+    # Extract key metrics for machine-readable output
+    LAST_PERF=$(grep "^PERF|" "$LOG" | tail -1)
+    echo "$LAST_PERF" > "$OUTDIR/perf_raw.txt"
+
+    # Check thresholds
+    FRAME_US=$(echo "$LAST_PERF" | tr '|' '\n' | grep "^frame=" | cut -d= -f2)
+    LARA_US=$(echo "$LAST_PERF" | tr '|' '\n' | grep "^la=" | cut -d= -f2)
+    FPS_VAL=$(echo "$LAST_PERF" | tr '|' '\n' | grep "^fps=" | cut -d= -f2)
+
+    echo "FRAME_US: $FRAME_US" >> "$REPORT"
+    echo "LARA_US: $LARA_US" >> "$REPORT"
+    echo "FPS: $FPS_VAL" >> "$REPORT"
+
+    # Performance gate
+    if [ -n "$LARA_US" ] && [ "$LARA_US" -gt 10000 ] 2>/dev/null; then
+        echo "  [WARN] Lara render time ${LARA_US}us > 10ms — T3D not working?" | tee -a "$REPORT"
+    fi
+    if [ -n "$FRAME_US" ] && [ "$FRAME_US" -gt 50000 ] 2>/dev/null; then
+        echo "  [WARN] Frame time ${FRAME_US}us > 50ms — severe performance issue" | tee -a "$REPORT"
+    fi
+else
+    echo "  No PERF| data (game didn't run long enough or no level loaded)"
+    echo "PERF_DATA: none" >> "$REPORT"
+fi
+
+# ----------------------------------------------------------------
 # REPORT
 # ----------------------------------------------------------------
 echo ""
@@ -225,5 +261,6 @@ cat "$REPORT"
 echo ""
 echo "Screenshots saved to: $OUTDIR/"
 echo "Full report: $REPORT"
+echo "Perf summary: $OUTDIR/perf_summary.txt"
 echo ""
 echo "To view screenshots, use: Read tool on /tmp/rom_test/<filename>.png"

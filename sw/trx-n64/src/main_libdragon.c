@@ -4404,6 +4404,27 @@ int main(void) {
                         perf_frame_us = (uint32_t)((float)delta / (float)TICKS_PER_SECOND * 1000000.0f);
                     }
 
+                    /* Periodic performance dump to debug console (every 60 frames).
+                     * Ares captures this via ISViewer — parseable from debug log. */
+                    {
+                        static int perf_dump_counter = 0;
+                        if (++perf_dump_counter >= 60) {
+                            perf_dump_counter = 0;
+                            printf("PERF|fps=%d|frame=%u|tex=%u|bkd=%u|rsp=%u"
+                                   "|rm=%u|sm=%u|la=%u|it=%u"
+                                   "|ttri=%d/%d|tface=%d/%d|btri=%d/%d"
+                                   "|rooms=%d|bkdrooms=%d\n",
+                                   fps_display, perf_frame_us,
+                                   perf_tex_us, perf_bkd_us, perf_rsp_us,
+                                   perf_tex_room_us, perf_tex_sm_us,
+                                   perf_tex_lara_us, perf_tex_item_us,
+                                   perf_tex_tris, TEX_TRI_BUDGET,
+                                   perf_tex_faces, TEX_FACE_BUDGET,
+                                   perf_bkd_tris, BKD_TRI_BUDGET,
+                                   perf_tex_rooms, perf_bkd_rooms);
+                        }
+                    }
+
                     /* Audio: mix and submit to AI */
                     if (audio_can_write()) {
                         short *buf = audio_write_begin();
