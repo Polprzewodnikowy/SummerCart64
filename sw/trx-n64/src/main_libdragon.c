@@ -943,17 +943,19 @@ int main(void) {
                  * Toggle via pause menu → global budgets page.
                  * Colors: Near=GREEN, MidFar=CYAN, Far=YELLOW, XFar=ORANGE, XXFar=RED */
                 bool g_debug_dist_colors = false;
-                uint16_t *dbg_tier_px = (uint16_t *)malloc_uncached_aligned(64, 16);
+                /* Each debug pixel needs its own 8-byte aligned address
+                 * for rdpq_tex_upload. Allocate 5 × 8 bytes = 40 bytes. */
+                uint16_t *dbg_tier_px = (uint16_t *)malloc_uncached_aligned(8, 5 * 8);
                 surface_t dbg_tier_surf[5] = {{0}};
                 if (dbg_tier_px) {
-                    /* RGBA16: RRRRR GGGGG BBBBB A */
-                    dbg_tier_px[0] = (0<<11)|(31<<6)|(0<<1)|1;   /* near:    green */
-                    dbg_tier_px[1] = (0<<11)|(31<<6)|(31<<1)|1;  /* mid-far: cyan */
-                    dbg_tier_px[2] = (31<<11)|(31<<6)|(0<<1)|1;  /* far:     yellow */
-                    dbg_tier_px[3] = (31<<11)|(16<<6)|(0<<1)|1;  /* x-far:   orange */
-                    dbg_tier_px[4] = (31<<11)|(0<<6)|(0<<1)|1;   /* xx-far:  red */
+                    /* RGBA16: RRRRR GGGGG BBBBB A — each at 8-byte stride */
+                    dbg_tier_px[0*4] = (0<<11)|(31<<6)|(0<<1)|1;   /* near:    green */
+                    dbg_tier_px[1*4] = (0<<11)|(31<<6)|(31<<1)|1;  /* mid-far: cyan */
+                    dbg_tier_px[2*4] = (31<<11)|(31<<6)|(0<<1)|1;  /* far:     yellow */
+                    dbg_tier_px[3*4] = (31<<11)|(16<<6)|(0<<1)|1;  /* x-far:   orange */
+                    dbg_tier_px[4*4] = (31<<11)|(0<<6)|(0<<1)|1;   /* xx-far:  red */
                     for (int i = 0; i < 5; i++)
-                        dbg_tier_surf[i] = surface_make_linear(&dbg_tier_px[i], FMT_RGBA16, 1, 1);
+                        dbg_tier_surf[i] = surface_make_linear(&dbg_tier_px[i*4], FMT_RGBA16, 1, 1);
                 }
 
                 /* On-demand mip buffer — one reusable 16×16 RGBA16 surface.
