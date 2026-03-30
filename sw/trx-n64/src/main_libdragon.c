@@ -1272,6 +1272,12 @@ int main(void) {
                  * Added to rz during baked pass projection. Tunable per-level. */
                 float g_baked_z_bias = 8.0f;
 
+                /* Per-face max draw distance — geometry beyond this distance
+                 * from the camera is culled regardless of room visibility.
+                 * Works on top of the room-based tier system. Tunable. */
+                float g_max_draw_dist = 30000.0f;
+                float g_max_draw_dist_sq = 30000.0f * 30000.0f;
+
                 /* Squared versions recomputed when thresholds change */
                 float g_dist_mid_sq, g_dist_vfar_sq, g_dist_xfar_sq, g_dist_xxfar_sq;
                 #define RECOMPUTE_DIST_SQ() do { \
@@ -1603,6 +1609,7 @@ int main(void) {
                         float edit_dist_xfar   = g_dist_xfar;
                         float edit_dist_xxfar  = g_dist_xxfar;
                         float edit_z_bias      = g_baked_z_bias;
+                        float edit_max_draw    = g_max_draw_dist;
                         room_budget_t edit_room_budgets[256];
                         memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
@@ -1758,6 +1765,7 @@ int main(void) {
                                 STAT_HL(slider_sel, 3, "XFar->XXFar:  %.0f", edit_dist_xxfar);
                                 STAT("");
                                 STAT_HL(slider_sel, 4, "Baked Z-Bias: %.0f", edit_z_bias);
+                                STAT_HL(slider_sel, 5, "Max Draw Dist: %.0f", edit_max_draw);
                                 STAT("");
                                 STAT("Tier colors (debug):");
                                 STAT(" <%.0f        GREEN  Near", edit_dist_mid);
@@ -1879,7 +1887,7 @@ int main(void) {
                                     }
                                 }
                             } else if (pause_page == 3) {
-                                int max_sel = 4; /* 0-3 = distances, 4 = z-bias */
+                                int max_sel = 5; /* 0-3=distances, 4=z-bias, 5=draw dist */
                                 if (bp.d_up && slider_sel > 0) slider_sel--;
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
@@ -1889,6 +1897,15 @@ int main(void) {
                                     if (hold_tick && bh.d_left)  edit_z_bias -= 2.0f;
                                     if (edit_z_bias < 0.0f) edit_z_bias = 0.0f;
                                     if (edit_z_bias > 128.0f) edit_z_bias = 128.0f;
+                                }
+                                /* Max draw distance (slider 5) */
+                                if (slider_sel == 5 && hold_tick) {
+                                    float step = (edit_max_draw < 2000) ? 100.0f :
+                                                 (edit_max_draw < 8000) ? 500.0f : 1000.0f;
+                                    if (bh.d_right) edit_max_draw += step;
+                                    if (bh.d_left)  edit_max_draw -= step;
+                                    if (edit_max_draw < 500.0f) edit_max_draw = 500.0f;
+                                    if (edit_max_draw > 65536.0f) edit_max_draw = 65536.0f;
                                 }
 
                                 /* Step scales with current value for fine control at low ranges */
@@ -1937,6 +1954,8 @@ int main(void) {
                         g_dist_xfar  = edit_dist_xfar;
                         g_dist_xxfar = edit_dist_xxfar;
                         g_baked_z_bias = edit_z_bias;
+                        g_max_draw_dist = edit_max_draw;
+                        g_max_draw_dist_sq = edit_max_draw * edit_max_draw;
                         RECOMPUTE_DIST_SQ();
                         memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
@@ -2399,10 +2418,15 @@ int main(void) {
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
 
-                                /* Back-cull from cache */
+                                /* Back-cull + distance cull from cache */
                                 {
                                     uint16_t v0i = face->vertices[0];
-                                    if (v0i < bkd_nv && vtx_cache[v0i].rz < -512.0f) continue;
+                                    if (v0i < bkd_nv) {
+                                        if (vtx_cache[v0i].rz < -512.0f) continue;
+                                        float dx = vtx_cache[v0i].rx;
+                                        float dz = vtx_cache[v0i].rz;
+                                        if (dx*dx + dz*dz > g_max_draw_dist_sq) continue;
+                                    }
                                 }
 
                                 uint16_t tex_idx = face->texture & 0x7FFF;
@@ -2779,11 +2803,16 @@ int main(void) {
                                 continue;
                             }
 
-                            /* Back-cull: check first vertex rz from cache */
+                            /* Back-cull + distance cull from cache */
                             {
                                 uint16_t v0i = face->vertices[0];
-                                if (v0i < nv_room && vtx_cache[v0i].rz < -1024.0f) {
-                                    perf_tex_culled++; continue;
+                                if (v0i < nv_room) {
+                                    if (vtx_cache[v0i].rz < -1024.0f) {
+                                        perf_tex_culled++; continue;
+                                    }
+                                    float dx = vtx_cache[v0i].rx;
+                                    float dz = vtx_cache[v0i].rz;
+                                    if (dx*dx + dz*dz > g_max_draw_dist_sq) continue;
                                 }
                             }
 
