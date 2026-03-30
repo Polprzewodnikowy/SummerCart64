@@ -57,5 +57,11 @@ $(BUILD_DIR)/level1.atx: $(LEVEL_DIR)/LEVEL1.PHD tools/aegistex_pack.py | $(BAKE
 # Legacy CI8 tiles (generated as side-effect of aegistex_pack)
 $(BUILD_DIR)/level1.ci8tiles: $(BUILD_DIR)/level1.atx
 
+# Emulator test: build ROM then boot in ares under Xvfb, capture screenshot
+EMU_DIR = ../../tools/emulator
+test: trx-n64.z64
+	@$(EMU_DIR)/run_test.sh trx-n64.z64 180 /tmp/trx_test.png
+.PHONY: test
+
 # Build depends on baked data
 $(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)

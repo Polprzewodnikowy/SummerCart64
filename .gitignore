@@ -15,3 +15,7 @@
 **/*.map
 **/*.z64
 toolchain/
+
+# Local tools — binaries installed permanently, not tracked in git
+tools/emulator/bin/
+tools/emulator/lib/
