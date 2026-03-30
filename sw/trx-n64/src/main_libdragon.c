@@ -1546,8 +1546,14 @@ int main(void) {
                         bool paused = true;
                         while (paused) {
                             surface_t *pause_disp = display_get();
-                            /* Clear to solid dark background to prevent overlap */
-                            graphics_fill_screen(pause_disp, 0x000000C0);
+                            /* Clear entire framebuffer to black manually.
+                             * graphics_fill_screen may not work on all libdragon builds,
+                             * and we need every double-buffered surface cleared. */
+                            {
+                                uint16_t *fb = (uint16_t *)pause_disp->buffer;
+                                int npx = pause_disp->width * pause_disp->height;
+                                for (int px = 0; px < npx; px++) fb[px] = 0x0001;
+                            }
                             graphics_set_color(0xFFFFFFFF, 0x00000000);
                             char buf[80];
                             int y = 4;
