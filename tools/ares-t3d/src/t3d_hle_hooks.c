@@ -38,8 +38,8 @@ static bool looks_like_rspq_cmd(uint32_t w0) {
     if (w0 == 0) return false; /* padding */
     int ovl = RSPQ_OVL_ID(w0);
     int cmd = RSPQ_CMD_ID(w0);
-    /* overlay 0: internal commands 0-7 */
-    if (ovl == 0 && cmd > 7) return false;
+    /* overlay 0: internal commands 0-10 (0xA) */
+    if (ovl == 0 && cmd > 10) return false;
     /* overlay 15 is unlikely (rspq supports 0-14 in practice) */
     if (ovl == 15) return false;
     return true;
@@ -52,15 +52,19 @@ static bool looks_like_rspq_cmd(uint32_t w0) {
  * "stop scanning" rather than guess and misalign.
  * ---------------------------------------------------------------- */
 static int rspq_internal_cmd_size(int cmd_id) {
+    /* Sizes from rspq_internal.h / rsp_queue.inc */
     switch (cmd_id) {
-    case RSPQ_CMD_NOOP:    return 1;
-    case RSPQ_CMD_JUMP:    return 1; /* addr in args */
-    case RSPQ_CMD_CALL:    return 2; /* addr + return */
-    case RSPQ_CMD_RET:     return 1;
-    case RSPQ_CMD_DMA:     return 4; /* rdram + dmem + length + ... */
-    case RSPQ_CMD_WRITE:   return 2;
-    case RSPQ_CMD_TEST:    return 1;
-    case RSPQ_CMD_WSTATUS: return 1;
+    case RSPQ_CMD_INVALID:      return 1;
+    case RSPQ_CMD_NOOP:         return 1;
+    case RSPQ_CMD_JUMP:         return 1; /* addr in args */
+    case RSPQ_CMD_CALL:         return 3; /* [cmd] [addr] [nesting] */
+    case RSPQ_CMD_RET:          return 1;
+    case RSPQ_CMD_DMA:          return 4;
+    case RSPQ_CMD_WRITE_STATUS: return 1;
+    case RSPQ_CMD_SWAP_BUFFERS: return 3;
+    case RSPQ_CMD_TEST_WSTATUS: return 1;
+    case RSPQ_CMD_RDP_SET_BUF:  return 3;
+    case RSPQ_CMD_RDP_APPEND:   return 3;
     default: return 1;
     }
 }
@@ -154,6 +158,50 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
             int size = rspq_internal_cmd_size(cmd_id);
             g_hle.frame.cmds_rspq++;
             g_hle.frame.cmds_total++;
+
+            /* CALL: follow the target block and scan it for T3D commands.
+             * rspq CALL format: [0x02AAAAAA] where AAAAAA = RDRAM addr.
+             * The block is a contiguous command buffer ending with RET. */
+            if (cmd_id == RSPQ_CMD_CALL) {
+                /* CALL format: [0x03XXXXXX] [block_addr] [nesting]
+                 * Block address is in word 1 (physical RDRAM address). */
+                uint32_t call_addr = t3d_hle_read32(rdram, rdram_size, pos + 4) & 0x1FFFFFFF;
+                if (call_addr > 0 && call_addr < rdram_size) {
+                    /* Scan the block (limited to 256 words = 1KB) */
+                    uint32_t bpos = call_addr;
+                    uint32_t bend = call_addr + 1024;
+                    if (bend > rdram_size) bend = rdram_size;
+                    int block_cmds = 0;
+                    while (bpos + 3 < bend && block_cmds < 128) {
+                        uint32_t bw = t3d_hle_read32(rdram, rdram_size, bpos);
+                        if (bw == 0) { bpos += 4; continue; }
+                        int bovl = RSPQ_OVL_ID(bw);
+                        int bcmd = RSPQ_CMD_ID(bw);
+                        /* RET = end of block */
+                        if (bovl == 0 && bcmd == RSPQ_CMD_RET) break;
+                        /* rspq internal in block */
+                        if (bovl == 0) {
+                            bpos += rspq_internal_cmd_size(bcmd) * 4;
+                            block_cmds++;
+                            continue;
+                        }
+                        /* T3D command in block */
+                        if (g_hle.detect.overlay_id >= 0 && bovl == g_hle.detect.overlay_id
+                            && bcmd < T3D_CMD_COUNT) {
+                            int consumed = t3d_hle_process_command(&g_hle, rdram, rdram_size, bpos);
+                            if (consumed > 0) {
+                                bpos += consumed * 4;
+                                block_cmds++;
+                                continue;
+                            }
+                        }
+                        /* Unknown in block — skip 4 bytes */
+                        bpos += 4;
+                        block_cmds++;
+                    }
+                }
+            }
+
             pos += size * 4;
             cmds_in_buffer++;
             continue;

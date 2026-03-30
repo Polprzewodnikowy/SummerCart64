@@ -115,7 +115,7 @@ static void test_vert_load_zero_size(void) {
 
     int consumed = t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
 
-    ASSERT_EQ(consumed, -1, "zero-size VERT_LOAD: rejected (stop scan)");
+    ASSERT_EQ(consumed, 3, "zero-size VERT_LOAD: skip 3 words (false candidate)");
     ASSERT_EQ(state.vert_count, 0, "zero-size VERT_LOAD: no verts");
 
     fclose(devnull);
@@ -140,7 +140,7 @@ static void test_vert_load_overflow(void) {
 
     int consumed = t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
 
-    ASSERT_EQ(consumed, -1, "oversized VERT_LOAD rejected (stop scan)");
+    ASSERT_EQ(consumed, 3, "oversized VERT_LOAD: skip 3 words (false candidate)");
     ASSERT_EQ(state.vert_count, 0, "no verts loaded on reject");
 
     fclose(devnull);

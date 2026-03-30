@@ -28,15 +28,18 @@
 #define RSPQ_CMD_ID(w0)   (((w0) >> 24) & 0xF)
 #define RSPQ_ARGS(w0)     ((w0) & 0x00FFFFFF)
 
-/* rspq internal commands (overlay 0) */
-#define RSPQ_CMD_NOOP     0x0
-#define RSPQ_CMD_JUMP     0x1
-#define RSPQ_CMD_CALL     0x2
-#define RSPQ_CMD_RET      0x3
-#define RSPQ_CMD_DMA      0x4
-#define RSPQ_CMD_WRITE    0x5
-#define RSPQ_CMD_TEST     0x6
-#define RSPQ_CMD_WSTATUS  0x7
+/* rspq internal commands (overlay 0) — from rspq_internal.h */
+#define RSPQ_CMD_INVALID       0x0
+#define RSPQ_CMD_NOOP          0x1
+#define RSPQ_CMD_JUMP          0x2
+#define RSPQ_CMD_CALL          0x3   /* 3 words: [cmd|flags] [addr] [nesting] */
+#define RSPQ_CMD_RET           0x4
+#define RSPQ_CMD_DMA           0x5
+#define RSPQ_CMD_WRITE_STATUS  0x6
+#define RSPQ_CMD_SWAP_BUFFERS  0x7
+#define RSPQ_CMD_TEST_WSTATUS  0x8
+#define RSPQ_CMD_RDP_SET_BUF   0x9
+#define RSPQ_CMD_RDP_APPEND    0xA
 
 /* ----------------------------------------------------------------
  * T3D command IDs (within T3D overlay)

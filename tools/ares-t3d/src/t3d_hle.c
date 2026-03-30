@@ -174,21 +174,24 @@ static int handle_vert_load(T3DHLEState *state,
     uint16_t dest_off  = (w2 >> 16) & 0xFFFF;
     uint16_t input_off = w2 & 0xFFFF;
 
-    /* Strict validation: input_size must be a multiple of 32 (T3DVertPacked size),
-     * max 70 verts = 35 packed pairs = 1120 bytes, and RDRAM address must be
-     * in a plausible range (not in MMIO space, 8-byte aligned for DMA). */
-    if (input_size > 1120 || input_size == 0 || (input_size % 32) != 0) {
-        /* Implausible — likely a misparse. Don't warn loudly, just reject. */
-        state->frame.cmds_unsupported++;
-        return -1; /* stop scanning */
+    /* Strict validation:
+     * VERT_INPUT_SIZE is 16 bytes per vertex (T3D packs 2 verts into 32 bytes).
+     * inputSize = ((count+1) & ~1) * 16, so always a multiple of 32 (pairs).
+     * Max 70 verts = 1120 bytes.
+     * RDRAM address must be in heap range (>= 0x1000, within RDRAM). */
+    if (input_size > 1120 || input_size == 0 || (input_size % 16) != 0) {
+        /* Implausible — this word is likely garbage, not a real VERT_LOAD.
+         * Return 3 (skip 3 words) to continue scanning past it. */
+        return 3;
     }
-    if (phys_addr < 0x1000 || phys_addr >= rdram_size) {
-        state->frame.cmds_unsupported++;
-        return -1;
+    if (phys_addr < 0x1000 || phys_addr + input_size > rdram_size) {
+        return 3; /* skip past this false candidate */
     }
 
+    /* Each T3DVertPacked is 32 bytes holding 2 vertices at 16 bytes each */
     int num_packed = input_size / 32;
     int num_verts = num_packed * 2;
+    if (input_size % 32 == 16) num_verts++; /* odd count: last 16 bytes = 1 vert */
     if (num_verts == 0) {
         LOG_WARN(state, "msg=\"VERT_LOAD zero vertices\" input_size=%u addr=0x%08X",
                  input_size, phys_addr);
