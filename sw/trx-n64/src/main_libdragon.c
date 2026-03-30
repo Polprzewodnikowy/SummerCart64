@@ -1951,7 +1951,7 @@ int main(void) {
                      *
                      * LOD policy: separate from both.
                      * =================================================== */
-                    #define MAX_DRAW_ROOMS 16
+                    #define MAX_DRAW_ROOMS 32
                     #define STREAM_PRI_HIGH   2
                     #define STREAM_PRI_MED    1
                     #define STREAM_PRI_LOW    0
@@ -2081,6 +2081,7 @@ int main(void) {
                     /* Track visibility for diagnostics */
                     perf_vis_ring1 = ring1_end;
                     perf_vis_ring2 = vis_count - ring1_end;
+                    /* ring2 now includes rings 2-5 */
                     perf_vis_total = vis_count;
 
                     /* LOD classification — DISTANCE-BASED, not ring-based.
