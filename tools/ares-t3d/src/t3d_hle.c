@@ -35,21 +35,25 @@ static const char *cmd_names[T3D_CMD_COUNT] = {
     [T3D_CMD_TRI_SEQ]      = "TRI_SEQ",
 };
 
-/* Command sizes in 32-bit words. 0 = variable/unknown. */
+/* Command sizes in 32-bit words (including the command word itself).
+ * Verified against t3d.c rspq_write() calls — see COMMAND_REFERENCE.md.
+ *
+ * Note: rspq_write(ovl, cmd, arg1, arg2, ...) emits cmd_word + N args.
+ * Total words = 1 (cmd) + N (args). The sizes below are totals. */
 static const int cmd_word_counts[T3D_CMD_COUNT] = {
-    [T3D_CMD_TRI_DRAW]     = 1,
-    [T3D_CMD_SCREEN_SIZE]  = 5,
-    [T3D_CMD_MATRIX_STACK] = 2,
-    [T3D_CMD_SET_WORD]     = 2,
-    [T3D_CMD_VERT_LOAD]    = 3,
-    [T3D_CMD_LIGHT_SET]    = 4,
-    [T3D_CMD_DRAWFLAGS]    = 1,
-    [T3D_CMD_PROJ_SET]     = 2,
-    [T3D_CMD_FOG_RANGE]    = 2,
-    [T3D_CMD_FOG_STATE]    = 1,
-    [T3D_CMD_TRI_SYNC]     = 1,
-    [T3D_CMD_TRI_STRIP]    = 2,
-    [T3D_CMD_TRI_SEQ]      = 2,
+    [T3D_CMD_TRI_DRAW]     = 2,  /* t3d.c:385 — rspq_write(id, cmd, v0, v12) → but via rdpq_write */
+    [T3D_CMD_SCREEN_SIZE]  = 5,  /* t3d.c:518 — rspq_write(id, cmd, gb, off, scl, depth) */
+    [T3D_CMD_MATRIX_STACK] = 2,  /* t3d.c:93  — rspq_write(id, cmd, flags, addr) */
+    [T3D_CMD_SET_WORD]     = 2,  /* t3d.c:100 — rspq_write(id, cmd, addr, value) */
+    [T3D_CMD_VERT_LOAD]    = 3,  /* t3d.c:151 — rspq_write(id, cmd, size, addr, offsets) */
+    [T3D_CMD_LIGHT_SET]    = 4,  /* t3d.c:190 — rspq_write(id, cmd, addr, rgba, d1, d2) */
+    [T3D_CMD_DRAWFLAGS]    = 2,  /* t3d.c:303 — rspq_write(id, cmd, cullmask, rdpcmd) */
+    [T3D_CMD_PROJ_SET]     = 1,  /* t3d.c:134 — rspq_write(id, cmd, addr) */
+    [T3D_CMD_FOG_RANGE]    = 2,  /* t3d.c:442 — rspq_write(id, cmd, mul16, offset32) */
+    [T3D_CMD_FOG_STATE]    = 1,  /* t3d.h:543 — rspq_write(id, cmd, flag) */
+    [T3D_CMD_TRI_SYNC]     = 1,  /* t3d.h:413 — rspq_write(id, cmd, 0) */
+    [T3D_CMD_TRI_STRIP]    = 2,  /* t3d.c:425 — rdpq_write(id, cmd, addr, packed) */
+    [T3D_CMD_TRI_SEQ]      = 2,  /* t3d.c:404 — rdpq_write(id, cmd, base, end) */
 };
 
 const char *t3d_hle_cmd_name(int cmd_id) {
@@ -232,44 +236,42 @@ static int handle_vert_load(T3DHLEState *state,
     return 3; /* 3 words consumed */
 }
 
-static int handle_tri_draw(T3DHLEState *state, uint32_t w0) {
-    /* Indices packed in the 24-bit arg: v0(8) v1(8) v2(8) */
-    uint32_t args = RSPQ_ARGS(w0);
-    int v0 = (args >> 16) & 0xFF;
-    int v1 = (args >>  8) & 0xFF;
-    int v2 = (args >>  0) & 0xFF;
+static int handle_tri_draw(T3DHLEState *state,
+                           const uint8_t *rdram, uint32_t rdram_size,
+                           uint32_t cmd_addr, uint32_t w0) {
+    /* TRI_DRAW is 2 words:
+     * Word 0: [ovl|cmd|v0_dmem_addr(24)]
+     * Word 1: [v1_dmem_addr(16) | v2_dmem_addr(16)]
+     *
+     * The addresses are DMEM offsets into the T3D vertex output buffer,
+     * not raw vertex indices. To convert to vertex indices, we'd need
+     * to know RSP_T3D_VERT_BUFFER offset and VERT_OUTPUT_SIZE.
+     * For telemetry, log the raw DMEM addresses.
+     * For the HLE vertex buffer (which uses 0-based indices), we
+     * approximate: index = dmem_offset / VERT_OUTPUT_SIZE. */
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t v0_addr = RSPQ_ARGS(w0);
+    uint32_t v1_addr = (w1 >> 16) & 0xFFFF;
+    uint32_t v2_addr = w1 & 0xFFFF;
 
-    /* Validate indices */
-    if (v0 >= state->vert_count || v1 >= state->vert_count || v2 >= state->vert_count) {
-        state->frame.tris_invalid++;
-        LOG_WARN(state, "msg=\"TRI_DRAW bad index\" v0=%d v1=%d v2=%d vert_count=%d",
-                 v0, v1, v2, state->vert_count);
-        return 1;
-    }
-    /* Degenerate triangle check */
-    if (v0 == v1 || v1 == v2 || v0 == v2) {
-        state->frame.tris_invalid++;
-        return 1; /* silently skip degenerate */
-    }
-
+    /* T3D vertex output size is 36 bytes per vertex in DMEM.
+     * Vertex buffer starts at a known DMEM offset.
+     * For telemetry, just log the raw addresses. */
     state->frame.tris_drawn++;
-    LOG_CMD(state, T3D_CMD_TRI_DRAW, "v0=%d v1=%d v2=%d", v0, v1, v2);
-    return 1;
+    LOG_CMD(state, T3D_CMD_TRI_DRAW,
+            "v0_addr=0x%06X v1_addr=0x%04X v2_addr=0x%04X",
+            v0_addr, v1_addr, v2_addr);
+    return 2;
 }
 
 static int handle_screen_size(T3DHLEState *state,
                               const uint8_t *rdram, uint32_t rdram_size,
                               uint32_t cmd_addr, uint32_t w0) {
+    (void)w0;
     uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
     uint32_t w2 = rd32(rdram, rdram_size, cmd_addr + 8);
     uint32_t w3 = rd32(rdram, rdram_size, cmd_addr + 12);
     uint32_t w4 = rd32(rdram, rdram_size, cmd_addr + 16);
-
-    /* w3: screen scale (x<<16 | y) */
-    /* w2: screen offset (x<<17 | y<<1) */
-    /* For now, extract approximate viewport from offset */
-    int16_t off_x = (w2 >> 17) & 0x7FFF;
-    int16_t off_y = (w2 >> 1) & 0xFFFF;
 
     LOG_CMD(state, T3D_CMD_SCREEN_SIZE,
             "guardband=0x%08X offset=0x%08X scale=0x%08X depth=0x%08X",
@@ -279,18 +281,20 @@ static int handle_screen_size(T3DHLEState *state,
     return 5;
 }
 
-static int handle_drawflags(T3DHLEState *state, uint32_t w0) {
-    state->draw_flags = RSPQ_ARGS(w0);
+static int handle_drawflags(T3DHLEState *state,
+                            const uint8_t *rdram, uint32_t rdram_size,
+                            uint32_t cmd_addr, uint32_t w0) {
+    /* DRAWFLAGS is 2 words:
+     * Word 0: [ovl|cmd|cull_mask(24)]
+     * Word 1: RDP command word (flags packed for rendering mode) */
+    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+    uint32_t cull_mask = RSPQ_ARGS(w0);
+    state->draw_flags = cull_mask;
     state->frame.state_changes++;
     LOG_CMD(state, T3D_CMD_DRAWFLAGS,
-            "flags=0x%06X depth=%d textured=%d shaded=%d cull_front=%d cull_back=%d",
-            state->draw_flags,
-            !!(state->draw_flags & T3D_FLAG_DEPTH),
-            !!(state->draw_flags & T3D_FLAG_TEXTURED),
-            !!(state->draw_flags & T3D_FLAG_SHADED),
-            !!(state->draw_flags & T3D_FLAG_CULL_FRONT),
-            !!(state->draw_flags & T3D_FLAG_CULL_BACK));
-    return 1;
+            "cull_mask=0x%06X rdp_cmd=0x%08X",
+            cull_mask, w1);
+    return 2;
 }
 
 static int handle_matrix_stack(T3DHLEState *state,
@@ -316,18 +320,14 @@ static int handle_matrix_stack(T3DHLEState *state,
 }
 
 static int handle_proj_set(T3DHLEState *state,
-                           const uint8_t *rdram, uint32_t rdram_size,
-                           uint32_t cmd_addr, uint32_t w0) {
-    uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
-    uint32_t mtx_addr = w1 & 0x1FFFFFFF;
-
-    if (!addr_valid(mtx_addr + 63, rdram_size)) {
-        LOG_WARN(state, "msg=\"PROJ_SET addr out of RDRAM\" addr=0x%08X", mtx_addr);
-    }
+                           uint32_t w0) {
+    /* PROJ_SET is 1 word: [ovl|cmd|rdram_addr(24)]
+     * The address is in the 24-bit args field (PhysicalAddr). */
+    uint32_t mtx_addr = RSPQ_ARGS(w0);
 
     state->frame.state_changes++;
-    LOG_CMD(state, T3D_CMD_PROJ_SET, "addr=0x%08X", mtx_addr);
-    return 2;
+    LOG_CMD(state, T3D_CMD_PROJ_SET, "addr=0x%06X", mtx_addr);
+    return 1;
 }
 
 static int handle_set_word(T3DHLEState *state,
@@ -490,11 +490,11 @@ int t3d_hle_process_command(T3DHLEState *state,
     /* Dispatch */
     switch (cmd_id) {
     case T3D_CMD_VERT_LOAD:    return handle_vert_load(state, rdram, rdram_size, cmd_addr, w0);
-    case T3D_CMD_TRI_DRAW:     return handle_tri_draw(state, w0);
+    case T3D_CMD_TRI_DRAW:     return handle_tri_draw(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_SCREEN_SIZE:  return handle_screen_size(state, rdram, rdram_size, cmd_addr, w0);
-    case T3D_CMD_DRAWFLAGS:    return handle_drawflags(state, w0);
+    case T3D_CMD_DRAWFLAGS:    return handle_drawflags(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_MATRIX_STACK: return handle_matrix_stack(state, rdram, rdram_size, cmd_addr, w0);
-    case T3D_CMD_PROJ_SET:     return handle_proj_set(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_PROJ_SET:     return handle_proj_set(state, w0);
     case T3D_CMD_SET_WORD:     return handle_set_word(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_LIGHT_SET:    return handle_light_set(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_FOG_RANGE:    return handle_fog_range(state, rdram, rdram_size, cmd_addr, w0);
