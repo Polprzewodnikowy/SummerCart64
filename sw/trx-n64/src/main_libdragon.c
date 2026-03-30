@@ -2456,8 +2456,11 @@ int main(void) {
                                 rdpq_tex_upload(TILE0, &dbg_tier_surf[bkd_tier], NULL);
                                 room_baked = true;
                                 bkd_last_tex = -99;
-                            } else if (bkd_tier == TIER_MIDFAR) {
-                                /* MidFar: CI8 per-face textures (same as textured pass) */
+                            } else if (bkd_tier == TIER_MIDFAR || bkd_tier == TIER_FAR) {
+                                /* MidFar + Far: CI8 per-face textures.
+                                 * Same rendering path, differentiated by tier fog weights
+                                 * (MidFar=15%, Far=40%). Far will get CI4 per-face
+                                 * once AegisTex build tool generates them. */
                                 rdpq_mode_tlut(TLUT_RGBA16);
                                 rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
                                 /* room_baked stays false → face loop uses per-face CI8 uploads */
