@@ -916,8 +916,16 @@ int main(void) {
                 #define CI4_TILE_TEXELS (TEX_TILE_DIM * TEX_TILE_DIM / 2) /* 512 bytes */
                 #define CI4_PAL_SIZE   16
                 #define CI4_PAYLOAD    (CI4_PAL_SIZE * 2 + CI4_TILE_TEXELS) /* 544 bytes */
-                /* ATX_ROM_OFFSET / ATX_ROM_SIZE defined in baked_offsets.h
-                 * (included later). If not available, default to 0. */
+                /* Include baked_offsets.h early for ATX_ROM_OFFSET */
+                #if __has_include("baked_offsets.h")
+                #include "baked_offsets.h"
+                #elif __has_include("../build/baked_offsets.h")
+                #include "../build/baked_offsets.h"
+                #endif
+                #if !defined(ATX_ROM_OFFSET)
+                #define ATX_ROM_OFFSET 0u
+                #define ATX_ROM_SIZE   0u
+                #endif
                 #define ATX_HEADER_SIZE 32
                 #define ATX_RECORD_SIZE 4
 
@@ -1125,20 +1133,11 @@ int main(void) {
                 #define BAKED_LOAD_PER_ROOM (MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
                 #define BAKED_HEADER_SIZE 16
 
-                /* Baked tile offsets from ROM.
-                 * Try build/ first (where build_full_rom.py generates it),
-                 * then fall back to current directory. */
-                #if __has_include("baked_offsets.h")
-                #include "baked_offsets.h"
-                #elif __has_include("../build/baked_offsets.h")
-                #include "../build/baked_offsets.h"
-                #else
+                /* Baked tile offsets — already included earlier for ATX.
+                 * Just need BAKED_ROM_OFFSET fallback if header was missing. */
+                #if !defined(BAKED_ROM_OFFSET)
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
-                #endif
-                #if !defined(ATX_ROM_OFFSET)
-                #define ATX_ROM_OFFSET 0u
-                #define ATX_ROM_SIZE   0u
                 #endif
 
                 printf("  Baked ROM: offset=0x%X size=%u\n",
