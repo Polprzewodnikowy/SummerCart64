@@ -1626,7 +1626,7 @@ int main(void) {
                             } while(0)
 
                             /* Page header */
-                            STAT("=== PAUSE [L<] Page %d/3 [>R] ===", pause_page);
+                            STAT("=== PAUSE [L<] Page %d/4 [>R] ===", pause_page);
 
                             if (pause_page == 0) {
                                 /* ---- PAGE 0: DIAGNOSTICS ---- */
@@ -1759,6 +1759,21 @@ int main(void) {
                                 STAT(" >%.0f       RED    XXFar", edit_dist_xxfar);
                             }
 
+                            } else if (pause_page == 4) {
+                                /* ---- PAGE 4: ROOM VISIBILITY DUMP ---- */
+                                STAT("=== VISIBLE ROOMS ===");
+                                STAT("Tex:%d Bkd:%d Total:%d",
+                                     perf_tex_rooms, perf_bkd_rooms, perf_vis_total);
+                                STAT("T=tex B=bkd *=lara");
+                                for (int ri = 0; ri < g_chunk_count && y < 230; ri++) {
+                                    if (!g_chunks[ri].visible) continue;
+                                    float dist = sqrtf(g_chunks[ri].dist_sq);
+                                    const char *pass = (g_chunks[ri].lod == CHUNK_LOD_NEAR) ? "T" : "B";
+                                    const char *mark = (ri == lara_room) ? "*" : " ";
+                                    STAT("%s%s R%d d:%.0f", mark, pass, ri, dist);
+                                }
+                            }
+
                             #undef STAT
                             #undef STAT_HL
                             display_show(pause_disp);
@@ -1780,7 +1795,7 @@ int main(void) {
                             if (bp.d_left || bp.d_right) hold_tick = true;
 
                             /* Page navigation */
-                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 3) pause_page = 3; }
+                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 4) pause_page = 4; }
                             if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
                             if (bp.start) { paused = false; }
 
