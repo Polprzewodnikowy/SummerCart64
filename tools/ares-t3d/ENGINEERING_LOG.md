@@ -155,3 +155,23 @@ tools/ares-t3d/
 ├── IMPLEMENTATION_PLAN.md 3-week plan
 └── ENGINEERING_LOG.md     This file
 ```
+
+### Chunk 9: Parser Convergence (CONFIRMED)
+**Objective**: Eliminate false positives without killing valid activity
+**Versions tested**: v1→v2→v3→v4
+
+| Metric | v1 | v2 | v3 | v4 |
+|--------|-----|-----|-----|-----|
+| Warnings | 104,167 | 4,386 | 124 | **0** |
+| cmd_id=13 | 60,413 | 1,065 | 0 | 0 |
+| VERT_LOAD overflow | 13,664 | 118 | 124 | **0** |
+| Detection | YES | YES | YES | YES |
+| Valid T3D activity | YES | YES | YES | YES |
+
+Root causes found and fixed:
+1. v2: Unknown overlay commands have unknown sizes → stop scanning
+2. v3: Unknown cmd_id (>=13) from misaligned scan → stop scanning  
+3. v4: Implausible VERT_LOAD (size>1120, addr<0x1000) → stop scanning
+
+Architecture insight: rspq multiplexes overlays in same DMA buffer.
+Parser must identify trustworthy T3D segments, not assume entire buffers.

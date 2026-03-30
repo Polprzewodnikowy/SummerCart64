@@ -1,0 +1,200 @@
+T3D_INIT mode=0 tier=telemetry
+T3D_HOOK event=system_init rdram_size=8388608
+T3D_DMA target=IMEM dram=0x00802000 pbus=0xFFFFF000 len=4096
+T3D_FRAME frame=1 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=2 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=3 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=4 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=5 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=6 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=7 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=8 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=9 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=10 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=11 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=12 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=13 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=14 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=15 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=16 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=17 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=18 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=19 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=20 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=21 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=22 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=23 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=24 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=25 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=26 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=27 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=28 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=29 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=30 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=31 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=32 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=33 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=34 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=35 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=36 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=37 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=38 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=39 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=40 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=41 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=42 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=43 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=44 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=45 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=46 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=47 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=48 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=49 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=50 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=51 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=52 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=53 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=54 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=55 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=56 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=57 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=58 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=59 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=60 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=61 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=62 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=63 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=64 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=65 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=66 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=67 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=68 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=69 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=70 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=71 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=72 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=73 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_FRAME frame=74 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=-1 confirmed=0
+T3D_DMA target=IMEM dram=0x00052540 pbus=0x0000 len=624
+T3D_DETECT event=candidate overlay=1 signal=TRI_DRAW
+T3D_DETECT event=signal overlay=1 signal=TRI_DRAW confidence=1/3
+T3D_CMD TRI_DRAW v0_addr=0x204080 v1_addr=0x0102 v2_addr=0x0408
+T3D_DMA target=DMEM dram=0x000527B0 len=504 cmds=1
+T3D_CMD TRI_DRAW v0_addr=0x204080 v1_addr=0x0102 v2_addr=0x0408
+T3D_DMA target=DMEM dram=0x0046CBB0 len=496 cmds=1
+T3D_DMA target=DMEM dram=0x00054680 len=32 cmds=1
+T3D_DMA target=DMEM dram=0x0057EC20 len=256 cmds=1
+T3D_FRAME frame=75 cmds=10 t3d=2 rspq=2 other=6 unsup=0 verts=0 tris=2 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=76 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=77 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=78 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=79 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=80 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=81 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=82 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=83 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=84 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=85 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_FRAME frame=86 cmds=0 t3d=0 rspq=0 other=0 unsup=0 verts=0 tris=0 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=0 warn=0 err=0 overlay=1 confirmed=0
+T3D_CMD TRI_DRAW v0_addr=0x400008 v1_addr=0x0002 v2_addr=0x0000
+T3D_DMA target=DMEM dram=0x0057DBE0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057EC40 len=256 cmds=2
+T3D_CMD TRI_DRAW v0_addr=0x400008 v1_addr=0x0002 v2_addr=0x0000
+T3D_DMA target=DMEM dram=0x0057DBE8 len=256 cmds=12
+T3D_DMA target=IMEM dram=0x00052C30 pbus=0x0270 len=3352
+T3D_DMA target=DMEM dram=0x0057EC68 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DC30 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DE58 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DF48 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E0A8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E278 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E478 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E648 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E738 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E908 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E9F8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DC18 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DC70 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DD58 len=256 cmds=1
+T3D_CMD FOG_RANGE w0=0x18FED402 w1=0x00005718
+T3D_DMA target=DMEM dram=0x0057DF30 len=256 cmds=3
+T3D_DMA target=DMEM dram=0x0057DF88 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E070 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E248 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E330 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E400 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E400 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E4E8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E540 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E718 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E800 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E820 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E908 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057EAE0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DC18 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DD08 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DDB8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DF88 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E078 len=256 cmds=1
+T3D_CMD TRI_DRAW v0_addr=0xFA2EFA v1_addr=0x0000 v2_addr=0x5704
+T3D_DMA target=DMEM dram=0x0057E168 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E338 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E378 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E4E8 len=256 cmds=1
+T3D_CMD TRI_SEQ w0=0x1CFF4AF9 w1=0x00005704
+T3D_DMA target=DMEM dram=0x0057E5D8 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E630 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E800 len=256 cmds=1
+T3D_CMD FOG_RANGE w0=0x18FEDB00 w1=0x00005718
+T3D_DMA target=DMEM dram=0x0057E8F0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057EAC0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057EBB0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DCC8 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DDB0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DE80 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DF68 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E140 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E228 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E400 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E458 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E458 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E540 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E718 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E718 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E800 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E9D8 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057EAC0 len=256 cmds=1
+T3D_FRAME frame=87 cmds=169 t3d=8 rspq=88 other=73 unsup=3 verts=0 tris=3 tris_invalid=0 tris_strip=0 tris_seq=0 drawcalls=0 mtx_ops=0 state_chg=2 warn=0 err=0 overlay=1 confirmed=0
+T3D_DMA target=DMEM dram=0x0057DC00 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DCB0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DE80 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DF70 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E140 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E230 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E490 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E540 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E628 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E800 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E8B0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E998 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057EAC0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057EBA8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DBE0 len=256 cmds=4
+T3D_DMA target=DMEM dram=0x0057DC18 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DDF0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DED8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E0B0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E198 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E370 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E370 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057E418 len=256 cmds=3
+T3D_DMA target=DMEM dram=0x0057E6C8 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E898 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057E988 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057EA78 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DBE0 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DBE0 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DC38 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DD20 len=256 cmds=1
+T3D_DMA target=DMEM dram=0x0057DEF8 len=256 cmds=2
+T3D_DMA target=DMEM dram=0x0057DF50 len=256 cmds=1
