@@ -2146,29 +2146,19 @@ int main(void) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        /* Force tier override: put ALL rooms in one pass */
-                        if (g_debug_force_tier == 1) {
-                            /* Force Near: all rooms go to textured pass */
-                            c->lod = CHUNK_LOD_NEAR;
-                            if (tex_count < MAX_DRAW_ROOMS)
-                                tex_rooms[tex_count++] = ri;
-                        } else if (g_debug_force_tier >= 2) {
-                            /* Force MidFar/Far/XFar/XXFar: all to baked pass */
+                        if (g_debug_force_tier >= 2) {
+                            /* Force baked tier: all rooms to baked pass */
                             c->lod = CHUNK_LOD_FAR;
                             if (bkd_count < MAX_DRAW_ROOMS)
                                 bkd_rooms[bkd_count++] = ri;
-                        } else if (ri == lara_room) {
-                            c->lod = CHUNK_LOD_NEAR;
-                            if (tex_count < MAX_DRAW_ROOMS)
-                                tex_rooms[tex_count++] = ri;
-                        } else if (c->dist_sq < g_dist_mid_sq) {
-                            c->lod = CHUNK_LOD_NEAR;
-                            if (tex_count < MAX_DRAW_ROOMS)
-                                tex_rooms[tex_count++] = ri;
                         } else {
-                            c->lod = CHUNK_LOD_FAR;
-                            if (bkd_count < MAX_DRAW_ROOMS)
-                                bkd_rooms[bkd_count++] = ri;
+                            /* Default: ALL rooms go to textured pass.
+                             * Distance tiers control quality degradation
+                             * via the fallback system, not the pass split.
+                             * This eliminates void between passes. */
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
                         }
                     }
 
