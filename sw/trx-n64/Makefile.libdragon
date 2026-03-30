@@ -1,5 +1,7 @@
 N64_INST = /opt/libdragon
+T3D_INST = $(N64_INST)
 include $(N64_INST)/include/n64.mk
+include $(T3D_INST)/t3d.mk
 
 CFLAGS += -Isrc -I../asset_streaming/src -I$(BUILD_DIR) -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations
 # Add -DN64_EMULATOR_MODE for ares testing (skips SC64 register access)
