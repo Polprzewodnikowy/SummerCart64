@@ -1255,9 +1255,11 @@ int main(void) {
                  *   very_far..xfar    → CI4 8×8 baked (far)
                  *   xfar..xxfar       → IA8 8×8 baked (extra-far)
                  *   > xxfar           → IA4 4×4 baked (extreme-far) */
+                /* Strictly monotonic: mid < vfar < xfar < xxfar.
+                 * Enforced in the UI — each threshold must be > the one before it. */
                 float g_dist_mid     = 7168.0f;   /* near→mid-far boundary */
-                float g_dist_vfar    = 15360.0f;  /* mid-far→far boundary */
-                float g_dist_xfar   = 12288.0f;  /* far→extra-far boundary */
+                float g_dist_vfar    = 10240.0f;  /* mid-far→far boundary */
+                float g_dist_xfar   = 13312.0f;  /* far→extra-far boundary */
                 float g_dist_xxfar  = 16384.0f;  /* extra-far→extreme-far boundary */
 
                 /* Squared versions recomputed when thresholds change */
@@ -1815,11 +1817,23 @@ int main(void) {
                                 if (bp.d_left)  fdelta = -512.0f;
 
                                 if (fdelta != 0) {
-                                    float *targets[] = { &edit_dist_mid, &edit_dist_vfar,
-                                                         &edit_dist_xfar, &edit_dist_xxfar };
-                                    *targets[slider_sel] += fdelta;
-                                    if (*targets[slider_sel] < 1024.0f) *targets[slider_sel] = 1024.0f;
-                                    if (*targets[slider_sel] > 32768.0f) *targets[slider_sel] = 32768.0f;
+                                    float *t[] = { &edit_dist_mid, &edit_dist_vfar,
+                                                   &edit_dist_xfar, &edit_dist_xxfar };
+                                    *t[slider_sel] += fdelta;
+                                    /* Clamp to absolute range */
+                                    if (*t[slider_sel] < 1024.0f) *t[slider_sel] = 1024.0f;
+                                    if (*t[slider_sel] > 32768.0f) *t[slider_sel] = 32768.0f;
+                                    /* Enforce monotonic: mid < vfar < xfar < xxfar.
+                                     * Push neighbors apart by 512 minimum gap. */
+                                    for (int k = slider_sel; k < 3; k++)
+                                        if (*t[k+1] <= *t[k]) *t[k+1] = *t[k] + 512.0f;
+                                    for (int k = slider_sel; k > 0; k--)
+                                        if (*t[k-1] >= *t[k]) *t[k-1] = *t[k] - 512.0f;
+                                    /* Re-clamp after push */
+                                    for (int k = 0; k < 4; k++) {
+                                        if (*t[k] < 1024.0f) *t[k] = 1024.0f;
+                                        if (*t[k] > 32768.0f) *t[k] = 32768.0f;
+                                    }
                                 }
                             }
                         }
