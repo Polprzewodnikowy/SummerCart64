@@ -2167,32 +2167,6 @@ int main(void) {
                             eff_dist_vfar_sq = room_floor_sq;
                     }
 
-                    /* Dynamic baked-pass draw distance clamp.
-                     * Finds the farthest visible room's far edge, adds safety
-                     * margin, smooths over time. Prevents wasting baked-pass
-                     * work on distances beyond what's actually visible. */
-                    {
-                        static float dynamic_clamp = 30000.0f;
-                        float farthest = 0;
-                        for (int vi = 0; vi < vis_count; vi++) {
-                            int ri = vis_rooms[vi];
-                            if (ri < 0 || ri >= g_chunk_count) continue;
-                            float d = sqrtf(g_chunks[ri].dist_sq) + g_chunks[ri].radius;
-                            if (d > farthest) farthest = d;
-                        }
-                        float target = farthest + 4096.0f; /* safety margin */
-                        /* Asymmetric smooth: expand fast (0.3), contract slow (0.05) */
-                        if (target > dynamic_clamp)
-                            dynamic_clamp += (target - dynamic_clamp) * 0.3f;
-                        else
-                            dynamic_clamp += (target - dynamic_clamp) * 0.05f;
-                        /* Apply as clamp on baked pass max draw dist */
-                        float eff_max_draw = g_max_draw_dist;
-                        if (dynamic_clamp < eff_max_draw)
-                            eff_max_draw = dynamic_clamp;
-                        g_max_draw_dist_sq = eff_max_draw * eff_max_draw;
-                    }
-
                     /* Reset per-frame counters + start frame timer */
                     perf_bkd_rooms = 0; perf_bkd_tris = 0;
                     perf_bkd_uploads = 0; perf_bkd_baked = 0;
@@ -2475,6 +2449,26 @@ int main(void) {
                     int tex_rooms[MAX_DRAW_ROOMS], tex_count = 0;
                     int bkd_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
 
+                    /* Dynamic baked-pass draw distance clamp */
+                    {
+                        static float dynamic_clamp = 30000.0f;
+                        float farthest = 0;
+                        for (int vi = 0; vi < vis_count; vi++) {
+                            int ri = vis_rooms[vi];
+                            if (ri < 0 || ri >= g_chunk_count) continue;
+                            float d = sqrtf(g_chunks[ri].dist_sq) + g_chunks[ri].radius;
+                            if (d > farthest) farthest = d;
+                        }
+                        float target = farthest + 4096.0f;
+                        if (target > dynamic_clamp)
+                            dynamic_clamp += (target - dynamic_clamp) * 0.3f;
+                        else
+                            dynamic_clamp += (target - dynamic_clamp) * 0.05f;
+                        float eff_max = g_max_draw_dist;
+                        if (dynamic_clamp < eff_max) eff_max = dynamic_clamp;
+                        g_max_draw_dist_sq = eff_max * eff_max;
+                    }
+
                     /* Threshold array for tier classification */
                     float tier_thresholds_sq[4] = {
                         g_dist_mid_sq, g_dist_vfar_sq,
@@ -2547,6 +2541,14 @@ int main(void) {
 
                         /* Culled rooms don't render */
                         if (tier >= TIER_CULLED) continue;
+
+                        /* Ring-1 rooms (directly connected): never worse than CI4.
+                         * Portal scissor clips to doorway opening — only the
+                         * visible slice pays the CI4 cost. */
+                        if (vi < ring1_end && tier > TIER_FAR) {
+                            tier = TIER_FAR;
+                            room_tiers[ri].current_tier = TIER_FAR;
+                        }
 
                         /* Near (tier 0) goes to textured pass, all others to baked */
                         if (tier == TIER_NEAR) {
