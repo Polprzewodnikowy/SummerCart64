@@ -13,6 +13,7 @@ add_library(t3d_hle_core STATIC
     src/gl_renderer.c
     src/rdpq_state.c
     src/shadow_render.c
+    src/segment_classifier.c
 )
 
 # Optional: build GL renderer with OSMesa

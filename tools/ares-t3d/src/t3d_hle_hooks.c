@@ -7,6 +7,7 @@
 
 #include "t3d_hle.h"
 #include "t3d_hle_hooks.h"
+#include "segment_classifier.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -125,6 +126,27 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
             else if (g_hle.detect.overlay_id >= 0 && ovl == g_hle.detect.overlay_id)
                 bkt->has_t3d_cmds++;
             else bkt->has_other_cmds++;
+        }
+    }
+
+    /* ---- Segment classifier: classify EVERY DMEM DMA ---- */
+    if (length >= 8) {
+        T3DSegmentAnalysis seg = t3d_segment_classify(
+            rdram, rdram_size, phys_dram, length,
+            g_hle.detect.overlay_id);
+
+        /* Log any segment with T3D evidence */
+        if (seg.classification >= SEG_T3D_STRONG &&
+            seg.classification <= SEG_T3D_WEAK) {
+            t3d_segment_log(&seg, g_hle.log_fp, g_hle.total_frames);
+        }
+
+        /* STRONG segments are the ones we trust for parsing */
+        if (seg.classification == SEG_T3D_STRONG && seg.saw_vert_load) {
+            T3D_LOG(&g_hle, "T3D_STRONG_HIT",
+                "dram=0x%08X len=%u dom_ovl=%d vload=1 tdraw=%d tsync=%d",
+                phys_dram, length, seg.dominant_overlay,
+                seg.saw_tri_draw, seg.saw_tri_sync);
         }
     }
 
