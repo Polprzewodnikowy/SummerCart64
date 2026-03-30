@@ -2659,24 +2659,29 @@ int main(void) {
                             float room_d = (room_idx < g_chunk_count)
                                 ? g_chunks[room_idx].dist_sq : 0.0f;
 
-                            /* Tier-aware fog: each tier has a fog weight that
-                             * progressively hides detail loss.
-                             * Near=0 (no fog in textured pass), MidFar=0.15,
-                             * Far=0.4, XFar=0.65, XXFar=0.85 */
+                            /* TR1-style per-room fog: uses the room's own fog start
+                             * and max draw distance from the level data. Dark rooms
+                             * have tighter fog, bright rooms see further.
+                             * Blended with tier fog weights for smooth transitions. */
+                            float fog_start_d2 = (room_idx < g_chunk_count) ?
+                                g_chunks[room_idx].fog_start_dist2 : 4096.0f * 4096.0f;
+                            float max_draw_d2 = (room_idx < g_chunk_count) ?
+                                g_chunks[room_idx].max_draw_dist2 : 16384.0f * 16384.0f;
+                            float fog_range_d2 = max_draw_d2 - fog_start_d2;
+                            if (fog_range_d2 < 1.0f) fog_range_d2 = 1.0f;
+
+                            /* Per-room distance fog (TR1 linear ramp) */
+                            float room_fog = (room_d - fog_start_d2) / fog_range_d2;
+                            if (room_fog < 0.0f) room_fog = 0.0f;
+                            if (room_fog > 0.9f) room_fog = 0.9f;
+
+                            /* Tier fog minimum (ensures farther tiers always have some fog) */
                             int rm_tier = (room_idx < 256) ? room_tiers[room_idx].current_tier : TIER_MIDFAR;
-                            float tier_fog_weights[5] = { 0.0f, 0.15f, 0.4f, 0.65f, 0.85f };
-                            float tier_fog = (rm_tier < 5) ? tier_fog_weights[rm_tier] : 0.85f;
+                            float tier_mins[5] = { 0.0f, 0.1f, 0.25f, 0.5f, 0.75f };
+                            float tier_min = (rm_tier < 5) ? tier_mins[rm_tier] : 0.75f;
+                            float fog = room_fog > tier_min ? room_fog : tier_min;
 
-                            /* Blend tier fog with distance fog for smooth ramp */
-                            float room_dist = sqrtf(room_d);
-                            float dist_fog = (room_dist - g_dist_mid) / (g_dist_xxfar - g_dist_mid);
-                            if (dist_fog < 0.0f) dist_fog = 0.0f;
-                            if (dist_fog > 1.0f) dist_fog = 1.0f;
-
-                            /* Use the stronger of tier fog and distance fog */
-                            float fog = tier_fog > dist_fog ? tier_fog : dist_fog;
-                            if (fog > 0.9f) fog = 0.9f;
-
+                            /* Use per-room fog color (already lerped into active_fog) */
                             float fog_scale  = 1.0f - fog;
                             float fog_add_r  = active_fog_r * fog;
                             float fog_add_g  = active_fog_g * fog;
@@ -3087,14 +3092,17 @@ int main(void) {
                         int nv_room = room->mesh.vertex_count;
                         if (nv_room > VTX_CACHE_MAX) nv_room = VTX_CACHE_MAX;
 
-                        /* Per-room distance fog — applies to ALL textured rooms.
-                         * Gentle ramp from g_dist_mid to g_dist_xxfar.
-                         * Current room (lara_room) gets no fog. */
+                        /* TR1-style per-room fog — uses each room's own fog start
+                         * and max draw distance from level data. Per-vertex in the
+                         * vertex cache. Current room gets no fog. */
                         bool room_has_fog = (room_idx != lara_room);
-                        float fog_near_dist = g_dist_mid * 0.5f; /* fog starts at half the mid threshold */
-                        float fog_far_dist = g_dist_xxfar;
-                        float fog_range_inv = 1.0f / (fog_far_dist * fog_far_dist - fog_near_dist * fog_near_dist);
-                        float fog_near_sq = fog_near_dist * fog_near_dist;
+                        float fog_near_sq = 0, fog_range_inv = 0;
+                        if (room_has_fog && room_idx < g_chunk_count) {
+                            fog_near_sq = g_chunks[room_idx].fog_start_dist2;
+                            float fr = g_chunks[room_idx].max_draw_dist2 - fog_near_sq;
+                            if (fr < 1.0f) fr = 1.0f;
+                            fog_range_inv = 1.0f / fr;
+                        }
 
                         for (int vi = 0; vi < nv_room; vi++) {
                             tr_room_vertex_t *rv = &room->mesh.vertices[vi];
