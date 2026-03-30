@@ -2552,7 +2552,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        #define NEAR_Z 450.0f  /* near clip plane */
+                        #define NEAR_Z 600.0f  /* near clip plane */
                         int bkd_last_tex = -1;
                         int bkd_tris = 0;
                         int bkd_rooms_max = bkd_count; /* no room cap — tri budget limits work */
