@@ -2050,10 +2050,13 @@ int main(void) {
                     perf_vis_ring2 = vis_count - ring1_end;
                     perf_vis_total = vis_count;
 
-                    /* LOD classification.
-                     * Ring 1 (current + connected): RDPQ near pass, CI8 textures, zbuf.
-                     * Ring 2 (connected-to-connected): RDPQ far pass, IA4 + fog.
-                     * Rule: never see void — ring 2 fills the gaps. */
+                    /* LOD classification — DISTANCE-BASED, not ring-based.
+                     * Tiers must progress smoothly: Near → MidFar → Far → XFar → XXFar.
+                     * Current room always Near. All others classified by distance
+                     * using the tunable g_dist_* thresholds.
+                     *
+                     * Near:   dist < g_dist_mid   → CI8 per-face, zbuf (near pass)
+                     * MidFar+: dist >= g_dist_mid → baked tiles, fog (far pass) */
                     int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
                     int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
 
@@ -2061,28 +2064,20 @@ int main(void) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        if (vi < ring1_end) {
-                            /* Ring 1: RDPQ near pass, CI8 textures.
-                             * Use per-room near threshold — small rooms
-                             * transition to fog sooner, large rooms later.
-                             * If too far for safe decimation (>3x near),
-                             * demote to ring 2 IA4 fog instead. */
-                            if (ri != lara_room && c->dist_sq > c->near_dist2 * 3.0f) {
-                                /* Too far — fall back to IA4 fog */
-                                c->lod = CHUNK_LOD_FAR;
-                                if (far_count < MAX_DRAW_ROOMS)
-                                    far_rooms[far_count++] = ri;
-                            } else if (c->dist_sq < c->near_dist2) {
-                                c->lod = CHUNK_LOD_NEAR;
-                                if (near_count < MAX_DRAW_ROOMS)
-                                    near_rooms[near_count++] = ri;
-                            } else {
-                                c->lod = CHUNK_LOD_MID;
-                                if (near_count < MAX_DRAW_ROOMS)
-                                    near_rooms[near_count++] = ri;
-                            }
+                        if (ri == lara_room) {
+                            /* Current room: always Near */
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
+                        } else if (c->dist_sq < g_dist_mid_sq) {
+                            /* Close enough for full CI8 per-face textures */
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
                         } else {
-                            /* Ring 2: RDPQ far pass, IA4 fog fallback */
+                            /* Beyond mid threshold → far pass with baked tiles.
+                             * Specific tier (MidFar/Far/XFar/XXFar) chosen at
+                             * render time by comparing dist vs g_dist_*_sq. */
                             c->lod = CHUNK_LOD_FAR;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
