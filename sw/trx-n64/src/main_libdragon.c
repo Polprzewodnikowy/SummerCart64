@@ -1934,7 +1934,7 @@ int main(void) {
                             } while(0)
 
                             /* Page header */
-                            STAT("=== PAUSE [L<] Page %d/4 [>R] ===", pause_page);
+                            STAT("=== PAUSE [L<] Page %d/7 [>R] ===", pause_page);
 
                             if (pause_page == 0) {
                                 /* ---- PAGE 0: DIAGNOSTICS ---- */
@@ -2082,6 +2082,144 @@ int main(void) {
                                     const char *mark = (ri == lara_room) ? "*" : " ";
                                     STAT("%s%s R%d d:%.0f", mark, pass, ri, dist);
                                 }
+
+                            } else if (pause_page == 5) {
+                                /* ---- PAGE 5: T3D PIPELINE STATUS ---- */
+                                /* Claude auto-test: verify T3D is active */
+                                STAT("=== T3D PIPELINE ===");
+                                STAT("");
+                                STAT("t3d_init:    %s", "YES");
+                                STAT("t3d_ready:   %s", t3d_lara_ready ? "YES" : "NO");
+                                STAT("");
+                                STAT("--- Lara Meshes ---");
+                                {
+                                    int total_verts = 0, total_blocks = 0;
+                                    for (int mi = 0; mi < T3D_LARA_MAX_MESHES; mi++) {
+                                        if (t3d_lara_blocks[mi]) total_blocks++;
+                                        total_verts += t3d_lara_vert_counts[mi];
+                                    }
+                                    STAT("Blocks:   %d/%d", total_blocks, T3D_LARA_MAX_MESHES);
+                                    STAT("Verts:    %d (max %d/mesh)",
+                                         total_verts, T3D_LARA_MAX_VERTS);
+                                }
+                                STAT("");
+                                STAT("--- Frame Pool ---");
+                                STAT("Pool size: %d bytes", T3D_FRAME_POOL_SIZE);
+                                STAT("Pool idx:  %d", t3d_frame_pool_idx);
+                                STAT("Pool used: %d bytes", t3d_frame_pool_pos);
+                                STAT("Pool free: %d bytes",
+                                     T3D_FRAME_POOL_SIZE - t3d_frame_pool_pos);
+                                STAT("");
+                                STAT("--- Viewport ---");
+                                STAT("FOV: 60deg  Near:10 Far:32000");
+                                STAT("");
+                                STAT("--- Lara Timing ---");
+                                STAT("La: %uus", perf_tex_lara_us);
+                                STAT("Target: <5000us (T3D)");
+                                if (perf_tex_lara_us > 10000) {
+                                    graphics_set_color(0xFF4444FF, 0x000000C0);
+                                    STAT("!! T3D NOT ACTIVE !!");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                } else if (perf_tex_lara_us > 5000) {
+                                    graphics_set_color(0xFFFF44FF, 0x000000C0);
+                                    STAT("WARN: above target");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                } else {
+                                    graphics_set_color(0x44FF44FF, 0x000000C0);
+                                    STAT("OK: T3D active");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+
+                            } else if (pause_page == 6) {
+                                /* ---- PAGE 6: TIMING WATERFALL ---- */
+                                /* Claude auto-test: visual timing breakdown */
+                                STAT("=== TIMING WATERFALL ===");
+                                STAT("(33333us = 30fps budget)");
+                                STAT("");
+                                /* Each bar: label, time, visual bar */
+                                #define TBAR(label, us) do { \
+                                    int bw = (int)((float)(us) / 33333.0f * 30.0f); \
+                                    if (bw > 30) bw = 30; \
+                                    char bar[32]; \
+                                    for (int b=0; b<bw; b++) bar[b]='#'; \
+                                    bar[bw] = 0; \
+                                    STAT("%-8s %5uus |%s", label, (unsigned)(us), bar); \
+                                } while(0)
+                                TBAR("Rooms", perf_tex_room_us);
+                                TBAR("StMesh", perf_tex_sm_us);
+                                TBAR("Lara", perf_tex_lara_us);
+                                TBAR("Items", perf_tex_item_us);
+                                TBAR("Baked", perf_bkd_us);
+                                TBAR("RSP", perf_rsp_us);
+                                STAT("------   ------  ---------30fps--");
+                                {
+                                    uint32_t total = perf_tex_room_us + perf_tex_sm_us
+                                        + perf_tex_lara_us + perf_tex_item_us
+                                        + perf_bkd_us + perf_rsp_us;
+                                    TBAR("SUM", total);
+                                    uint32_t other = perf_frame_us > total
+                                        ? perf_frame_us - total : 0;
+                                    TBAR("Other", other);
+                                }
+                                STAT("");
+                                TBAR("FRAME", perf_frame_us);
+                                STAT("");
+                                STAT("FPS: %d  Frame: %uus", fps_display, perf_frame_us);
+                                STAT("Budget: 33333us (30fps)");
+                                {
+                                    float pct = (float)perf_frame_us / 33333.0f * 100.0f;
+                                    if (pct <= 100.0f) {
+                                        graphics_set_color(0x44FF44FF, 0x000000C0);
+                                        STAT("Usage: %.0f%% -- ON BUDGET", pct);
+                                    } else {
+                                        graphics_set_color(0xFF4444FF, 0x000000C0);
+                                        STAT("Usage: %.0f%% -- OVER BUDGET", pct);
+                                    }
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+                                #undef TBAR
+
+                            } else if (pause_page == 7) {
+                                /* ---- PAGE 7: AUTO-TUNE TARGETS ---- */
+                                /* Claude auto-test: pass/fail against targets */
+                                STAT("=== PERFORMANCE TARGETS ===");
+                                STAT("(for automated tuning)");
+                                STAT("");
+                                /* Helper: print metric with PASS/FAIL */
+                                #define TARGET(label, val, op, thresh, unit) do { \
+                                    bool _pass = ((int)(val)) op ((int)(thresh)); \
+                                    if (_pass) graphics_set_color(0x44FF44FF, 0x000000C0); \
+                                    else       graphics_set_color(0xFF4444FF, 0x000000C0); \
+                                    STAT("%-14s %5d%s %s %d -> %s", \
+                                         label, (int)(val), unit, #op, (int)(thresh), \
+                                         _pass ? "PASS" : "FAIL"); \
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0); \
+                                } while(0)
+                                STAT("--- Frame Budget ---");
+                                TARGET("Frame(us)", perf_frame_us, <=, 33333, "us");
+                                TARGET("FPS", fps_display, >=, 20, "");
+                                STAT("");
+                                STAT("--- T3D Lara ---");
+                                TARGET("Lara(us)", perf_tex_lara_us, <=, 5000, "us");
+                                TARGET("T3D ready", t3d_lara_ready?1:0, ==, 1, "");
+                                STAT("");
+                                STAT("--- CPU Subsystems ---");
+                                TARGET("Rooms(us)", perf_tex_room_us, <=, 15000, "us");
+                                TARGET("StMesh(us)", perf_tex_sm_us, <=, 5000, "us");
+                                TARGET("Items(us)", perf_tex_item_us, <=, 3000, "us");
+                                TARGET("Baked(us)", perf_bkd_us, <=, 10000, "us");
+                                STAT("");
+                                STAT("--- Budgets ---");
+                                TARGET("TexTri", perf_tex_tris, <=, TEX_TRI_BUDGET, "");
+                                TARGET("TexFace", perf_tex_faces, <=, TEX_FACE_BUDGET, "");
+                                TARGET("BkdTri", perf_bkd_tris, <=, BKD_TRI_BUDGET, "");
+                                STAT("");
+                                STAT("--- Memory ---");
+                                {
+                                    uint32_t hfree = n64_mem_available();
+                                    TARGET("HeapFree(KB)", hfree/1024, >=, 256, "KB");
+                                }
+                                #undef TARGET
                             }
 
                             #undef STAT
@@ -2105,8 +2243,39 @@ int main(void) {
                             if (bp.d_left || bp.d_right) hold_tick = true;
 
                             /* Page navigation */
-                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 4) pause_page = 4; }
-                            if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
+                            {
+                                int prev_page = pause_page;
+                                if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 7) pause_page = 7; }
+                                if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
+                                /* Dump page data to debug console on page change
+                                 * (parseable by automated test pipeline) */
+                                if (pause_page != prev_page) {
+                                    if (pause_page == 5) {
+                                        int tv = 0, tb = 0;
+                                        for (int m = 0; m < T3D_LARA_MAX_MESHES; m++) {
+                                            if (t3d_lara_blocks[m]) tb++;
+                                            tv += t3d_lara_vert_counts[m];
+                                        }
+                                        printf("T3D|ready=%d|blocks=%d|verts=%d|pool_used=%d|pool_size=%d|la_us=%u\n",
+                                               t3d_lara_ready?1:0, tb, tv,
+                                               t3d_frame_pool_pos, T3D_FRAME_POOL_SIZE,
+                                               perf_tex_lara_us);
+                                    } else if (pause_page == 7) {
+                                        printf("TARGETS|frame=%u|fps=%d|la=%u|t3d=%d"
+                                               "|rm=%u|sm=%u|it=%u|bkd=%u"
+                                               "|ttri=%d/%d|tface=%d/%d|btri=%d/%d"
+                                               "|heap_free=%u\n",
+                                               perf_frame_us, fps_display,
+                                               perf_tex_lara_us, t3d_lara_ready?1:0,
+                                               perf_tex_room_us, perf_tex_sm_us,
+                                               perf_tex_item_us, perf_bkd_us,
+                                               perf_tex_tris, TEX_TRI_BUDGET,
+                                               perf_tex_faces, TEX_FACE_BUDGET,
+                                               perf_bkd_tris, BKD_TRI_BUDGET,
+                                               n64_mem_available());
+                                    }
+                                }
+                            }
                             if (bp.start) { paused = false; }
 
                             /* Slider navigation + adjustment (edits copies only) */

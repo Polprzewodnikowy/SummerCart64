@@ -189,6 +189,24 @@ sleep 0.5
 "$IMPORT" -window root "$OUTDIR/page5_visibility.png" 2>/dev/null
 echo "  Captured: page5_visibility.png"
 
+# Page 6: T3D Pipeline (Claude diagnostic)
+"$INPUT" r 100
+sleep 0.5
+"$IMPORT" -window root "$OUTDIR/page6_t3d.png" 2>/dev/null
+echo "  Captured: page6_t3d.png"
+
+# Page 7: Timing Waterfall (Claude diagnostic)
+"$INPUT" r 100
+sleep 0.5
+"$IMPORT" -window root "$OUTDIR/page7_waterfall.png" 2>/dev/null
+echo "  Captured: page7_waterfall.png"
+
+# Page 8: Performance Targets (Claude diagnostic)
+"$INPUT" r 100
+sleep 0.5
+"$IMPORT" -window root "$OUTDIR/page8_targets.png" 2>/dev/null
+echo "  Captured: page8_targets.png"
+
 # Close pause menu
 "$INPUT" start 200
 sleep 0.5

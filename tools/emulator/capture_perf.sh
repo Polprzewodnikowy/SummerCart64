@@ -96,6 +96,24 @@ sleep 0.5
 echo "Capturing page 5: Room visibility"
 "$IMPORT" -window root "$OUTDIR/page5_visibility.png" 2>/dev/null
 
+# Page 6 (Claude: T3D Pipeline Status)
+"$INPUT" r 100
+sleep 0.5
+echo "Capturing page 6: T3D pipeline"
+"$IMPORT" -window root "$OUTDIR/page6_t3d.png" 2>/dev/null
+
+# Page 7 (Claude: Timing Waterfall)
+"$INPUT" r 100
+sleep 0.5
+echo "Capturing page 7: Timing waterfall"
+"$IMPORT" -window root "$OUTDIR/page7_waterfall.png" 2>/dev/null
+
+# Page 8 (Claude: Performance Targets)
+"$INPUT" r 100
+sleep 0.5
+echo "Capturing page 8: Performance targets"
+"$IMPORT" -window root "$OUTDIR/page8_targets.png" 2>/dev/null
+
 echo ""
 echo "=== Capture Complete ==="
 echo "Screenshots: $OUTDIR/"
