@@ -1394,7 +1394,7 @@ int main(void) {
                 int g_bkd_tri_budget      = 1250;
                 int g_bkd_upload_budget    = 16;
                 int g_tex_tri_budget      = 550;
-                int g_tex_face_budget     = 400;
+                int g_tex_face_budget     = 550;
                 int g_tex_upload_budget    = 96;
 
                 /* View distance thresholds (runtime-adjustable, in world units).
@@ -2227,15 +2227,29 @@ int main(void) {
                     #define STREAM_PRI_LOW    0
                     int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
-                    int vis_stream_pri[MAX_DRAW_ROOMS]; /* streaming priority hints (future use) */
-                    (void)vis_stream_pri; /* suppresses set-but-unused warning */
+                    int vis_stream_pri[MAX_DRAW_ROOMS];
+                    (void)vis_stream_pri;
 
-                    /* Rule 1: current room — always, highest priority */
+                    /* Per-room portal scissor: screen-space AABB of the portal
+                     * through which this room is visible. Current room = full screen. */
+                    typedef struct { int x0, y0, x1, y1; } scissor_t;
+                    scissor_t room_scissor[256];
+                    for (int i = 0; i < 256; i++) {
+                        room_scissor[i].x0 = 0; room_scissor[i].y0 = 0;
+                        room_scissor[i].x1 = 320; room_scissor[i].y1 = 240;
+                    }
+
+                    /* Rule 1: current room — full screen scissor */
                     if (lara_room >= 0 && lara_room < g_chunk_count) {
                         g_chunks[lara_room].dist_sq = 0.0f;
                         g_chunks[lara_room].visible = true;
                         vis_rooms[vis_count] = lara_room;
                         vis_stream_pri[vis_count] = STREAM_PRI_HIGH;
+                        /* Current room: full screen */
+                        room_scissor[lara_room].x0 = 0;
+                        room_scissor[lara_room].y0 = 0;
+                        room_scissor[lara_room].x1 = 320;
+                        room_scissor[lara_room].y1 = 240;
                         vis_count++;
                     }
 
@@ -2261,19 +2275,26 @@ int main(void) {
                             int priority = STREAM_PRI_LOW;
                             int verts_in_front = 0;
                             float pmin_sx = 320, pmax_sx = 0;
+                            float pmin_sy = 240, pmax_sy = 0;
 
                             for (int pv = 0; pv < 4; pv++) {
                                 float px = (float)(lr->x + portal->vertices[pv].x) - cam_x;
+                                float py = (float)(portal->vertices[pv].y) - cam_y;
                                 float pz = (float)(lr->z + portal->vertices[pv].z) - cam_z;
-                                float rz_p = px * sy + pz * cy;
+                                float rx_p = px * cy - pz * sy;
+                                float rz_yaw = px * sy + pz * cy;
+                                float ry_p = py * cp - rz_yaw * sp;
+                                float rz_p = py * sp + rz_yaw * cp;
 
-                                if (rz_p > -256.0f) {
+                                if (rz_p > 1.0f) {
                                     verts_in_front++;
-                                    if (rz_p < 1.0f) rz_p = 1.0f;
-                                    float rx_p = px * cy - pz * sy;
-                                    float sx_p = 160.0f + rx_p * 256.0f / rz_p;
+                                    float inv = 256.0f / rz_p;
+                                    float sx_p = 160.0f + rx_p * inv;
+                                    float sy_p = 120.0f + ry_p * inv;
                                     if (sx_p < pmin_sx) pmin_sx = sx_p;
                                     if (sx_p > pmax_sx) pmax_sx = sx_p;
+                                    if (sy_p < pmin_sy) pmin_sy = sy_p;
+                                    if (sy_p > pmax_sy) pmax_sy = sy_p;
                                 }
                             }
 
@@ -2297,6 +2318,27 @@ int main(void) {
                             c->visible = true;
                             vis_rooms[vis_count] = dest;
                             vis_stream_pri[vis_count] = priority;
+                            /* Store portal screen AABB as scissor for this room.
+                             * Clamp to screen bounds. If portal crosses near plane,
+                             * use full screen (can't compute reliable bounds). */
+                            if (dest < 256) {
+                                if (verts_in_front < 4) {
+                                    /* Crosses near plane — full screen */
+                                    room_scissor[dest].x0 = 0;
+                                    room_scissor[dest].y0 = 0;
+                                    room_scissor[dest].x1 = 320;
+                                    room_scissor[dest].y1 = 240;
+                                } else {
+                                    int sx0 = (int)pmin_sx; if (sx0 < 0) sx0 = 0;
+                                    int sy0 = (int)pmin_sy; if (sy0 < 0) sy0 = 0;
+                                    int sx1 = (int)pmax_sx + 1; if (sx1 > 320) sx1 = 320;
+                                    int sy1 = (int)pmax_sy + 1; if (sy1 > 240) sy1 = 240;
+                                    room_scissor[dest].x0 = sx0;
+                                    room_scissor[dest].y0 = sy0;
+                                    room_scissor[dest].x1 = sx1;
+                                    room_scissor[dest].y1 = sy1;
+                                }
+                            }
                             vis_count++;
                         }
                     }
@@ -2365,6 +2407,28 @@ int main(void) {
                                 c->visible = true;
                                 vis_rooms[vis_count] = dest;
                                 vis_stream_pri[vis_count] = STREAM_PRI_LOW;
+                                /* Store portal scissor — intersect with parent room's scissor */
+                                if (dest < 256) {
+                                    scissor_t parent_sc = (r1 < 256) ? room_scissor[r1] :
+                                        (scissor_t){0, 0, 320, 240};
+                                    if (front < 4) {
+                                        room_scissor[dest] = parent_sc; /* near plane: use parent */
+                                    } else {
+                                        int sx0 = (int)pmin_sx; if (sx0 < 0) sx0 = 0;
+                                        int sy0 = (int)pmin_sy; if (sy0 < 0) sy0 = 0;
+                                        int sx1 = (int)pmax_sx + 1; if (sx1 > 320) sx1 = 320;
+                                        int sy1 = (int)pmax_sy + 1; if (sy1 > 240) sy1 = 240;
+                                        /* Intersect with parent scissor */
+                                        if (sx0 < parent_sc.x0) sx0 = parent_sc.x0;
+                                        if (sy0 < parent_sc.y0) sy0 = parent_sc.y0;
+                                        if (sx1 > parent_sc.x1) sx1 = parent_sc.x1;
+                                        if (sy1 > parent_sc.y1) sy1 = parent_sc.y1;
+                                        room_scissor[dest].x0 = sx0;
+                                        room_scissor[dest].y0 = sy0;
+                                        room_scissor[dest].x1 = sx1;
+                                        room_scissor[dest].y1 = sy1;
+                                    }
+                                }
                                 vis_count++;
                             }
                         }
@@ -2657,6 +2721,13 @@ int main(void) {
                             perf_bkd_rooms++;
                             if (room_baked) perf_bkd_baked++;
 
+                            /* Set portal scissor — clips rendering to the portal opening */
+                            if (room_idx < 256) {
+                                scissor_t sc = room_scissor[room_idx];
+                                if (sc.x1 > sc.x0 && sc.y1 > sc.y0)
+                                    rdpq_set_scissor(sc.x0, sc.y0, sc.x1, sc.y1);
+                            }
+
                             /* ---- Baked pass vertex cache ---- */
                             float room_ox = (float)room->x - cam_x;
                             float room_oz = (float)room->z - cam_z;
@@ -2886,6 +2957,8 @@ int main(void) {
                         }
                     }
                     bkd_pass_done:
+                    /* Reset scissor to full screen */
+                    rdpq_set_scissor(0, 0, 320, 240);
 
                     /* Record baked pass CPU time */
                     {
@@ -2944,6 +3017,13 @@ int main(void) {
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
                         perf_tex_rooms++;
+
+                        /* Set portal scissor */
+                        if (room_idx < 256) {
+                            scissor_t sc = room_scissor[room_idx];
+                            if (sc.x1 > sc.x0 && sc.y1 > sc.y0)
+                                rdpq_set_scissor(sc.x0, sc.y0, sc.x1, sc.y1);
+                        }
 
                         bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
@@ -3295,6 +3375,8 @@ int main(void) {
                         }
                     }
 
+                    /* Reset scissor for Lara/items/shadow (not room-clipped) */
+                    rdpq_set_scissor(0, 0, 320, 240);
                     perf_tex_room_us = (uint32_t)((float)TICKS_DISTANCE(_nr_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
                     } /* end room faces timing */
 
