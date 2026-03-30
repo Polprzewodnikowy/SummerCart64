@@ -1238,9 +1238,9 @@ int main(void) {
                 static room_budget_t room_budgets[256]; /* up to 256 rooms */
                 /* Initialize all to inherit */
                 for (int i = 0; i < 256; i++) {
-                    room_budgets[i].near_face_budget = ROOM_BUDGET_INHERIT;
-                    room_budgets[i].near_tri_budget  = ROOM_BUDGET_INHERIT;
-                    room_budgets[i].far_tri_budget   = ROOM_BUDGET_INHERIT;
+                    room_budgets[i].near_face_budget = (int16_t)g_near_face_budget;
+                    room_budgets[i].near_tri_budget  = (int16_t)g_near_tri_budget;
+                    room_budgets[i].far_tri_budget   = (int16_t)g_far_tri_budget;
                 }
 
                 /* Effective budget helpers — computed per frame from current room */
@@ -1556,7 +1556,7 @@ int main(void) {
                             }
                             graphics_set_color(0xFFFFFFFF, 0x00000000);
                             char buf[80];
-                            int y = 4;
+                            int y = 14;
                             #define STAT(fmt, ...) do { \
                                 snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
                                 graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
@@ -1639,9 +1639,12 @@ int main(void) {
                                 STAT_HL(slider_sel, 2, "Far Tri:   %d (global:%d)",
                                         (int)edit_room_budgets[ri].far_tri_budget, edit_g_far_tri);
                                 STAT("");
-                                STAT("Effective: Face:%d Tri:%d FarTri:%d",
-                                     EFF_BUDGET(edit_room_budgets[ri].near_face_budget, edit_g_near_face),
-                                     EFF_BUDGET(edit_room_budgets[ri].near_tri_budget, edit_g_near_tri),
+                                STAT("Effective:");
+                                STAT("  Face:   %d",
+                                     EFF_BUDGET(edit_room_budgets[ri].near_face_budget, edit_g_near_face));
+                                STAT("  Tri:    %d",
+                                     EFF_BUDGET(edit_room_budgets[ri].near_tri_budget, edit_g_near_tri));
+                                STAT("  FarTri: %d",
                                      EFF_BUDGET(edit_room_budgets[ri].far_tri_budget, edit_g_far_tri));
                                 STAT("");
                                 STAT("Room size: %s",
