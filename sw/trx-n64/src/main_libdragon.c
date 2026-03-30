@@ -2460,9 +2460,10 @@ int main(void) {
 
                                     float ts = 0, tt = 0;
                                     if (room_baked) {
-                                        float baked_dim = MIP0_DIM * room_uv_scale;
-                                        ts = ((float)(v % 2)) * baked_dim;
-                                        tt = ((float)(v / 2)) * baked_dim;
+                                        /* Sample baked tile center — gives solid room color
+                                         * instead of zigzag tiling pattern */
+                                        ts = 0.5f;
+                                        tt = 0.5f;
                                     } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
@@ -2832,9 +2833,9 @@ int main(void) {
                                 float ts = 0, tt = 0;
                                 if (tex_fallback_active) {
                                     /* Fallback: baked tile UV (same as baked pass) */
-                                    float baked_dim = 16.0f; /* CI8 16×16 default */
-                                    ts = ((float)(v % 2)) * baked_dim;
-                                    tt = ((float)(v / 2)) * baked_dim;
+                                    /* Fallback baked: sample center */
+                                    ts = 0.5f;
+                                    tt = 0.5f;
                                 } else if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
