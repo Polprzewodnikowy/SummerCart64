@@ -2010,6 +2010,18 @@ int main(void) {
                         eff_bkd_tri_budget   = EFF_BUDGET(room_budgets[ri].bkd_tri_budget,   g_bkd_tri_budget);
                     }
 
+                    /* Dynamic MidFar→Far floor: ensure the current room's
+                     * farthest wall always renders with full CI8 textures.
+                     * Uses room bounding sphere × 2 as the minimum threshold. */
+                    float eff_dist_vfar_sq = g_dist_vfar_sq;
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        float room_radius = g_chunks[lara_room].radius;
+                        float room_floor = room_radius * 2.0f;
+                        float room_floor_sq = room_floor * room_floor;
+                        if (room_floor_sq > eff_dist_vfar_sq)
+                            eff_dist_vfar_sq = room_floor_sq;
+                    }
+
                     /* Reset per-frame counters + start frame timer */
                     perf_bkd_rooms = 0; perf_bkd_tris = 0;
                     perf_bkd_uploads = 0; perf_bkd_baked = 0;
@@ -2265,8 +2277,9 @@ int main(void) {
                         /* Determine raw target tier from distance */
                         float dist = sqrtf(c->dist_sq);
                         int raw_tier = TIER_NEAR;
+                        float eff_vfar = sqrtf(eff_dist_vfar_sq);
                         float thresholds[4] = {
-                            g_dist_mid, g_dist_vfar, g_dist_xfar, g_dist_xxfar
+                            g_dist_mid, eff_vfar, g_dist_xfar, g_dist_xxfar
                         };
                         for (int t = 0; t < 4; t++) {
                             /* Hysteresis: need to cross threshold + band to promote,
