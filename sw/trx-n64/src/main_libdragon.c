@@ -2176,7 +2176,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        #define NEAR_Z 200.0f  /* near clip plane */
+                        #define NEAR_Z 350.0f  /* near clip plane */
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
