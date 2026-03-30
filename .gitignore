@@ -23,3 +23,8 @@ tools/emulator/lib/
 # Game assets — extracted from levels.tar.gz, kept locally for ROM builds
 levels.tar.gz
 sw/trx-n64/data/levels/
+
+# Bake/pack artifacts
+**/*.baked
+**/*.ci8tiles
+**/*.atx
