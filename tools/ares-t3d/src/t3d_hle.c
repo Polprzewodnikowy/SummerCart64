@@ -532,7 +532,10 @@ void t3d_hle_frame_end(T3DHLEState *state) {
             f->warnings, f->errors,
             state->detect.overlay_id, state->detect.confirmed);
 
-    /* Reset per-frame counters */
+    /* Carry over to running totals, then reset per-frame counters.
+     * Note: in ares, vblank may fire before DMA processes commands
+     * for the current frame. To handle this, we only reset after
+     * emitting — late commands will count toward the next frame. */
     memset(f, 0, sizeof(*f));
 }
 
