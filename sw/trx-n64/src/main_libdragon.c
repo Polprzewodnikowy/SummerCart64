@@ -911,6 +911,85 @@ int main(void) {
                        num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024,
                        n64_mem_available() / 1024);
 
+                /* Generate CI4 per-face tiles from CI8 for the Far tier.
+                 * Each CI4 tile: 16-color local palette (32B) + packed nibbles (512B).
+                 * Generated at load time by quantizing CI8 tiles. */
+                #define CI4_TILE_TEXELS (TEX_TILE_DIM * TEX_TILE_DIM / 2) /* 512 bytes */
+                #define CI4_PAL_SIZE   16
+                uint8_t  *ci4_tiles = NULL;  /* packed nibble data */
+                uint16_t *ci4_pals  = NULL;  /* per-tile 16-color RGBA16 palettes */
+                surface_t *ci4_surfs = NULL;
+                if (num_otex > 0 && ci8_tiles) {
+                    ci4_tiles = (uint8_t *)malloc_uncached_aligned(
+                        64, num_otex * CI4_TILE_TEXELS);
+                    ci4_pals = (uint16_t *)malloc_uncached_aligned(
+                        64, num_otex * CI4_PAL_SIZE * sizeof(uint16_t));
+                    ci4_surfs = (surface_t *)n64_mem_alloc(
+                        num_otex * sizeof(surface_t));
+                }
+                if (ci4_tiles && ci4_pals && ci4_surfs) {
+                    for (int i = 0; i < num_otex; i++) {
+                        uint8_t *src = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                        uint8_t *dst = ci4_tiles + i * CI4_TILE_TEXELS;
+                        uint16_t *pal = ci4_pals + i * CI4_PAL_SIZE;
+
+                        /* Count frequency of each palette index */
+                        uint16_t freq[256] = {0};
+                        for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
+                            freq[src[p]]++;
+
+                        /* Find top 16 most frequent */
+                        uint8_t top16[16] = {0};
+                        for (int t = 0; t < 16; t++) {
+                            int best_idx = 0, best_freq = -1;
+                            for (int c = 0; c < 256; c++) {
+                                if ((int)freq[c] > best_freq) {
+                                    bool dup = false;
+                                    for (int tt = 0; tt < t; tt++)
+                                        if (top16[tt] == c) { dup = true; break; }
+                                    if (!dup) { best_idx = c; best_freq = freq[c]; }
+                                }
+                            }
+                            top16[t] = best_idx;
+                        }
+
+                        /* Build local RGBA16 palette */
+                        for (int t = 0; t < 16; t++)
+                            pal[t] = pal16[top16[t]];
+
+                        /* Build reverse map */
+                        uint8_t remap[256];
+                        for (int c = 0; c < 256; c++) {
+                            /* Find nearest in top16 by palette RGB distance */
+                            int best_ci4 = 0, best_d = 999999;
+                            uint16_t src_rgba = pal16[c];
+                            int sr = (src_rgba >> 11) & 0x1F;
+                            int sg = (src_rgba >> 6) & 0x1F;
+                            int sb = (src_rgba >> 1) & 0x1F;
+                            for (int t = 0; t < 16; t++) {
+                                int pr = (pal[t] >> 11) & 0x1F;
+                                int pg = (pal[t] >> 6) & 0x1F;
+                                int pb = (pal[t] >> 1) & 0x1F;
+                                int d = (sr-pr)*(sr-pr) + (sg-pg)*(sg-pg) + (sb-pb)*(sb-pb);
+                                if (d < best_d) { best_d = d; best_ci4 = t; }
+                            }
+                            remap[c] = best_ci4;
+                        }
+
+                        /* Pack into nibbles */
+                        for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p += 2) {
+                            uint8_t hi = remap[src[p]] & 0xF;
+                            uint8_t lo = remap[src[p + 1]] & 0xF;
+                            dst[p / 2] = (hi << 4) | lo;
+                        }
+
+                        ci4_surfs[i] = surface_make_linear(
+                            dst, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                    }
+                    printf("  CI4 tiles generated: %d tiles (%d KB)\n",
+                           num_otex, num_otex * CI4_TILE_TEXELS / 1024);
+                }
+
                 /* ---- Memory audit ---- */
                 printf("\n=== MEMORY AUDIT ===\n");
                 printf("  Bump heap:  %u KB used, %u KB free (of %u KB)\n",
@@ -2456,14 +2535,15 @@ int main(void) {
                                 rdpq_tex_upload(TILE0, &dbg_tier_surf[bkd_tier], NULL);
                                 room_baked = true;
                                 bkd_last_tex = -99;
-                            } else if (bkd_tier == TIER_MIDFAR || bkd_tier == TIER_FAR) {
-                                /* MidFar + Far: CI8 per-face textures.
-                                 * Same rendering path, differentiated by tier fog weights
-                                 * (MidFar=15%, Far=40%). Far will get CI4 per-face
-                                 * once AegisTex build tool generates them. */
+                            } else if (bkd_tier == TIER_MIDFAR) {
+                                /* MidFar: CI8 per-face textures */
                                 rdpq_mode_tlut(TLUT_RGBA16);
                                 rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
-                                /* room_baked stays false → face loop uses per-face CI8 uploads */
+                                /* room_baked stays false → face loop uses per-face CI8 */
+                                bkd_last_tex = -99;
+                            } else if (bkd_tier == TIER_FAR) {
+                                /* Far: CI4 per-face textures (half TMEM, 16-color palette) */
+                                /* room_baked stays false → face loop uses per-face CI4 */
                                 bkd_last_tex = -99;
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 /* Far/XFar/XXFar: use baked tiles */
@@ -2543,11 +2623,19 @@ int main(void) {
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
                                 if (!room_baked) {
-                                    /* MidFar / non-baked: CI8 per-face textures with fog */
-                                    if (!is_flat && tex_idx < num_otex && ci8_surfs) {
+                                    /* Per-face textures: CI4 for Far, CI8 for MidFar */
+                                    if (!is_flat && tex_idx < num_otex) {
                                         if ((int)tex_idx != bkd_last_tex) {
-                                            if (bkd_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                            rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                            if (bkd_tier == TIER_FAR && ci4_surfs && ci4_pals) {
+                                                /* CI4: upload local 16-color palette + tile */
+                                                rdpq_mode_tlut(TLUT_RGBA16);
+                                                rdpq_tex_upload_tlut(ci4_pals + tex_idx * CI4_PAL_SIZE, 0, 16);
+                                                rdpq_tex_upload(TILE0, &ci4_surfs[tex_idx], NULL);
+                                            } else if (ci8_surfs) {
+                                                /* CI8: global palette already uploaded */
+                                                if (bkd_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                                rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                            }
                                             bkd_last_tex = (int)tex_idx;
                                             perf_bkd_uploads++;
                                         }
