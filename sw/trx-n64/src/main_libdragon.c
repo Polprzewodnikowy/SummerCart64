@@ -2260,7 +2260,7 @@ int main(void) {
 
                             for (int f = 0; f < room->mesh.face_count; f++) {
                                 if (far_tris >= FAR_TRI_BUDGET) goto far_pass_done;
-                                if (room_baked && (f & 1)) continue;
+                                /* (face skip removed — vertex cache makes per-face cost cheap enough) */
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
