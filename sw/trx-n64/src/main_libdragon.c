@@ -911,83 +911,148 @@ int main(void) {
                        num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024,
                        n64_mem_available() / 1024);
 
-                /* Generate CI4 per-face tiles from CI8 for the Far tier.
-                 * Each CI4 tile: 16-color local palette (32B) + packed nibbles (512B).
-                 * Generated at load time by quantizing CI8 tiles. */
+                /* Load AegisTex .atx from ROM — per-tile CI4/CI8 format data.
+                 * Contains pre-quantized CI4 tiles with local palettes. */
                 #define CI4_TILE_TEXELS (TEX_TILE_DIM * TEX_TILE_DIM / 2) /* 512 bytes */
                 #define CI4_PAL_SIZE   16
-                uint8_t  *ci4_tiles = NULL;  /* packed nibble data */
-                uint16_t *ci4_pals  = NULL;  /* per-tile 16-color RGBA16 palettes */
+                #define CI4_PAYLOAD    (CI4_PAL_SIZE * 2 + CI4_TILE_TEXELS) /* 544 bytes */
+                #if !defined(ATX_ROM_OFFSET)
+                #define ATX_ROM_OFFSET 0u
+                #define ATX_ROM_SIZE   0u
+                #endif
+                #define ATX_HEADER_SIZE 32
+                #define ATX_RECORD_SIZE 4
+
+                uint8_t  *ci4_tiles = NULL;
+                uint16_t *ci4_pals  = NULL;
                 surface_t *ci4_surfs = NULL;
-                if (num_otex > 0 && ci8_tiles) {
+                uint8_t  *atx_tile_modes = NULL; /* 0=CI8, 1=CI4 per tile */
+
+                if (ATX_ROM_OFFSET > 0 && ATX_ROM_SIZE > ATX_HEADER_SIZE && num_otex > 0) {
+                    /* Read ATX header */
+                    static uint8_t atx_hdr[32] __attribute__((aligned(16)));
+                    dma_read(atx_hdr, ROM_CART_BASE + ATX_ROM_OFFSET, 32);
+
+                    if (atx_hdr[0]=='A' && atx_hdr[1]=='T' &&
+                        atx_hdr[2]=='X' && atx_hdr[3]=='1') {
+                        int atx_count = atx_hdr[4] | (atx_hdr[5] << 8);
+                        int atx_ci8_n = atx_hdr[8] | (atx_hdr[9] << 8);
+                        int atx_ci4_n = atx_hdr[10] | (atx_hdr[11] << 8);
+                        printf("  ATX: %d tiles (%d CI8, %d CI4)\n",
+                               atx_count, atx_ci8_n, atx_ci4_n);
+
+                        /* Read per-tile records */
+                        int records_size = (atx_count * ATX_RECORD_SIZE + 15) & ~15;
+                        uint8_t *atx_records = (uint8_t *)n64_mem_alloc(records_size + 16);
+                        if (atx_records) {
+                            dma_read(atx_records,
+                                     ROM_CART_BASE + ATX_ROM_OFFSET + ATX_HEADER_SIZE,
+                                     records_size);
+                            data_cache_hit_writeback_invalidate(atx_records, records_size);
+
+                            /* Allocate CI4 tile storage */
+                            atx_tile_modes = (uint8_t *)n64_mem_alloc(atx_count);
+                            ci4_tiles = (uint8_t *)malloc_uncached_aligned(
+                                64, atx_ci4_n * CI4_TILE_TEXELS);
+                            ci4_pals = (uint16_t *)malloc_uncached_aligned(
+                                64, atx_ci4_n * CI4_PAL_SIZE * sizeof(uint16_t));
+                            ci4_surfs = (surface_t *)n64_mem_alloc(
+                                atx_count * sizeof(surface_t));
+
+                            if (ci4_tiles && ci4_pals && ci4_surfs && atx_tile_modes) {
+                                /* Load CI4 payloads from ROM */
+                                uint32_t payload_base = ATX_ROM_OFFSET + ATX_HEADER_SIZE + records_size;
+                                int ci4_idx = 0;
+                                for (int i = 0; i < atx_count && i < num_otex; i++) {
+                                    uint8_t mode = atx_records[i * ATX_RECORD_SIZE];
+                                    uint16_t payload_off16 = atx_records[i * ATX_RECORD_SIZE + 2] |
+                                                             (atx_records[i * ATX_RECORD_SIZE + 3] << 8);
+                                    atx_tile_modes[i] = mode;
+
+                                    if (mode == 1 && ci4_idx < atx_ci4_n) {
+                                        /* CI4: DMA payload (544 bytes, 16-aligned) */
+                                        uint32_t rom_off = ROM_CART_BASE + payload_base + payload_off16 * 16;
+                                        uint8_t *dest_pal = (uint8_t *)(ci4_pals + ci4_idx * CI4_PAL_SIZE);
+                                        uint8_t *dest_tex = ci4_tiles + ci4_idx * CI4_TILE_TEXELS;
+
+                                        /* DMA palette (32 bytes) + texels (512 bytes) together */
+                                        static uint8_t ci4_buf[560] __attribute__((aligned(16)));
+                                        dma_read(ci4_buf, rom_off, 544);
+                                        data_cache_hit_writeback_invalidate(ci4_buf, 544);
+
+                                        /* Copy palette to uncached */
+                                        for (int p = 0; p < CI4_PAL_SIZE; p++)
+                                            ci4_pals[ci4_idx * CI4_PAL_SIZE + p] =
+                                                ci4_buf[p*2] | (ci4_buf[p*2+1] << 8);
+
+                                        /* Copy texels to uncached */
+                                        memcpy(dest_tex, ci4_buf + 32, CI4_TILE_TEXELS);
+
+                                        ci4_surfs[i] = surface_make_linear(
+                                            dest_tex, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                                        ci4_idx++;
+                                    } else {
+                                        /* CI8: no CI4 surface, use CI8 at runtime */
+                                        atx_tile_modes[i] = 0;
+                                        ci4_surfs[i] = (surface_t){0}; /* null surface */
+                                    }
+                                }
+                                printf("  Loaded %d CI4 tiles from ROM\n", ci4_idx);
+                            }
+                        }
+                    }
+                }
+                /* Fallback: if ATX not available, generate CI4 at runtime */
+                if (!ci4_tiles && num_otex > 0 && ci8_tiles) {
+                    printf("  ATX not in ROM — generating CI4 at runtime...\n");
                     ci4_tiles = (uint8_t *)malloc_uncached_aligned(
                         64, num_otex * CI4_TILE_TEXELS);
                     ci4_pals = (uint16_t *)malloc_uncached_aligned(
                         64, num_otex * CI4_PAL_SIZE * sizeof(uint16_t));
                     ci4_surfs = (surface_t *)n64_mem_alloc(
                         num_otex * sizeof(surface_t));
-                }
-                if (ci4_tiles && ci4_pals && ci4_surfs) {
-                    for (int i = 0; i < num_otex; i++) {
-                        uint8_t *src = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
-                        uint8_t *dst = ci4_tiles + i * CI4_TILE_TEXELS;
-                        uint16_t *pal = ci4_pals + i * CI4_PAL_SIZE;
-
-                        /* Count frequency of each palette index */
-                        uint16_t freq[256] = {0};
-                        for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
-                            freq[src[p]]++;
-
-                        /* Find top 16 most frequent */
-                        uint8_t top16[16] = {0};
-                        for (int t = 0; t < 16; t++) {
-                            int best_idx = 0, best_freq = -1;
-                            for (int c = 0; c < 256; c++) {
-                                if ((int)freq[c] > best_freq) {
-                                    bool dup = false;
-                                    for (int tt = 0; tt < t; tt++)
-                                        if (top16[tt] == c) { dup = true; break; }
-                                    if (!dup) { best_idx = c; best_freq = freq[c]; }
-                                }
-                            }
-                            top16[t] = best_idx;
-                        }
-
-                        /* Build local RGBA16 palette */
-                        for (int t = 0; t < 16; t++)
-                            pal[t] = pal16[top16[t]];
-
-                        /* Build reverse map */
-                        uint8_t remap[256];
-                        for (int c = 0; c < 256; c++) {
-                            /* Find nearest in top16 by palette RGB distance */
-                            int best_ci4 = 0, best_d = 999999;
-                            uint16_t src_rgba = pal16[c];
-                            int sr = (src_rgba >> 11) & 0x1F;
-                            int sg = (src_rgba >> 6) & 0x1F;
-                            int sb = (src_rgba >> 1) & 0x1F;
+                    atx_tile_modes = (uint8_t *)n64_mem_alloc(num_otex);
+                    if (ci4_tiles && ci4_pals && ci4_surfs && atx_tile_modes) {
+                        for (int i = 0; i < num_otex; i++) {
+                            uint8_t *src = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                            uint8_t *dst = ci4_tiles + i * CI4_TILE_TEXELS;
+                            uint16_t *pal = ci4_pals + i * CI4_PAL_SIZE;
+                            uint16_t freq[256] = {0};
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
+                                freq[src[p]]++;
+                            uint8_t top16[16] = {0};
                             for (int t = 0; t < 16; t++) {
-                                int pr = (pal[t] >> 11) & 0x1F;
-                                int pg = (pal[t] >> 6) & 0x1F;
-                                int pb = (pal[t] >> 1) & 0x1F;
-                                int d = (sr-pr)*(sr-pr) + (sg-pg)*(sg-pg) + (sb-pb)*(sb-pb);
-                                if (d < best_d) { best_d = d; best_ci4 = t; }
+                                int best = 0, bf = -1;
+                                for (int c = 0; c < 256; c++) {
+                                    if ((int)freq[c] > bf) {
+                                        bool dup = false;
+                                        for (int tt = 0; tt < t; tt++)
+                                            if (top16[tt] == c) { dup = true; break; }
+                                        if (!dup) { best = c; bf = freq[c]; }
+                                    }
+                                }
+                                top16[t] = best;
                             }
-                            remap[c] = best_ci4;
+                            for (int t = 0; t < 16; t++) pal[t] = pal16[top16[t]];
+                            uint8_t remap[256];
+                            for (int c = 0; c < 256; c++) {
+                                int bc = 0, bd = 999999;
+                                uint16_t s = pal16[c];
+                                int sr=(s>>11)&0x1F, sg=(s>>6)&0x1F, sb=(s>>1)&0x1F;
+                                for (int t = 0; t < 16; t++) {
+                                    int pr=(pal[t]>>11)&0x1F, pg=(pal[t]>>6)&0x1F, pb=(pal[t]>>1)&0x1F;
+                                    int d=(sr-pr)*(sr-pr)+(sg-pg)*(sg-pg)+(sb-pb)*(sb-pb);
+                                    if (d < bd) { bd = d; bc = t; }
+                                }
+                                remap[c] = bc;
+                            }
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p += 2)
+                                dst[p/2] = (remap[src[p]] << 4) | remap[src[p+1]];
+                            ci4_surfs[i] = surface_make_linear(dst, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                            atx_tile_modes[i] = 1; /* all CI4 in fallback */
                         }
-
-                        /* Pack into nibbles */
-                        for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p += 2) {
-                            uint8_t hi = remap[src[p]] & 0xF;
-                            uint8_t lo = remap[src[p + 1]] & 0xF;
-                            dst[p / 2] = (hi << 4) | lo;
-                        }
-
-                        ci4_surfs[i] = surface_make_linear(
-                            dst, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                        printf("  CI4 fallback: %d tiles generated\n", num_otex);
                     }
-                    printf("  CI4 tiles generated: %d tiles (%d KB)\n",
-                           num_otex, num_otex * CI4_TILE_TEXELS / 1024);
                 }
 
                 /* ---- Memory audit ---- */
@@ -2433,6 +2498,21 @@ int main(void) {
                         bkd_rooms[j + 1] = key;
                     }
 
+                    /* Helper: upload best available texture for a tile index.
+                     * Uses CI4 if AegisTex flagged it, else CI8. */
+                    #define UPLOAD_BEST_TEX(tidx, last_tex_var) do { \
+                        if (atx_tile_modes && atx_tile_modes[tidx] == 1 && \
+                            ci4_surfs && ci4_surfs[tidx].buffer) { \
+                            rdpq_mode_tlut(TLUT_RGBA16); \
+                            rdpq_tex_upload_tlut(ci4_pals + (tidx) * CI4_PAL_SIZE, 0, 16); \
+                            rdpq_tex_upload(TILE0, &ci4_surfs[tidx], NULL); \
+                        } else if (ci8_surfs) { \
+                            if ((last_tex_var) == -2) rdpq_mode_tlut(TLUT_RGBA16); \
+                            rdpq_tex_upload(TILE0, &ci8_surfs[tidx], NULL); \
+                        } \
+                        (last_tex_var) = (int)(tidx); \
+                    } while(0)
+
                     /* Merge: near rooms first, then far rooms */
                     int rooms_to_draw[MAX_DRAW_ROOMS * 2];
                     int num_draw = 0;
@@ -2626,17 +2706,7 @@ int main(void) {
                                     /* Per-face textures: CI4 for Far, CI8 for MidFar */
                                     if (!is_flat && tex_idx < num_otex) {
                                         if ((int)tex_idx != bkd_last_tex) {
-                                            if (bkd_tier == TIER_FAR && ci4_surfs && ci4_pals) {
-                                                /* CI4: upload local 16-color palette + tile */
-                                                rdpq_mode_tlut(TLUT_RGBA16);
-                                                rdpq_tex_upload_tlut(ci4_pals + tex_idx * CI4_PAL_SIZE, 0, 16);
-                                                rdpq_tex_upload(TILE0, &ci4_surfs[tex_idx], NULL);
-                                            } else if (ci8_surfs) {
-                                                /* CI8: global palette already uploaded */
-                                                if (bkd_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                                rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                            }
-                                            bkd_last_tex = (int)tex_idx;
+                                            UPLOAD_BEST_TEX(tex_idx, bkd_last_tex);
                                             perf_bkd_uploads++;
                                         }
                                     } else if (is_flat) {
@@ -3023,8 +3093,7 @@ int main(void) {
                             } else if (!is_flat && tex_idx < num_otex && ci8_surfs) {
                                 if ((int)tex_idx != tex_last_tex &&
                                     tex_uploads < TEX_UPLOAD_BUDGET) {
-                                    if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                    rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                    UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
                                     tex_last_tex = (int)tex_idx;
                                     tex_uploads++;
                                     perf_tex_binds++;
@@ -3290,8 +3359,7 @@ int main(void) {
                                 } else if (tex_idx < num_otex && ci8_surfs) {
                                     sm_fr = sm_fg = sm_fb = sm_bright;
                                     if ((int)tex_idx != tex_last_tex) {
-                                        if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                        rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                        UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
                                         tex_last_tex = (int)tex_idx;
                                     }
                                 } else continue;
@@ -3480,8 +3548,7 @@ int main(void) {
                                         }
                                     } else if (tex_idx < num_otex && ci8_surfs) {
                                         if ((int)tex_idx != tex_last_tex) {
-                                            if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                            rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                            UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
                                             tex_last_tex = (int)tex_idx;
                                         }
                                     } else continue;
@@ -3802,8 +3869,7 @@ int main(void) {
                             } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
                                 if ((int)tex_idx != tex_last_tex) {
-                                    if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
-                                    rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
+                                    UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
                                     tex_last_tex = (int)tex_idx;
                                 }
                             } else continue;

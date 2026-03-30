@@ -16,7 +16,7 @@ Baked data and CI8 tile offsets are stored in baked_offsets.h.
 import sys
 import os
 
-def build_full_rom(rom_path, assets_path, output_path, baked_path=None, ci8_path=None):
+def build_full_rom(rom_path, assets_path, output_path, baked_path=None, ci8_path=None, atx_path=None):
     with open(rom_path, "rb") as f:
         rom = f.read()
 
@@ -68,6 +68,20 @@ def build_full_rom(rom_path, assets_path, output_path, baked_path=None, ci8_path
         while len(full) % 4:
             full += b'\x00'
 
+    # Append AegisTex .atx if available
+    atx_offset = 0
+    atx_size = 0
+    if atx_path and os.path.exists(atx_path):
+        while len(full) % 16:
+            full += b'\x00'
+        atx_offset = len(full)
+        with open(atx_path, "rb") as f:
+            atx = f.read()
+        full += bytearray(atx)
+        atx_size = len(atx)
+        while len(full) % 4:
+            full += b'\x00'
+
     with open(output_path, "wb") as f:
         f.write(full)
 
@@ -78,6 +92,8 @@ def build_full_rom(rom_path, assets_path, output_path, baked_path=None, ci8_path
         print(f"  Baked:  {bake_size/1024:.1f} KB at offset 0x{bake_offset:X}")
     if ci8_offset:
         print(f"  CI8:    {ci8_size/1024:.1f} KB at offset 0x{ci8_offset:X}")
+    if atx_offset:
+        print(f"  ATX:    {atx_size/1024:.1f} KB at offset 0x{atx_offset:X}")
     print(f"  Total:  {len(full)/1024/1024:.1f} MB")
 
     # Write header file with offsets for C code
@@ -88,12 +104,15 @@ def build_full_rom(rom_path, assets_path, output_path, baked_path=None, ci8_path
         f.write(f"#define BAKED_ROM_SIZE    {bake_size}u\n")
         f.write(f"#define CI8_ROM_OFFSET    0x{ci8_offset:X}u\n")
         f.write(f"#define CI8_ROM_SIZE      {ci8_size}u\n")
+        f.write(f"#define ATX_ROM_OFFSET    0x{atx_offset:X}u\n")
+        f.write(f"#define ATX_ROM_SIZE      {atx_size}u\n")
     print(f"  Header: {header_path}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
-        print(f"Usage: {sys.argv[0]} <rom.z64> <assets.bin> <output.z64> [baked.baked] [ci8.ci8tiles]")
+        print(f"Usage: {sys.argv[0]} <rom.z64> <assets.bin> <output.z64> [baked.baked] [ci8.ci8tiles] [atx.atx]")
         sys.exit(1)
     baked = sys.argv[4] if len(sys.argv) > 4 else None
     ci8 = sys.argv[5] if len(sys.argv) > 5 else None
-    build_full_rom(sys.argv[1], sys.argv[2], sys.argv[3], baked, ci8)
+    atx = sys.argv[6] if len(sys.argv) > 6 else None
+    build_full_rom(sys.argv[1], sys.argv[2], sys.argv[3], baked, ci8, atx)
