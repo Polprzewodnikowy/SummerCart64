@@ -1908,7 +1908,7 @@ int main(void) {
                                     *tt[slider_sel] += fdelta;
                                     /* Clamp: min 1 (essentially zero), max 65536 */
                                     if (*tt[slider_sel] < 1.0f)  *tt[slider_sel] = 1.0f;
-                                    if (*t[slider_sel] > 65536.0f) *t[slider_sel] = 65536.0f;
+                                    if (*tt[slider_sel] > 65536.0f) *tt[slider_sel] = 65536.0f;
                                     /* Enforce monotonic: mid < vfar < xfar < xxfar.
                                      * Push neighbors apart by 256 minimum gap. */
                                     for (int k = slider_sel; k < 3; k++)
