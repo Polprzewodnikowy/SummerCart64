@@ -939,6 +939,23 @@ int main(void) {
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
                 }
 
+                /* Debug distance-tier visualization: 5 solid-color 1×1 textures.
+                 * Toggle via pause menu → global budgets page.
+                 * Colors: Near=GREEN, MidFar=CYAN, Far=YELLOW, XFar=ORANGE, XXFar=RED */
+                bool g_debug_dist_colors = false;
+                uint16_t *dbg_tier_px = (uint16_t *)malloc_uncached_aligned(64, 16);
+                surface_t dbg_tier_surf[5] = {{0}};
+                if (dbg_tier_px) {
+                    /* RGBA16: RRRRR GGGGG BBBBB A */
+                    dbg_tier_px[0] = (0<<11)|(31<<6)|(0<<1)|1;   /* near:    green */
+                    dbg_tier_px[1] = (0<<11)|(31<<6)|(31<<1)|1;  /* mid-far: cyan */
+                    dbg_tier_px[2] = (31<<11)|(31<<6)|(0<<1)|1;  /* far:     yellow */
+                    dbg_tier_px[3] = (31<<11)|(16<<6)|(0<<1)|1;  /* x-far:   orange */
+                    dbg_tier_px[4] = (31<<11)|(0<<6)|(0<<1)|1;   /* xx-far:  red */
+                    for (int i = 0; i < 5; i++)
+                        dbg_tier_surf[i] = surface_make_linear(&dbg_tier_px[i], FMT_RGBA16, 1, 1);
+                }
+
                 /* On-demand mip buffer — one reusable 16×16 RGBA16 surface.
                  * Instead of pre-allocating mips for all 880 textures,
                  * box-filter on-the-fly for the ~8 uploads per frame.
@@ -1540,6 +1557,7 @@ int main(void) {
                         int edit_g_near_upload = g_near_upload_budget;
                         int edit_g_far_tri     = g_far_tri_budget;
                         int edit_g_far_upload  = g_far_upload_budget;
+                        bool edit_debug_dist   = g_debug_dist_colors;
                         room_budget_t edit_room_budgets[256];
                         memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
@@ -1623,6 +1641,13 @@ int main(void) {
                                 STAT_HL(slider_sel, 3, "Far Tri Budget:   %d", edit_g_far_tri);
                                 STAT_HL(slider_sel, 4, "Far Upload Cap:   %d", edit_g_far_upload);
                                 STAT("");
+                                STAT_HL(slider_sel, 5, "Dist Debug Colors: %s",
+                                        edit_debug_dist ? "ON" : "OFF");
+                                if (edit_debug_dist) {
+                                    STAT(" GREEN=Near CYAN=MidFar");
+                                    STAT(" YELLOW=Far ORANGE=XFar RED=XXFar");
+                                }
+                                STAT("");
                                 STAT("(applied on unpause)");
 
                             } else if (pause_page == 2) {
@@ -1669,9 +1694,13 @@ int main(void) {
 
                             /* Slider navigation + adjustment (edits copies only) */
                             if (pause_page == 1) {
-                                int max_sel = 4;
+                                int max_sel = 5; /* 0-4 = budgets, 5 = debug toggle */
                                 if (bp.d_up && slider_sel > 0) slider_sel--;
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                /* Toggle for debug dist colors */
+                                if (slider_sel == 5 && (bp.d_left || bp.d_right))
+                                    edit_debug_dist = !edit_debug_dist;
 
                                 int delta = 0;
                                 if (bp.d_right) delta = 50;
@@ -1739,6 +1768,7 @@ int main(void) {
                         g_near_upload_budget = edit_g_near_upload;
                         g_far_tri_budget     = edit_g_far_tri;
                         g_far_upload_budget  = edit_g_far_upload;
+                        g_debug_dist_colors  = edit_debug_dist;
                         memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
                     }
@@ -2074,7 +2104,14 @@ int main(void) {
                             if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 float rd = is_ring2 ? (CHUNK_XXFAR_DIST2 + 1.0f) : room_d;
                                 rspq_flush();
-                                if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
+                                if (g_debug_dist_colors && dbg_tier_px) {
+                                    /* Debug: solid color per distance tier */
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    int tier = (rd > CHUNK_XXFAR_DIST2) ? 4 :
+                                               (rd > CHUNK_XFAR_DIST2)  ? 3 :
+                                               (rd > CHUNK_VERY_FAR_DIST2) ? 2 : 1;
+                                    rdpq_tex_upload(TILE0, &dbg_tier_surf[tier], NULL);
+                                } else if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
@@ -2088,7 +2125,6 @@ int main(void) {
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_m1_surf) {
-                                    /* Finest tier — used for close far-rooms too */
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                     rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
@@ -2309,6 +2345,13 @@ int main(void) {
                     int near_last_tex = -99; /* force first upload */
                     int near_uploads = 0;
 
+                    /* Debug: override near pass with solid green */
+                    if (g_debug_dist_colors && dbg_tier_px) {
+                        rdpq_mode_tlut(TLUT_NONE);
+                        rdpq_tex_upload(TILE0, &dbg_tier_surf[0], NULL); /* green = near */
+                        near_last_tex = -99;
+                    }
+
                     /* ===== NEAR PASS: ROOM FACES ===== */
                     { uint32_t _nr_t0 = TICKS_READ();
                     /* CPU transform + near-plane clip + project → rdpq_triangle.
@@ -2419,8 +2462,10 @@ int main(void) {
                             uint16_t tex_idx = face->texture & 0x7FFF;
                             bool is_flat = (face->texture & 0x8000) != 0;
 
-                            /* Texture upload on change */
-                            if (!is_flat && tex_idx < num_otex && ci8_surfs) {
+                            /* Texture upload on change (skip when debug dist colors active) */
+                            if (g_debug_dist_colors) {
+                                /* debug: keep solid green, skip all uploads */
+                            } else if (!is_flat && tex_idx < num_otex && ci8_surfs) {
                                 if ((int)tex_idx != near_last_tex &&
                                     near_uploads < NEAR_UPLOAD_BUDGET) {
                                     if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
