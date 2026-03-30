@@ -129,9 +129,8 @@ static void test_unknown_cmd_id(void) {
     /* cmd_id = 15 which is >= T3D_CMD_COUNT (13) */
     put_be32(fake_rdram, 0, rspq_word(6, 15, 0));
     int consumed = t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
-    ASSERT_EQ(consumed, 1, "unknown cmd returns 1");
+    ASSERT_EQ(consumed, -1, "unknown cmd returns -1 (stop scanning)");
     ASSERT_EQ(state.frame.cmds_unsupported, 1, "unsupported counted");
-    ASSERT_EQ(state.frame.warnings, 1, "warning emitted");
 
     fclose(devnull);
 }

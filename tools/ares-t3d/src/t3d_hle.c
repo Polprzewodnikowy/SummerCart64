@@ -471,12 +471,11 @@ int t3d_hle_process_command(T3DHLEState *state,
     state->frame.cmds_t3d++;
     state->total_cmds++;
 
-    /* Validate command ID range */
+    /* Validate command ID range. If unknown, return -1 to signal
+     * the caller to stop scanning — we're likely misaligned. */
     if (cmd_id >= T3D_CMD_COUNT) {
-        LOG_WARN(state, "msg=\"unknown T3D cmd\" cmd_id=%d overlay=%d addr=0x%08X",
-                 cmd_id, ovl_id, cmd_addr);
         state->frame.cmds_unsupported++;
-        return 1; /* assume 1 word, caller should handle gracefully */
+        return -1; /* stop scanning */
     }
 
     /* Validate we can read the full command */

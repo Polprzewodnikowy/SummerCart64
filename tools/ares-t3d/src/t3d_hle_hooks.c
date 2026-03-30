@@ -134,6 +134,8 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
                 cmds_in_buffer++;
                 continue;
             }
+            /* consumed <= 0 means unknown/bad command — stop scanning */
+            break;
         }
 
         /* Unknown overlay command — we don't know its size.

@@ -4,7 +4,7 @@ Verified against `/tmp/tiny3d/src/t3d/t3d.c` and `t3d.h`.
 
 ## TR1 Usage Priority
 
-The current TR1 game uses **6 of 13** commands. These are the MVP for Tier 3.
+The current TR1 game uses **7 of 13** commands (updated from live telemetry).
 
 | Priority | Cmd | ID | Words | TR1 | Emitter | Render Semantic |
 |----------|-----|-----|-------|-----|---------|----------------|
@@ -14,13 +14,20 @@ The current TR1 game uses **6 of 13** commands. These are the MVP for Tier 3.
 | **P0** | TRI_SYNC | 0xA | 1 | YES | `t3d_tri_sync()` t3d.h:413 | Flush draw batch |
 | **P1** | DRAWFLAGS | 0x6 | 2 | YES | `t3d_state_set_drawflags()` t3d.c:303 | Render state |
 | **P1** | LIGHT_SET | 0x5 | 4 | YES | `t3d_light_set_ambient()` t3d.c:190 | Lighting |
+| **P1** | FOG_RANGE | 0x8 | 2 | **YES** | `t3d_fog_set_range()` t3d.c:442 | **Fog params (confirmed live)** |
 | P2 | SCREEN_SIZE | 0x1 | 5 | no | `t3d_viewport_attach()` t3d.c:518 | Viewport setup |
 | P2 | PROJ_SET | 0x7 | 1 | no | `t3d_matrix_set_proj()` t3d.c:134 | Projection matrix |
 | P2 | SET_WORD | 0x3 | 2 | no | `t3d_dmem_set_u32()` t3d.c:100 | DMEM state |
-| P3 | FOG_RANGE | 0x8 | 2 | no | `t3d_fog_set_range()` t3d.c:442 | Fog params |
 | P3 | FOG_STATE | 0x9 | 1 | no | `t3d_fog_set_enabled()` t3d.h:543 | Fog toggle |
 | P3 | TRI_STRIP | 0xB | 2 | no | `t3d_tri_draw_strip()` t3d.c:425 | Triangle strip |
 | P3 | TRI_SEQ | 0xC | 2 | no | `t3d_tri_draw_unindexed()` t3d.c:404 | Sequential tris |
+
+### Live telemetry data (from TR1 Caves, frame 88)
+```
+cmds=7408 t3d=112 rspq=4060 other=3236
+verts=560 tris=32 drawcalls=6 mtx_ops=3
+overlay=1 (runtime-assigned)
+```
 
 ## Detailed Command Encoding
 
