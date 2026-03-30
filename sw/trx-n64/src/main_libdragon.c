@@ -2354,7 +2354,9 @@ int main(void) {
                                             clipped[v][k] = cv[v][k];
                                 }
 
-                                /* Project to screen — clamp, don't reject.
+                                /* Project + guard-band reject */
+                                bool screen_ok = true;
+                                /* Project to screen — guard-band reject.
                                  * Let RDP scissor handle off-screen tris;
                                  * rejecting per-vertex was too aggressive
                                  * for large faces near screen edges. */
@@ -2364,16 +2366,17 @@ int main(void) {
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + clipped[v][0] * inv_z;
                                     float scy = 120.0f + clipped[v][1] * inv_z;
-                                    if (scx < -2048) scx = -2048;
-                                    if (scx >  2048) scx =  2048;
-                                    if (scy < -2048) scy = -2048;
-                                    if (scy >  2048) scy =  2048;
+                                    if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
+                                        screen_ok = false; break;
+                                    }
                                     sv[v][0] = scx;  sv[v][1] = scy;
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    sv[v][8] = 1.0f / rz;
+                                    sv[v][8] = inv_z;
                                 }
+                                if (!screen_ok) continue;
 
                                 int num_tris = clip_nv - 2;
                                 for (int tri = 0; tri < num_tris; tri++) {
@@ -2640,24 +2643,33 @@ int main(void) {
                                     for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
                             }
 
-                            /* Project — clamp, don't reject */
+                            /* Project + guard-band reject.
+                             * RDP valid range ~[-1024, 1023]. Reject entire face
+                             * if any vertex projects beyond guard band. Clamp
+                             * vertices within guard band to safe range. */
+                            #define GUARD_LO_X (-1000.0f)
+                            #define GUARD_HI_X (1320.0f)
+                            #define GUARD_LO_Y (-760.0f)
+                            #define GUARD_HI_Y (1000.0f)
                             float sv[6][10];
+                            bool guard_ok = true;
                             for (int v = 0; v < clip_nv; v++) {
                                 float rz = clipped[v][2];
                                 float inv_z = 256.0f / rz;
                                 float scx = 160.0f + clipped[v][0] * inv_z;
                                 float scy = 120.0f + clipped[v][1] * inv_z;
-                                if (scx < -2048) scx = -2048;
-                                if (scx >  2048) scx =  2048;
-                                if (scy < -2048) scy = -2048;
-                                if (scy >  2048) scy =  2048;
+                                if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                    scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
+                                    guard_ok = false; break;
+                                }
                                 sv[v][0]=scx;   sv[v][1]=scy;
                                 sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f) sv[v][2]=1.0f;
                                 sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
                                 sv[v][5]=clipped[v][5]; sv[v][6]=1.0f;
                                 sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
-                                sv[v][9]=1.0f/rz; /* perspective W: must be 1/z, not 256/z */
+                                sv[v][9]=inv_z;
                             }
+                            if (!guard_ok) continue;
 
                             int num_tris = clip_nv - 2;
                             for (int tri = 0; tri < num_tris; tri++) {
@@ -2790,22 +2802,24 @@ int main(void) {
                                     if(sm_cnv<3) continue;
                                 } else { for(int i=0;i<nv;i++) for(int k=0;k<8;k++) sm_cl[i][k]=sm_cv[i][k]; }
 
+                                bool sm_guard_ok = true;
                                 for (int v=0;v<sm_cnv;v++) {
                                     float rz=sm_cl[v][2];
                                     float inv_z=256.0f/rz;
                                     float scx=160.0f+sm_cl[v][0]*inv_z;
                                     float scy=120.0f+sm_cl[v][1]*inv_z;
-                                    if (scx < -2048) scx = -2048;
-                                    if (scx >  2048) scx =  2048;
-                                    if (scy < -2048) scy = -2048;
-                                    if (scy >  2048) scy =  2048;
+                                    if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
+                                        sm_guard_ok = false; break;
+                                    }
                                     sv[v][0]=scx; sv[v][1]=scy;
                                     sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
                                     sv[v][6]=1.0f;
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
-                                    sv[v][9]=1.0f/rz;
+                                    sv[v][9]=256.0f/rz;
                                 }
+                                if (!sm_guard_ok) continue;
                                 int num_tris = sm_cnv - 2;
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
@@ -2965,7 +2979,7 @@ int main(void) {
                                             sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
                                             sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                         } else { sv[v][7]=0; sv[v][8]=0; }
-                                        sv[v][9]=1.0f/rz;
+                                        sv[v][9]=256.0f/rz;
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
@@ -3041,7 +3055,7 @@ int main(void) {
                             for (int v = 0; v < 4; v++) {
                                 sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
                                 sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
-                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=1.0f/rz_s;
+                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=256.0f/rz_s;
                             }
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
