@@ -1635,9 +1635,13 @@ int main(void) {
                                 STAT("RSP stall:%uus (%s)", perf_rsp_us,
                                      perf_rsp_us > 4000 ? "RDP" :
                                      perf_rsp_us > 1000 ? "RSP" : "CPU");
-                                STAT("Room:%d Vis:%d r1:%d r2:%d",
+                                STAT("Room:%d Vis:%d r1:%d ext:%d",
                                      lara_room, perf_vis_total,
                                      perf_vis_ring1, perf_vis_ring2);
+                                STAT("Rings:%d/%d/%d/%d/%d",
+                                     perf_ring_counts[0],
+                                     perf_ring_counts[1], perf_ring_counts[2],
+                                     perf_ring_counts[3], perf_ring_counts[4]);
                                 /* Show actual distances for debugging tier thresholds */
                                 {
                                     /* Find nearest non-lara visible room's dist_sq */
@@ -2038,7 +2042,9 @@ int main(void) {
                      * and the farthest visible rooms. */
                     int ring1_end = vis_count;
                     #define MAX_RING_DEPTH 5
-                    int ring_start = 0; /* start of current ring's rooms in vis_rooms */
+                    int ring_start = 0;
+                    static int perf_ring_counts[MAX_RING_DEPTH+1]; /* rooms found per ring */
+                    perf_ring_counts[0] = vis_count; /* ring 0 = current + ring1 */
                     for (int ring = 0; ring < MAX_RING_DEPTH && vis_count < MAX_DRAW_ROOMS; ring++) {
                         int ring_end = vis_count;
                         for (int vi = ring_start; vi < ring_end && vis_count < MAX_DRAW_ROOMS; vi++) {
@@ -2075,7 +2081,8 @@ int main(void) {
                                 vis_count++;
                             }
                         }
-                        ring_start = ring_end; /* next ring starts where this one ended */
+                        ring_start = ring_end;
+                        perf_ring_counts[ring+1] = vis_count - ring_end; /* new rooms in this ring */
                     }
 
                     /* Track visibility for diagnostics */
