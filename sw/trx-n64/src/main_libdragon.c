@@ -1303,6 +1303,38 @@ int main(void) {
                     room_budgets[i].bkd_tri_budget   = (int16_t)g_bkd_tri_budget;
                 }
 
+                /* ============================================================
+                 * PER-ROOM TIER STATE — hysteresis + sticky residency
+                 *
+                 * Tiers: 0=Near, 1=MidFar, 2=Far, 3=XFar, 4=XXFar, 5=Culled
+                 * Each room tracks its current rendering tier and resists
+                 * switching until the new tier is stable for TIER_HOLD frames.
+                 * Hysteresis band: a room must cross threshold + HYSTERESIS
+                 * to promote, or threshold - HYSTERESIS to demote.
+                 * ============================================================ */
+                #define TIER_NEAR   0
+                #define TIER_MIDFAR 1
+                #define TIER_FAR    2
+                #define TIER_XFAR   3
+                #define TIER_XXFAR  4
+                #define TIER_CULLED 5
+                #define TIER_HOLD_FRAMES 4  /* frames to hold before switching */
+                #define TIER_HYSTERESIS  0.15f /* 15% of threshold as dead zone */
+
+                typedef struct {
+                    uint8_t current_tier;
+                    uint8_t target_tier;
+                    uint8_t hold_count;   /* frames target has been stable */
+                    uint8_t fallback_tier; /* cheapest valid fallback */
+                } room_tier_state_t;
+                static room_tier_state_t room_tiers[256];
+                for (int i = 0; i < 256; i++) {
+                    room_tiers[i].current_tier = TIER_NEAR;
+                    room_tiers[i].target_tier = TIER_NEAR;
+                    room_tiers[i].hold_count = TIER_HOLD_FRAMES;
+                    room_tiers[i].fallback_tier = TIER_XXFAR;
+                }
+
                 /* Effective budget helpers — computed per frame from current room */
                 #define EFF_BUDGET(per_room, global) \
                     ((per_room) >= 0 ? ((per_room) < (global) ? (per_room) : (global)) : (global))
@@ -2189,36 +2221,87 @@ int main(void) {
                     /* ring2 now includes rings 2-5 */
                     perf_vis_total = vis_count;
 
-                    /* LOD classification — DISTANCE-BASED, not ring-based.
-                     * Tiers must progress smoothly: Near → MidFar → Far → XFar → XXFar.
-                     * Current room always Near. All others classified by distance
-                     * using the tunable g_dist_* thresholds.
-                     *
-                     * Near:   dist < g_dist_mid   → CI8 per-face, zbuf (textured pass)
-                     * MidFar+: dist >= g_dist_mid → baked tiles, fog (baked pass) */
+                    /* LOD classification with HYSTERESIS.
+                     * Each room tracks current/target tier. Tier only switches
+                     * after target is stable for TIER_HOLD_FRAMES. Hysteresis
+                     * band prevents flapping at boundaries. */
                     int tex_rooms[MAX_DRAW_ROOMS], tex_count = 0;
                     int bkd_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
+
+                    /* Threshold array for tier classification */
+                    float tier_thresholds_sq[4] = {
+                        g_dist_mid_sq, g_dist_vfar_sq,
+                        g_dist_xfar_sq, g_dist_xxfar_sq
+                    };
 
                     for (int vi = 0; vi < vis_count; vi++) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        /* Force tier override: put ALL rooms in one pass */
+                        /* Force tier override */
                         if (g_debug_force_tier == 1) {
-                            /* Force Near: all rooms go to textured pass */
                             c->lod = CHUNK_LOD_NEAR;
                             if (tex_count < MAX_DRAW_ROOMS)
                                 tex_rooms[tex_count++] = ri;
+                            continue;
                         } else if (g_debug_force_tier >= 2) {
-                            /* Force MidFar/Far/XFar/XXFar: all to baked pass */
                             c->lod = CHUNK_LOD_FAR;
                             if (bkd_count < MAX_DRAW_ROOMS)
                                 bkd_rooms[bkd_count++] = ri;
-                        } else if (ri == lara_room) {
+                            continue;
+                        }
+
+                        /* Current room always Near */
+                        if (ri == lara_room) {
+                            room_tiers[ri].current_tier = TIER_NEAR;
+                            room_tiers[ri].target_tier = TIER_NEAR;
+                            room_tiers[ri].hold_count = TIER_HOLD_FRAMES;
                             c->lod = CHUNK_LOD_NEAR;
                             if (tex_count < MAX_DRAW_ROOMS)
                                 tex_rooms[tex_count++] = ri;
-                        } else if (c->dist_sq < g_dist_mid_sq) {
+                            continue;
+                        }
+
+                        /* Determine raw target tier from distance */
+                        float dist = sqrtf(c->dist_sq);
+                        int raw_tier = TIER_NEAR;
+                        float thresholds[4] = {
+                            g_dist_mid, g_dist_vfar, g_dist_xfar, g_dist_xxfar
+                        };
+                        for (int t = 0; t < 4; t++) {
+                            /* Hysteresis: need to cross threshold + band to promote,
+                             * threshold - band to demote */
+                            float band = thresholds[t] * TIER_HYSTERESIS;
+                            float promote_at = thresholds[t] + band;
+                            float demote_at  = thresholds[t] - band;
+                            if (room_tiers[ri].current_tier <= t && dist > promote_at)
+                                raw_tier = t + 1;
+                            else if (room_tiers[ri].current_tier > t && dist > demote_at)
+                                raw_tier = t + 1;
+                        }
+                        /* Max draw distance cull */
+                        if (dist > g_max_draw_dist) raw_tier = TIER_CULLED;
+
+                        /* Update target + hold counter */
+                        if (raw_tier != room_tiers[ri].target_tier) {
+                            room_tiers[ri].target_tier = raw_tier;
+                            room_tiers[ri].hold_count = 0;
+                        } else if (room_tiers[ri].hold_count < TIER_HOLD_FRAMES) {
+                            room_tiers[ri].hold_count++;
+                        }
+
+                        /* Switch current tier only when target is stable */
+                        if (room_tiers[ri].hold_count >= TIER_HOLD_FRAMES) {
+                            room_tiers[ri].current_tier = room_tiers[ri].target_tier;
+                        }
+
+                        int tier = room_tiers[ri].current_tier;
+
+                        /* Culled rooms don't render */
+                        if (tier >= TIER_CULLED) continue;
+
+                        /* Near (tier 0) goes to textured pass, all others to baked */
+                        if (tier == TIER_NEAR) {
                             c->lod = CHUNK_LOD_NEAR;
                             if (tex_count < MAX_DRAW_ROOMS)
                                 tex_rooms[tex_count++] = ri;
@@ -2332,14 +2415,14 @@ int main(void) {
                              * (is_ring2 override removed — distance-based tiers now) */
                             float rd = room_d;
 
-                            /* Determine far tier (force override or by distance) */
+                            /* Use the room's assigned tier from hysteresis system */
                             int bkd_tier;
                             if (g_debug_force_tier >= 2)
-                                bkd_tier = g_debug_force_tier - 1; /* 2→1(MidFar), 3→2(Far), 4→3(XFar), 5→4(XXFar) */
+                                bkd_tier = g_debug_force_tier - 1;
+                            else if (room_idx < 256)
+                                bkd_tier = room_tiers[room_idx].current_tier;
                             else
-                                bkd_tier = (rd > g_dist_xxfar_sq) ? 4 :
-                                           (rd > g_dist_xfar_sq)  ? 3 :
-                                           (rd > g_dist_vfar_sq)  ? 2 : 1;
+                                bkd_tier = TIER_MIDFAR;
 
                             /* Debug colors: apply to ALL far rooms */
                             if (g_debug_dist_colors && dbg_tier_px) {
@@ -2348,7 +2431,7 @@ int main(void) {
                                 rdpq_tex_upload(TILE0, &dbg_tier_surf[bkd_tier], NULL);
                                 room_baked = true;
                                 bkd_last_tex = -99;
-                            } else if (bkd_tier == 1) {
+                            } else if (bkd_tier == TIER_MIDFAR) {
                                 /* MidFar: CI8 per-face textures (same as textured pass) */
                                 rdpq_mode_tlut(TLUT_RGBA16);
                                 rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
@@ -2357,13 +2440,13 @@ int main(void) {
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 /* Far/XFar/XXFar: use baked tiles */
                                 rspq_flush();
-                                if (bkd_tier >= 4 && bkd_m4_surf) {
+                                if (bkd_tier >= TIER_XXFAR && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
-                                } else if (bkd_tier >= 3 && bkd_m3_surf) {
+                                } else if (bkd_tier >= TIER_XFAR && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
-                                } else if (bkd_tier >= 2 && bkd_m2_surf) {
+                                } else if (bkd_tier >= TIER_FAR && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
@@ -2486,9 +2569,9 @@ int main(void) {
                                         float room_d = ck->max_z - ck->min_z;
                                         if (room_w < 1.0f) room_w = 1.0f;
                                         if (room_d < 1.0f) room_d = 1.0f;
-                                        float tile_dim = (bkd_tier >= 4) ? 4.0f :
-                                                         (bkd_tier >= 3) ? 8.0f :
-                                                         (bkd_tier >= 2) ? 8.0f : 16.0f;
+                                        float tile_dim = (bkd_tier >= TIER_XXFAR) ? 4.0f :
+                                                         (bkd_tier >= TIER_XFAR) ? 8.0f :
+                                                         (bkd_tier >= TIER_FAR) ? 8.0f : 16.0f;
                                         ts = ((wx - ck->min_x) / room_w) * tile_dim;
                                         tt = ((wz - ck->min_z) / room_d) * tile_dim;
                                         /* Clamp to valid tile range */
