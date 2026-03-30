@@ -2130,11 +2130,14 @@ int main(void) {
                     #define VTX_CACHE_MAX 600
                     static struct { float rx, ry, rz, r, g, b; } vtx_cache[VTX_CACHE_MAX];
 
-                    /* Guard band for screen-space rejection (RDP valid range) */
-                    #define GUARD_LO_X (-1000.0f)
-                    #define GUARD_HI_X (1320.0f)
-                    #define GUARD_LO_Y (-760.0f)
-                    #define GUARD_HI_Y (1000.0f)
+                    /* Guard band for screen-space rejection.
+                     * Must be tight enough for RDP fixed-point precision
+                     * but wide enough that near-edge faces don't vanish.
+                     * Screen is 320×240; allow ~500px margin each side. */
+                    #define GUARD_LO_X (-500.0f)
+                    #define GUARD_HI_X (820.0f)
+                    #define GUARD_LO_Y (-380.0f)
+                    #define GUARD_HI_Y (620.0f)
 
                     uint32_t perf_far_t0 = TICKS_READ(); /* start far pass timer */
 
@@ -2152,7 +2155,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        #define NEAR_Z 128.0f
+                        #define NEAR_Z 256.0f  /* near clip plane — higher = less screen fill from close faces */
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
