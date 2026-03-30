@@ -2407,12 +2407,24 @@ int main(void) {
                             float room_d = (room_idx < g_chunk_count)
                                 ? g_chunks[room_idx].dist_sq : 0.0f;
 
-                            /* Distance-based fog — smooth ramp, no forced minimum.
-                             * Close baked rooms get light fog, distant get heavy. */
+                            /* Tier-aware fog: each tier has a fog weight that
+                             * progressively hides detail loss.
+                             * Near=0 (no fog in textured pass), MidFar=0.15,
+                             * Far=0.4, XFar=0.65, XXFar=0.85 */
+                            int rm_tier = (room_idx < 256) ? room_tiers[room_idx].current_tier : TIER_MIDFAR;
+                            float tier_fog_weights[5] = { 0.0f, 0.15f, 0.4f, 0.65f, 0.85f };
+                            float tier_fog = (rm_tier < 5) ? tier_fog_weights[rm_tier] : 0.85f;
+
+                            /* Blend tier fog with distance fog for smooth ramp */
                             float room_dist = sqrtf(room_d);
-                            float fog = (room_dist - g_dist_mid) / (g_dist_xxfar - g_dist_mid);
-                            if (fog < 0.0f) fog = 0.0f;
-                            if (fog > 0.85f) fog = 0.85f;
+                            float dist_fog = (room_dist - g_dist_mid) / (g_dist_xxfar - g_dist_mid);
+                            if (dist_fog < 0.0f) dist_fog = 0.0f;
+                            if (dist_fog > 1.0f) dist_fog = 1.0f;
+
+                            /* Use the stronger of tier fog and distance fog */
+                            float fog = tier_fog > dist_fog ? tier_fog : dist_fog;
+                            if (fog > 0.9f) fog = 0.9f;
+
                             float fog_scale  = 1.0f - fog;
                             float fog_add_r  = active_fog_r * fog;
                             float fog_add_g  = active_fog_g * fog;
@@ -2805,17 +2817,14 @@ int main(void) {
                         int nv_room = room->mesh.vertex_count;
                         if (nv_room > VTX_CACHE_MAX) nv_room = VTX_CACHE_MAX;
 
-                        /* Per-room fog constants (hoisted from per-vertex) */
-                        bool room_has_fog = (room_idx != lara_room &&
-                            room_idx < g_chunk_count &&
-                            g_chunks[room_idx].lod >= CHUNK_LOD_MID);
-                        float fog_start = 0, fog_inv_range = 0;
-                        if (room_has_fog) {
-                            fog_start = g_chunks[room_idx].fog_start_dist2;
-                            float fog_range = g_chunks[room_idx].max_draw_dist2 - fog_start;
-                            if (fog_range < 1.0f) fog_range = 1.0f;
-                            fog_inv_range = 1.0f / fog_range;
-                        }
+                        /* Per-room distance fog — applies to ALL textured rooms.
+                         * Gentle ramp from g_dist_mid to g_dist_xxfar.
+                         * Current room (lara_room) gets no fog. */
+                        bool room_has_fog = (room_idx != lara_room);
+                        float fog_near_dist = g_dist_mid * 0.5f; /* fog starts at half the mid threshold */
+                        float fog_far_dist = g_dist_xxfar;
+                        float fog_range_inv = 1.0f / (fog_far_dist * fog_far_dist - fog_near_dist * fog_near_dist);
+                        float fog_near_sq = fog_near_dist * fog_near_dist;
 
                         for (int vi = 0; vi < nv_room; vi++) {
                             tr_room_vertex_t *rv = &room->mesh.vertices[vi];
@@ -2840,7 +2849,7 @@ int main(void) {
                                 float vx_w = room->x + rv->x;
                                 float vz_w = room->z + rv->z;
                                 float d2 = (vx_w-cam_x)*(vx_w-cam_x) + (vz_w-cam_z)*(vz_w-cam_z);
-                                float fog = (d2 - fog_start) * fog_inv_range;
+                                float fog = (d2 - fog_near_sq) * fog_range_inv;
                                 if (fog < 0.0f) fog = 0.0f;
                                 if (fog > 0.85f) fog = 0.85f;
                                 float inv_fog = 1.0f - fog;
