@@ -21,7 +21,7 @@ all: trx-n64.z64
 .PHONY: all
 
 # Full ROM with baked data + CI8 tiles: bake → build → combine
-fullrom: $(BUILD_DIR)/level1.baked $(BUILD_DIR)/level1.ci8tiles trx-n64.z64
+fullrom: $(BUILD_DIR)/level1.baked $(BUILD_DIR)/level1.atx trx-n64.z64
 	@echo "Building full ROM with baked chunk data + CI8 tiles..."
 	python3 tools/build_full_rom.py trx-n64.z64 \
 		$$(ls ../asset_streaming/build/tr1_assets.bin 2>/dev/null || ls build/tr1_assets.bin 2>/dev/null || echo "MISSING_ASSETS") \
@@ -47,9 +47,12 @@ $(BAKE_DIR):
 $(BUILD_DIR)/level1.baked: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_chunks.py | $(BAKE_DIR)
 	python3 tools/bake_chunks.py $< $@
 
-# CI8 texture tiles — pre-baked for ROM streaming cache
-$(BUILD_DIR)/level1.ci8tiles: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_ci8_tiles.py | $(BAKE_DIR)
-	python3 tools/bake_ci8_tiles.py $< $@
+# AegisTex — CI4/CI8 format-chosen per-face tiles
+$(BUILD_DIR)/level1.atx: $(LEVEL_DIR)/LEVEL1.PHD tools/aegistex_pack.py | $(BAKE_DIR)
+	python3 tools/aegistex_pack.py $< $@
+
+# Legacy CI8 tiles (generated as side-effect of aegistex_pack)
+$(BUILD_DIR)/level1.ci8tiles: $(BUILD_DIR)/level1.atx
 
 # Build depends on baked data
 $(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)
