@@ -855,7 +855,7 @@ int main(void) {
                     }
                 }
 
-                /* Build CI8 tiles for the RDPQ near pass.
+                /* Build CI8 tiles for the RDPQ textured pass.
                  * TR1 source textures ARE already CI8 (palette-indexed), so
                  * we just read raw palette indices instead of converting to
                  * RGBA16.  Paired with the global pal16 TLUT uploaded once
@@ -967,7 +967,7 @@ int main(void) {
                 /* ---- Pre-baked room tiles (Lambert-style) ----
                  * Load per-room baked textures from ROM if available.
                  * Each room has 3 mip levels: 32×32, 16×16, 8×8.
-                 * Far pass uploads pre-baked tile = zero runtime filtering.
+                 * Baked pass uploads pre-baked tile = zero runtime filtering.
                  *
                  * Falls back to on-demand box filtering if baked data
                  * is not in ROM (for development without full pipeline). */
@@ -1079,7 +1079,7 @@ int main(void) {
                     printf("  No baked data in ROM\n");
                 }
 
-                /* CPU mip buffers removed — far pass now uses baked room tiles
+                /* CPU mip buffers removed — baked pass now uses baked room tiles
                  * as the default for all far rooms (no per-face mip generation). */
 
                 /* ============================================
@@ -1243,16 +1243,16 @@ int main(void) {
                  * ============================================================ */
 
                 /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
-                int g_far_tri_budget      = 200;
-                int g_far_upload_budget    = 8;
-                int g_near_tri_budget      = 1400;
-                int g_near_face_budget     = 600;
-                int g_near_upload_budget    = 48;
+                int g_bkd_tri_budget      = 200;
+                int g_bkd_upload_budget    = 8;
+                int g_tex_tri_budget      = 1400;
+                int g_tex_face_budget     = 600;
+                int g_tex_upload_budget    = 48;
 
                 /* View distance thresholds (runtime-adjustable, in world units).
                  * Stored as linear distance; squared at comparison time.
                  * Tier boundaries:
-                 *   Near < mid_dist → CI8 per-face near pass
+                 *   Near < mid_dist → CI8 per-face textured pass
                  *   mid_dist..very_far → CI8 16×16 baked (mid-far)
                  *   very_far..xfar    → CI4 8×8 baked (far)
                  *   xfar..xxfar       → IA8 8×8 baked (extra-far)
@@ -1277,56 +1277,56 @@ int main(void) {
                 /* Per-room budget overrides (-1 = inherit global) */
                 #define ROOM_BUDGET_INHERIT (-1)
                 typedef struct {
-                    int16_t near_face_budget;
-                    int16_t near_tri_budget;
-                    int16_t far_tri_budget;
+                    int16_t tex_face_budget;
+                    int16_t tex_tri_budget;
+                    int16_t bkd_tri_budget;
                 } room_budget_t;
                 static room_budget_t room_budgets[256]; /* up to 256 rooms */
                 /* Initialize all to inherit */
                 for (int i = 0; i < 256; i++) {
-                    room_budgets[i].near_face_budget = (int16_t)g_near_face_budget;
-                    room_budgets[i].near_tri_budget  = (int16_t)g_near_tri_budget;
-                    room_budgets[i].far_tri_budget   = (int16_t)g_far_tri_budget;
+                    room_budgets[i].tex_face_budget = (int16_t)g_tex_face_budget;
+                    room_budgets[i].tex_tri_budget  = (int16_t)g_tex_tri_budget;
+                    room_budgets[i].bkd_tri_budget   = (int16_t)g_bkd_tri_budget;
                 }
 
                 /* Effective budget helpers — computed per frame from current room */
                 #define EFF_BUDGET(per_room, global) \
                     ((per_room) >= 0 ? ((per_room) < (global) ? (per_room) : (global)) : (global))
-                int eff_near_face_budget = 600, eff_near_tri_budget = 1400, eff_far_tri_budget = 200;
+                int eff_tex_face_budget = 600, eff_tex_tri_budget = 1400, eff_bkd_tri_budget = 200;
 
                 /* Legacy #defines for code that still references them (pause display) */
-                #define FAR_TRI_BUDGET      eff_far_tri_budget
-                #define FAR_UPLOAD_BUDGET   g_far_upload_budget
-                #define NEAR_TRI_BUDGET     eff_near_tri_budget
-                #define NEAR_FACE_BUDGET    eff_near_face_budget
-                #define NEAR_UPLOAD_BUDGET  g_near_upload_budget
+                #define BKD_TRI_BUDGET      eff_bkd_tri_budget
+                #define BKD_UPLOAD_BUDGET   g_bkd_upload_budget
+                #define TEX_TRI_BUDGET     eff_tex_tri_budget
+                #define TEX_FACE_BUDGET    eff_tex_face_budget
+                #define TEX_UPLOAD_BUDGET  g_tex_upload_budget
 
                 /* Per-frame perf counters (updated each frame, shown on pause) */
                 /* Per-frame performance counters — reset each frame,
                  * displayed on pause screen for diagnostics. */
-                int perf_far_rooms = 0;
+                int perf_bkd_rooms = 0;
                 int perf_ring_counts[6] = {0}; /* rooms found per ring depth */
-                int perf_far_tris = 0;
-                int perf_far_uploads = 0;
-                int perf_far_baked = 0;     /* rooms using baked tile */
-                int perf_near_rooms = 0;
-                int perf_near_tris = 0;
-                int perf_near_binds = 0;
-                int perf_near_culled = 0;   /* faces back-culled */
-                int perf_near_detail_skip = 0; /* detail faces skipped */
-                int perf_near_faces = 0;    /* total face iterations (including culled) */
+                int perf_bkd_tris = 0;
+                int perf_bkd_uploads = 0;
+                int perf_bkd_baked = 0;     /* rooms using baked tile */
+                int perf_tex_rooms = 0;
+                int perf_tex_tris = 0;
+                int perf_tex_binds = 0;
+                int perf_tex_culled = 0;   /* faces back-culled */
+                int perf_tex_detail_skip = 0; /* detail faces skipped */
+                int perf_tex_faces = 0;    /* total face iterations (including culled) */
                 int perf_vis_total = 0;     /* total visible rooms */
                 int perf_vis_ring1 = 0;     /* ring 1 rooms */
                 int perf_vis_ring2 = 0;     /* ring 2 rooms */
                 uint32_t perf_frame_start = 0;
                 uint32_t perf_frame_us = 0; /* last frame time in µs */
-                uint32_t perf_far_us = 0;   /* CPU time: far pass */
-                uint32_t perf_near_us = 0;  /* CPU time: near pass */
+                uint32_t perf_bkd_us = 0;   /* CPU time: baked pass */
+                uint32_t perf_tex_us = 0;  /* CPU time: textured pass */
                 uint32_t perf_rsp_us = 0;   /* RSP sync stall at frame end */
-                uint32_t perf_near_room_us = 0;  /* near sub-timing: rooms */
-                uint32_t perf_near_sm_us = 0;    /* near sub-timing: static meshes */
-                uint32_t perf_near_lara_us = 0;  /* near sub-timing: Lara */
-                uint32_t perf_near_item_us = 0;  /* near sub-timing: items */
+                uint32_t perf_tex_room_us = 0;  /* near sub-timing: rooms */
+                uint32_t perf_tex_sm_us = 0;    /* near sub-timing: static meshes */
+                uint32_t perf_tex_lara_us = 0;  /* near sub-timing: Lara */
+                uint32_t perf_tex_item_us = 0;  /* near sub-timing: items */
 
                 /* Active fog color — lerps toward current room's fog.
                  * Starts at neutral cave fog. */
@@ -1583,11 +1583,11 @@ int main(void) {
 
                         /* Snapshot current budgets — edits happen on copies,
                          * applied only on unpause */
-                        int edit_g_near_face   = g_near_face_budget;
-                        int edit_g_near_tri    = g_near_tri_budget;
-                        int edit_g_near_upload = g_near_upload_budget;
-                        int edit_g_far_tri     = g_far_tri_budget;
-                        int edit_g_far_upload  = g_far_upload_budget;
+                        int edit_g_tex_face   = g_tex_face_budget;
+                        int edit_g_tex_tri    = g_tex_tri_budget;
+                        int edit_g_tex_upload = g_tex_upload_budget;
+                        int edit_g_bkd_tri     = g_bkd_tri_budget;
+                        int edit_g_bkd_upload  = g_bkd_upload_budget;
                         bool edit_debug_dist   = g_debug_dist_colors;
                         int  edit_force_tier   = g_debug_force_tier;
                         float edit_dist_mid    = g_dist_mid;
@@ -1631,10 +1631,10 @@ int main(void) {
                                      fps_display, perf_frame_us,
                                      (float)perf_frame_us / 33333.0f * 100.0f);
                                 {
-                                    uint32_t other_us = perf_frame_us > perf_far_us + perf_near_us
-                                        ? perf_frame_us - perf_far_us - perf_near_us : 0;
+                                    uint32_t other_us = perf_frame_us > perf_bkd_us + perf_tex_us
+                                        ? perf_frame_us - perf_bkd_us - perf_tex_us : 0;
                                     STAT("Far:%uus Near:%uus Misc:%uus",
-                                         perf_far_us, perf_near_us, other_us);
+                                         perf_bkd_us, perf_tex_us, other_us);
                                 }
                                 STAT("RSP stall:%uus (%s)", perf_rsp_us,
                                      perf_rsp_us > 4000 ? "RDP" :
@@ -1659,21 +1659,21 @@ int main(void) {
                                     STAT("VisDist:%.0f-%.0f", sqrtf(min_d), sqrtf(max_d));
                                     STAT("mid_th:%.0f mid_sq:%.0f", g_dist_mid, g_dist_mid_sq);
                                 }
-                                STAT("--- NEAR ---");
+                                STAT("--- TEXTURED ---");
                                 STAT("Tris:%d/%d Faces:%d/%d",
-                                     perf_near_tris, NEAR_TRI_BUDGET,
-                                     perf_near_faces, NEAR_FACE_BUDGET);
+                                     perf_tex_tris, TEX_TRI_BUDGET,
+                                     perf_tex_faces, TEX_FACE_BUDGET);
                                 STAT("Binds:%d Cull:%d DSkip:%d",
-                                     perf_near_binds, perf_near_culled,
-                                     perf_near_detail_skip);
+                                     perf_tex_binds, perf_tex_culled,
+                                     perf_tex_detail_skip);
                                 STAT("Rm:%uus SM:%uus La:%uus It:%uus",
-                                     perf_near_room_us, perf_near_sm_us,
-                                     perf_near_lara_us, perf_near_item_us);
-                                STAT("--- FAR ---");
+                                     perf_tex_room_us, perf_tex_sm_us,
+                                     perf_tex_lara_us, perf_tex_item_us);
+                                STAT("--- BAKED ---");
                                 STAT("Rooms:%d Bk:%d/%d Tri:%d/%d",
-                                     perf_far_rooms, perf_far_baked,
+                                     perf_bkd_rooms, perf_bkd_baked,
                                      baked_room_count,
-                                     perf_far_tris, FAR_TRI_BUDGET);
+                                     perf_bkd_tris, BKD_TRI_BUDGET);
                                 STAT("--- MEM ---");
                                 {
                                     uint32_t hf = n64_mem_available();
@@ -1688,11 +1688,11 @@ int main(void) {
                                 STAT("=== GLOBAL BUDGETS ===");
                                 STAT("D-pad Up/Down=select Left/Right=adjust");
                                 STAT("");
-                                STAT_HL(slider_sel, 0, "Near Face Budget: %d", edit_g_near_face);
-                                STAT_HL(slider_sel, 1, "Near Tri Budget:  %d", edit_g_near_tri);
-                                STAT_HL(slider_sel, 2, "Near Upload Cap:  %d", edit_g_near_upload);
-                                STAT_HL(slider_sel, 3, "Far Tri Budget:   %d", edit_g_far_tri);
-                                STAT_HL(slider_sel, 4, "Far Upload Cap:   %d", edit_g_far_upload);
+                                STAT_HL(slider_sel, 0, "Tex Face Budget: %d", edit_g_tex_face);
+                                STAT_HL(slider_sel, 1, "Tex Tri Budget:  %d", edit_g_tex_tri);
+                                STAT_HL(slider_sel, 2, "Tex Upload Cap:  %d", edit_g_tex_upload);
+                                STAT_HL(slider_sel, 3, "Bkd Tri Budget:   %d", edit_g_bkd_tri);
+                                STAT_HL(slider_sel, 4, "Bkd Upload Cap:   %d", edit_g_bkd_upload);
                                 STAT("");
                                 STAT_HL(slider_sel, 5, "Dist Debug Colors: %s",
                                         edit_debug_dist ? "ON" : "OFF");
@@ -1717,20 +1717,20 @@ int main(void) {
                                 STAT("D-pad Up/Down=select Left/Right=adjust");
                                 STAT("(-1 = inherit global)");
                                 STAT("");
-                                STAT_HL(slider_sel, 0, "Near Face: %d (global:%d)",
-                                        (int)edit_room_budgets[ri].near_face_budget, edit_g_near_face);
-                                STAT_HL(slider_sel, 1, "Near Tri:  %d (global:%d)",
-                                        (int)edit_room_budgets[ri].near_tri_budget, edit_g_near_tri);
-                                STAT_HL(slider_sel, 2, "Far Tri:   %d (global:%d)",
-                                        (int)edit_room_budgets[ri].far_tri_budget, edit_g_far_tri);
+                                STAT_HL(slider_sel, 0, "Tex Face: %d (global:%d)",
+                                        (int)edit_room_budgets[ri].tex_face_budget, edit_g_tex_face);
+                                STAT_HL(slider_sel, 1, "Tex Tri:  %d (global:%d)",
+                                        (int)edit_room_budgets[ri].tex_tri_budget, edit_g_tex_tri);
+                                STAT_HL(slider_sel, 2, "Bkd Tri:   %d (global:%d)",
+                                        (int)edit_room_budgets[ri].bkd_tri_budget, edit_g_bkd_tri);
                                 STAT("");
                                 STAT("Effective:");
                                 STAT("  Face:   %d",
-                                     EFF_BUDGET(edit_room_budgets[ri].near_face_budget, edit_g_near_face));
+                                     EFF_BUDGET(edit_room_budgets[ri].tex_face_budget, edit_g_tex_face));
                                 STAT("  Tri:    %d",
-                                     EFF_BUDGET(edit_room_budgets[ri].near_tri_budget, edit_g_near_tri));
+                                     EFF_BUDGET(edit_room_budgets[ri].tex_tri_budget, edit_g_tex_tri));
                                 STAT("  FarTri: %d",
-                                     EFF_BUDGET(edit_room_budgets[ri].far_tri_budget, edit_g_far_tri));
+                                     EFF_BUDGET(edit_room_budgets[ri].bkd_tri_budget, edit_g_bkd_tri));
                                 STAT("");
                                 STAT("Room size: %s",
                                      ri < g_chunk_count ?
@@ -1802,25 +1802,25 @@ int main(void) {
 
                                 if (delta) {
                                     switch (slider_sel) {
-                                        case 0: edit_g_near_face += delta;
-                                                if (edit_g_near_face < 50)   edit_g_near_face = 50;
-                                                if (edit_g_near_face > 5000) edit_g_near_face = 5000;
+                                        case 0: edit_g_tex_face += delta;
+                                                if (edit_g_tex_face < 50)   edit_g_tex_face = 50;
+                                                if (edit_g_tex_face > 5000) edit_g_tex_face = 5000;
                                                 break;
-                                        case 1: edit_g_near_tri += delta;
-                                                if (edit_g_near_tri < 50)    edit_g_near_tri = 50;
-                                                if (edit_g_near_tri > 5000)  edit_g_near_tri = 5000;
+                                        case 1: edit_g_tex_tri += delta;
+                                                if (edit_g_tex_tri < 50)    edit_g_tex_tri = 50;
+                                                if (edit_g_tex_tri > 5000)  edit_g_tex_tri = 5000;
                                                 break;
-                                        case 2: edit_g_near_upload += delta / 10;
-                                                if (edit_g_near_upload < 4)  edit_g_near_upload = 4;
-                                                if (edit_g_near_upload > 128) edit_g_near_upload = 128;
+                                        case 2: edit_g_tex_upload += delta / 10;
+                                                if (edit_g_tex_upload < 4)  edit_g_tex_upload = 4;
+                                                if (edit_g_tex_upload > 128) edit_g_tex_upload = 128;
                                                 break;
-                                        case 3: edit_g_far_tri += delta;
-                                                if (edit_g_far_tri < 50)     edit_g_far_tri = 50;
-                                                if (edit_g_far_tri > 2000)   edit_g_far_tri = 2000;
+                                        case 3: edit_g_bkd_tri += delta;
+                                                if (edit_g_bkd_tri < 50)     edit_g_bkd_tri = 50;
+                                                if (edit_g_bkd_tri > 2000)   edit_g_bkd_tri = 2000;
                                                 break;
-                                        case 4: edit_g_far_upload += delta / 10;
-                                                if (edit_g_far_upload < 2)   edit_g_far_upload = 2;
-                                                if (edit_g_far_upload > 32)  edit_g_far_upload = 32;
+                                        case 4: edit_g_bkd_upload += delta / 10;
+                                                if (edit_g_bkd_upload < 2)   edit_g_bkd_upload = 2;
+                                                if (edit_g_bkd_upload > 32)  edit_g_bkd_upload = 32;
                                                 break;
                                     }
                                 }
@@ -1838,12 +1838,12 @@ int main(void) {
                                     int16_t *target = NULL;
                                     int gmax = 0;
                                     switch (slider_sel) {
-                                        case 0: target = &edit_room_budgets[ri].near_face_budget;
-                                                gmax = edit_g_near_face; break;
-                                        case 1: target = &edit_room_budgets[ri].near_tri_budget;
-                                                gmax = edit_g_near_tri; break;
-                                        case 2: target = &edit_room_budgets[ri].far_tri_budget;
-                                                gmax = edit_g_far_tri; break;
+                                        case 0: target = &edit_room_budgets[ri].tex_face_budget;
+                                                gmax = edit_g_tex_face; break;
+                                        case 1: target = &edit_room_budgets[ri].tex_tri_budget;
+                                                gmax = edit_g_tex_tri; break;
+                                        case 2: target = &edit_room_budgets[ri].bkd_tri_budget;
+                                                gmax = edit_g_bkd_tri; break;
                                     }
                                     if (target) {
                                         int val = (int)*target + delta;
@@ -1885,11 +1885,11 @@ int main(void) {
                         }
 
                         /* Apply edits on unpause */
-                        g_near_face_budget   = edit_g_near_face;
-                        g_near_tri_budget    = edit_g_near_tri;
-                        g_near_upload_budget = edit_g_near_upload;
-                        g_far_tri_budget     = edit_g_far_tri;
-                        g_far_upload_budget  = edit_g_far_upload;
+                        g_tex_face_budget   = edit_g_tex_face;
+                        g_tex_tri_budget    = edit_g_tex_tri;
+                        g_tex_upload_budget = edit_g_tex_upload;
+                        g_bkd_tri_budget     = edit_g_bkd_tri;
+                        g_bkd_upload_budget  = edit_g_bkd_upload;
                         g_debug_dist_colors  = edit_debug_dist;
                         g_debug_force_tier   = edit_force_tier;
                         g_dist_mid   = edit_dist_mid;
@@ -1905,25 +1905,25 @@ int main(void) {
                      * Frame order:
                      *   1. rdpq_attach (framebuffer + zbuf)
                      *   2. rdpq_clear (color + depth)
-                     *   3. RDPQ far pass  (CI8/IA4 baked tiles, no zbuf)
-                     *   4. RDPQ near pass (CI8 per-face, zbuf on)
+                     *   3. RDPQ baked pass  (CI8/IA4 baked tiles, no zbuf)
+                     *   4. RDPQ textured pass (CI8 per-face, zbuf on)
                      *   5. rdpq_detach_show()
                      *
                      * All geometry uses pure RDPQ.  No GL. */
                     /* Compute effective budgets for this frame's room */
                     {
                         int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
-                        eff_near_face_budget = EFF_BUDGET(room_budgets[ri].near_face_budget, g_near_face_budget);
-                        eff_near_tri_budget  = EFF_BUDGET(room_budgets[ri].near_tri_budget,  g_near_tri_budget);
-                        eff_far_tri_budget   = EFF_BUDGET(room_budgets[ri].far_tri_budget,   g_far_tri_budget);
+                        eff_tex_face_budget = EFF_BUDGET(room_budgets[ri].tex_face_budget, g_tex_face_budget);
+                        eff_tex_tri_budget  = EFF_BUDGET(room_budgets[ri].tex_tri_budget,  g_tex_tri_budget);
+                        eff_bkd_tri_budget   = EFF_BUDGET(room_budgets[ri].bkd_tri_budget,   g_bkd_tri_budget);
                     }
 
                     /* Reset per-frame counters + start frame timer */
-                    perf_far_rooms = 0; perf_far_tris = 0;
-                    perf_far_uploads = 0; perf_far_baked = 0;
-                    perf_near_rooms = 0; perf_near_tris = 0;
-                    perf_near_binds = 0; perf_near_culled = 0;
-                    perf_near_detail_skip = 0; perf_near_faces = 0;
+                    perf_bkd_rooms = 0; perf_bkd_tris = 0;
+                    perf_bkd_uploads = 0; perf_bkd_baked = 0;
+                    perf_tex_rooms = 0; perf_tex_tris = 0;
+                    perf_tex_binds = 0; perf_tex_culled = 0;
+                    perf_tex_detail_skip = 0; perf_tex_faces = 0;
                     perf_frame_start = TICKS_READ();
 
                     surface_t *disp = display_get();
@@ -1932,7 +1932,7 @@ int main(void) {
                     /* Clear color + depth via proper rdpq API.
                      * Using rdpq_clear instead of manual set_mode_fill +
                      * fill_rectangle to avoid RDP mode tracking conflicts
-                     * with the subsequent set_mode_standard for the far pass. */
+                     * with the subsequent set_mode_standard for the baked pass. */
                     /* Clear to fog color (not black) so sub-pixel gaps
                      * between triangles blend in instead of showing stark
                      * black seams.  Matches the far-pass fog target color. */
@@ -2112,10 +2112,10 @@ int main(void) {
                      * Current room always Near. All others classified by distance
                      * using the tunable g_dist_* thresholds.
                      *
-                     * Near:   dist < g_dist_mid   → CI8 per-face, zbuf (near pass)
-                     * MidFar+: dist >= g_dist_mid → baked tiles, fog (far pass) */
-                    int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
-                    int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
+                     * Near:   dist < g_dist_mid   → CI8 per-face, zbuf (textured pass)
+                     * MidFar+: dist >= g_dist_mid → baked tiles, fog (baked pass) */
+                    int tex_rooms[MAX_DRAW_ROOMS], tex_count = 0;
+                    int far_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
 
                     for (int vi = 0; vi < vis_count; vi++) {
                         int ri = vis_rooms[vi];
@@ -2123,27 +2123,27 @@ int main(void) {
 
                         /* Force tier override: put ALL rooms in one pass */
                         if (g_debug_force_tier == 1) {
-                            /* Force Near: all rooms go to near pass */
+                            /* Force Near: all rooms go to textured pass */
                             c->lod = CHUNK_LOD_NEAR;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
                         } else if (g_debug_force_tier >= 2) {
-                            /* Force MidFar/Far/XFar/XXFar: all to far pass */
+                            /* Force MidFar/Far/XFar/XXFar: all to baked pass */
                             c->lod = CHUNK_LOD_FAR;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
+                            if (bkd_count < MAX_DRAW_ROOMS)
+                                bkd_rooms[bkd_count++] = ri;
                         } else if (ri == lara_room) {
                             c->lod = CHUNK_LOD_NEAR;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
                         } else if (c->dist_sq < g_dist_mid_sq) {
                             c->lod = CHUNK_LOD_NEAR;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
                         } else {
                             c->lod = CHUNK_LOD_FAR;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
+                            if (bkd_count < MAX_DRAW_ROOMS)
+                                bkd_rooms[bkd_count++] = ri;
                         }
                     }
 
@@ -2162,28 +2162,28 @@ int main(void) {
                             cl->face_skip = 4;       /* very far: every 4th */
                     }
 
-                    /* Bubble-sort far rooms back-to-front (prep for Phase 2 far pass).
+                    /* Bubble-sort far rooms back-to-front (prep for Phase 2 baked pass).
                      * Small list so insertion sort is fine. */
-                    for (int i = 1; i < far_count; i++) {
-                        int key = far_rooms[i];
+                    for (int i = 1; i < bkd_count; i++) {
+                        int key = bkd_rooms[i];
                         float key_d = g_chunks[key].dist_sq;
                         int j = i - 1;
-                        while (j >= 0 && g_chunks[far_rooms[j]].dist_sq < key_d) {
-                            far_rooms[j + 1] = far_rooms[j];
+                        while (j >= 0 && g_chunks[bkd_rooms[j]].dist_sq < key_d) {
+                            bkd_rooms[j + 1] = bkd_rooms[j];
                             j--;
                         }
-                        far_rooms[j + 1] = key;
+                        bkd_rooms[j + 1] = key;
                     }
 
                     /* Merge: near rooms first, then far rooms */
                     int rooms_to_draw[MAX_DRAW_ROOMS * 2];
                     int num_draw = 0;
-                    for (int i = 0; i < near_count; i++)
-                        rooms_to_draw[num_draw++] = near_rooms[i];
-                    for (int i = 0; i < far_count; i++)
-                        rooms_to_draw[num_draw++] = far_rooms[i];
+                    for (int i = 0; i < tex_count; i++)
+                        rooms_to_draw[num_draw++] = tex_rooms[i];
+                    for (int i = 0; i < bkd_count; i++)
+                        rooms_to_draw[num_draw++] = bkd_rooms[i];
 
-                    /* Shared vertex cache — used by both far and near passes.
+                    /* Shared vertex cache — used by both far and textured passes.
                      * Transform all room vertices once per room, reuse for faces. */
                     #define VTX_CACHE_MAX 600
                     static struct { float rx, ry, rz, r, g, b; } vtx_cache[VTX_CACHE_MAX];
@@ -2197,9 +2197,9 @@ int main(void) {
                     #define GUARD_LO_Y (-380.0f)
                     #define GUARD_HI_Y (620.0f)
 
-                    uint32_t perf_far_t0 = TICKS_READ(); /* start far pass timer */
+                    uint32_t perf_bkd_t0 = TICKS_READ(); /* start baked pass timer */
 
-                    /* ===== RDPQ FAR PASS (performance-optimized) =====
+                    /* ===== RDPQ BAKED PASS (performance-optimized) =====
                      * CPU-projected, textured + shaded triangles via rdpq.
                      * Key perf choices:
                      *   - rspq_flush (non-blocking) not rspq_wait (blocking)
@@ -2214,13 +2214,13 @@ int main(void) {
                         rdpq_mode_filter(FILTER_BILINEAR);
 
                         #define NEAR_Z 350.0f  /* near clip plane */
-                        int far_last_tex = -1;
-                        int far_tris = 0;
-                        int far_rooms_max = far_count; /* no room cap — tri budget limits work */
-                        /* FAR_TRI_BUDGET / FAR_UPLOAD_BUDGET defined at function scope */
+                        int bkd_last_tex = -1;
+                        int bkd_tris = 0;
+                        int bkd_rooms_max = bkd_count; /* no room cap — tri budget limits work */
+                        /* BKD_TRI_BUDGET / BKD_UPLOAD_BUDGET defined at function scope */
 
-                        for (int fi = 0; fi < far_rooms_max; fi++) {
-                            int room_idx = far_rooms[fi];
+                        for (int fi = 0; fi < bkd_rooms_max; fi++) {
+                            int room_idx = bkd_rooms[fi];
                             if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                             tr_room_t *room = &g_level.rooms[room_idx];
 
@@ -2254,11 +2254,11 @@ int main(void) {
                             float rd = room_d;
 
                             /* Determine far tier (force override or by distance) */
-                            int far_tier;
+                            int bkd_tier;
                             if (g_debug_force_tier >= 2)
-                                far_tier = g_debug_force_tier - 1; /* 2→1(MidFar), 3→2(Far), 4→3(XFar), 5→4(XXFar) */
+                                bkd_tier = g_debug_force_tier - 1; /* 2→1(MidFar), 3→2(Far), 4→3(XFar), 5→4(XXFar) */
                             else
-                                far_tier = (rd > g_dist_xxfar_sq) ? 4 :
+                                bkd_tier = (rd > g_dist_xxfar_sq) ? 4 :
                                            (rd > g_dist_xfar_sq)  ? 3 :
                                            (rd > g_dist_vfar_sq)  ? 2 : 1;
 
@@ -2266,29 +2266,29 @@ int main(void) {
                             if (g_debug_dist_colors && dbg_tier_px) {
                                 rspq_flush();
                                 rdpq_mode_tlut(TLUT_NONE);
-                                rdpq_tex_upload(TILE0, &dbg_tier_surf[far_tier], NULL);
+                                rdpq_tex_upload(TILE0, &dbg_tier_surf[bkd_tier], NULL);
                                 room_baked = true;
-                                far_last_tex = -99;
-                            } else if (far_tier == 1) {
+                                bkd_last_tex = -99;
+                            } else if (bkd_tier == 1) {
                                 /* MidFar: solid color test to verify geometry renders */
                                 rspq_flush();
                                 rdpq_mode_tlut(TLUT_NONE);
                                 if (dbg_tier_px)
                                     rdpq_tex_upload(TILE0, &dbg_tier_surf[1], NULL); /* cyan */
                                 room_baked = true; /* use baked UV path so faces draw */
-                                far_last_tex = -99;
+                                bkd_last_tex = -99;
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 /* Far/XFar/XXFar: use baked tiles */
                                 rspq_flush();
-                                if (far_tier >= 4 && bkd_m4_surf) {
+                                if (bkd_tier >= 4 && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
-                                } else if (far_tier >= 3 && bkd_m3_surf) {
+                                } else if (bkd_tier >= 3 && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
-                                } else if (far_tier >= 2 && bkd_m2_surf) {
+                                } else if (bkd_tier >= 2 && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
@@ -2300,8 +2300,8 @@ int main(void) {
                                     room_uv_scale = 16.0f / 32.0f;
                                 }
                                 room_baked = true;
-                                far_last_tex = -99;
-                                perf_far_uploads++;
+                                bkd_last_tex = -99;
+                                perf_bkd_uploads++;
                             }
                             /* Non-baked fallback: flat faces use white_surf (uploaded
                              * on demand below); textured faces use last-bound tile. */
@@ -2309,16 +2309,16 @@ int main(void) {
                             /* (sphere-in-front test removed — always clip when any_behind) */
 
                             bool is_water = (room->flags & 1) != 0;
-                            perf_far_rooms++;
-                            if (room_baked) perf_far_baked++;
+                            perf_bkd_rooms++;
+                            if (room_baked) perf_bkd_baked++;
 
-                            /* ---- Far pass vertex cache ---- */
+                            /* ---- Baked pass vertex cache ---- */
                             float room_ox = (float)room->x - cam_x;
                             float room_oz = (float)room->z - cam_z;
 
-                            int far_nv = room->mesh.vertex_count;
-                            if (far_nv > VTX_CACHE_MAX) far_nv = VTX_CACHE_MAX;
-                            for (int vi = 0; vi < far_nv; vi++) {
+                            int bkd_nv = room->mesh.vertex_count;
+                            if (bkd_nv > VTX_CACHE_MAX) bkd_nv = VTX_CACHE_MAX;
+                            for (int vi = 0; vi < bkd_nv; vi++) {
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
                                 float cx_v = room_ox + rv->x;
                                 float cy_v = (float)rv->y - cam_y;
@@ -2339,7 +2339,7 @@ int main(void) {
                             }
 
                             for (int f = 0; f < room->mesh.face_count; f++) {
-                                if (far_tris >= FAR_TRI_BUDGET) goto far_pass_done;
+                                if (bkd_tris >= BKD_TRI_BUDGET) goto far_pass_done;
                                 /* (face skip removed — vertex cache makes per-face cost cheap enough) */
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
@@ -2348,7 +2348,7 @@ int main(void) {
                                 /* Back-cull from cache */
                                 {
                                     uint16_t v0i = face->vertices[0];
-                                    if (v0i < far_nv && vtx_cache[v0i].rz < -512.0f) continue;
+                                    if (v0i < bkd_nv && vtx_cache[v0i].rz < -512.0f) continue;
                                 }
 
                                 uint16_t tex_idx = face->texture & 0x7FFF;
@@ -2356,18 +2356,18 @@ int main(void) {
                                 if (!room_baked) {
                                     /* MidFar / non-baked: CI8 per-face textures with fog */
                                     if (!is_flat && tex_idx < num_otex && ci8_surfs) {
-                                        if ((int)tex_idx != far_last_tex) {
-                                            if (far_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                        if ((int)tex_idx != bkd_last_tex) {
+                                            if (bkd_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                             rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                            far_last_tex = (int)tex_idx;
-                                            perf_far_uploads++;
+                                            bkd_last_tex = (int)tex_idx;
+                                            perf_bkd_uploads++;
                                         }
                                     } else if (is_flat) {
-                                        if (white_px && far_last_tex != -2) {
+                                        if (white_px && bkd_last_tex != -2) {
                                             rdpq_mode_tlut(TLUT_NONE);
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            far_last_tex = -2;
-                                            perf_far_uploads++;
+                                            bkd_last_tex = -2;
+                                            perf_bkd_uploads++;
                                         }
                                     } else continue;
                                 }
@@ -2383,7 +2383,7 @@ int main(void) {
 
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
-                                    if (vi >= far_nv) { visible = false; break; }
+                                    if (vi >= bkd_nv) { visible = false; break; }
 
                                     cv[v][0] = vtx_cache[vi].rx;
                                     cv[v][1] = vtx_cache[vi].ry;
@@ -2509,11 +2509,11 @@ int main(void) {
                                 for (int tri = 0; tri < num_tris; tri++) {
                                     rdpq_triangle(&TRIFMT_SHADE_TEX,
                                         sv_src[0], sv_src[tri+1], sv_src[tri+2]);
-                                    far_tris++;
-                                    perf_far_tris = far_tris;
-                                    if ((far_tris & 7) == 0)
+                                    bkd_tris++;
+                                    perf_bkd_tris = bkd_tris;
+                                    if ((bkd_tris & 7) == 0)
                                         rspq_flush();
-                                    if (far_tris >= FAR_TRI_BUDGET)
+                                    if (bkd_tris >= BKD_TRI_BUDGET)
                                         goto far_pass_done;
                                 }
                             }
@@ -2521,24 +2521,24 @@ int main(void) {
                     }
                     far_pass_done:
 
-                    /* Record far pass CPU time */
+                    /* Record baked pass CPU time */
                     {
-                        uint32_t d = TICKS_DISTANCE(perf_far_t0, TICKS_READ());
-                        perf_far_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                        uint32_t d = TICKS_DISTANCE(perf_bkd_t0, TICKS_READ());
+                        perf_bkd_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
                     }
 
-                    /* Flush far pass + reset TLUT before near pass.
-                     * Far pass uses CI4/CI8 baked tiles with TLUT;
-                     * near pass re-enables it with the global pal16. */
+                    /* Flush baked pass + reset TLUT before textured pass.
+                     * Baked pass uses CI4/CI8 baked tiles with TLUT;
+                     * textured pass re-enables it with the global pal16. */
                     rdpq_mode_tlut(TLUT_NONE);
                     rspq_flush();
 
-                    uint32_t perf_near_t0 = TICKS_READ(); /* start near pass timer */
+                    uint32_t perf_tex_t0 = TICKS_READ(); /* start textured pass timer */
 
-                    /* ===== RDPQ NEAR PASS — ring 1, CI8 textures, z-buffered =====
-                     * Pure CPU transform + rdpq_triangle, same paradigm as far pass. */
+                    /* ===== RDPQ TEXTURED PASS — ring 1, CI8 textures, z-buffered =====
+                     * Pure CPU transform + rdpq_triangle, same paradigm as baked pass. */
 
-                    /* RDPQ near pass state:
+                    /* RDPQ textured pass state:
                      *  - CI8 + global pal16 TLUT (1 KB/tex vs 2 KB RGBA16)
                      *  - TLUT uploaded once per frame; only tile re-uploads per change
                      *  - Z-buffer: compare + write (depth clear already done above)
@@ -2553,31 +2553,31 @@ int main(void) {
                     rdpq_mode_tlut(TLUT_RGBA16);
                     rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
 
-                    int near_last_tex = -99; /* force first upload */
-                    int near_uploads = 0;
+                    int tex_last_tex = -99; /* force first upload */
+                    int tex_uploads = 0;
 
-                    /* Debug: override near pass with solid green */
+                    /* Debug: override textured pass with solid green */
                     if (g_debug_dist_colors && dbg_tier_px) {
                         rdpq_mode_tlut(TLUT_NONE);
                         rdpq_tex_upload(TILE0, &dbg_tier_surf[0], NULL); /* green = near */
-                        near_last_tex = -99;
+                        tex_last_tex = -99;
                     }
 
-                    /* ===== NEAR PASS: ROOM FACES ===== */
+                    /* ===== TEXTURED PASS: ROOM FACES ===== */
                     { uint32_t _nr_t0 = TICKS_READ();
                     /* CPU transform + near-plane clip + project → rdpq_triangle.
                      * CI8 tiles (1 KB each) with shared pal16 TLUT.
                      * Z-buffer already cleared above. */
                     /* Fallback state persists across rooms — once budget fires,
                      * ALL remaining near rooms use baked tiles instead of CI8. */
-                    bool near_fallback_active = false;
+                    bool tex_fallback_active = false;
 
-                    for (int ri = 0; ri < near_count; ri++) {
+                    for (int ri = 0; ri < tex_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
                         bool is_water = (room->flags & 1) != 0;
-                        perf_near_rooms++;
+                        perf_tex_rooms++;
 
                         bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
@@ -2586,7 +2586,7 @@ int main(void) {
                         }
 
                         /* If already in fallback mode, upload this room's baked tile */
-                        if (near_fallback_active &&
+                        if (tex_fallback_active &&
                             baked_room_count > 0 && room_idx < baked_room_count) {
                             float rd = (room_idx < g_chunk_count) ? g_chunks[room_idx].dist_sq : 0;
                             rdpq_mode_tlut(TLUT_NONE);
@@ -2603,7 +2603,7 @@ int main(void) {
                                 rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                 rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
                             }
-                            near_last_tex = -99;
+                            tex_last_tex = -99;
                         }
 
                         float room_ox = (float)room->x - cam_x;
@@ -2664,10 +2664,10 @@ int main(void) {
                         /* ---- Face loop: index into cached vertices ---- */
                         for (int f = 0; f < room->mesh.face_count; f++) {
                             /* Check budget — switch to fallback instead of goto */
-                            if (!near_fallback_active &&
-                                (perf_near_tris >= NEAR_TRI_BUDGET ||
-                                 perf_near_faces >= NEAR_FACE_BUDGET)) {
-                                near_fallback_active = true;
+                            if (!tex_fallback_active &&
+                                (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                 perf_tex_faces >= TEX_FACE_BUDGET)) {
+                                tex_fallback_active = true;
                                 /* Upload this room's baked tile as fallback.
                                  * Pick tier by room distance. */
                                 if (baked_room_count > 0 && room_idx < baked_room_count) {
@@ -2688,22 +2688,22 @@ int main(void) {
                                     } else if (white_px) {
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
                                     }
-                                    near_last_tex = -99;
+                                    tex_last_tex = -99;
                                 } else if (white_px) {
                                     /* No baked data — use white as last resort */
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                    near_last_tex = -2;
+                                    tex_last_tex = -2;
                                 }
                             }
 
-                            perf_near_faces++;
+                            perf_tex_faces++;
                             tr_face_t *face = &room->mesh.faces[f];
                             int nv = face->vertex_count;
                             if (nv < 3) continue;
 
                             if (do_decimate && (face->flags & FACE_FLAG_DETAIL)) {
-                                perf_near_detail_skip++;
+                                perf_tex_detail_skip++;
                                 continue;
                             }
 
@@ -2711,7 +2711,7 @@ int main(void) {
                             {
                                 uint16_t v0i = face->vertices[0];
                                 if (v0i < nv_room && vtx_cache[v0i].rz < -1024.0f) {
-                                    perf_near_culled++; continue;
+                                    perf_tex_culled++; continue;
                                 }
                             }
 
@@ -2721,24 +2721,24 @@ int main(void) {
                             /* Texture upload on change.
                              * In fallback mode: skip per-face uploads, use baked tile.
                              * In debug mode: keep solid green. */
-                            if (near_fallback_active || g_debug_dist_colors) {
+                            if (tex_fallback_active || g_debug_dist_colors) {
                                 /* fallback/debug: use whatever tile is already bound */
                             } else if (!is_flat && tex_idx < num_otex && ci8_surfs) {
-                                if ((int)tex_idx != near_last_tex &&
-                                    near_uploads < NEAR_UPLOAD_BUDGET) {
-                                    if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                if ((int)tex_idx != tex_last_tex &&
+                                    tex_uploads < TEX_UPLOAD_BUDGET) {
+                                    if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                    near_last_tex = (int)tex_idx;
-                                    near_uploads++;
-                                    perf_near_binds++;
+                                    tex_last_tex = (int)tex_idx;
+                                    tex_uploads++;
+                                    perf_tex_binds++;
                                 }
                             } else if (is_flat) {
-                                if (white_px && near_last_tex != -2 &&
-                                    near_uploads < NEAR_UPLOAD_BUDGET) {
+                                if (white_px && tex_last_tex != -2 &&
+                                    tex_uploads < TEX_UPLOAD_BUDGET) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                    near_last_tex = -2;
-                                    near_uploads++;
+                                    tex_last_tex = -2;
+                                    tex_uploads++;
                                 }
                             } else continue;
 
@@ -2767,8 +2767,8 @@ int main(void) {
 
                                 /* UV computation */
                                 float ts = 0, tt = 0;
-                                if (near_fallback_active) {
-                                    /* Fallback: baked tile UV (same as far pass) */
+                                if (tex_fallback_active) {
+                                    /* Fallback: baked tile UV (same as baked pass) */
                                     float baked_dim = 16.0f; /* CI8 16×16 default */
                                     ts = ((float)(v % 2)) * baked_dim;
                                     tt = ((float)(v / 2)) * baked_dim;
@@ -2911,21 +2911,21 @@ int main(void) {
                             int num_tris = sv_nv - 2;
                             for (int tri = 0; tri < num_tris; tri++) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv_src[0], sv_src[tri+1], sv_src[tri+2]);
-                                perf_near_tris++;
-                                if ((perf_near_tris & 7) == 0) rspq_flush();
+                                perf_tex_tris++;
+                                if ((perf_tex_tris & 7) == 0) rspq_flush();
                             }
                         }
                     }
 
-                    perf_near_room_us = (uint32_t)((float)TICKS_DISTANCE(_nr_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    perf_tex_room_us = (uint32_t)((float)TICKS_DISTANCE(_nr_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
                     } /* end room faces timing */
 
-                    /* ===== NEAR PASS: STATIC MESHES ===== */
+                    /* ===== TEXTURED PASS: STATIC MESHES ===== */
                     { uint32_t _sm_t0 = TICKS_READ();
                     /* Z-bias: pull mesh slightly toward camera to win Z-test
                      * against coplanar room walls (no glPolygonOffset in RDPQ). */
                     #define SM_Z_BIAS 0.997f
-                    for (int ri = 0; ri < near_count; ri++) {
+                    for (int ri = 0; ri < tex_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
@@ -2958,9 +2958,9 @@ int main(void) {
                             float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
 
                             for (int f = 0; f < mesh->face_count && f < 100; f++) {
-                                if (perf_near_tris >= NEAR_TRI_BUDGET ||
-                                    perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
-                                perf_near_faces++;
+                                if (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                    perf_tex_faces >= TEX_FACE_BUDGET) goto near_pass_done;
+                                perf_tex_faces++;
                                 tr_face_t *face = &mesh->faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
@@ -2974,17 +2974,17 @@ int main(void) {
                                     sm_fr = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
                                     sm_fg = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
                                     sm_fb = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
-                                    if (white_px && near_last_tex != -2) {
+                                    if (white_px && tex_last_tex != -2) {
                                         rdpq_mode_tlut(TLUT_NONE);
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        near_last_tex = -2;
+                                        tex_last_tex = -2;
                                     }
                                 } else if (tex_idx < num_otex && ci8_surfs) {
                                     sm_fr = sm_fg = sm_fb = sm_bright;
-                                    if ((int)tex_idx != near_last_tex) {
-                                        if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                    if ((int)tex_idx != tex_last_tex) {
+                                        if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                         rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                        near_last_tex = (int)tex_idx;
+                                        tex_last_tex = (int)tex_idx;
                                     }
                                 } else continue;
 
@@ -3060,17 +3060,17 @@ int main(void) {
                                 int num_tris = sm_cnv - 2;
                                 for (int tri=0;tri<num_tris;tri++) {
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
-                                    perf_near_tris++;
-                                    if ((perf_near_tris & 7) == 0) rspq_flush();
+                                    perf_tex_tris++;
+                                    if ((perf_tex_tris & 7) == 0) rspq_flush();
                                 }
                             }
                         }
                     }
                     #undef SM_Z_BIAS
-                    perf_near_sm_us = (uint32_t)((float)TICKS_DISTANCE(_sm_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    perf_tex_sm_us = (uint32_t)((float)TICKS_DISTANCE(_sm_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
                     } /* end static meshes timing */
 
-                    /* ===== NEAR PASS: LARA ===== */
+                    /* ===== TEXTURED PASS: LARA ===== */
                     { uint32_t _la_t0 = TICKS_READ();
                     {
                         static tr_object_def_t *lara_obj = NULL;
@@ -3151,7 +3151,7 @@ int main(void) {
                                 for (int f = 0; f < mesh->face_count; f++) {
                                     /* Lara exempt from face budget — she's fixed cost
                                      * (~6ms) and must always render completely. */
-                                    perf_near_faces++;
+                                    perf_tex_faces++;
                                     tr_face_t *face = &mesh->faces[f];
                                     int nv = face->vertex_count;
                                     if (nv < 3) continue;
@@ -3165,16 +3165,16 @@ int main(void) {
                                         l_fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
                                         l_fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
                                         l_fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
-                                        if (white_px && near_last_tex != -2) {
+                                        if (white_px && tex_last_tex != -2) {
                                             rdpq_mode_tlut(TLUT_NONE);
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            near_last_tex = -2;
+                                            tex_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex && ci8_surfs) {
-                                        if ((int)tex_idx != near_last_tex) {
-                                            if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                        if ((int)tex_idx != tex_last_tex) {
+                                            if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                             rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                            near_last_tex = (int)tex_idx;
+                                            tex_last_tex = (int)tex_idx;
                                         }
                                     } else continue;
 
@@ -3220,12 +3220,12 @@ int main(void) {
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
-                                    perf_near_tris++;
+                                    perf_tex_tris++;
                                     if (nv == 4) {
                                         rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
-                                        perf_near_tris++;
+                                        perf_tex_tris++;
                                     }
-                                    if ((perf_near_tris & 7) == 0) rspq_flush();
+                                    if ((perf_tex_tris & 7) == 0) rspq_flush();
                                 }
                             }
                         }
@@ -3277,9 +3277,9 @@ int main(void) {
                             spr_bright *= (1.0f - rz_s / 16384.0f);
                             if (spr_bright < 0) spr_bright = 0;
 
-                            if (white_px && near_last_tex != -2) {
+                            if (white_px && tex_last_tex != -2) {
                                 rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                near_last_tex = -2;
+                                tex_last_tex = -2;
                             }
 
                             float sv[4][10];
@@ -3301,7 +3301,7 @@ int main(void) {
 
 #endif /* ROOM SPRITES disabled */
 
-#if 0 /* DRAW STATIC OBJECTS — superseded by NEAR PASS: STATIC MESHES (CI8, z-bias) */
+#if 0 /* DRAW STATIC OBJECTS — superseded by TEXTURED PASS: STATIC MESHES (CI8, z-bias) */
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
@@ -3353,15 +3353,15 @@ int main(void) {
                                     fr_r = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
                                     fr_g = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
                                     fr_b = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
-                                    if (white_px && near_last_tex != -2) {
+                                    if (white_px && tex_last_tex != -2) {
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        near_last_tex = -2;
+                                        tex_last_tex = -2;
                                     }
                                 } else if (tex_idx < num_otex) {
                                     otex = &g_level.object_textures[tex_idx];
-                                    if ((int)tex_idx != near_last_tex) {
+                                    if ((int)tex_idx != tex_last_tex) {
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        near_last_tex = (int)tex_idx;
+                                        tex_last_tex = (int)tex_idx;
                                     }
                                 } else continue;
 
@@ -3424,7 +3424,7 @@ int main(void) {
                     }
 #endif /* DRAW STATIC OBJECTS disabled */
 
-                    perf_near_lara_us = (uint32_t)((float)TICKS_DISTANCE(_la_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    perf_tex_lara_us = (uint32_t)((float)TICKS_DISTANCE(_la_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
                     } /* end Lara timing */
 
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
@@ -3471,9 +3471,9 @@ int main(void) {
                         float isy = sinf(iyaw), icy = cosf(iyaw);
 
                         for (int f = 0; f < mesh->face_count && f < 50; f++) {
-                            if (perf_near_tris >= NEAR_TRI_BUDGET ||
-                                perf_near_faces >= NEAR_FACE_BUDGET) goto near_pass_done;
-                            perf_near_faces++;
+                            if (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                perf_tex_faces >= TEX_FACE_BUDGET) goto near_pass_done;
+                            perf_tex_faces++;
                             tr_face_t *face = &mesh->faces[f];
                             if (face->vertex_count < 3) continue;
                             bool is_flat = (face->texture & 0x8000) != 0;
@@ -3486,17 +3486,17 @@ int main(void) {
                                 ifr = (float)g_level.palette[ci*3+0]/63.0f*item_shade;
                                 ifg = (float)g_level.palette[ci*3+1]/63.0f*item_shade;
                                 ifb = (float)g_level.palette[ci*3+2]/63.0f*item_shade;
-                                if (white_px && near_last_tex != -2) {
+                                if (white_px && tex_last_tex != -2) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                    near_last_tex = -2;
+                                    tex_last_tex = -2;
                                 }
                             } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
-                                if ((int)tex_idx != near_last_tex) {
-                                    if (near_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
+                                if ((int)tex_idx != tex_last_tex) {
+                                    if (tex_last_tex == -2) rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload(TILE0, &ci8_surfs[tex_idx], NULL);
-                                    near_last_tex = (int)tex_idx;
+                                    tex_last_tex = (int)tex_idx;
                                 }
                             } else continue;
 
@@ -3535,18 +3535,18 @@ int main(void) {
                             }
                             if (!vis) continue;
                             rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
-                            perf_near_tris++;
+                            perf_tex_tris++;
                             if (face->vertex_count == 4) {
                                 rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
-                                perf_near_tris++;
+                                perf_tex_tris++;
                             }
-                            if ((perf_near_tris & 7) == 0) rspq_flush();
+                            if ((perf_tex_tris & 7) == 0) rspq_flush();
                         }
                     }
-                    perf_near_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    perf_tex_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
                     } /* end items timing */
 
-#if 0 /* DRAW LARA — superseded by NEAR PASS: LARA (CI8 textures above) */
+#if 0 /* DRAW LARA — superseded by TEXTURED PASS: LARA (CI8 textures above) */
                     {
                         /* Find Lara's object + item (cached after first frame) */
                         static tr_object_def_t *lara_obj = NULL;
@@ -3642,15 +3642,15 @@ int main(void) {
                                         fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
                                         fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
                                         fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
-                                        if (white_px && near_last_tex != -2) {
+                                        if (white_px && tex_last_tex != -2) {
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            near_last_tex = -2;
+                                            tex_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex) {
                                         otex = &g_level.object_textures[tex_idx];
-                                        if ((int)tex_idx != near_last_tex) {
+                                        if ((int)tex_idx != tex_last_tex) {
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                            near_last_tex = (int)tex_idx;
+                                            tex_last_tex = (int)tex_idx;
                                         }
                                     } else continue;
 
@@ -3717,9 +3717,9 @@ int main(void) {
                         float sy_pos = (float)shadow_item->pos.y + 10.0f;
                         float sz_pos = (float)shadow_item->pos.z;
 
-                        if (white_px && near_last_tex != -2) {
+                        if (white_px && tex_last_tex != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                            near_last_tex = -2;
+                            tex_last_tex = -2;
                         }
 
                         /* Enable semi-transparent blending for shadow */
@@ -3764,11 +3764,11 @@ int main(void) {
                         rdpq_mode_pop();
                     }}
                     near_pass_done:
-                    /* End near pass — record CPU time, measure RSP stall, detach */
+                    /* End textured pass — record CPU time, measure RSP stall, detach */
                     rdpq_mode_tlut(TLUT_NONE);
                     {
-                        uint32_t d = TICKS_DISTANCE(perf_near_t0, TICKS_READ());
-                        perf_near_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                        uint32_t d = TICKS_DISTANCE(perf_tex_t0, TICKS_READ());
+                        perf_tex_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
                     }
                     /* Measure how long CPU stalls waiting for RSP/RDP to drain.
                      * Large value = RSP/RDP is the bottleneck.
