@@ -943,6 +943,8 @@ int main(void) {
                  * Toggle via pause menu → global budgets page.
                  * Colors: Near=GREEN, MidFar=CYAN, Far=YELLOW, XFar=ORANGE, XXFar=RED */
                 bool g_debug_dist_colors = false;
+                /* Force all rooms to render as a specific tier (0=off, 1-5=tier) */
+                int g_debug_force_tier = 0;
                 /* Each debug pixel needs its own 8-byte aligned address
                  * for rdpq_tex_upload. Allocate 5 × 8 bytes = 40 bytes. */
                 uint16_t *dbg_tier_px = (uint16_t *)malloc_uncached_aligned(8, 5 * 8);
@@ -1587,6 +1589,7 @@ int main(void) {
                         int edit_g_far_tri     = g_far_tri_budget;
                         int edit_g_far_upload  = g_far_upload_budget;
                         bool edit_debug_dist   = g_debug_dist_colors;
+                        int  edit_force_tier   = g_debug_force_tier;
                         float edit_dist_mid    = g_dist_mid;
                         float edit_dist_vfar   = g_dist_vfar;
                         float edit_dist_xfar   = g_dist_xfar;
@@ -1693,7 +1696,14 @@ int main(void) {
                                 STAT("");
                                 STAT_HL(slider_sel, 5, "Dist Debug Colors: %s",
                                         edit_debug_dist ? "ON" : "OFF");
-                                if (edit_debug_dist) {
+                                {
+                                    static const char *tier_names[] = {
+                                        "OFF", "Near", "MidFar", "Far", "XFar", "XXFar"
+                                    };
+                                    STAT_HL(slider_sel, 6, "Force All Tier: %s",
+                                            tier_names[edit_force_tier]);
+                                }
+                                if (edit_debug_dist || edit_force_tier) {
                                     STAT(" GREEN=Near CYAN=MidFar");
                                     STAT(" YELLOW=Far ORANGE=XFar RED=XXFar");
                                 }
@@ -1773,13 +1783,18 @@ int main(void) {
 
                             /* Slider navigation + adjustment (edits copies only) */
                             if (pause_page == 1) {
-                                int max_sel = 5; /* 0-4 = budgets, 5 = debug toggle */
+                                int max_sel = 6; /* 0-4=budgets, 5=debug colors, 6=force tier */
                                 if (bp.d_up && slider_sel > 0) slider_sel--;
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 /* Toggle for debug dist colors */
                                 if (slider_sel == 5 && (bp.d_left || bp.d_right))
                                     edit_debug_dist = !edit_debug_dist;
+                                /* Cycle force tier: OFF→Near→MidFar→Far→XFar→XXFar→OFF */
+                                if (slider_sel == 6 && bp.d_right)
+                                    { edit_force_tier++; if (edit_force_tier > 5) edit_force_tier = 0; }
+                                if (slider_sel == 6 && bp.d_left)
+                                    { edit_force_tier--; if (edit_force_tier < 0) edit_force_tier = 5; }
 
                                 int delta = 0;
                                 if (hold_tick && bh.d_right) delta = 50;
@@ -1876,6 +1891,7 @@ int main(void) {
                         g_far_tri_budget     = edit_g_far_tri;
                         g_far_upload_budget  = edit_g_far_upload;
                         g_debug_dist_colors  = edit_debug_dist;
+                        g_debug_force_tier   = edit_force_tier;
                         g_dist_mid   = edit_dist_mid;
                         g_dist_vfar  = edit_dist_vfar;
                         g_dist_xfar  = edit_dist_xfar;
@@ -2105,20 +2121,26 @@ int main(void) {
                         int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        if (ri == lara_room) {
-                            /* Current room: always Near */
+                        /* Force tier override: put ALL rooms in one pass */
+                        if (g_debug_force_tier == 1) {
+                            /* Force Near: all rooms go to near pass */
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (near_count < MAX_DRAW_ROOMS)
+                                near_rooms[near_count++] = ri;
+                        } else if (g_debug_force_tier >= 2) {
+                            /* Force MidFar/Far/XFar/XXFar: all to far pass */
+                            c->lod = CHUNK_LOD_FAR;
+                            if (far_count < MAX_DRAW_ROOMS)
+                                far_rooms[far_count++] = ri;
+                        } else if (ri == lara_room) {
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
                         } else if (c->dist_sq < g_dist_mid_sq) {
-                            /* Close enough for full CI8 per-face textures */
                             c->lod = CHUNK_LOD_NEAR;
                             if (near_count < MAX_DRAW_ROOMS)
                                 near_rooms[near_count++] = ri;
                         } else {
-                            /* Beyond mid threshold → far pass with baked tiles.
-                             * Specific tier (MidFar/Far/XFar/XXFar) chosen at
-                             * render time by comparing dist vs g_dist_*_sq. */
                             c->lod = CHUNK_LOD_FAR;
                             if (far_count < MAX_DRAW_ROOMS)
                                 far_rooms[far_count++] = ri;
@@ -2231,8 +2253,12 @@ int main(void) {
                              * (is_ring2 override removed — distance-based tiers now) */
                             float rd = room_d;
 
-                            /* Determine far tier by distance */
-                            int far_tier = (rd > g_dist_xxfar_sq) ? 4 :
+                            /* Determine far tier (force override or by distance) */
+                            int far_tier;
+                            if (g_debug_force_tier >= 2)
+                                far_tier = g_debug_force_tier - 1; /* 2→1(MidFar), 3→2(Far), 4→3(XFar), 5→4(XXFar) */
+                            else
+                                far_tier = (rd > g_dist_xxfar_sq) ? 4 :
                                            (rd > g_dist_xfar_sq)  ? 3 :
                                            (rd > g_dist_vfar_sq)  ? 2 : 1;
 
