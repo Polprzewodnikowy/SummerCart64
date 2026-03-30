@@ -19,45 +19,54 @@ static uint32_t g_rdram_size = 0;
 static bool g_initialized = false;
 
 /* ----------------------------------------------------------------
- * rspq DMEM layout constants (from libdragon rspq_constants.h)
- *
- * The rspq engine stores its read pointer and other state in
- * fixed DMEM offsets. We observe these after DMA to detect when
- * a new command buffer has been loaded.
- * ---------------------------------------------------------------- */
-
-/* rspq uses a double-buffered DMEM region for command prefetch.
- * The exact layout varies by libdragon version, but the command
- * data typically occupies DMEM 0x100-0x1FF (256 bytes).
- *
- * For Tier 1 telemetry, we don't intercept at the DMEM level.
- * Instead, we scan RDRAM command buffers directly. The RSP DMA
- * to DMEM tells us WHICH RDRAM region contains commands. */
-
-/* ----------------------------------------------------------------
  * system_init — called once at startup
  * ---------------------------------------------------------------- */
 
 void t3d_hle_system_init(uint8_t *rdram_data, uint32_t rdram_size) {
     g_rdram = rdram_data;
     g_rdram_size = rdram_size;
-
-    /* Initialize in telemetry mode (Tier 1) */
     t3d_hle_init(&g_hle, 0);
     g_initialized = true;
-
     T3D_LOG(&g_hle, "T3D_HOOK", "event=system_init rdram_size=%u", rdram_size);
 }
 
 /* ----------------------------------------------------------------
+ * Validate if a 32-bit word looks like a plausible rspq command.
+ * Heuristic: overlay ID 0-15, and if overlay 0, cmd should be 0-7.
+ * ---------------------------------------------------------------- */
+static bool looks_like_rspq_cmd(uint32_t w0) {
+    if (w0 == 0) return false; /* padding */
+    int ovl = RSPQ_OVL_ID(w0);
+    int cmd = RSPQ_CMD_ID(w0);
+    /* overlay 0: internal commands 0-7 */
+    if (ovl == 0 && cmd > 7) return false;
+    /* overlay 15 is unlikely (rspq supports 0-14 in practice) */
+    if (ovl == 15) return false;
+    return true;
+}
+
+/* ----------------------------------------------------------------
+ * Estimate command size for a non-T3D overlay command.
+ * For rspq internal (overlay 0), we know exact sizes.
+ * For unknown overlays, we can't know — return 0 to signal
+ * "stop scanning" rather than guess and misalign.
+ * ---------------------------------------------------------------- */
+static int rspq_internal_cmd_size(int cmd_id) {
+    switch (cmd_id) {
+    case RSPQ_CMD_NOOP:    return 1;
+    case RSPQ_CMD_JUMP:    return 1; /* addr in args */
+    case RSPQ_CMD_CALL:    return 2; /* addr + return */
+    case RSPQ_CMD_RET:     return 1;
+    case RSPQ_CMD_DMA:     return 4; /* rdram + dmem + length + ... */
+    case RSPQ_CMD_WRITE:   return 2;
+    case RSPQ_CMD_TEST:    return 1;
+    case RSPQ_CMD_WSTATUS: return 1;
+    default: return 1;
+    }
+}
+
+/* ----------------------------------------------------------------
  * on_rsp_dma — called after every RSP DMA transfer
- *
- * This is the primary ingestion point. We observe:
- * - DMA to IMEM (region=1): ucode loading → overlay detection
- * - DMA to DMEM (region=0): command/data buffers → parse commands
- *
- * For DMEM DMA, the source RDRAM region often contains rspq
- * command buffers. We scan them for T3D commands.
  * ---------------------------------------------------------------- */
 
 void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
@@ -65,83 +74,79 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
                          const uint8_t *rdram, uint32_t rdram_size,
                          const uint8_t *region_data) {
     if (!g_initialized) return;
+    (void)region_data;
 
-    /* Update RDRAM pointer (may change on system reset) */
     g_rdram = rdram;
     g_rdram_size = rdram_size;
 
     uint32_t phys_dram = dram_addr & 0x1FFFFFFF;
 
     if (region == 1) {
-        /* DMA to IMEM — potential microcode load.
-         * Log it for overlay detection (Tier 1 telemetry). */
+        /* DMA to IMEM — microcode load */
         if (g_hle.verbose) {
             T3D_LOG(&g_hle, "T3D_DMA", "target=IMEM dram=0x%08X pbus=0x%04X len=%u",
-                phys_dram, pbus_addr, length);
+                    phys_dram, pbus_addr, length);
         }
-        /* TODO: IMEM fingerprinting for rspq/T3D overlay detection.
-         * For now, detection happens via command pattern matching. */
         return;
     }
 
-    /* DMA to DMEM — could be command buffer, vertex data, or overlay table.
-     *
-     * rspq command buffers are loaded into DMEM at offset 0x000-0x0FF
-     * (the prefetch buffer). The source RDRAM address tells us where
-     * the command buffer lives. We scan that RDRAM region directly.
-     *
-     * Filter: only scan small DMAs to low DMEM addresses (likely commands).
-     * Large DMAs to high DMEM are usually data (vertex buffers loaded by
-     * the RSP itself, not rspq command data). */
-    if (pbus_addr < 0x200 && length <= 512) {
-        /* This looks like a command buffer prefetch. Scan the source
-         * RDRAM region for rspq commands. */
-        uint32_t scan_end = phys_dram + length;
-        if (scan_end > rdram_size) scan_end = rdram_size;
+    /* DMA to DMEM — only scan if destination is in the rspq prefetch
+     * region (low DMEM) and length is command-buffer-sized. */
+    if (pbus_addr >= 0x200 || length > 512 || length < 8) return;
 
-        uint32_t pos = phys_dram;
-        int cmds_in_buffer = 0;
+    /* Validate first word as a plausible rspq command */
+    if (phys_dram + 3 >= rdram_size) return;
+    uint32_t first_word = t3d_hle_read32(rdram, rdram_size, phys_dram);
+    if (!looks_like_rspq_cmd(first_word)) return;
 
-        while (pos + 3 < scan_end) {
-            uint32_t w0 = t3d_hle_read32(rdram, rdram_size, pos);
+    /* Scan the buffer for commands */
+    uint32_t scan_end = phys_dram + length;
+    if (scan_end > rdram_size) scan_end = rdram_size;
 
-            /* Skip zero words (padding/empty slots) */
-            if (w0 == 0) { pos += 4; continue; }
+    uint32_t pos = phys_dram;
+    int cmds_in_buffer = 0;
 
-            int ovl_id = RSPQ_OVL_ID(w0);
+    while (pos + 3 < scan_end) {
+        uint32_t w0 = t3d_hle_read32(rdram, rdram_size, pos);
 
-            /* rspq internal commands (overlay 0) — skip but count */
-            if (ovl_id == 0) {
-                int cmd = RSPQ_CMD_ID(w0);
-                /* JUMP/CALL/RET are 1-2 words. Be conservative. */
-                int size = (cmd == RSPQ_CMD_JUMP || cmd == RSPQ_CMD_CALL) ? 2 : 1;
-                g_hle.frame.cmds_rspq++;
-                g_hle.frame.cmds_total++;
-                pos += size * 4;
-                cmds_in_buffer++;
-                continue;
-            }
+        if (w0 == 0) { pos += 4; continue; }
+        if (!looks_like_rspq_cmd(w0)) break; /* garbage — stop */
 
-            /* Non-zero overlay — try our T3D parser */
+        int ovl_id = RSPQ_OVL_ID(w0);
+        int cmd_id = RSPQ_CMD_ID(w0);
+
+        /* rspq internal commands (overlay 0) */
+        if (ovl_id == 0) {
+            int size = rspq_internal_cmd_size(cmd_id);
+            g_hle.frame.cmds_rspq++;
+            g_hle.frame.cmds_total++;
+            pos += size * 4;
+            cmds_in_buffer++;
+            continue;
+        }
+
+        /* T3D overlay — parse fully */
+        if (g_hle.detect.overlay_id == ovl_id ||
+            (g_hle.detect.overlay_id == -1 && cmd_id < T3D_CMD_COUNT)) {
             int consumed = t3d_hle_process_command(&g_hle, rdram, rdram_size, pos);
             if (consumed > 0) {
                 pos += consumed * 4;
                 cmds_in_buffer++;
-            } else {
-                /* Unknown command from unknown overlay. Advance 1 word
-                 * to avoid infinite loop, but this is a heuristic. */
-                pos += 4;
-                cmds_in_buffer++;
+                continue;
             }
-
-            /* Safety: don't scan more than 64 commands per buffer */
-            if (cmds_in_buffer > 64) break;
         }
 
-        if (cmds_in_buffer > 0 && g_hle.verbose) {
-            T3D_LOG(&g_hle, "T3D_DMA", "target=DMEM dram=0x%08X len=%u cmds=%d",
+        /* Unknown overlay command — we don't know its size.
+         * Rather than guess and misalign, stop scanning.
+         * The next DMA will pick up from where the RSP left off. */
+        g_hle.frame.cmds_other++;
+        g_hle.frame.cmds_total++;
+        break;
+    }
+
+    if (cmds_in_buffer > 0 && g_hle.verbose) {
+        T3D_LOG(&g_hle, "T3D_DMA", "target=DMEM dram=0x%08X len=%u cmds=%d",
                 phys_dram, length, cmds_in_buffer);
-        }
     }
 }
 
