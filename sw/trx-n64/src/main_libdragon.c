@@ -1638,6 +1638,19 @@ int main(void) {
                                 STAT("Room:%d Vis:%d r1:%d r2:%d",
                                      lara_room, perf_vis_total,
                                      perf_vis_ring1, perf_vis_ring2);
+                                /* Show actual distances for debugging tier thresholds */
+                                {
+                                    /* Find nearest non-lara visible room's dist_sq */
+                                    float min_d = 999999999.0f, max_d = 0;
+                                    for (int ri = 0; ri < g_chunk_count; ri++) {
+                                        if (ri == lara_room || !g_chunks[ri].visible) continue;
+                                        float d = g_chunks[ri].dist_sq;
+                                        if (d < min_d) min_d = d;
+                                        if (d > max_d) max_d = d;
+                                    }
+                                    STAT("VisDist:%.0f-%.0f", sqrtf(min_d), sqrtf(max_d));
+                                    STAT("mid_th:%.0f mid_sq:%.0f", g_dist_mid, g_dist_mid_sq);
+                                }
                                 STAT("--- NEAR ---");
                                 STAT("Tris:%d/%d Faces:%d/%d",
                                      perf_near_tris, NEAR_TRI_BUDGET,
