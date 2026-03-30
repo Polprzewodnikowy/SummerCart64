@@ -2441,34 +2441,74 @@ int main(void) {
                                             clipped[v][k] = cv[v][k];
                                 }
 
-                                /* Project + guard-band reject */
-                                bool screen_ok = true;
-                                /* Project to screen — guard-band reject.
-                                 * Let RDP scissor handle off-screen tris;
-                                 * rejecting per-vertex was too aggressive
-                                 * for large faces near screen edges. */
-                                float sv[6][9];
+                                /* Project to screen space */
+                                float sv_raw[8][9];
+                                bool any_outside = false;
                                 for (int v = 0; v < clip_nv; v++) {
                                     float rz = clipped[v][2];
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + clipped[v][0] * inv_z;
                                     float scy = 120.0f + clipped[v][1] * inv_z;
                                     if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
-                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
-                                        screen_ok = false; break;
-                                    }
-                                    sv[v][0] = scx;  sv[v][1] = scy;
-                                    sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
-                                    sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
-                                    sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    sv[v][8] = 1.0f; /* affine */
+                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y)
+                                        any_outside = true;
+                                    sv_raw[v][0] = scx;  sv_raw[v][1] = scy;
+                                    sv_raw[v][2] = clipped[v][3]; sv_raw[v][3] = clipped[v][4];
+                                    sv_raw[v][4] = clipped[v][5]; sv_raw[v][5] = 1.0f;
+                                    sv_raw[v][6] = clipped[v][6]; sv_raw[v][7] = clipped[v][7];
+                                    sv_raw[v][8] = 1.0f; /* affine */
                                 }
-                                if (!screen_ok) continue;
 
-                                int num_tris = clip_nv - 2;
+                                /* Screen-space S-H clip against guard band (4 edges) */
+                                float (*sv_src)[9] = sv_raw;
+                                int sv_nv = clip_nv;
+                                float sv_t1[8][9], sv_t2[8][9];
+                                if (any_outside) {
+                                    /* Left */
+                                    int n1 = 0;
+                                    for (int i = 0; i < sv_nv; i++) {
+                                        int j = (i+1) % sv_nv;
+                                        bool ii = sv_src[i][0] >= GUARD_LO_X, ji = sv_src[j][0] >= GUARD_LO_X;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t1[n1][k]=sv_src[i][k]; n1++; }
+                                        if (ii!=ji) { float t=(GUARD_LO_X-sv_src[i][0])/(sv_src[j][0]-sv_src[i][0]); for(int k=0;k<9;k++) sv_t1[n1][k]=sv_src[i][k]+t*(sv_src[j][k]-sv_src[i][k]); n1++; }
+                                        if (n1>=8) break;
+                                    }
+                                    /* Right */
+                                    int n2 = 0;
+                                    for (int i = 0; i < n1; i++) {
+                                        int j = (i+1) % n1;
+                                        bool ii = sv_t1[i][0] <= GUARD_HI_X, ji = sv_t1[j][0] <= GUARD_HI_X;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]; n2++; }
+                                        if (ii!=ji) { float t=(GUARD_HI_X-sv_t1[i][0])/(sv_t1[j][0]-sv_t1[i][0]); for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]+t*(sv_t1[j][k]-sv_t1[i][k]); n2++; }
+                                        if (n2>=8) break;
+                                    }
+                                    /* Top */
+                                    n1 = 0;
+                                    for (int i = 0; i < n2; i++) {
+                                        int j = (i+1) % n2;
+                                        bool ii = sv_t2[i][1] >= GUARD_LO_Y, ji = sv_t2[j][1] >= GUARD_LO_Y;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t1[n1][k]=sv_t2[i][k]; n1++; }
+                                        if (ii!=ji) { float t=(GUARD_LO_Y-sv_t2[i][1])/(sv_t2[j][1]-sv_t2[i][1]); for(int k=0;k<9;k++) sv_t1[n1][k]=sv_t2[i][k]+t*(sv_t2[j][k]-sv_t2[i][k]); n1++; }
+                                        if (n1>=8) break;
+                                    }
+                                    /* Bottom */
+                                    n2 = 0;
+                                    for (int i = 0; i < n1; i++) {
+                                        int j = (i+1) % n1;
+                                        bool ii = sv_t1[i][1] <= GUARD_HI_Y, ji = sv_t1[j][1] <= GUARD_HI_Y;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]; n2++; }
+                                        if (ii!=ji) { float t=(GUARD_HI_Y-sv_t1[i][1])/(sv_t1[j][1]-sv_t1[i][1]); for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]+t*(sv_t1[j][k]-sv_t1[i][k]); n2++; }
+                                        if (n2>=8) break;
+                                    }
+                                    sv_src = sv_t2;
+                                    sv_nv = n2;
+                                    if (sv_nv < 3) continue;
+                                }
+
+                                int num_tris = sv_nv - 2;
                                 for (int tri = 0; tri < num_tris; tri++) {
                                     rdpq_triangle(&TRIFMT_SHADE_TEX,
-                                        sv[0], sv[tri+1], sv[tri+2]);
+                                        sv_src[0], sv_src[tri+1], sv_src[tri+2]);
                                     far_tris++;
                                     perf_far_tris = far_tris;
                                     if ((far_tris & 7) == 0)
