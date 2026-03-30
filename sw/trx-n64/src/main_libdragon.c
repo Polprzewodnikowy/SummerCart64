@@ -2150,7 +2150,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        #define NEAR_Z 256.0f  /* near clip plane — higher = less screen fill from close faces */
+                        #define NEAR_Z 512.0f  /* near clip plane — higher = less close-face magnification */
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
@@ -2372,7 +2372,7 @@ int main(void) {
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    sv[v][8] = inv_z;
+                                    { float tw = inv_z; if (tw > 0.5f) tw = 0.5f; sv[v][8] = tw; }
                                 }
                                 if (!screen_ok) continue;
 
@@ -2646,7 +2646,11 @@ int main(void) {
                                 sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
                                 sv[v][5]=clipped[v][5]; sv[v][6]=1.0f;
                                 sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
-                                sv[v][9]=inv_z;
+                                /* Clamp perspective W to prevent extreme magnification
+                                 * that causes texture swimming on the RDP's fixed-point math */
+                                float tex_w = inv_z;
+                                if (tex_w > 0.5f) tex_w = 0.5f;
+                                sv[v][9]=tex_w;
                             }
                             if (!guard_ok) continue;
 
@@ -2796,7 +2800,7 @@ int main(void) {
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
                                     sv[v][6]=1.0f;
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
-                                    sv[v][9]=256.0f/rz;
+                                    { float tw=256.0f/rz; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
                                 }
                                 if (!sm_guard_ok) continue;
                                 int num_tris = sm_cnv - 2;
@@ -2958,7 +2962,7 @@ int main(void) {
                                             sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
                                             sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                         } else { sv[v][7]=0; sv[v][8]=0; }
-                                        sv[v][9]=256.0f/rz;
+                                        { float tw=256.0f/rz; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
@@ -3034,7 +3038,7 @@ int main(void) {
                             for (int v = 0; v < 4; v++) {
                                 sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
                                 sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
-                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=256.0f/rz_s;
+                                sv[v][7]=0; sv[v][8]=0; { float tw=256.0f/rz_s; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
                             }
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
