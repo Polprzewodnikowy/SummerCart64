@@ -916,10 +916,8 @@ int main(void) {
                 #define CI4_TILE_TEXELS (TEX_TILE_DIM * TEX_TILE_DIM / 2) /* 512 bytes */
                 #define CI4_PAL_SIZE   16
                 #define CI4_PAYLOAD    (CI4_PAL_SIZE * 2 + CI4_TILE_TEXELS) /* 544 bytes */
-                #if !defined(ATX_ROM_OFFSET)
-                #define ATX_ROM_OFFSET 0u
-                #define ATX_ROM_SIZE   0u
-                #endif
+                /* ATX_ROM_OFFSET / ATX_ROM_SIZE defined in baked_offsets.h
+                 * (included later). If not available, default to 0. */
                 #define ATX_HEADER_SIZE 32
                 #define ATX_RECORD_SIZE 4
 
@@ -1137,6 +1135,10 @@ int main(void) {
                 #else
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
+                #endif
+                #if !defined(ATX_ROM_OFFSET)
+                #define ATX_ROM_OFFSET 0u
+                #define ATX_ROM_SIZE   0u
                 #endif
 
                 printf("  Baked ROM: offset=0x%X size=%u\n",
