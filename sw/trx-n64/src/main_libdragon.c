@@ -1267,6 +1267,11 @@ int main(void) {
                 float g_dist_xfar   = 13312.0f;  /* far→extra-far boundary */
                 float g_dist_xxfar  = 16384.0f;  /* extra-far→extreme-far boundary */
 
+                /* Baked pass depth bias: push baked vertices slightly away from
+                 * camera to prevent Z-fighting with textured pass geometry.
+                 * Added to rz during baked pass projection. Tunable per-level. */
+                float g_baked_z_bias = 8.0f;
+
                 /* Squared versions recomputed when thresholds change */
                 float g_dist_mid_sq, g_dist_vfar_sq, g_dist_xfar_sq, g_dist_xxfar_sq;
                 #define RECOMPUTE_DIST_SQ() do { \
@@ -1597,6 +1602,7 @@ int main(void) {
                         float edit_dist_vfar   = g_dist_vfar;
                         float edit_dist_xfar   = g_dist_xfar;
                         float edit_dist_xxfar  = g_dist_xxfar;
+                        float edit_z_bias      = g_baked_z_bias;
                         room_budget_t edit_room_budgets[256];
                         memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
@@ -1751,6 +1757,8 @@ int main(void) {
                                 STAT_HL(slider_sel, 2, "Far->XFar:    %.0f", edit_dist_xfar);
                                 STAT_HL(slider_sel, 3, "XFar->XXFar:  %.0f", edit_dist_xxfar);
                                 STAT("");
+                                STAT_HL(slider_sel, 4, "Baked Z-Bias: %.0f", edit_z_bias);
+                                STAT("");
                                 STAT("Tier colors (debug):");
                                 STAT(" <%.0f        GREEN  Near", edit_dist_mid);
                                 STAT(" %.0f-%.0f   CYAN   MidFar", edit_dist_mid, edit_dist_vfar);
@@ -1871,15 +1879,23 @@ int main(void) {
                                     }
                                 }
                             } else if (pause_page == 3) {
-                                int max_sel = 3;
+                                int max_sel = 4; /* 0-3 = distances, 4 = z-bias */
                                 if (bp.d_up && slider_sel > 0) slider_sel--;
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                /* Z-bias adjustment (slider 4) */
+                                if (slider_sel == 4) {
+                                    if (hold_tick && bh.d_right) edit_z_bias += 2.0f;
+                                    if (hold_tick && bh.d_left)  edit_z_bias -= 2.0f;
+                                    if (edit_z_bias < 0.0f) edit_z_bias = 0.0f;
+                                    if (edit_z_bias > 128.0f) edit_z_bias = 128.0f;
+                                }
 
                                 float fdelta = 0;
                                 if (hold_tick && bh.d_right) fdelta = 256.0f;
                                 if (hold_tick && bh.d_left)  fdelta = -256.0f;
 
-                                if (fdelta != 0) {
+                                if (fdelta != 0 && slider_sel < 4) {
                                     float *t[] = { &edit_dist_mid, &edit_dist_vfar,
                                                    &edit_dist_xfar, &edit_dist_xxfar };
                                     *t[slider_sel] += fdelta;
@@ -1913,6 +1929,7 @@ int main(void) {
                         g_dist_vfar  = edit_dist_vfar;
                         g_dist_xfar  = edit_dist_xfar;
                         g_dist_xxfar = edit_dist_xxfar;
+                        g_baked_z_bias = edit_z_bias;
                         RECOMPUTE_DIST_SQ();
                         memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
@@ -2479,11 +2496,12 @@ int main(void) {
                                             clipped[v][k] = cv[v][k];
                                 }
 
-                                /* Project to screen space */
+                                /* Project to screen space (with Z-bias to prevent
+                                 * Z-fighting against textured pass at same depth) */
                                 float sv_raw[8][9];
                                 bool any_outside = false;
                                 for (int v = 0; v < clip_nv; v++) {
-                                    float rz = clipped[v][2];
+                                    float rz = clipped[v][2] + g_baked_z_bias;
                                     float inv_z = 256.0f / rz;
                                     float scx = 160.0f + clipped[v][0] * inv_z;
                                     float scy = 120.0f + clipped[v][1] * inv_z;
