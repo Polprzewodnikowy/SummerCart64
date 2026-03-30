@@ -2459,11 +2459,25 @@ int main(void) {
                                     cv[v][5] = vtx_cache[vi].b;
 
                                     float ts = 0, tt = 0;
-                                    if (room_baked) {
-                                        /* Sample baked tile center — gives solid room color
-                                         * instead of zigzag tiling pattern */
-                                        ts = 0.5f;
-                                        tt = 0.5f;
+                                    if (room_baked && room_idx < g_chunk_count) {
+                                        /* Map baked tile across room footprint.
+                                         * UV from vertex world XZ position within room bounds. */
+                                        tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                        float wx = (float)(room->x + rv->x);
+                                        float wz = (float)(room->z + rv->z);
+                                        tr_chunk_t *ck = &g_chunks[room_idx];
+                                        float room_w = ck->max_x - ck->min_x;
+                                        float room_d = ck->max_z - ck->min_z;
+                                        if (room_w < 1.0f) room_w = 1.0f;
+                                        if (room_d < 1.0f) room_d = 1.0f;
+                                        float tile_dim = (bkd_tier >= 4) ? 4.0f :
+                                                         (bkd_tier >= 3) ? 8.0f :
+                                                         (bkd_tier >= 2) ? 8.0f : 16.0f;
+                                        ts = ((wx - ck->min_x) / room_w) * tile_dim;
+                                        tt = ((wz - ck->min_z) / room_d) * tile_dim;
+                                        /* Clamp to valid tile range */
+                                        if (ts < 0) ts = 0; if (ts > tile_dim) ts = tile_dim;
+                                        if (tt < 0) tt = 0; if (tt > tile_dim) tt = tile_dim;
                                     } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
@@ -2831,11 +2845,20 @@ int main(void) {
 
                                 /* UV computation */
                                 float ts = 0, tt = 0;
-                                if (tex_fallback_active) {
-                                    /* Fallback: baked tile UV (same as baked pass) */
-                                    /* Fallback baked: sample center */
-                                    ts = 0.5f;
-                                    tt = 0.5f;
+                                if (tex_fallback_active && room_idx < g_chunk_count) {
+                                    /* Fallback: map baked tile across room footprint */
+                                    tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                    float wx = (float)(room->x + rv->x);
+                                    float wz = (float)(room->z + rv->z);
+                                    tr_chunk_t *ck = &g_chunks[room_idx];
+                                    float rw = ck->max_x - ck->min_x;
+                                    float rd = ck->max_z - ck->min_z;
+                                    if (rw < 1.0f) rw = 1.0f;
+                                    if (rd < 1.0f) rd = 1.0f;
+                                    ts = ((wx - ck->min_x) / rw) * 16.0f;
+                                    tt = ((wz - ck->min_z) / rd) * 16.0f;
+                                    if (ts < 0) ts = 0; if (ts > 16.0f) ts = 16.0f;
+                                    if (tt < 0) tt = 0; if (tt > 16.0f) tt = 16.0f;
                                 } else if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
