@@ -11,6 +11,7 @@ add_library(t3d_hle_core STATIC
     src/t3d_hle.c
     src/matrix_convert.c
     src/gl_renderer.c
+    src/rdpq_state.c
 )
 
 # Optional: build GL renderer with OSMesa
@@ -36,6 +37,9 @@ target_link_libraries(test_detection t3d_hle_core)
 add_executable(test_matrix tests/test_matrix.c)
 target_link_libraries(test_matrix t3d_hle_core m)
 
+add_executable(test_rdpq_state tests/test_rdpq_state.c)
+target_link_libraries(test_rdpq_state t3d_hle_core)
+
 # Fixture generator
 add_executable(gen_fixture tests/gen_fixture.c)
 
@@ -49,6 +53,7 @@ add_custom_target(check
     COMMAND test_vertex_extract
     COMMAND test_detection
     COMMAND test_matrix
-    DEPENDS test_t3d_commands test_vertex_extract test_detection test_matrix
+    COMMAND test_rdpq_state
+    DEPENDS test_t3d_commands test_vertex_extract test_detection test_matrix test_rdpq_state
     COMMENT "Running ares-t3d unit tests"
 )
