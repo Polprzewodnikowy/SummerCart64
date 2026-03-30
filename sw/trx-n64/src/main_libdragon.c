@@ -2304,10 +2304,7 @@ int main(void) {
                             float fog_add_g  = active_fog_g * fog;
                             float fog_add_b  = active_fog_b * fog;
 
-                            /* UV scale for baked tile mapping */
-                            float room_uv_scale = 1.0f;
-                            if (room_d > g_dist_vfar_sq) room_uv_scale = 8.0f / 32.0f;
-                            else if (room_d > g_dist_mid_sq)  room_uv_scale = 16.0f / 32.0f;
+                            /* (room_uv_scale removed — UV now computed from room footprint) */
 
                             /* Baked room tile — DEFAULT for all far rooms.
                              * Tier chosen by distance.  Ring 2 always gets IA4.
@@ -2476,8 +2473,10 @@ int main(void) {
                                         ts = ((wx - ck->min_x) / room_w) * tile_dim;
                                         tt = ((wz - ck->min_z) / room_d) * tile_dim;
                                         /* Clamp to valid tile range */
-                                        if (ts < 0) ts = 0; if (ts > tile_dim) ts = tile_dim;
-                                        if (tt < 0) tt = 0; if (tt > tile_dim) tt = tile_dim;
+                                        if (ts < 0) ts = 0;
+                                        if (ts > tile_dim) ts = tile_dim;
+                                        if (tt < 0) tt = 0;
+                                        if (tt > tile_dim) tt = tile_dim;
                                     } else if (otex && tex_uv_map) {
                                         float tu = (float)(otex->uv[v].u >> 8);
                                         float tv = (float)(otex->uv[v].v >> 8);
@@ -2857,8 +2856,10 @@ int main(void) {
                                     if (rd < 1.0f) rd = 1.0f;
                                     ts = ((wx - ck->min_x) / rw) * 16.0f;
                                     tt = ((wz - ck->min_z) / rd) * 16.0f;
-                                    if (ts < 0) ts = 0; if (ts > 16.0f) ts = 16.0f;
-                                    if (tt < 0) tt = 0; if (tt > 16.0f) tt = 16.0f;
+                                    if (ts < 0) ts = 0;
+                                    if (ts > 16.0f) ts = 16.0f;
+                                    if (tt < 0) tt = 0;
+                                    if (tt > 16.0f) tt = 16.0f;
                                 } else if (otex && tex_uv_map) {
                                     float tu = (float)(otex->uv[v].u >> 8);
                                     float tv = (float)(otex->uv[v].v >> 8);
