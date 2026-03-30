@@ -1734,6 +1734,7 @@ int main(void) {
                             /* Input handling */
                             joypad_poll();
                             joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+                            joypad_buttons_t bh = joypad_get_buttons(JOYPAD_PORT_1);
 
                             /* Page navigation */
                             if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 3) pause_page = 3; }
@@ -1751,8 +1752,8 @@ int main(void) {
                                     edit_debug_dist = !edit_debug_dist;
 
                                 int delta = 0;
-                                if (bp.d_right) delta = 50;
-                                if (bp.d_left)  delta = -50;
+                                if (bh.d_right) delta = 50;
+                                if (bh.d_left)  delta = -50;
 
                                 if (delta) {
                                     switch (slider_sel) {
@@ -1785,8 +1786,8 @@ int main(void) {
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 int delta = 0;
-                                if (bp.d_right) delta = 50;
-                                if (bp.d_left)  delta = -50;
+                                if (bh.d_right) delta = 50;
+                                if (bh.d_left)  delta = -50;
 
                                 if (delta) {
                                     int16_t *target = NULL;
@@ -1813,8 +1814,8 @@ int main(void) {
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 float fdelta = 0;
-                                if (bp.d_right) fdelta = 512.0f;
-                                if (bp.d_left)  fdelta = -512.0f;
+                                if (bh.d_right) fdelta = 512.0f;
+                                if (bh.d_left)  fdelta = -512.0f;
 
                                 if (fdelta != 0) {
                                     float *t[] = { &edit_dist_mid, &edit_dist_vfar,
@@ -2150,7 +2151,7 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        #define NEAR_Z 512.0f  /* near clip plane — higher = less close-face magnification */
+                        #define NEAR_Z 200.0f  /* near clip plane */
                         int far_last_tex = -1;
                         int far_tris = 0;
                         int far_rooms_max = far_count; /* no room cap — tri budget limits work */
@@ -2186,7 +2187,9 @@ int main(void) {
                              * Tier chosen by distance.  Ring 2 always gets IA4.
                              * No per-face uploads happen when room_baked=true. */
                             bool room_baked = false;
-                            float rd = is_ring2 ? (g_dist_xxfar_sq + 1.0f) : room_d;
+                            /* Use actual room distance for tier selection.
+                             * (is_ring2 override removed — distance-based tiers now) */
+                            float rd = room_d;
 
                             /* Debug colors: apply to ALL far rooms regardless of baked status */
                             if (g_debug_dist_colors && dbg_tier_px) {
@@ -2372,7 +2375,7 @@ int main(void) {
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    { float tw = inv_z; if (tw > 0.5f) tw = 0.5f; sv[v][8] = tw; }
+                                    sv[v][8] = inv_z;
                                 }
                                 if (!screen_ok) continue;
 
@@ -2693,34 +2696,95 @@ int main(void) {
                                     for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
                             }
 
-                            /* Project + guard-band reject */
-                            float sv[6][10];
-                            bool guard_ok = true;
+                            /* Project to screen space */
+                            float sv_raw[8][10];
+                            bool any_outside = false;
                             for (int v = 0; v < clip_nv; v++) {
                                 float rz = clipped[v][2];
                                 float inv_z = 256.0f / rz;
                                 float scx = 160.0f + clipped[v][0] * inv_z;
                                 float scy = 120.0f + clipped[v][1] * inv_z;
                                 if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
-                                    scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
-                                    guard_ok = false; break;
-                                }
-                                sv[v][0]=scx;   sv[v][1]=scy;
-                                sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f) sv[v][2]=1.0f;
-                                sv[v][3]=clipped[v][3]; sv[v][4]=clipped[v][4];
-                                sv[v][5]=clipped[v][5]; sv[v][6]=1.0f;
-                                sv[v][7]=clipped[v][6]; sv[v][8]=clipped[v][7];
-                                /* Clamp perspective W to prevent extreme magnification
-                                 * that causes texture swimming on the RDP's fixed-point math */
-                                float tex_w = inv_z;
-                                if (tex_w > 0.5f) tex_w = 0.5f;
-                                sv[v][9]=tex_w;
+                                    scy < GUARD_LO_Y || scy > GUARD_HI_Y)
+                                    any_outside = true;
+                                sv_raw[v][0]=scx;   sv_raw[v][1]=scy;
+                                sv_raw[v][2]=rz/32768.0f; if(sv_raw[v][2]>1.0f) sv_raw[v][2]=1.0f;
+                                sv_raw[v][3]=clipped[v][3]; sv_raw[v][4]=clipped[v][4];
+                                sv_raw[v][5]=clipped[v][5]; sv_raw[v][6]=1.0f;
+                                sv_raw[v][7]=clipped[v][6]; sv_raw[v][8]=clipped[v][7];
+                                sv_raw[v][9]=inv_z;
                             }
-                            if (!guard_ok) continue;
 
-                            int num_tris = clip_nv - 2;
+                            /* Screen-space S-H clip against guard band (4 edges).
+                             * Only runs for faces with vertices outside the band. */
+                            float (*sv_src)[10] = sv_raw;
+                            int sv_nv = clip_nv;
+                            float sv_tmp1[8][10], sv_tmp2[8][10];
+                            if (any_outside) {
+                                /* Clip left (x >= GUARD_LO_X) */
+                                int out_nv = 0;
+                                for (int i = 0; i < sv_nv; i++) {
+                                    int j = (i+1) % sv_nv;
+                                    bool ii = sv_src[i][0] >= GUARD_LO_X;
+                                    bool ji = sv_src[j][0] >= GUARD_LO_X;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_src[i][k]; out_nv++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_LO_X-sv_src[i][0])/(sv_src[j][0]-sv_src[i][0]);
+                                        for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_src[i][k]+t*(sv_src[j][k]-sv_src[i][k]);
+                                        out_nv++;
+                                    }
+                                    if (out_nv >= 8) break;
+                                }
+                                /* Clip right (x <= GUARD_HI_X) */
+                                int out2 = 0;
+                                for (int i = 0; i < out_nv; i++) {
+                                    int j = (i+1) % out_nv;
+                                    bool ii = sv_tmp1[i][0] <= GUARD_HI_X;
+                                    bool ji = sv_tmp1[j][0] <= GUARD_HI_X;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]; out2++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_HI_X-sv_tmp1[i][0])/(sv_tmp1[j][0]-sv_tmp1[i][0]);
+                                        for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]+t*(sv_tmp1[j][k]-sv_tmp1[i][k]);
+                                        out2++;
+                                    }
+                                    if (out2 >= 8) break;
+                                }
+                                /* Clip top (y >= GUARD_LO_Y) */
+                                out_nv = 0;
+                                for (int i = 0; i < out2; i++) {
+                                    int j = (i+1) % out2;
+                                    bool ii = sv_tmp2[i][1] >= GUARD_LO_Y;
+                                    bool ji = sv_tmp2[j][1] >= GUARD_LO_Y;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_tmp2[i][k]; out_nv++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_LO_Y-sv_tmp2[i][1])/(sv_tmp2[j][1]-sv_tmp2[i][1]);
+                                        for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_tmp2[i][k]+t*(sv_tmp2[j][k]-sv_tmp2[i][k]);
+                                        out_nv++;
+                                    }
+                                    if (out_nv >= 8) break;
+                                }
+                                /* Clip bottom (y <= GUARD_HI_Y) */
+                                out2 = 0;
+                                for (int i = 0; i < out_nv; i++) {
+                                    int j = (i+1) % out_nv;
+                                    bool ii = sv_tmp1[i][1] <= GUARD_HI_Y;
+                                    bool ji = sv_tmp1[j][1] <= GUARD_HI_Y;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]; out2++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_HI_Y-sv_tmp1[i][1])/(sv_tmp1[j][1]-sv_tmp1[i][1]);
+                                        for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]+t*(sv_tmp1[j][k]-sv_tmp1[i][k]);
+                                        out2++;
+                                    }
+                                    if (out2 >= 8) break;
+                                }
+                                sv_src = sv_tmp2;
+                                sv_nv = out2;
+                                if (sv_nv < 3) continue;
+                            }
+
+                            int num_tris = sv_nv - 2;
                             for (int tri = 0; tri < num_tris; tri++) {
-                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
+                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv_src[0], sv_src[tri+1], sv_src[tri+2]);
                                 perf_near_tris++;
                                 if ((perf_near_tris & 7) == 0) rspq_flush();
                             }
@@ -2864,7 +2928,7 @@ int main(void) {
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
                                     sv[v][6]=1.0f;
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
-                                    { float tw=256.0f/rz; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
+                                    sv[v][9]=256.0f/rz;
                                 }
                                 if (!sm_guard_ok) continue;
                                 int num_tris = sm_cnv - 2;
@@ -3026,7 +3090,7 @@ int main(void) {
                                             sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
                                             sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                         } else { sv[v][7]=0; sv[v][8]=0; }
-                                        { float tw=256.0f/rz; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
+                                        sv[v][9]=256.0f/rz;
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
@@ -3102,7 +3166,7 @@ int main(void) {
                             for (int v = 0; v < 4; v++) {
                                 sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
                                 sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
-                                sv[v][7]=0; sv[v][8]=0; { float tw=256.0f/rz_s; if(tw>0.5f)tw=0.5f; sv[v][9]=tw; }
+                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=256.0f/rz_s;
                             }
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
