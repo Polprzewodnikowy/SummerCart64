@@ -1576,6 +1576,7 @@ int main(void) {
                     if (pressed.start) {
                         static int pause_page = 0;
                         static int slider_sel = 0;
+                        int hold_timer = 0; /* throttle held d-pad adjustments */
 
                         /* Snapshot current budgets — edits happen on copies,
                          * applied only on unpause */
@@ -1736,6 +1737,17 @@ int main(void) {
                             joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
                             joypad_buttons_t bh = joypad_get_buttons(JOYPAD_PORT_1);
 
+                            /* Throttle held d-pad: only adjust every 6 frames (~200ms at 30fps) */
+                            bool hold_tick = false;
+                            if (bh.d_left || bh.d_right) {
+                                hold_timer++;
+                                if (hold_timer >= 6) { hold_tick = true; hold_timer = 0; }
+                            } else {
+                                hold_timer = 0;
+                            }
+                            /* First press always triggers immediately */
+                            if (bp.d_left || bp.d_right) hold_tick = true;
+
                             /* Page navigation */
                             if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 3) pause_page = 3; }
                             if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
@@ -1752,8 +1764,8 @@ int main(void) {
                                     edit_debug_dist = !edit_debug_dist;
 
                                 int delta = 0;
-                                if (bh.d_right) delta = 50;
-                                if (bh.d_left)  delta = -50;
+                                if (hold_tick && bh.d_right) delta = 50;
+                                if (hold_tick && bh.d_left)  delta = -50;
 
                                 if (delta) {
                                     switch (slider_sel) {
@@ -1786,8 +1798,8 @@ int main(void) {
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 int delta = 0;
-                                if (bh.d_right) delta = 50;
-                                if (bh.d_left)  delta = -50;
+                                if (hold_tick && bh.d_right) delta = 50;
+                                if (hold_tick && bh.d_left)  delta = -50;
 
                                 if (delta) {
                                     int16_t *target = NULL;
@@ -1814,8 +1826,8 @@ int main(void) {
                                 if (bp.d_down && slider_sel < max_sel) slider_sel++;
 
                                 float fdelta = 0;
-                                if (bh.d_right) fdelta = 256.0f;
-                                if (bh.d_left)  fdelta = -256.0f;
+                                if (hold_tick && bh.d_right) fdelta = 256.0f;
+                                if (hold_tick && bh.d_left)  fdelta = -256.0f;
 
                                 if (fdelta != 0) {
                                     float *t[] = { &edit_dist_mid, &edit_dist_vfar,
@@ -2375,7 +2387,7 @@ int main(void) {
                                     sv[v][2] = clipped[v][3]; sv[v][3] = clipped[v][4];
                                     sv[v][4] = clipped[v][5]; sv[v][5] = 1.0f;
                                     sv[v][6] = clipped[v][6]; sv[v][7] = clipped[v][7];
-                                    sv[v][8] = inv_z;
+                                    sv[v][8] = 1.0f; /* affine */
                                 }
                                 if (!screen_ok) continue;
 
@@ -2712,7 +2724,7 @@ int main(void) {
                                 sv_raw[v][3]=clipped[v][3]; sv_raw[v][4]=clipped[v][4];
                                 sv_raw[v][5]=clipped[v][5]; sv_raw[v][6]=1.0f;
                                 sv_raw[v][7]=clipped[v][6]; sv_raw[v][8]=clipped[v][7];
-                                sv_raw[v][9]=inv_z;
+                                sv_raw[v][9]=1.0f; /* affine texturing (PS1 style) — stable, no swimming */
                             }
 
                             /* Screen-space S-H clip against guard band (4 edges).
@@ -2928,7 +2940,7 @@ int main(void) {
                                     sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
                                     sv[v][6]=1.0f;
                                     sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
-                                    sv[v][9]=256.0f/rz;
+                                    sv[v][9]=1.0f; /* affine */
                                 }
                                 if (!sm_guard_ok) continue;
                                 int num_tris = sm_cnv - 2;
@@ -3090,7 +3102,7 @@ int main(void) {
                                             sv[v][7]=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
                                             sv[v][8]=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                         } else { sv[v][7]=0; sv[v][8]=0; }
-                                        sv[v][9]=256.0f/rz;
+                                        sv[v][9]=1.0f; /* affine */
                                     }
                                     if (!vis) continue;
                                     rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
@@ -3166,7 +3178,7 @@ int main(void) {
                             for (int v = 0; v < 4; v++) {
                                 sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
                                 sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
-                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=256.0f/rz_s;
+                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=1.0f; /* affine */
                             }
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
