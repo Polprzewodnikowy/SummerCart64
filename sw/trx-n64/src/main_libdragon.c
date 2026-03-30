@@ -1064,7 +1064,10 @@ int main(void) {
                                 bkd_m4_surf[bi] = surface_make_linear(
                                     d + off, FMT_IA4, 4, 4);
                             }
-                            data_cache_hit_writeback(baked_data, total_load);
+                            /* Invalidate cache — DMA wrote directly to RDRAM,
+                             * CPU cache has stale data. Must invalidate so
+                             * rdpq_tex_upload reads the DMA'd baked tiles. */
+                            data_cache_hit_writeback_invalidate(baked_data, total_load);
                             printf("  BAK3 loaded: %d KB cached\n",
                                    total_load / 1024);
                         } else {
@@ -2270,12 +2273,10 @@ int main(void) {
                                 room_baked = true;
                                 bkd_last_tex = -99;
                             } else if (bkd_tier == 1) {
-                                /* MidFar: solid color test to verify geometry renders */
-                                rspq_flush();
-                                rdpq_mode_tlut(TLUT_NONE);
-                                if (dbg_tier_px)
-                                    rdpq_tex_upload(TILE0, &dbg_tier_surf[1], NULL); /* cyan */
-                                room_baked = true; /* use baked UV path so faces draw */
+                                /* MidFar: CI8 per-face textures (same as textured pass) */
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
+                                /* room_baked stays false → face loop uses per-face CI8 uploads */
                                 bkd_last_tex = -99;
                             } else if (baked_room_count > 0 && room_idx < baked_room_count) {
                                 /* Far/XFar/XXFar: use baked tiles */
