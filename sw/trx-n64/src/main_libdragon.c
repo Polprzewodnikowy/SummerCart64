@@ -287,9 +287,9 @@ static void classify_faces(tr_level_t *level) {
 
             /* Floor/ceiling: mostly horizontal (|ny| > 0.7) */
             if (ny > 0.7f || ny < -0.7f) {
-                if (cy > (ry_floor - 256.0f)) {
+                if (cy > (ry_floor - 128.0f)) {
                     flags |= FACE_FLAG_FLOOR | FACE_FLAG_ESSENTIAL;
-                } else if (cy < (ry_ceil + 256.0f)) {
+                } else if (cy < (ry_ceil + 128.0f)) {
                     flags |= FACE_FLAG_CEILING | FACE_FLAG_ESSENTIAL;
                 } else {
                     /* Interior horizontal — essential if large */
@@ -1891,27 +1891,34 @@ int main(void) {
                                     if (edit_z_bias > 128.0f) edit_z_bias = 128.0f;
                                 }
 
+                                /* Step scales with current value for fine control at low ranges */
                                 float fdelta = 0;
-                                if (hold_tick && bh.d_right) fdelta = 256.0f;
-                                if (hold_tick && bh.d_left)  fdelta = -256.0f;
-
-                                if (fdelta != 0 && slider_sel < 4) {
+                                if (hold_tick && slider_sel < 4) {
                                     float *t[] = { &edit_dist_mid, &edit_dist_vfar,
                                                    &edit_dist_xfar, &edit_dist_xxfar };
-                                    *t[slider_sel] += fdelta;
-                                    /* Clamp: min 256 (quarter room), max 65536 */
-                                    if (*t[slider_sel] < 256.0f)  *t[slider_sel] = 256.0f;
+                                    float cur = *t[slider_sel];
+                                    float step = (cur < 1024) ? 64.0f : (cur < 4096) ? 128.0f : 256.0f;
+                                    if (bh.d_right) fdelta = step;
+                                    if (bh.d_left)  fdelta = -step;
+                                }
+
+                                if (fdelta != 0 && slider_sel < 4) {
+                                    float *tt[] = { &edit_dist_mid, &edit_dist_vfar,
+                                                    &edit_dist_xfar, &edit_dist_xxfar };
+                                    *tt[slider_sel] += fdelta;
+                                    /* Clamp: min 1 (essentially zero), max 65536 */
+                                    if (*tt[slider_sel] < 1.0f)  *tt[slider_sel] = 1.0f;
                                     if (*t[slider_sel] > 65536.0f) *t[slider_sel] = 65536.0f;
                                     /* Enforce monotonic: mid < vfar < xfar < xxfar.
                                      * Push neighbors apart by 256 minimum gap. */
                                     for (int k = slider_sel; k < 3; k++)
-                                        if (*t[k+1] <= *t[k]) *t[k+1] = *t[k] + 256.0f;
+                                        if (*tt[k+1] <= *tt[k]) *tt[k+1] = *tt[k] + 128.0f;
                                     for (int k = slider_sel; k > 0; k--)
-                                        if (*t[k-1] >= *t[k]) *t[k-1] = *t[k] - 256.0f;
+                                        if (*tt[k-1] >= *tt[k]) *tt[k-1] = *tt[k] - 128.0f;
                                     /* Re-clamp after push */
                                     for (int k = 0; k < 4; k++) {
-                                        if (*t[k] < 256.0f)  *t[k] = 256.0f;
-                                        if (*t[k] > 65536.0f) *t[k] = 65536.0f;
+                                        if (*tt[k] < 1.0f)  *tt[k] = 1.0f;
+                                        if (*tt[k] > 65536.0f) *tt[k] = 65536.0f;
                                     }
                                 }
                             }
