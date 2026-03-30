@@ -1246,11 +1246,11 @@ int main(void) {
                  * ============================================================ */
 
                 /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
-                int g_bkd_tri_budget      = 200;
-                int g_bkd_upload_budget    = 8;
-                int g_tex_tri_budget      = 1400;
-                int g_tex_face_budget     = 600;
-                int g_tex_upload_budget    = 48;
+                int g_bkd_tri_budget      = 800;
+                int g_bkd_upload_budget    = 16;
+                int g_tex_tri_budget      = 3000;
+                int g_tex_face_budget     = 2000;
+                int g_tex_upload_budget    = 96;
 
                 /* View distance thresholds (runtime-adjustable, in world units).
                  * Stored as linear distance; squared at comparison time.
@@ -1662,7 +1662,7 @@ int main(void) {
                                     STAT("VisDist:%.0f-%.0f", sqrtf(min_d), sqrtf(max_d));
                                     STAT("mid_th:%.0f mid_sq:%.0f", g_dist_mid, g_dist_mid_sq);
                                 }
-                                STAT("--- TEXTURED ---");
+                                STAT("--- TEXTURED (rooms:%d) ---", perf_tex_rooms);
                                 STAT("Tris:%d/%d Faces:%d/%d",
                                      perf_tex_tris, TEX_TRI_BUDGET,
                                      perf_tex_faces, TEX_FACE_BUDGET);
@@ -2080,15 +2080,37 @@ int main(void) {
                                 }
                                 if (dup) continue;
 
-                                /* Only add if portal has at least 1 vertex in front */
+                                /* Portal frustum check: project portal vertices to screen.
+                                 * Only add room if portal overlaps the screen area.
+                                 * This prevents adding rooms behind/beside the camera. */
                                 int front = 0;
+                                float pmin_sx = 320, pmax_sx = 0;
+                                float pmin_sy = 240, pmax_sy = 0;
                                 for (int pv = 0; pv < 4; pv++) {
                                     float px = (float)(r1r->x + portal->vertices[pv].x) - cam_x;
+                                    float py = (float)(portal->vertices[pv].y) - cam_y;
                                     float pz = (float)(r1r->z + portal->vertices[pv].z) - cam_z;
-                                    float rz_p = px * sy + pz * cy;
-                                    if (rz_p > -256.0f) front++;
+                                    float rx_p = px * cy - pz * sy;
+                                    float rz_yaw = px * sy + pz * cy;
+                                    float ry_p = py * cp - rz_yaw * sp;
+                                    float rz_p = py * sp + rz_yaw * cp;
+                                    if (rz_p > 1.0f) {
+                                        front++;
+                                        float inv = 256.0f / rz_p;
+                                        float sx = 160.0f + rx_p * inv;
+                                        float sy_p = 120.0f + ry_p * inv;
+                                        if (sx < pmin_sx) pmin_sx = sx;
+                                        if (sx > pmax_sx) pmax_sx = sx;
+                                        if (sy_p < pmin_sy) pmin_sy = sy_p;
+                                        if (sy_p > pmax_sy) pmax_sy = sy_p;
+                                    }
                                 }
+                                /* Skip if entirely behind camera */
                                 if (front == 0) continue;
+                                /* Skip if portal projects entirely off-screen
+                                 * (with generous margin for partially visible portals) */
+                                if (front == 4 && (pmax_sx < -100 || pmin_sx > 420 ||
+                                    pmax_sy < -100 || pmin_sy > 340)) continue;
 
                                 tr_chunk_t *c = &g_chunks[dest];
                                 float ddx = c->cx - cam_x;
