@@ -2291,14 +2291,13 @@ int main(void) {
                             /* ---- Per-room constants (hoisted out of face loop) ---- */
                             float room_d = (room_idx < g_chunk_count)
                                 ? g_chunks[room_idx].dist_sq : 0.0f;
-                            bool is_ring2 = (room_idx < g_chunk_count &&
-                                g_chunks[room_idx].lod == CHUNK_LOD_FAR);
 
-                            /* Fog factor — constant for all faces in this room */
-                            float fog = (room_d - 16777216.0f) / 383223784.0f;
+                            /* Distance-based fog — smooth ramp, no forced minimum.
+                             * Close baked rooms get light fog, distant get heavy. */
+                            float room_dist = sqrtf(room_d);
+                            float fog = (room_dist - g_dist_mid) / (g_dist_xxfar - g_dist_mid);
                             if (fog < 0.0f) fog = 0.0f;
                             if (fog > 0.85f) fog = 0.85f;
-                            if (is_ring2 && fog < 0.6f) fog = 0.6f;
                             float fog_scale  = 1.0f - fog;
                             float fog_add_r  = active_fog_r * fog;
                             float fog_add_g  = active_fog_g * fog;
