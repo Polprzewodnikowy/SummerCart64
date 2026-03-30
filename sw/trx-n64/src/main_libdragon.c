@@ -2115,7 +2115,7 @@ int main(void) {
                      * Near:   dist < g_dist_mid   → CI8 per-face, zbuf (textured pass)
                      * MidFar+: dist >= g_dist_mid → baked tiles, fog (baked pass) */
                     int tex_rooms[MAX_DRAW_ROOMS], tex_count = 0;
-                    int far_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
+                    int bkd_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
 
                     for (int vi = 0; vi < vis_count; vi++) {
                         int ri = vis_rooms[vi];
@@ -2339,7 +2339,7 @@ int main(void) {
                             }
 
                             for (int f = 0; f < room->mesh.face_count; f++) {
-                                if (bkd_tris >= BKD_TRI_BUDGET) goto far_pass_done;
+                                if (!g_debug_force_tier && bkd_tris >= BKD_TRI_BUDGET) goto bkd_pass_done;
                                 /* (face skip removed — vertex cache makes per-face cost cheap enough) */
                                 tr_face_t *face = &room->mesh.faces[f];
                                 int nv = face->vertex_count;
@@ -2513,13 +2513,13 @@ int main(void) {
                                     perf_bkd_tris = bkd_tris;
                                     if ((bkd_tris & 7) == 0)
                                         rspq_flush();
-                                    if (bkd_tris >= BKD_TRI_BUDGET)
-                                        goto far_pass_done;
+                                    if (!g_debug_force_tier && bkd_tris >= BKD_TRI_BUDGET)
+                                        goto bkd_pass_done;
                                 }
                             }
                         }
                     }
-                    far_pass_done:
+                    bkd_pass_done:
 
                     /* Record baked pass CPU time */
                     {
