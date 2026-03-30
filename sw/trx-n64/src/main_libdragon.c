@@ -2342,21 +2342,17 @@ int main(void) {
                                 if (bkd_tier >= 4 && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
-                                    room_uv_scale = 4.0f / 32.0f;
                                 } else if (bkd_tier >= 3 && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
-                                    room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_tier >= 2 && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
-                                    room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_m1_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                     rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
-                                    room_uv_scale = 16.0f / 32.0f;
                                 }
                                 room_baked = true;
                                 bkd_last_tex = -99;
