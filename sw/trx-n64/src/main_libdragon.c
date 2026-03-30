@@ -1531,12 +1531,24 @@ int main(void) {
                      * ============================================================ */
                     if (pressed.start) {
                         static int pause_page = 0;
-                        static int slider_sel = 0; /* selected slider index */
+                        static int slider_sel = 0;
+
+                        /* Snapshot current budgets — edits happen on copies,
+                         * applied only on unpause */
+                        int edit_g_near_face   = g_near_face_budget;
+                        int edit_g_near_tri    = g_near_tri_budget;
+                        int edit_g_near_upload = g_near_upload_budget;
+                        int edit_g_far_tri     = g_far_tri_budget;
+                        int edit_g_far_upload  = g_far_upload_budget;
+                        room_budget_t edit_room_budgets[256];
+                        memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
                         bool paused = true;
                         while (paused) {
                             surface_t *pause_disp = display_get();
-                            graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                            /* Clear to solid dark background to prevent overlap */
+                            graphics_fill_screen(pause_disp, 0x000000C0);
+                            graphics_set_color(0xFFFFFFFF, 0x00000000);
                             char buf[80];
                             int y = 4;
                             #define STAT(fmt, ...) do { \
@@ -1599,16 +1611,13 @@ int main(void) {
                                 STAT("=== GLOBAL BUDGETS ===");
                                 STAT("D-pad Up/Down=select Left/Right=adjust");
                                 STAT("");
-                                STAT_HL(slider_sel, 0, "Near Face Budget: %d", g_near_face_budget);
-                                STAT_HL(slider_sel, 1, "Near Tri Budget:  %d", g_near_tri_budget);
-                                STAT_HL(slider_sel, 2, "Near Upload Cap:  %d", g_near_upload_budget);
-                                STAT_HL(slider_sel, 3, "Far Tri Budget:   %d", g_far_tri_budget);
-                                STAT_HL(slider_sel, 4, "Far Upload Cap:   %d", g_far_upload_budget);
+                                STAT_HL(slider_sel, 0, "Near Face Budget: %d", edit_g_near_face);
+                                STAT_HL(slider_sel, 1, "Near Tri Budget:  %d", edit_g_near_tri);
+                                STAT_HL(slider_sel, 2, "Near Upload Cap:  %d", edit_g_near_upload);
+                                STAT_HL(slider_sel, 3, "Far Tri Budget:   %d", edit_g_far_tri);
+                                STAT_HL(slider_sel, 4, "Far Upload Cap:   %d", edit_g_far_upload);
                                 STAT("");
-                                STAT("Effective this room (%d):", lara_room);
-                                STAT(" Face:%d Tri:%d FarTri:%d",
-                                     eff_near_face_budget, eff_near_tri_budget,
-                                     eff_far_tri_budget);
+                                STAT("(applied on unpause)");
 
                             } else if (pause_page == 2) {
                                 /* ---- PAGE 2: PER-ROOM BUDGET SLIDERS ---- */
@@ -1618,16 +1627,16 @@ int main(void) {
                                 STAT("(-1 = inherit global)");
                                 STAT("");
                                 STAT_HL(slider_sel, 0, "Near Face: %d (global:%d)",
-                                        (int)room_budgets[ri].near_face_budget, g_near_face_budget);
+                                        (int)edit_room_budgets[ri].near_face_budget, edit_g_near_face);
                                 STAT_HL(slider_sel, 1, "Near Tri:  %d (global:%d)",
-                                        (int)room_budgets[ri].near_tri_budget, g_near_tri_budget);
+                                        (int)edit_room_budgets[ri].near_tri_budget, edit_g_near_tri);
                                 STAT_HL(slider_sel, 2, "Far Tri:   %d (global:%d)",
-                                        (int)room_budgets[ri].far_tri_budget, g_far_tri_budget);
+                                        (int)edit_room_budgets[ri].far_tri_budget, edit_g_far_tri);
                                 STAT("");
                                 STAT("Effective: Face:%d Tri:%d FarTri:%d",
-                                     EFF_BUDGET(room_budgets[ri].near_face_budget, g_near_face_budget),
-                                     EFF_BUDGET(room_budgets[ri].near_tri_budget, g_near_tri_budget),
-                                     EFF_BUDGET(room_budgets[ri].far_tri_budget, g_far_tri_budget));
+                                     EFF_BUDGET(edit_room_budgets[ri].near_face_budget, edit_g_near_face),
+                                     EFF_BUDGET(edit_room_budgets[ri].near_tri_budget, edit_g_near_tri),
+                                     EFF_BUDGET(edit_room_budgets[ri].far_tri_budget, edit_g_far_tri));
                                 STAT("");
                                 STAT("Room size: %s",
                                      ri < g_chunk_count ?
@@ -1649,7 +1658,7 @@ int main(void) {
                             if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
                             if (bp.start) { paused = false; }
 
-                            /* Slider navigation + adjustment */
+                            /* Slider navigation + adjustment (edits copies only) */
                             if (pause_page == 1) {
                                 int max_sel = 4;
                                 if (bp.d_up && slider_sel > 0) slider_sel--;
@@ -1661,25 +1670,25 @@ int main(void) {
 
                                 if (delta) {
                                     switch (slider_sel) {
-                                        case 0: g_near_face_budget += delta;
-                                                if (g_near_face_budget < 50)  g_near_face_budget = 50;
-                                                if (g_near_face_budget > 5000) g_near_face_budget = 5000;
+                                        case 0: edit_g_near_face += delta;
+                                                if (edit_g_near_face < 50)   edit_g_near_face = 50;
+                                                if (edit_g_near_face > 5000) edit_g_near_face = 5000;
                                                 break;
-                                        case 1: g_near_tri_budget += delta;
-                                                if (g_near_tri_budget < 50)   g_near_tri_budget = 50;
-                                                if (g_near_tri_budget > 5000)  g_near_tri_budget = 5000;
+                                        case 1: edit_g_near_tri += delta;
+                                                if (edit_g_near_tri < 50)    edit_g_near_tri = 50;
+                                                if (edit_g_near_tri > 5000)  edit_g_near_tri = 5000;
                                                 break;
-                                        case 2: g_near_upload_budget += delta / 10;
-                                                if (g_near_upload_budget < 4)  g_near_upload_budget = 4;
-                                                if (g_near_upload_budget > 128) g_near_upload_budget = 128;
+                                        case 2: edit_g_near_upload += delta / 10;
+                                                if (edit_g_near_upload < 4)  edit_g_near_upload = 4;
+                                                if (edit_g_near_upload > 128) edit_g_near_upload = 128;
                                                 break;
-                                        case 3: g_far_tri_budget += delta;
-                                                if (g_far_tri_budget < 50)    g_far_tri_budget = 50;
-                                                if (g_far_tri_budget > 2000)   g_far_tri_budget = 2000;
+                                        case 3: edit_g_far_tri += delta;
+                                                if (edit_g_far_tri < 50)     edit_g_far_tri = 50;
+                                                if (edit_g_far_tri > 2000)   edit_g_far_tri = 2000;
                                                 break;
-                                        case 4: g_far_upload_budget += delta / 10;
-                                                if (g_far_upload_budget < 2)   g_far_upload_budget = 2;
-                                                if (g_far_upload_budget > 32)   g_far_upload_budget = 32;
+                                        case 4: edit_g_far_upload += delta / 10;
+                                                if (edit_g_far_upload < 2)   edit_g_far_upload = 2;
+                                                if (edit_g_far_upload > 32)  edit_g_far_upload = 32;
                                                 break;
                                     }
                                 }
@@ -1697,25 +1706,31 @@ int main(void) {
                                     int16_t *target = NULL;
                                     int gmax = 0;
                                     switch (slider_sel) {
-                                        case 0: target = &room_budgets[ri].near_face_budget;
-                                                gmax = g_near_face_budget; break;
-                                        case 1: target = &room_budgets[ri].near_tri_budget;
-                                                gmax = g_near_tri_budget; break;
-                                        case 2: target = &room_budgets[ri].far_tri_budget;
-                                                gmax = g_far_tri_budget; break;
+                                        case 0: target = &edit_room_budgets[ri].near_face_budget;
+                                                gmax = edit_g_near_face; break;
+                                        case 1: target = &edit_room_budgets[ri].near_tri_budget;
+                                                gmax = edit_g_near_tri; break;
+                                        case 2: target = &edit_room_budgets[ri].far_tri_budget;
+                                                gmax = edit_g_far_tri; break;
                                     }
                                     if (target) {
                                         int val = (int)*target + delta;
-                                        /* -1 = inherit; below -1 wraps to inherit */
                                         if (val < -1) val = -1;
                                         if (val > gmax) val = gmax;
-                                        /* Snap to -1 if close to 0 from below */
                                         if (val >= 0 && val < 50) val = 50;
                                         *target = (int16_t)val;
                                     }
                                 }
                             }
                         }
+
+                        /* Apply edits on unpause */
+                        g_near_face_budget   = edit_g_near_face;
+                        g_near_tri_budget    = edit_g_near_tri;
+                        g_near_upload_budget = edit_g_near_upload;
+                        g_far_tri_budget     = edit_g_far_tri;
+                        g_far_upload_budget  = edit_g_far_upload;
+                        memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
                     }
 
