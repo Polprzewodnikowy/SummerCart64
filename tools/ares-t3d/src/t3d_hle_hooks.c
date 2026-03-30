@@ -90,6 +90,40 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
         return;
     }
 
+    /* ---- DMA Survey: record ALL DMEM DMAs before filtering ---- */
+    if (g_hle.dma_survey_enabled && length >= 4) {
+        /* Find or create bucket for this pbus range (quantize to 256-byte blocks) */
+        uint32_t bucket_key = pbus_addr / 256;
+        T3DDMASurveyBucket *bkt = NULL;
+        for (int i = 0; i < g_hle.dma_survey_count; i++) {
+            if (g_hle.dma_survey[i].pbus_lo / 256 == bucket_key) {
+                bkt = &g_hle.dma_survey[i];
+                break;
+            }
+        }
+        if (!bkt && g_hle.dma_survey_count < T3D_DMA_SURVEY_BUCKETS) {
+            bkt = &g_hle.dma_survey[g_hle.dma_survey_count++];
+            memset(bkt, 0, sizeof(*bkt));
+            bkt->pbus_lo = pbus_addr;
+            bkt->pbus_hi = pbus_addr;
+        }
+        if (bkt) {
+            bkt->count++;
+            bkt->total_bytes += length;
+            if (pbus_addr < bkt->pbus_lo) bkt->pbus_lo = pbus_addr;
+            if (pbus_addr > bkt->pbus_hi) bkt->pbus_hi = pbus_addr;
+
+            /* Classify first word */
+            uint32_t w0 = t3d_hle_read32(rdram, rdram_size, phys_dram);
+            int ovl = RSPQ_OVL_ID(w0);
+            if (w0 == 0) bkt->has_zero++;
+            else if (ovl == 0) bkt->has_rspq_cmds++;
+            else if (g_hle.detect.overlay_id >= 0 && ovl == g_hle.detect.overlay_id)
+                bkt->has_t3d_cmds++;
+            else bkt->has_other_cmds++;
+        }
+    }
+
     /* DMA to DMEM — only scan if destination is in the rspq prefetch
      * region (low DMEM) and length is command-buffer-sized. */
     if (pbus_addr >= 0x200 || length > 512 || length < 8) return;
@@ -138,12 +172,34 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
             break;
         }
 
-        /* Unknown overlay command — we don't know its size.
-         * Rather than guess and misalign, stop scanning.
-         * The next DMA will pick up from where the RSP left off. */
+        /* Unknown overlay command — we don't know its exact size.
+         * Strategy: skip forward looking for the next recognizable
+         * command word (T3D overlay or rspq overlay 0).
+         * Limit scan to 16 words to avoid runaway. */
         g_hle.frame.cmds_other++;
         g_hle.frame.cmds_total++;
-        break;
+        {
+            bool found_next = false;
+            uint32_t skip_pos = pos + 4; /* skip at least 1 word */
+            int skip_limit = 16;
+            while (skip_pos + 3 < scan_end && skip_limit-- > 0) {
+                uint32_t probe = t3d_hle_read32(rdram, rdram_size, skip_pos);
+                if (probe == 0) { skip_pos += 4; continue; }
+                int probe_ovl = RSPQ_OVL_ID(probe);
+                int probe_cmd = RSPQ_CMD_ID(probe);
+                /* Recognizable: overlay 0 with valid cmd, or our T3D overlay */
+                if (probe_ovl == 0 && probe_cmd <= 7) { found_next = true; break; }
+                if (g_hle.detect.overlay_id >= 0 && probe_ovl == g_hle.detect.overlay_id
+                    && probe_cmd < T3D_CMD_COUNT) { found_next = true; break; }
+                skip_pos += 4;
+            }
+            if (found_next) {
+                pos = skip_pos;
+                cmds_in_buffer++;
+                continue;
+            }
+            break; /* couldn't find next valid command — stop */
+        }
     }
 
     if (cmds_in_buffer > 0 && g_hle.verbose) {

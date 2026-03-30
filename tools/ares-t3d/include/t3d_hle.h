@@ -133,6 +133,22 @@ typedef struct {
 } T3DHLEDetection;
 
 /* ----------------------------------------------------------------
+ * DMA survey — maps destination addresses to content types
+ * ---------------------------------------------------------------- */
+#define T3D_DMA_SURVEY_BUCKETS 16
+
+typedef struct {
+    uint32_t pbus_lo;           /* lowest pbus addr seen in this bucket */
+    uint32_t pbus_hi;           /* highest */
+    uint32_t count;             /* number of DMAs */
+    uint32_t total_bytes;       /* total bytes transferred */
+    uint32_t has_t3d_cmds;      /* DMAs where first word matches T3D overlay */
+    uint32_t has_rspq_cmds;     /* DMAs where first word is overlay 0 */
+    uint32_t has_other_cmds;    /* DMAs where first word is some other overlay */
+    uint32_t has_zero;          /* DMAs where first word is 0 */
+} T3DDMASurveyBucket;
+
+/* ----------------------------------------------------------------
  * Main HLE state
  * ---------------------------------------------------------------- */
 typedef struct {
@@ -160,6 +176,11 @@ typedef struct {
     uint64_t total_frames;
     uint64_t total_cmds;
     uint64_t total_tris;
+
+    /* DMA survey (per-frame, reset at frame_end) */
+    T3DDMASurveyBucket dma_survey[T3D_DMA_SURVEY_BUCKETS];
+    int dma_survey_count;       /* how many buckets used */
+    bool dma_survey_enabled;    /* emit T3D_DMA_SURVEY lines */
 
     /* Config */
     int mode;                   /* 0=telemetry, 1=shadow, 2=replace */

@@ -110,7 +110,9 @@ void t3d_hle_init(T3DHLEState *state, int mode) {
     state->detect.confidence = 0;
     state->detect.confirmed = false;
 
-    LOG(state, "T3D_INIT", "mode=%d tier=%s",
+    state->dma_survey_enabled = true; /* survey active during Tier 1 */
+
+    LOG(state, "T3D_INIT", "mode=%d tier=%s dma_survey=on",
         mode, mode == 0 ? "telemetry" : mode == 1 ? "shadow" : "replace");
 }
 
@@ -535,6 +537,23 @@ void t3d_hle_frame_end(T3DHLEState *state) {
             f->drawcalls, f->matrix_ops, f->state_changes,
             f->warnings, f->errors,
             state->detect.overlay_id, state->detect.confirmed);
+
+    /* Emit DMA survey if active */
+    if (state->dma_survey_enabled && state->dma_survey_count > 0) {
+        for (int i = 0; i < state->dma_survey_count; i++) {
+            T3DDMASurveyBucket *b = &state->dma_survey[i];
+            fprintf(state->log_fp,
+                "T3D_DMA_SURVEY frame=%llu pbus=0x%04X-0x%04X "
+                "dmas=%u bytes=%u t3d=%u rspq=%u other=%u zero=%u\n",
+                (unsigned long long)state->total_frames + 1,
+                b->pbus_lo, b->pbus_hi,
+                b->count, b->total_bytes,
+                b->has_t3d_cmds, b->has_rspq_cmds,
+                b->has_other_cmds, b->has_zero);
+        }
+        memset(state->dma_survey, 0, sizeof(state->dma_survey));
+        state->dma_survey_count = 0;
+    }
 
     /* Carry over to running totals, then reset per-frame counters.
      * Note: in ares, vblank may fire before DMA processes commands
