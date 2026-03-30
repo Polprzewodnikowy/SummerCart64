@@ -65,8 +65,8 @@ const char *t3d_hle_cmd_name(int cmd_id) {
  * Logging helpers (machine-readable to log_fp)
  * ---------------------------------------------------------------- */
 
-#define LOG(state, tag, fmt, ...) \
-    fprintf((state)->log_fp, tag " " fmt "\n", ##__VA_ARGS__)
+/* Use T3D_LOG from header. Define local alias for brevity. */
+#define LOG T3D_LOG
 
 #define LOG_CMD(state, cmd, fmt, ...) \
     do { if ((state)->verbose) \

@@ -194,6 +194,13 @@ int  t3d_hle_overlay_id(const T3DHLEState *state);
 const char *t3d_hle_cmd_name(int cmd_id);
 
 /* ----------------------------------------------------------------
+ * Logging macros (shared between t3d_hle.c and t3d_hle_hooks.c)
+ * ---------------------------------------------------------------- */
+
+#define T3D_LOG(state, tag, fmt, ...) \
+    fprintf((state)->log_fp, tag " " fmt "\n", ##__VA_ARGS__)
+
+/* ----------------------------------------------------------------
  * RDRAM access (big-endian, with bounds checking)
  * ---------------------------------------------------------------- */
 

@@ -46,7 +46,7 @@ void t3d_hle_system_init(uint8_t *rdram_data, uint32_t rdram_size) {
     t3d_hle_init(&g_hle, 0);
     g_initialized = true;
 
-    LOG(&g_hle, "T3D_HOOK", "event=system_init rdram_size=%u", rdram_size);
+    T3D_LOG(&g_hle, "T3D_HOOK", "event=system_init rdram_size=%u", rdram_size);
 }
 
 /* ----------------------------------------------------------------
@@ -76,7 +76,7 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
         /* DMA to IMEM — potential microcode load.
          * Log it for overlay detection (Tier 1 telemetry). */
         if (g_hle.verbose) {
-            LOG(&g_hle, "T3D_DMA", "target=IMEM dram=0x%08X pbus=0x%04X len=%u",
+            T3D_LOG(&g_hle, "T3D_DMA", "target=IMEM dram=0x%08X pbus=0x%04X len=%u",
                 phys_dram, pbus_addr, length);
         }
         /* TODO: IMEM fingerprinting for rspq/T3D overlay detection.
@@ -139,7 +139,7 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
         }
 
         if (cmds_in_buffer > 0 && g_hle.verbose) {
-            LOG(&g_hle, "T3D_DMA", "target=DMEM dram=0x%08X len=%u cmds=%d",
+            T3D_LOG(&g_hle, "T3D_DMA", "target=DMEM dram=0x%08X len=%u cmds=%d",
                 phys_dram, length, cmds_in_buffer);
         }
     }
