@@ -1090,7 +1090,8 @@ int main(void) {
                     _p; \
                 })
 
-                /* Find Lara's object definition */
+                /* Fill T3D vertex buffers for Lara (doesn't need T3D init).
+                 * Block recording deferred to after t3d_init(). */
                 {
                     tr_object_def_t *lobj = NULL;
                     for (int i = 0; i < g_level.object_count; i++)
@@ -1108,73 +1109,31 @@ int main(void) {
 
                             int nv = mesh->vertex_count;
                             if (nv > T3D_LARA_MAX_VERTS) nv = T3D_LARA_MAX_VERTS;
-                            /* T3DVertPacked stores 2 verts per struct */
                             int packed_count = (nv + 1) / 2;
                             T3DVertPacked *vp = malloc_uncached(sizeof(T3DVertPacked) * packed_count);
                             if (!vp) continue;
                             memset(vp, 0, sizeof(T3DVertPacked) * packed_count);
 
-                            /* Fill T3DVertPacked from TR1 mesh vertices */
                             for (int v = 0; v < nv; v++) {
                                 int16_t *pos = t3d_vertbuffer_get_pos(vp, v);
                                 uint8_t *rgba = t3d_vertbuffer_get_rgba(vp, v);
                                 int16_t *uv = t3d_vertbuffer_get_uv(vp, v);
-
-                                /* Position: TR1 int16, scale for T3D fixed-point */
                                 pos[0] = mesh->vertices[v].x;
                                 pos[1] = mesh->vertices[v].y;
                                 pos[2] = mesh->vertices[v].z;
-
-                                /* Color: uniform shade (updated per-frame via ambient) */
                                 rgba[0] = rgba[1] = rgba[2] = 180;
                                 rgba[3] = 255;
-
-                                /* Normal: placeholder (0,1,0) */
                                 uint16_t *norm = t3d_vertbuffer_get_norm(vp, v);
                                 *norm = t3d_vert_pack_normal(&(T3DVec3){{0, 1, 0}});
-
-                                /* UV: set to 0 for now (textures handled via rdpq) */
                                 uv[0] = 0;
                                 uv[1] = 0;
                             }
-
-                            /* Flush vertex data to RDRAM for RSP DMA */
                             data_cache_hit_writeback(vp, sizeof(T3DVertPacked) * packed_count);
 
                             t3d_lara_verts[mi] = vp;
                             t3d_lara_vert_counts[mi] = nv;
-
-                            /* Record rspq_block for this mesh */
-                            rspq_block_begin();
-                            rdpq_set_mode_standard();
-                            rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
-                            rdpq_mode_zbuf(true, true);
-                            t3d_state_set_drawflags(T3D_FLAG_DEPTH | T3D_FLAG_SHADED);
-                            t3d_vert_load(vp, 0, nv);
-                            /* Draw all faces as triangles.
-                             * TR1 uses CW winding, T3D expects CCW — swap v1/v2. */
-                            for (int f = 0; f < mesh->face_count; f++) {
-                                tr_face_t *face = &mesh->faces[f];
-                                if (face->vertex_count < 3) continue;
-                                uint16_t v0 = face->vertices[0];
-                                uint16_t v1 = face->vertices[1];
-                                uint16_t v2 = face->vertices[2];
-                                if (v0 >= nv || v1 >= nv || v2 >= nv) continue;
-                                t3d_tri_draw(v0, v2, v1);
-                                if (face->vertex_count == 4) {
-                                    uint16_t v3 = face->vertices[3];
-                                    if (v3 < nv)
-                                        t3d_tri_draw(v0, v3, v2);
-                                }
-                            }
-                            t3d_tri_sync();
-                            t3d_lara_blocks[mi] = rspq_block_end();
                         }
-
-                        t3d_lara_ready = true;
-                        (void)t3d_lara_verts; /* used at load time only */
-                        (void)t3d_lara_mesh_count;
-                        printf("  T3D Lara: %d meshes converted\n", mc);
+                        printf("  T3D Lara: %d meshes, vertex buffers ready\n", mc);
                     }
                 }
 
@@ -1455,6 +1414,48 @@ int main(void) {
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
                 t3d_init((T3DInitParams){});
+
+                /* Record T3D rspq_blocks for Lara meshes (needs t3d_init first) */
+                {
+                    tr_object_def_t *lobj = NULL;
+                    for (int i = 0; i < g_level.object_count; i++)
+                        if (g_level.objects[i].object_id == 0) { lobj = &g_level.objects[i]; break; }
+
+                    if (lobj && t3d_lara_mesh_count > 0) {
+                        for (int mi = 0; mi < t3d_lara_mesh_count; mi++) {
+                            if (!t3d_lara_verts[mi]) continue;
+                            int nv = t3d_lara_vert_counts[mi];
+                            int gmi = lobj->mesh_idx + mi;
+                            if (gmi >= g_level.mesh_count) continue;
+                            tr_object_mesh_t *mesh = &g_level.meshes[gmi];
+
+                            rspq_block_begin();
+                            t3d_state_set_drawflags(T3D_FLAG_DEPTH | T3D_FLAG_SHADED);
+                            t3d_vert_load(t3d_lara_verts[mi], 0, nv);
+                            for (int f = 0; f < mesh->face_count; f++) {
+                                tr_face_t *face = &mesh->faces[f];
+                                if (face->vertex_count < 3) continue;
+                                uint16_t v0 = face->vertices[0];
+                                uint16_t v1 = face->vertices[1];
+                                uint16_t v2 = face->vertices[2];
+                                if (v0 >= nv || v1 >= nv || v2 >= nv) continue;
+                                t3d_tri_draw(v0, v2, v1);
+                                if (face->vertex_count == 4) {
+                                    uint16_t v3 = face->vertices[3];
+                                    if (v3 < nv)
+                                        t3d_tri_draw(v0, v3, v2);
+                                }
+                            }
+                            t3d_tri_sync();
+                            t3d_lara_blocks[mi] = rspq_block_end();
+                        }
+                        t3d_lara_ready = true;
+                        (void)t3d_lara_verts;
+                        (void)t3d_lara_mesh_count;
+                        printf("  T3D Lara: %d blocks recorded\n", t3d_lara_mesh_count);
+                    }
+                }
+
                 bool has_zbuf = true;  /* all passes use z-buffer */
 
                 /* Camera state */

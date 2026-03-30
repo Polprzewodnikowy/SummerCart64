@@ -19,3 +19,7 @@ toolchain/
 # Local tools — binaries installed permanently, not tracked in git
 tools/emulator/bin/
 tools/emulator/lib/
+
+# Game assets — extracted from levels.tar.gz, kept locally for ROM builds
+levels.tar.gz
+sw/trx-n64/data/levels/
