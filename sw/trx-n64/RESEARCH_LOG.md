@@ -622,5 +622,35 @@ Full N64 game engine + visual editor by the T3D author.
 
 ---
 
+## HailToDodongo/rspl — RSP Language Compiler ★★
+Source: https://github.com/HailToDodongo/rspl
+
+C-like language that transpiles to RSP MIPS assembly. T3D's entire
+RSP microcode is written in RSPL. Web IDE available for instant
+transpilation.
+
+### Relevance
+- Write custom RSP overlays without raw assembly
+- ~50-100 lines RSPL for a BCI texture decode overlay
+- Handles register allocation, vector swizzle, DMA built-ins,
+  instruction scheduling automatically
+- Output is standard libdragon rspq overlay (.S file)
+- Learning curve: ~2 days language, ~1-2 weeks RSP architecture
+
+### Potential Uses for Our Project
+1. **AegisTex BCI decode overlay**: DMA compressed tile from ROM →
+   DMEM → expand 4-color palette → DMA to RDRAM. RSP 8-lane SIMD
+   processes 8 texels/cycle.
+2. **Custom vertex effects**: TR1's per-vertex light values aren't
+   standard normals — could extend T3D with custom light processing.
+3. **Deferred UV resolve**: if we adopt BigTex approach later.
+
+### Not Needed Immediately
+T3D handles vertex work. CI8 tiles work without compression.
+RSPL is the path to custom RSP work when ready for AegisTex
+BCI decode or other specialized processing.
+
+---
+
 ## Future Repos to Investigate
 - libdragon GL internals — RSP overlay for OpenGL vertex processing
