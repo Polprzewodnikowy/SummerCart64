@@ -1263,7 +1263,7 @@ int main(void) {
                 /* Strictly monotonic: mid < vfar < xfar < xxfar.
                  * Enforced in the UI — each threshold must be > the one before it. */
                 float g_dist_mid     = 7168.0f;   /* near→mid-far boundary */
-                float g_dist_vfar    = 10240.0f;  /* mid-far→far boundary */
+                float g_dist_vfar    = 21889.0f;  /* mid-far→far boundary */
                 float g_dist_xfar   = 13312.0f;  /* far→extra-far boundary */
                 float g_dist_xxfar  = 16384.0f;  /* extra-far→extreme-far boundary */
 
