@@ -1394,7 +1394,7 @@ int main(void) {
                 int g_bkd_tri_budget      = 1250;
                 int g_bkd_upload_budget    = 16;
                 int g_tex_tri_budget      = 550;
-                int g_tex_face_budget     = 550;
+                int g_tex_face_budget     = 600;
                 int g_tex_upload_budget    = 96;
 
                 /* View distance thresholds (runtime-adjustable, in world units).
