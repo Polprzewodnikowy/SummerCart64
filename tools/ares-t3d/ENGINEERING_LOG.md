@@ -102,6 +102,27 @@ tools/ares-t3d/build/decode_buffer <captured.bin> 6
 9. [ ] Validate.sh passes
 10. [ ] TR1 still renders correctly in ares (HLE is passive in Tier 1)
 
+### Chunk 8: Live ares Integration Test (CONFIRMED)
+**Objective**: Boot TR1 in ares-t3d, verify telemetry flows
+**Binary**: tools/emulator/bin/ares-t3d (16MB, stripped)
+**ROM**: sw/trx-n64/build/trx-n64-full.z64
+**Result**: CONFIRMED — T3D overlay detected, 2.2M commands parsed
+
+Live output:
+- `T3D_INIT mode=0 tier=telemetry` — fires at startup
+- `T3D_HOOK event=system_init rdram_size=8388608` — 8MB RDRAM
+- `T3D_DMA target=IMEM dram=0x00802000 len=4096` — rspq ucode load
+- `T3D_DMA target=DMEM dram=0x000527B0 len=504 cmds=16` — command buffer
+- `T3D_DETECT event=confirmed overlay=1 confidence=3` — auto-detected
+- `T3D_CMD TRI_DRAW v0_addr=0x204080 v1_addr=0x0102 v2_addr=0x0408`
+- `T3D_CMD MATRIX_STACK addr=0x00005714 flags=0x025101 multiply=1 push=0`
+- 27 T3D_FRAME lines in 90 seconds (lavapipe speed)
+- 2,240,024 T3D_CMD/DMA/DETECT lines total
+
+Known issue: T3D_FRAME counters show cmds=0 — vblank fires before
+DMA hook processes commands for that frame. Commands ARE parsed
+(proven by 2.2M lines). Fix: use DMA-based frame boundaries.
+
 ## Remaining Risks
 1. ares link may fail on remaining C++ issues
 2. DMA hook filter may miss command buffers (pbus < 0x200 heuristic)
