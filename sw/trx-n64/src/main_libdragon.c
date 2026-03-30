@@ -2130,6 +2130,12 @@ int main(void) {
                     #define VTX_CACHE_MAX 600
                     static struct { float rx, ry, rz, r, g, b; } vtx_cache[VTX_CACHE_MAX];
 
+                    /* Guard band for screen-space rejection (RDP valid range) */
+                    #define GUARD_LO_X (-1000.0f)
+                    #define GUARD_HI_X (1320.0f)
+                    #define GUARD_LO_Y (-760.0f)
+                    #define GUARD_HI_Y (1000.0f)
+
                     uint32_t perf_far_t0 = TICKS_READ(); /* start far pass timer */
 
                     /* ===== RDPQ FAR PASS (performance-optimized) =====
@@ -2222,17 +2228,7 @@ int main(void) {
                             /* Non-baked fallback: flat faces use white_surf (uploaded
                              * on demand below); textured faces use last-bound tile. */
 
-                            /* Sphere-in-front test: skip near-plane clip for rooms
-                             * whose bounding sphere is entirely in front of z=NEAR_Z. */
-                            bool room_no_clip = false;
-                            if (room_idx < g_chunk_count) {
-                                tr_chunk_t *ck = &g_chunks[room_idx];
-                                float cxr = ck->cx - cam_x, czr = ck->cz - cam_z;
-                                float cyr = ck->cy - cam_y;
-                                float rz_c = cxr * sy + czr * cy;
-                                float rz_sphere = cyr * sp + rz_c * cp;
-                                if (rz_sphere - ck->radius > NEAR_Z) room_no_clip = true;
-                            }
+                            /* (sphere-in-front test removed — always clip when any_behind) */
 
                             bool is_water = (room->flags & 1) != 0;
                             perf_far_rooms++;
@@ -2452,18 +2448,6 @@ int main(void) {
                         bool is_water = (room->flags & 1) != 0;
                         perf_near_rooms++;
 
-                        /* Sphere-in-front: skip near-plane clip for this room
-                         * if all geometry is guaranteed past z=NEAR_Z. */
-                        bool near_no_clip = false;
-                        if (room_idx < g_chunk_count) {
-                            tr_chunk_t *ck = &g_chunks[room_idx];
-                            float cxr = ck->cx - cam_x, czr = ck->cz - cam_z;
-                            float cyr = ck->cy - cam_y;
-                            float rz_c = cxr * sy + czr * cy;
-                            float rz_sph = cyr * sp + rz_c * cp;
-                            if (rz_sph - ck->radius > NEAR_Z) near_no_clip = true;
-                        }
-
                         bool do_decimate = false;
                         if (room_idx != lara_room && room_idx < g_chunk_count) {
                             tr_chunk_t *c = &g_chunks[room_idx];
@@ -2647,14 +2631,7 @@ int main(void) {
                                     for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
                             }
 
-                            /* Project + guard-band reject.
-                             * RDP valid range ~[-1024, 1023]. Reject entire face
-                             * if any vertex projects beyond guard band. Clamp
-                             * vertices within guard band to safe range. */
-                            #define GUARD_LO_X (-1000.0f)
-                            #define GUARD_HI_X (1320.0f)
-                            #define GUARD_LO_Y (-760.0f)
-                            #define GUARD_HI_Y (1000.0f)
+                            /* Project + guard-band reject */
                             float sv[6][10];
                             bool guard_ok = true;
                             for (int v = 0; v < clip_nv; v++) {
