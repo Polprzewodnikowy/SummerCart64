@@ -652,5 +652,46 @@ BCI decode or other specialized processing.
 
 ---
 
+## lambertjamesd/skelatool64 — Mesh-to-N64 Converter (libultra) ★
+Source: https://github.com/lambertjamesd/skelatool64
+
+Build tool used by Portal64. Converts 3D models → C display lists.
+Targets libultra only (not libdragon/T3D). Can't read TR1 .PHD.
+
+### Borrowable Algorithms (reference, not code)
+
+1. **Branch-and-bound render chunk ordering**
+   - Finds optimal mesh draw order to minimize state transition cost
+   - Cost model includes per-RDP-command timing estimates (microseconds)
+   - Greedy fallback when search space too large
+   - **Reference for AegisTex material sort optimization**
+   - File: `src/RenderChunkOrder.cpp`
+
+2. **RDP command cost model**
+   - Individual timing for each mode change (combine, blend, tile, etc.)
+   - Used as weights for the ordering optimizer
+   - **Directly applicable to our material delta system**
+   - File: `src/materials/MaterialTransitionTiming.h`
+
+3. **Texture format auto-detection**
+   - Analyzes pixel content to choose CI4/CI8/RGBA16/I/IA
+   - Palette generation via nearest-neighbor RGB distance
+   - Two-tone grayscale via least-squares fitting
+   - **Reference for AegisTex offline format chooser**
+   - File: `src/materials/TextureDefinition.cpp:565`
+
+### Not Applicable
+- Output format (libultra Gfx/Vtx, not T3D)
+- Input parser (Assimp, can't read .PHD)
+- No texture atlas/page support
+
+### Lambert's libdragon fork
+Source: https://github.com/lambertjamesd/libdragon
+**Not useful.** PR staging area, 341 commits behind upstream, only 4
+minor commits (gamma correction, CI4 auto-detect, compiler warning).
+All Lambert's real innovations are in his game repos.
+
+---
+
 ## Future Repos to Investigate
 - libdragon GL internals — RSP overlay for OpenGL vertex processing
