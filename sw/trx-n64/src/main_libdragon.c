@@ -1246,7 +1246,7 @@ int main(void) {
                  * ============================================================ */
 
                 /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
-                int g_bkd_tri_budget      = 750;
+                int g_bkd_tri_budget      = 1100;
                 int g_bkd_upload_budget    = 16;
                 int g_tex_tri_budget      = 550;
                 int g_tex_face_budget     = 400;
