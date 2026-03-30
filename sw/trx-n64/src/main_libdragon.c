@@ -1246,10 +1246,10 @@ int main(void) {
                  * ============================================================ */
 
                 /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
-                int g_bkd_tri_budget      = 800;
+                int g_bkd_tri_budget      = 450;
                 int g_bkd_upload_budget    = 16;
-                int g_tex_tri_budget      = 3000;
-                int g_tex_face_budget     = 2000;
+                int g_tex_tri_budget      = 550;
+                int g_tex_face_budget     = 350;
                 int g_tex_upload_budget    = 96;
 
                 /* View distance thresholds (runtime-adjustable, in world units).
@@ -1275,8 +1275,8 @@ int main(void) {
                 /* Per-face max draw distance — geometry beyond this distance
                  * from the camera is culled regardless of room visibility.
                  * Works on top of the room-based tier system. Tunable. */
-                float g_max_draw_dist = 30000.0f;
-                float g_max_draw_dist_sq = 30000.0f * 30000.0f;
+                float g_max_draw_dist = 33000.0f;
+                float g_max_draw_dist_sq = 33000.0f * 33000.0f;
 
                 /* Squared versions recomputed when thresholds change */
                 float g_dist_mid_sq, g_dist_vfar_sq, g_dist_xfar_sq, g_dist_xxfar_sq;
