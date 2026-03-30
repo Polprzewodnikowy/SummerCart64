@@ -3761,9 +3761,11 @@ int main(void) {
                                 if (lara_shade < 0.1f) lara_shade = 0.1f;
                             }
 
-                            /* Set up T3D for Lara rendering */
-                            rspq_flush(); /* flush pending rdpq commands */
-                            t3d_frame_start();
+                            /* Set up T3D for Lara rendering.
+                             * Do NOT call t3d_frame_start() — it resets rdpq mode
+                             * and would clear everything already drawn this frame.
+                             * Just attach the viewport and set T3D state directly. */
+                            rspq_flush();
                             t3d_viewport_attach(&t3d_vp);
                             rdpq_set_mode_standard();
                             rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
