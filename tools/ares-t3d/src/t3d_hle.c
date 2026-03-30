@@ -172,16 +172,21 @@ static int handle_vert_load(T3DHLEState *state,
     uint16_t dest_off  = (w2 >> 16) & 0xFFFF;
     uint16_t input_off = w2 & 0xFFFF;
 
+    /* Strict validation: input_size must be a multiple of 32 (T3DVertPacked size),
+     * max 70 verts = 35 packed pairs = 1120 bytes, and RDRAM address must be
+     * in a plausible range (not in MMIO space, 8-byte aligned for DMA). */
+    if (input_size > 1120 || input_size == 0 || (input_size % 32) != 0) {
+        /* Implausible — likely a misparse. Don't warn loudly, just reject. */
+        state->frame.cmds_unsupported++;
+        return -1; /* stop scanning */
+    }
+    if (phys_addr < 0x1000 || phys_addr >= rdram_size) {
+        state->frame.cmds_unsupported++;
+        return -1;
+    }
+
     int num_packed = input_size / 32;
     int num_verts = num_packed * 2;
-
-    /* Validate */
-    if (num_verts > T3D_HLE_MAX_VERTS) {
-        LOG_WARN(state, "msg=\"VERT_LOAD count exceeds max\" count=%d max=%d addr=0x%08X",
-                 num_verts, T3D_HLE_MAX_VERTS, phys_addr);
-        num_verts = T3D_HLE_MAX_VERTS;
-        num_packed = num_verts / 2;
-    }
     if (num_verts == 0) {
         LOG_WARN(state, "msg=\"VERT_LOAD zero vertices\" input_size=%u addr=0x%08X",
                  input_size, phys_addr);

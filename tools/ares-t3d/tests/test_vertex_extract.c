@@ -8,8 +8,8 @@
 #include "t3d_hle.h"
 #include "test_helpers.h"
 
-/* 4KB fake RDRAM — enough for vertex buffers */
-static uint8_t fake_rdram[4096];
+/* 16KB fake RDRAM — enough for vertex buffers at high offsets */
+static uint8_t fake_rdram[16384];
 
 static void test_single_packed_pair(void) {
     T3DHLEState state;
@@ -24,10 +24,11 @@ static void test_single_packed_pair(void) {
 
     memset(fake_rdram, 0, sizeof(fake_rdram));
 
-    /* Build one T3DVertPacked (32 bytes) at RDRAM offset 0x100.
+    /* Build one T3DVertPacked (32 bytes) at RDRAM offset 0x2000.
+     * Must be >= 0x1000 to pass VERT_LOAD address validation.
      * Vertex A: pos=(100, -200, 300), normal=0x1234, uv=(10, 20), rgba=(255,128,64,255)
      * Vertex B: pos=(-50, 75, -100), normal=0x5678, uv=(30, 40), rgba=(32,64,96,128) */
-    uint32_t vaddr = 0x100;
+    uint32_t vaddr = 0x2000;
     /* posA: x=100, y=-200, z=300 */
     put_be16(fake_rdram, vaddr + 0, (uint16_t)100);
     put_be16(fake_rdram, vaddr + 2, (uint16_t)(int16_t)-200);
@@ -112,10 +113,10 @@ static void test_vert_load_zero_size(void) {
     put_be32(fake_rdram, 4, 0x100);
     put_be32(fake_rdram, 8, 0);
 
-    t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
+    int consumed = t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
 
+    ASSERT_EQ(consumed, -1, "zero-size VERT_LOAD: rejected (stop scan)");
     ASSERT_EQ(state.vert_count, 0, "zero-size VERT_LOAD: no verts");
-    ASSERT_EQ(state.frame.warnings, 1, "zero-size VERT_LOAD: warning emitted");
 
     fclose(devnull);
 }
@@ -132,15 +133,15 @@ static void test_vert_load_overflow(void) {
 
     memset(fake_rdram, 0, sizeof(fake_rdram));
 
-    /* VERT_LOAD with input_size = 80 * 32 = 2560 (80 packed pairs = 160 verts > MAX 70) */
+    /* VERT_LOAD with input_size = 2560 (>1120 max) — rejected as implausible */
     put_be32(fake_rdram, 0, ((5 << 28) | (T3D_CMD_VERT_LOAD << 24) | 2560));
     put_be32(fake_rdram, 4, 0x100);
     put_be32(fake_rdram, 8, 0);
 
-    t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
+    int consumed = t3d_hle_process_command(&state, fake_rdram, sizeof(fake_rdram), 0);
 
-    ASSERT(state.vert_count <= T3D_HLE_MAX_VERTS, "vert count clamped to max");
-    ASSERT_EQ(state.frame.warnings, 1, "overflow warning emitted");
+    ASSERT_EQ(consumed, -1, "oversized VERT_LOAD rejected (stop scan)");
+    ASSERT_EQ(state.vert_count, 0, "no verts loaded on reject");
 
     fclose(devnull);
 }
