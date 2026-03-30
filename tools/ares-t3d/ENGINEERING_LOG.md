@@ -175,3 +175,31 @@ Root causes found and fixed:
 
 Architecture insight: rspq multiplexes overlays in same DMA buffer.
 Parser must identify trustworthy T3D segments, not assume entire buffers.
+
+### Chunk 10: VERT_LOAD Hunt — Architecture Discovery
+**Objective**: Find real VERT_LOAD commands in live data
+**Result**: ARCHITECTURAL BLOCKER identified
+
+Key discoveries:
+1. ALL DMEM DMAs go to pbus 0x0000-0x00A0 (no separate vertex DMA region)
+2. rspq internal command IDs were wrong (CALL=3 not 2, RET=4 not 3, etc.)
+3. CALL targets in DMA buffers point to low RDRAM (0x573C) containing RSP
+   instructions, not rspq blocks — these are NOT real CALL commands
+4. The 24K TRI_DRAW commands are likely from rdpq overlay, not T3D
+5. Real T3D VERT_LOAD lives inside rspq_blocks (heap-allocated, replayed
+   by RSP via CALL command), NOT in the CPU-initiated DMA prefetch stream
+6. Our DMA hook intercepts CPU→RSP transfers, but block replay is RSP→RSP
+
+**Architecture insight**: The rspq engine has two command paths:
+- **Live stream**: CPU writes to RDRAM buffer, RSP DMAs to DMEM (our hook)
+- **Block replay**: RSP reads CALL target address, DMAs block from RDRAM to DMEM (internal to RSP, NOT via our hook)
+
+To capture block contents, we need a different hook:
+1. Hook the RSP's own DMA reads (not just CPU-initiated ones)
+2. OR hook at the CPU's rspq_block_run() call site
+3. OR scan RDRAM heap for block data patterns
+
+**Next step**: Add a hook in the RSP DMA path that catches RSP-initiated
+DMAs (where the RSP itself triggers the DMA, not the CPU). In ares,
+this is the `dma.busy.read` path triggered by RSP instruction writes
+to the SP_DMA registers.
