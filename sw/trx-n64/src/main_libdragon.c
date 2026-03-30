@@ -391,7 +391,7 @@ static void build_chunks(const tr_level_t *level) {
          * Larger rooms stay visible further. Scale the largest
          * XZ dimension by a multiplier — a room should be drawable
          * until it would be just a few pixels on screen.
-         * Clamp to [CHUNK_MID_DIST2 .. CHUNK_XXFAR_DIST2]. */
+         * Clamp to [g_dist_mid_sq .. g_dist_xxfar_sq]. */
         /* Room size class + scaled thresholds.
          * Computed once at load, stable for the room's lifetime.
          *
@@ -1245,6 +1245,29 @@ int main(void) {
                 int g_near_face_budget     = 600;
                 int g_near_upload_budget    = 48;
 
+                /* View distance thresholds (runtime-adjustable, in world units).
+                 * Stored as linear distance; squared at comparison time.
+                 * Tier boundaries:
+                 *   Near < mid_dist → CI8 per-face near pass
+                 *   mid_dist..very_far → CI8 16×16 baked (mid-far)
+                 *   very_far..xfar    → CI4 8×8 baked (far)
+                 *   xfar..xxfar       → IA8 8×8 baked (extra-far)
+                 *   > xxfar           → IA4 4×4 baked (extreme-far) */
+                float g_dist_mid     = 7168.0f;   /* near→mid-far boundary */
+                float g_dist_vfar    = 15360.0f;  /* mid-far→far boundary */
+                float g_dist_xfar   = 12288.0f;  /* far→extra-far boundary */
+                float g_dist_xxfar  = 16384.0f;  /* extra-far→extreme-far boundary */
+
+                /* Squared versions recomputed when thresholds change */
+                float g_dist_mid_sq, g_dist_vfar_sq, g_dist_xfar_sq, g_dist_xxfar_sq;
+                #define RECOMPUTE_DIST_SQ() do { \
+                    g_dist_mid_sq   = g_dist_mid   * g_dist_mid;   \
+                    g_dist_vfar_sq  = g_dist_vfar  * g_dist_vfar;  \
+                    g_dist_xfar_sq  = g_dist_xfar  * g_dist_xfar;  \
+                    g_dist_xxfar_sq = g_dist_xxfar * g_dist_xxfar;  \
+                } while(0)
+                RECOMPUTE_DIST_SQ();
+
                 /* Per-room budget overrides (-1 = inherit global) */
                 #define ROOM_BUDGET_INHERIT (-1)
                 typedef struct {
@@ -1558,6 +1581,10 @@ int main(void) {
                         int edit_g_far_tri     = g_far_tri_budget;
                         int edit_g_far_upload  = g_far_upload_budget;
                         bool edit_debug_dist   = g_debug_dist_colors;
+                        float edit_dist_mid    = g_dist_mid;
+                        float edit_dist_vfar   = g_dist_vfar;
+                        float edit_dist_xfar   = g_dist_xfar;
+                        float edit_dist_xxfar  = g_dist_xxfar;
                         room_budget_t edit_room_budgets[256];
                         memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
@@ -1587,7 +1614,7 @@ int main(void) {
                             } while(0)
 
                             /* Page header */
-                            STAT("=== PAUSE [L<] Page %d/2 [>R] ===", pause_page);
+                            STAT("=== PAUSE [L<] Page %d/3 [>R] ===", pause_page);
 
                             if (pause_page == 0) {
                                 /* ---- PAGE 0: DIAGNOSTICS ---- */
@@ -1677,6 +1704,23 @@ int main(void) {
                                      (g_chunks[ri].size_class == 0 ? "small" :
                                       g_chunks[ri].size_class == 1 ? "medium" :
                                       g_chunks[ri].size_class == 2 ? "large" : "open") : "?");
+                            } else if (pause_page == 3) {
+                                /* ---- PAGE 3: VIEW DISTANCE THRESHOLDS ---- */
+                                STAT("=== VIEW DISTANCE TIERS ===");
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("(units = TR1 world units)");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Near->MidFar: %.0f", edit_dist_mid);
+                                STAT_HL(slider_sel, 1, "MidFar->Far:  %.0f", edit_dist_vfar);
+                                STAT_HL(slider_sel, 2, "Far->XFar:    %.0f", edit_dist_xfar);
+                                STAT_HL(slider_sel, 3, "XFar->XXFar:  %.0f", edit_dist_xxfar);
+                                STAT("");
+                                STAT("Tier colors (debug):");
+                                STAT(" <%.0f        GREEN  Near", edit_dist_mid);
+                                STAT(" %.0f-%.0f   CYAN   MidFar", edit_dist_mid, edit_dist_vfar);
+                                STAT(" %.0f-%.0f  YELLOW Far", edit_dist_vfar, edit_dist_xfar);
+                                STAT(" %.0f-%.0f  ORANGE XFar", edit_dist_xfar, edit_dist_xxfar);
+                                STAT(" >%.0f       RED    XXFar", edit_dist_xxfar);
                             }
 
                             #undef STAT
@@ -1688,7 +1732,7 @@ int main(void) {
                             joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
 
                             /* Page navigation */
-                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 2) pause_page = 2; }
+                            if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 3) pause_page = 3; }
                             if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
                             if (bp.start) { paused = false; }
 
@@ -1759,6 +1803,22 @@ int main(void) {
                                         *target = (int16_t)val;
                                     }
                                 }
+                            } else if (pause_page == 3) {
+                                int max_sel = 3;
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                float fdelta = 0;
+                                if (bp.d_right) fdelta = 512.0f;
+                                if (bp.d_left)  fdelta = -512.0f;
+
+                                if (fdelta != 0) {
+                                    float *targets[] = { &edit_dist_mid, &edit_dist_vfar,
+                                                         &edit_dist_xfar, &edit_dist_xxfar };
+                                    *targets[slider_sel] += fdelta;
+                                    if (*targets[slider_sel] < 1024.0f) *targets[slider_sel] = 1024.0f;
+                                    if (*targets[slider_sel] > 32768.0f) *targets[slider_sel] = 32768.0f;
+                                }
                             }
                         }
 
@@ -1769,6 +1829,11 @@ int main(void) {
                         g_far_tri_budget     = edit_g_far_tri;
                         g_far_upload_budget  = edit_g_far_upload;
                         g_debug_dist_colors  = edit_debug_dist;
+                        g_dist_mid   = edit_dist_mid;
+                        g_dist_vfar  = edit_dist_vfar;
+                        g_dist_xfar  = edit_dist_xfar;
+                        g_dist_xxfar = edit_dist_xxfar;
+                        RECOMPUTE_DIST_SQ();
                         memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
                     }
@@ -2017,7 +2082,7 @@ int main(void) {
                         cl->dist_sq = cdx*cdx + cdz*cdz;
                         if (cl->dist_sq < CHUNK_FAR_DIST2)
                             cl->face_skip = 1;       /* near: all faces */
-                        else if (cl->dist_sq < CHUNK_VERY_FAR_DIST2)
+                        else if (cl->dist_sq < g_dist_vfar_sq)
                             cl->face_skip = 2;       /* far: every 2nd face */
                         else
                             cl->face_skip = 4;       /* very far: every 4th */
@@ -2094,32 +2159,32 @@ int main(void) {
 
                             /* UV scale for baked tile mapping */
                             float room_uv_scale = 1.0f;
-                            if (room_d > CHUNK_VERY_FAR_DIST2) room_uv_scale = 8.0f / 32.0f;
-                            else if (room_d > CHUNK_MID_DIST2)  room_uv_scale = 16.0f / 32.0f;
+                            if (room_d > g_dist_vfar_sq) room_uv_scale = 8.0f / 32.0f;
+                            else if (room_d > g_dist_mid_sq)  room_uv_scale = 16.0f / 32.0f;
 
                             /* Baked room tile — DEFAULT for all far rooms.
                              * Tier chosen by distance.  Ring 2 always gets IA4.
                              * No per-face uploads happen when room_baked=true. */
                             bool room_baked = false;
                             if (baked_room_count > 0 && room_idx < baked_room_count) {
-                                float rd = is_ring2 ? (CHUNK_XXFAR_DIST2 + 1.0f) : room_d;
+                                float rd = is_ring2 ? (g_dist_xxfar_sq + 1.0f) : room_d;
                                 rspq_flush();
                                 if (g_debug_dist_colors && dbg_tier_px) {
                                     /* Debug: solid color per distance tier */
                                     rdpq_mode_tlut(TLUT_NONE);
-                                    int tier = (rd > CHUNK_XXFAR_DIST2) ? 4 :
-                                               (rd > CHUNK_XFAR_DIST2)  ? 3 :
-                                               (rd > CHUNK_VERY_FAR_DIST2) ? 2 : 1;
+                                    int tier = (rd > g_dist_xxfar_sq) ? 4 :
+                                               (rd > g_dist_xfar_sq)  ? 3 :
+                                               (rd > g_dist_vfar_sq) ? 2 : 1;
                                     rdpq_tex_upload(TILE0, &dbg_tier_surf[tier], NULL);
-                                } else if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
+                                } else if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
                                     room_uv_scale = 4.0f / 32.0f;
-                                } else if (rd > CHUNK_XFAR_DIST2 && bkd_m3_surf) {
+                                } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
                                     room_uv_scale = 8.0f / 32.0f;
-                                } else if (rd > CHUNK_VERY_FAR_DIST2 && bkd_m2_surf) {
+                                } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
