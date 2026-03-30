@@ -1303,6 +1303,7 @@ int main(void) {
                 /* Per-frame performance counters — reset each frame,
                  * displayed on pause screen for diagnostics. */
                 int perf_far_rooms = 0;
+                int perf_ring_counts[6] = {0}; /* rooms found per ring depth */
                 int perf_far_tris = 0;
                 int perf_far_uploads = 0;
                 int perf_far_baked = 0;     /* rooms using baked tile */
@@ -2043,7 +2044,6 @@ int main(void) {
                     int ring1_end = vis_count;
                     #define MAX_RING_DEPTH 5
                     int ring_start = 0;
-                    static int perf_ring_counts[MAX_RING_DEPTH+1]; /* rooms found per ring */
                     perf_ring_counts[0] = vis_count; /* ring 0 = current + ring1 */
                     for (int ring = 0; ring < MAX_RING_DEPTH && vis_count < MAX_DRAW_ROOMS; ring++) {
                         int ring_end = vis_count;
