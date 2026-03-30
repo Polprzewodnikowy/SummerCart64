@@ -165,7 +165,26 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
             if (cmd_id == RSPQ_CMD_CALL) {
                 /* CALL format: [0x03XXXXXX] [block_addr] [nesting]
                  * Block address is in word 1 (physical RDRAM address). */
-                uint32_t call_addr = t3d_hle_read32(rdram, rdram_size, pos + 4) & 0x1FFFFFFF;
+                uint32_t raw_w1 = t3d_hle_read32(rdram, rdram_size, pos + 4);
+                uint32_t call_addr = raw_w1 & 0x1FFFFFFF;
+
+                /* Debug: log first 10 CALL commands with raw words */
+                static int call_diag_count = 0;
+                if (call_diag_count < 10 && g_hle.detect.confirmed) {
+                    uint32_t raw_w2 = t3d_hle_read32(rdram, rdram_size, pos + 8);
+                    T3D_LOG(&g_hle, "T3D_CALL",
+                        "w0=0x%08X w1=0x%08X w2=0x%08X addr=0x%08X",
+                        w0, raw_w1, raw_w2, call_addr);
+                    if (call_addr > 0 && call_addr + 31 < rdram_size) {
+                        uint32_t b[8];
+                        for (int di = 0; di < 8; di++)
+                            b[di] = t3d_hle_read32(rdram, rdram_size, call_addr + di * 4);
+                        T3D_LOG(&g_hle, "T3D_CALL_BLOCK",
+                            "addr=0x%08X [%08X %08X %08X %08X %08X %08X %08X %08X]",
+                            call_addr, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+                    }
+                    call_diag_count++;
+                }
                 if (call_addr > 0 && call_addr < rdram_size) {
                     /* Scan the block (limited to 256 words = 1KB) */
                     uint32_t bpos = call_addr;
