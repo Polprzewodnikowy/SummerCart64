@@ -2182,45 +2182,62 @@ int main(void) {
 
                             } else if (pause_page == 7) {
                                 /* ---- PAGE 7: AUTO-TUNE TARGETS ---- */
-                                /* Claude auto-test: pass/fail against targets */
-                                STAT("=== PERFORMANCE TARGETS ===");
-                                STAT("(for automated tuning)");
+                                /* 3-tier: GREEN=pass YELLOW=warn RED=fail */
+                                STAT("=== PERF TARGETS (G/Y/R) ===");
                                 STAT("");
-                                /* Helper: print metric with PASS/FAIL */
-                                #define TARGET(label, val, op, thresh, unit) do { \
-                                    bool _pass = ((int)(val)) op ((int)(thresh)); \
-                                    if (_pass) graphics_set_color(0x44FF44FF, 0x000000C0); \
-                                    else       graphics_set_color(0xFF4444FF, 0x000000C0); \
-                                    STAT("%-14s %5d%s %s %d -> %s", \
-                                         label, (int)(val), unit, #op, (int)(thresh), \
-                                         _pass ? "PASS" : "FAIL"); \
+                                /* Helper: 3-tier threshold display */
+                                #define T3(label, val, green, yellow, unit, higher_is_better) do { \
+                                    int _v = (int)(val); \
+                                    int _state; \
+                                    if (higher_is_better) \
+                                        _state = (_v >= (int)(green)) ? 0 : (_v >= (int)(yellow)) ? 1 : 2; \
+                                    else \
+                                        _state = (_v <= (int)(green)) ? 0 : (_v <= (int)(yellow)) ? 1 : 2; \
+                                    const char *_tag = _state==0 ? "PASS" : _state==1 ? "WARN" : "FAIL"; \
+                                    uint32_t _col = _state==0 ? 0x44FF44FF : _state==1 ? 0xFFFF44FF : 0xFF4444FF; \
+                                    graphics_set_color(_col, 0x000000C0); \
+                                    STAT("%-12s %5d%-2s %s", label, _v, unit, _tag); \
                                     graphics_set_color(0xFFFFFFFF, 0x000000C0); \
                                 } while(0)
-                                STAT("--- Frame Budget ---");
-                                TARGET("Frame(us)", perf_frame_us, <=, 33333, "us");
-                                TARGET("FPS", fps_display, >=, 20, "");
-                                STAT("");
-                                STAT("--- T3D Lara ---");
-                                TARGET("Lara(us)", perf_tex_lara_us, <=, 5000, "us");
-                                TARGET("T3D ready", t3d_lara_ready?1:0, ==, 1, "");
-                                STAT("");
-                                STAT("--- CPU Subsystems ---");
-                                TARGET("Rooms(us)", perf_tex_room_us, <=, 15000, "us");
-                                TARGET("StMesh(us)", perf_tex_sm_us, <=, 5000, "us");
-                                TARGET("Items(us)", perf_tex_item_us, <=, 3000, "us");
-                                TARGET("Baked(us)", perf_bkd_us, <=, 10000, "us");
-                                STAT("");
-                                STAT("--- Budgets ---");
-                                TARGET("TexTri", perf_tex_tris, <=, TEX_TRI_BUDGET, "");
-                                TARGET("TexFace", perf_tex_faces, <=, TEX_FACE_BUDGET, "");
-                                TARGET("BkdTri", perf_bkd_tris, <=, BKD_TRI_BUDGET, "");
-                                STAT("");
-                                STAT("--- Memory ---");
+                                T3("Frame(us)", perf_frame_us, 33333, 45000, "us", 0);
+                                T3("FPS", fps_display, 20, 15, "", 1);
+                                T3("Lara(us)", perf_tex_lara_us, 5000, 10000, "us", 0);
+                                T3("T3D", t3d_lara_ready?1:0, 1, 1, "", 1);
+                                T3("Rooms(us)", perf_tex_room_us, 15000, 25000, "us", 0);
+                                T3("StMesh(us)", perf_tex_sm_us, 5000, 8000, "us", 0);
+                                T3("Items(us)", perf_tex_item_us, 3000, 6000, "us", 0);
+                                T3("Baked(us)", perf_bkd_us, 10000, 18000, "us", 0);
+                                T3("RSP(us)", perf_rsp_us, 4000, 8000, "us", 0);
+                                T3("TexTri", perf_tex_tris, TEX_TRI_BUDGET, TEX_TRI_BUDGET*3/2, "", 0);
+                                T3("BkdTri", perf_bkd_tris, BKD_TRI_BUDGET, BKD_TRI_BUDGET*3/2, "", 0);
                                 {
                                     uint32_t hfree = n64_mem_available();
-                                    TARGET("HeapFree(KB)", hfree/1024, >=, 256, "KB");
+                                    T3("HeapKB", hfree/1024, 256, 128, "KB", 1);
                                 }
-                                #undef TARGET
+                                STAT("");
+                                /* Bottleneck diagnosis */
+                                {
+                                    const char *bn = "none";
+                                    const char *fix = "all clear";
+                                    uint32_t worst = 0;
+                                    if (perf_tex_lara_us > 5000 && perf_tex_lara_us > worst)
+                                        { worst = perf_tex_lara_us; bn = "LARA"; fix = "verify T3D active"; }
+                                    if (perf_tex_room_us > 15000 && perf_tex_room_us > worst)
+                                        { worst = perf_tex_room_us; bn = "ROOMS"; fix = "tighten vis/budgets"; }
+                                    if (perf_bkd_us > 10000 && perf_bkd_us > worst)
+                                        { worst = perf_bkd_us; bn = "BAKED"; fix = "reduce bkd budget"; }
+                                    if (perf_tex_sm_us > 5000 && perf_tex_sm_us > worst)
+                                        { worst = perf_tex_sm_us; bn = "STMESH"; fix = "cull/LOD statics"; }
+                                    if (perf_rsp_us > 8000 && perf_rsp_us > worst)
+                                        { worst = perf_rsp_us; bn = "RSP"; fix = "reduce tri count"; }
+                                    if (n64_mem_available() < 256*1024)
+                                        { bn = "MEMORY"; fix = "lower upload cap"; }
+                                    graphics_set_color(0x44CCFFFF, 0x000000C0);
+                                    STAT("Bottleneck: %s", bn);
+                                    STAT("Action:     %s", fix);
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+                                #undef T3
                             }
 
                             #undef STAT
@@ -4575,7 +4592,7 @@ int main(void) {
                     }
 
                     /* Periodic performance dump to debug console (every 60 frames).
-                     * Ares captures this via ISViewer — parseable from debug log. */
+                     * Outputs PERF| metrics + ADVICE| bottleneck diagnosis. */
                     {
                         static int perf_dump_counter = 0;
                         if (++perf_dump_counter >= 60) {
@@ -4583,7 +4600,8 @@ int main(void) {
                             printf("PERF|fps=%d|frame=%u|tex=%u|bkd=%u|rsp=%u"
                                    "|rm=%u|sm=%u|la=%u|it=%u"
                                    "|ttri=%d/%d|tface=%d/%d|btri=%d/%d"
-                                   "|rooms=%d|bkdrooms=%d\n",
+                                   "|rooms=%d|bkdrooms=%d|t3d=%d"
+                                   "|heap_free=%u\n",
                                    fps_display, perf_frame_us,
                                    perf_tex_us, perf_bkd_us, perf_rsp_us,
                                    perf_tex_room_us, perf_tex_sm_us,
@@ -4591,7 +4609,28 @@ int main(void) {
                                    perf_tex_tris, TEX_TRI_BUDGET,
                                    perf_tex_faces, TEX_FACE_BUDGET,
                                    perf_bkd_tris, BKD_TRI_BUDGET,
-                                   perf_tex_rooms, perf_bkd_rooms);
+                                   perf_tex_rooms, perf_bkd_rooms,
+                                   t3d_lara_ready ? 1 : 0,
+                                   n64_mem_available());
+
+                            /* Bottleneck diagnosis — identify primary offender */
+                            const char *bottleneck = "none";
+                            const char *suggest = "none";
+                            uint32_t worst = 0;
+                            if (perf_tex_lara_us > 5000 && perf_tex_lara_us > worst)
+                                { worst = perf_tex_lara_us; bottleneck = "LARA"; suggest = "verify_t3d_active"; }
+                            if (perf_tex_room_us > 15000 && perf_tex_room_us > worst)
+                                { worst = perf_tex_room_us; bottleneck = "ROOMS"; suggest = "tighten_vis_or_budgets"; }
+                            if (perf_bkd_us > 10000 && perf_bkd_us > worst)
+                                { worst = perf_bkd_us; bottleneck = "BAKED"; suggest = "reduce_bkd_tri_budget"; }
+                            if (perf_tex_sm_us > 5000 && perf_tex_sm_us > worst)
+                                { worst = perf_tex_sm_us; bottleneck = "STATICMESH"; suggest = "cull_or_lod_statics"; }
+                            if (perf_rsp_us > 8000 && perf_rsp_us > worst)
+                                { worst = perf_rsp_us; bottleneck = "RSP"; suggest = "reduce_tri_count"; }
+                            if (n64_mem_available() < 256 * 1024)
+                                { bottleneck = "MEMORY"; suggest = "lower_upload_cap"; }
+                            printf("ADVICE|bottleneck=%s|suggest=%s|worst_us=%u\n",
+                                   bottleneck, suggest, worst);
                         }
                     }
 
