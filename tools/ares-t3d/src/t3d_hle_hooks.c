@@ -329,7 +329,79 @@ void t3d_hle_on_vblank(void) {
                 }
             }
         }
-        T3D_LOG(&g_hle, "T3D_SCAN", "event=scan_complete hits=%d", hits);
+        T3D_LOG(&g_hle, "T3D_SCAN", "event=scan_complete hits=%d t3d_ovl=%d", hits,
+                g_ovl_map.t3d_slot);
+
+        /* Now parse each block region around the VERT_LOAD hits.
+         * Scan backwards to find the block start (DRAWFLAGS or start of
+         * contiguous T3D commands), then forward to TRI_SYNC/RET. */
+        if (hits > 0 && g_ovl_map.t3d_confirmed) {
+            int t3d_ovl_id = g_ovl_map.t3d_slot;
+            T3D_LOG(&g_hle, "T3D_BLOCK_PARSE", "event=start parsing %d blocks", hits);
+
+            /* Re-scan to find and parse each block */
+            for (uint32_t a = 0x10000; a + 11 < g_rdram_size; a += 4) {
+                uint32_t w = t3d_hle_read32(g_rdram, g_rdram_size, a);
+                int o = RSPQ_OVL_ID(w);
+                int c = RSPQ_CMD_ID(w);
+                if (o != t3d_ovl_id || c != T3D_CMD_VERT_LOAD) continue;
+
+                uint32_t isz = RSPQ_ARGS(w);
+                uint32_t w1v = t3d_hle_read32(g_rdram, g_rdram_size, a + 4);
+                uint32_t pv = w1v & 0x1FFFFFFF;
+                if (isz == 0 || isz > 1120 || (isz % 16) != 0) continue;
+                if (pv < 0x10000 || pv >= g_rdram_size) continue;
+
+                /* Found a valid VERT_LOAD. Scan backwards for block start. */
+                uint32_t block_start = a;
+                for (int back = 1; back < 20; back++) {
+                    uint32_t prev = a - back * 4;
+                    if (prev < 0x10000) break;
+                    uint32_t pw = t3d_hle_read32(g_rdram, g_rdram_size, prev);
+                    int po = RSPQ_OVL_ID(pw);
+                    if (po == t3d_ovl_id || po == 0) {
+                        block_start = prev;
+                    } else {
+                        break; /* hit non-T3D/non-rspq word */
+                    }
+                }
+
+                /* Parse from block_start forward with the T3D parser */
+                T3D_LOG(&g_hle, "T3D_BLOCK_PARSE",
+                    "block_start=0x%08X vert_load_at=0x%08X",
+                    block_start, a);
+
+                uint32_t bpos = block_start;
+                uint32_t bend = a + 512; /* max 512 bytes past VERT_LOAD */
+                if (bend > g_rdram_size) bend = g_rdram_size;
+                int block_cmds = 0;
+
+                while (bpos + 3 < bend && block_cmds < 64) {
+                    uint32_t bw = t3d_hle_read32(g_rdram, g_rdram_size, bpos);
+                    if (bw == 0) { bpos += 4; continue; }
+                    int bo = RSPQ_OVL_ID(bw);
+                    int bc = RSPQ_CMD_ID(bw);
+
+                    if (bo == 0 && bc == RSPQ_CMD_RET) break; /* end of block */
+
+                    if (bo == t3d_ovl_id && bc < T3D_CMD_COUNT) {
+                        int consumed = t3d_hle_process_command(
+                            &g_hle, g_rdram, g_rdram_size, bpos);
+                        if (consumed > 0) {
+                            bpos += consumed * 4;
+                            block_cmds++;
+                            continue;
+                        }
+                    }
+                    bpos += 4; /* skip unknown */
+                    block_cmds++;
+                }
+
+                T3D_LOG(&g_hle, "T3D_BLOCK_PARSE",
+                    "block done: %d cmds, verts=%d tris=%d",
+                    block_cmds, g_hle.frame.verts_loaded, g_hle.frame.tris_drawn);
+            }
+        }
     }
 
     /* Log overlay map state periodically */
