@@ -32,9 +32,12 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
 /* Called from vi.cpp at vblank (frame boundary). */
 void t3d_hle_on_vblank(void);
 
-/* Called from rsp/io.cpp when CPU writes to SP_STATUS register.
- * data: the raw value written. We check for SIG_MORE (signal 7). */
+/* Called from rsp/io.cpp when CPU writes to SP_STATUS register. */
 void t3d_hle_on_sp_status(uint32_t data);
+
+/* Called from rdram.hpp on every CPU word write to RDRAM.
+ * Must be extremely fast for non-watched addresses. */
+void t3d_hle_on_rdram_write(uint32_t address, uint32_t value);
 
 #ifdef __cplusplus
 }
