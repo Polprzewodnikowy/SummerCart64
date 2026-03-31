@@ -76,17 +76,29 @@ static void scan_rdram_for_blocks(void) {
     T3D_LOG(&g_hle, "T3D_SCAN", "event=start rdram_size=%u", g_rdram_size);
     g_block_count = 0;
 
+    /* Diagnostic: count ALL cmd=4 words with various filters */
+    int total_cmd4 = 0, cmd4_good_size = 0, cmd4_good_addr = 0;
+
     for (uint32_t addr = 0x10000; addr + 11 < g_rdram_size; addr += 4) {
         uint32_t w0 = t3d_hle_read32(g_rdram, g_rdram_size, addr);
         int ovl = RSPQ_OVL_ID(w0);
         int cmd = RSPQ_CMD_ID(w0);
-        if (cmd != T3D_CMD_VERT_LOAD || ovl == 0 || ovl >= 15) continue;
+        if (cmd != T3D_CMD_VERT_LOAD) continue;
+        if (ovl == 0 || ovl >= 15) continue;
+
+        total_cmd4++;
 
         uint32_t isz = RSPQ_ARGS(w0);
+        if (isz == 0 || isz > 1120 || (isz % 16) != 0) continue;
+        cmd4_good_size++;
+
         uint32_t w1 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 4);
         uint32_t pa = w1 & 0x1FFFFFFF;
-        if (isz == 0 || isz > 1120 || (isz % 16) != 0) continue;
         if (pa < 0x10000 || pa >= g_rdram_size) continue;
+        cmd4_good_addr++;
+
+        /* Also check w1 is 8-byte aligned (DMA requirement) */
+        if ((pa & 0x7) != 0) continue;
 
         if (g_t3d_slot < 0) {
             g_t3d_slot = ovl;
@@ -111,7 +123,9 @@ static void scan_rdram_for_blocks(void) {
         }
     }
 
-    T3D_LOG(&g_hle, "T3D_SCAN", "event=anchors blocks=%d ovl=%d", g_block_count, g_t3d_slot);
+    T3D_LOG(&g_hle, "T3D_SCAN",
+        "event=anchors blocks=%d ovl=%d total_cmd4=%d good_size=%d good_addr=%d",
+        g_block_count, g_t3d_slot, total_cmd4, cmd4_good_size, cmd4_good_addr);
     if (g_block_count == 0) return;
 
     for (int bi = 0; bi < g_block_count; bi++) {
