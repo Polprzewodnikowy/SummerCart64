@@ -45,6 +45,31 @@ target_link_libraries(test_rdpq_state t3d_hle_core)
 add_executable(test_shadow tests/test_shadow.c)
 target_link_libraries(test_shadow t3d_hle_core m)
 
+# Shared library plugin (for ares runtime loading — rebuild in <2s)
+add_library(t3d_hle SHARED
+    src/t3d_hle.c
+    src/t3d_hle_hooks.c
+    src/t3d_hle_plugin.c
+    src/cpu_intercept.c
+    src/stream_walker.c
+    src/segment_classifier.c
+    src/matrix_convert.c
+    src/gl_renderer.c
+    src/rdpq_state.c
+    src/shadow_render.c
+)
+target_include_directories(t3d_hle PRIVATE include)
+set_target_properties(t3d_hle PROPERTIES C_VISIBILITY_PRESET hidden)
+if(OSMESA_LIB)
+    target_compile_definitions(t3d_hle PRIVATE T3D_HLE_GL_ENABLED)
+    target_link_libraries(t3d_hle ${OSMESA_LIB})
+endif()
+
+# ares-side loader (link into ares, loads .so at runtime)
+add_library(t3d_hle_loader STATIC src/t3d_hle_loader.c)
+target_include_directories(t3d_hle_loader PRIVATE include)
+target_link_libraries(t3d_hle_loader dl)
+
 # Fixture generator
 add_executable(gen_fixture tests/gen_fixture.c)
 
