@@ -203,3 +203,32 @@ To capture block contents, we need a different hook:
 DMAs (where the RSP itself triggers the DMA, not the CPU). In ares,
 this is the `dma.busy.read` path triggered by RSP instruction writes
 to the SP_DMA registers.
+
+### Chunk 11: Stream Walker + rdpq Size Table (Path A)
+**Objective**: Correct mixed-stream walking to isolate real T3D commands
+**Result**: PARTIAL SUCCESS
+
+overlay_sizes.h: Complete rdpq command size table (64 commands, 4-176 bytes)
+stream_walker.c: Correct stepping through multiplexed command buffers
+
+Live test results:
+- rdpq auto-detected as overlay slot 4 (confirmed)
+- T3D auto-detected as overlay slot 1 (confirmed)
+- Walker correctly steps past rdpq commands using size table
+- T3D commands found: 494K FOG_STATE, 92K TRI_DRAW, 17K MATRIX_STACK
+- VERT_LOAD still 0 — all cmd_id=4 encounters are the same garbage word
+  (w0=0x1401B202, args=111106 bytes, always at same RDRAM addr)
+
+CALL following results:
+- "CALL" words (0x03XXXXXX) point to low RDRAM (0x573C) or beyond 8MB
+- None are real rspq_block targets (those are heap-allocated)
+- These are data words that accidentally match the 0x03 pattern
+
+**Architectural wall**: per-DMA-chunk scanning cannot reliably find
+rspq CALL commands or follow block targets because:
+1. The RSP fetches small chunks, CALL may span DMA boundaries
+2. Data words in the stream match overlay/cmd patterns by coincidence
+3. The rspq_block content is fetched by the RSP in subsequent DMAs,
+   mixed with other overlay commands
+
+**Next step**: Path B — CPU-side interception of rspq_write/rspq_block_run
