@@ -498,7 +498,17 @@ int t3d_hle_process_command(T3DHLEState *state,
 
     /* Dispatch */
     switch (cmd_id) {
-    case T3D_CMD_VERT_LOAD:    return handle_vert_load(state, rdram, rdram_size, cmd_addr, w0);
+    case T3D_CMD_VERT_LOAD: {
+        int r = handle_vert_load(state, rdram, rdram_size, cmd_addr, w0);
+        static int vl_diag = 0;
+        if (vl_diag < 20) {
+            uint32_t w1 = rd32(rdram, rdram_size, cmd_addr + 4);
+            LOG(state, "T3D_VLOAD_DIAG", "r=%d w0=0x%08X w1=0x%08X args=0x%06X addr=0x%08X",
+                r, w0, w1, RSPQ_ARGS(w0), w1 & 0x1FFFFFFF);
+            vl_diag++;
+        }
+        return r;
+    }
     case T3D_CMD_TRI_DRAW:     return handle_tri_draw(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_SCREEN_SIZE:  return handle_screen_size(state, rdram, rdram_size, cmd_addr, w0);
     case T3D_CMD_DRAWFLAGS:    return handle_drawflags(state, rdram, rdram_size, cmd_addr, w0);
