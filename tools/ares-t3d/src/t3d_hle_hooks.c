@@ -144,6 +144,35 @@ static void wcap_flush(void) {
         seg_log++;
     }
 
+    /* Scan for CALL commands (overlay 0, cmd 3) in captured words.
+     * CALL format: [0x03XXXXXX] [block_addr] [nesting]
+     * Extract block addresses and scan them directly in real RDRAM. */
+    for (int i = 0; i < g_wcap.count - 2; i++) {
+        uint32_t w = g_wcap.words[i];
+        if ((w >> 28) == 0 && ((w >> 24) & 0xF) == 0x3) {
+            uint32_t block_addr = g_wcap.words[i + 1] & 0x1FFFFFFF;
+            static int call_extract_log = 0;
+            if (call_extract_log < 30) {
+                T3D_LOG(&g_hle, "T3D_WCAP_CALL",
+                    "w0=0x%08X block=0x%08X nesting=0x%08X",
+                    w, block_addr, g_wcap.words[i + 2]);
+                call_extract_log++;
+
+                /* If the block address is in heap range, scan it! */
+                if (g_rdram && block_addr > 0x10000 && block_addr + 64 < g_rdram_size) {
+                    /* Read first 8 words of block from real RDRAM */
+                    T3D_LOG(&g_hle, "T3D_WCAP_BLOCK",
+                        "addr=0x%08X first=[%08X %08X %08X %08X]",
+                        block_addr,
+                        t3d_hle_read32(g_rdram, g_rdram_size, block_addr),
+                        t3d_hle_read32(g_rdram, g_rdram_size, block_addr + 4),
+                        t3d_hle_read32(g_rdram, g_rdram_size, block_addr + 8),
+                        t3d_hle_read32(g_rdram, g_rdram_size, block_addr + 12));
+                }
+            }
+        }
+    }
+
     /* Build a fake RDRAM-like buffer for the parser.
      * The words are in host byte order (already swapped by ares).
      * We need to convert back to big-endian for our parser. */
@@ -247,6 +276,46 @@ void t3d_hle_on_sp_status(uint32_t data) {
 
 void t3d_hle_on_vblank(void) {
     if (!g_initialized) return;
+
+    /* One-time full RDRAM scan for VERT_LOAD patterns in blocks.
+     * Run once after the game has loaded (frame 80). */
+    static bool rdram_scanned = false;
+    if (!rdram_scanned && g_hle.total_frames == 80 && g_rdram && g_rdram_size > 0) {
+        rdram_scanned = true;
+        T3D_LOG(&g_hle, "T3D_SCAN", "event=full_rdram_scan size=%u", g_rdram_size);
+
+        int t3d_ovl = g_ovl_map.t3d_confirmed ? g_ovl_map.t3d_slot : 1;
+        int hits = 0;
+
+        for (uint32_t addr = 0x10000; addr + 11 < g_rdram_size; addr += 4) {
+            uint32_t w0 = t3d_hle_read32(g_rdram, g_rdram_size, addr);
+            int ovl = RSPQ_OVL_ID(w0);
+            int cmd = RSPQ_CMD_ID(w0);
+
+            /* Look for ANY overlay with cmd=4 (VERT_LOAD-like) */
+            if (cmd == T3D_CMD_VERT_LOAD && ovl > 0 && ovl < 15) {
+                uint32_t input_size = RSPQ_ARGS(w0);
+                uint32_t w1 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 4);
+                uint32_t phys = w1 & 0x1FFFFFFF;
+
+                /* Check plausibility */
+                if (input_size > 0 && input_size <= 1120 &&
+                    (input_size % 16) == 0 &&
+                    phys > 0x10000 && phys < g_rdram_size) {
+                    hits++;
+                    if (hits <= 20) {
+                        uint32_t w2 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 8);
+                        T3D_LOG(&g_hle, "T3D_SCAN_HIT",
+                            "addr=0x%08X w0=0x%08X w1=0x%08X w2=0x%08X "
+                            "verts=%u rdram_addr=0x%08X",
+                            addr, w0, w1, w2,
+                            input_size / 16, phys);
+                    }
+                }
+            }
+        }
+        T3D_LOG(&g_hle, "T3D_SCAN", "event=scan_complete hits=%d", hits);
+    }
 
     /* Log overlay map state periodically */
     if ((g_hle.total_frames % 60) == 0 && g_hle.total_frames > 0) {
