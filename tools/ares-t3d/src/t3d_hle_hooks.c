@@ -74,6 +74,17 @@ void t3d_hle_on_rdram_write(uint32_t address, uint32_t value) { (void)address; (
 static void scan_rdram_for_blocks(void) {
     if (!g_rdram || g_rdram_size == 0) return;
     T3D_LOG(&g_hle, "T3D_SCAN", "event=start rdram_size=%u", g_rdram_size);
+
+    /* Debug: dump 16 words at known block address from T3D demo */
+    if (g_rdram_size >= 0x000E0180) {
+        T3D_LOG(&g_hle, "T3D_SCAN_PROBE", "addr=0x000E0160 (known T3D demo block cmds)");
+        for (int i = 0; i < 16; i++) {
+            uint32_t w = t3d_hle_read32(g_rdram, g_rdram_size, 0x000E0160 + i * 4);
+            T3D_LOG(&g_hle, "T3D_SCAN_PROBE",
+                "  [%d] 0x%08X ovl=%d cmd=%d",
+                i, w, RSPQ_OVL_ID(w), RSPQ_CMD_ID(w));
+        }
+    }
     g_block_count = 0;
 
     /* Diagnostic: count ALL cmd=4 words with various filters */
@@ -93,8 +104,28 @@ static void scan_rdram_for_blocks(void) {
         cmd4_good_size++;
 
         uint32_t w1 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 4);
-        uint32_t pa = w1 & 0x1FFFFFFF;
-        if (pa < 0x10000 || pa >= g_rdram_size) continue;
+        /* w1 = PhysicalAddr(vertices). PhysicalAddr strips KSEG0/1 prefix.
+         * Result should be in physical RDRAM range: 0x00000000-0x007FFFFF.
+         * No need to mask with 0x1FFFFFFF — it's already physical. */
+        uint32_t pa = w1;
+
+        /* Log first 10 candidates that pass size check */
+        static int near_miss_log = 0;
+        if (near_miss_log < 10) {
+            uint32_t w2 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 8);
+            T3D_LOG(&g_hle, "T3D_SCAN_CANDIDATE",
+                "addr=0x%08X ovl=%d isz=%u(%u verts) w1=0x%08X w2=0x%08X",
+                addr, ovl, isz, isz/16, w1, w2);
+            near_miss_log++;
+        }
+
+        /* Physical address validation:
+         * - Must be within RDRAM (0x00000000-0x007FFFFF for 8MB)
+         * - Must be above code/stack region (> 0x1000)
+         * - Must be 8-byte aligned (N64 DMA requirement) */
+        if (pa >= g_rdram_size) continue;
+        if (pa < 0x1000) continue;
+        if ((pa & 0x7) != 0) continue;
         cmd4_good_addr++;
 
         /* Also check w1 is 8-byte aligned (DMA requirement) */
