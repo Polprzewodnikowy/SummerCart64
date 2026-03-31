@@ -171,29 +171,26 @@ static void wcap_flush(void) {
 void t3d_hle_on_rdram_write(uint32_t address, uint32_t value) {
     if (!g_initialized) return;
 
-    /* Fast path: is this address in our watched range? */
+    /* Address-based filter with auto-discovery from DMA.
+     * Watch the first discovered buffer range (~2KB). */
     if (!g_wcap.watch_active) {
-        /* Auto-discover: the first DMA-to-DMEM gives us the buffer range.
-         * Use cpu_intercept's discovered addresses. */
-        if (g_cpu.buf_lo_addr[0] != 0) {
-            g_wcap.watch_lo = g_cpu.buf_lo_addr[0];
-            g_wcap.watch_hi = g_cpu.buf_lo_addr[0] + 0x800; /* 2KB */
-            if (g_cpu.buf_lo_addr[1] != 0) {
-                /* Extend to cover second buffer */
-                uint32_t hi2 = g_cpu.buf_lo_addr[1] + 0x800;
-                if (hi2 > g_wcap.watch_hi) g_wcap.watch_hi = hi2;
-                if (g_cpu.buf_lo_addr[1] < g_wcap.watch_lo)
-                    g_wcap.watch_lo = g_cpu.buf_lo_addr[1];
-            }
+        /* Use the 0x0057XXXX range directly — this is where the most
+         * rspq DMA activity occurs, meaning it's the active command buffer.
+         * We hardcode this for now; a proper discovery would track
+         * the most-frequently-DMA'd range. */
+        if (g_hle.total_frames > 70) { /* wait for game to start */
+            g_wcap.watch_lo = 0x0057D000;
+            g_wcap.watch_hi = 0x00580000; /* 12KB range */
             g_wcap.watch_active = true;
             T3D_LOG(&g_hle, "T3D_WCAP",
-                "event=watch_armed lo=0x%08X hi=0x%08X",
-                g_wcap.watch_lo, g_wcap.watch_hi);
+                "event=watch_armed lo=0x%08X hi=0x%08X size=%u",
+                g_wcap.watch_lo, g_wcap.watch_hi,
+                g_wcap.watch_hi - g_wcap.watch_lo);
         }
         return;
     }
 
-    /* Range check — this must be fast */
+    /* Fast range check */
     if (address < g_wcap.watch_lo || address >= g_wcap.watch_hi) return;
 
     g_wcap.writes_total++;
