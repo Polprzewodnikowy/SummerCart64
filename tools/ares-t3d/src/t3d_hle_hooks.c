@@ -8,6 +8,7 @@
 #include "t3d_hle.h"
 #include "t3d_hle_hooks.h"
 #include "stream_walker.h"
+#include "cpu_intercept.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -16,6 +17,7 @@
  * ---------------------------------------------------------------- */
 static T3DHLEState g_hle;
 static T3DOverlayMap g_ovl_map;
+static T3DCpuIntercept g_cpu;
 static const uint8_t *g_rdram = NULL;
 static uint32_t g_rdram_size = 0;
 static bool g_initialized = false;
@@ -31,6 +33,7 @@ void t3d_hle_system_init(uint8_t *rdram_data, uint32_t rdram_size) {
     memset(&g_ovl_map, 0, sizeof(g_ovl_map));
     g_ovl_map.rdpq_slot = -1;
     g_ovl_map.t3d_slot = -1;
+    t3d_cpu_init(&g_cpu);
     g_initialized = true;
     T3D_LOG(&g_hle, "T3D_HOOK", "event=system_init rdram_size=%u", rdram_size);
 }
@@ -63,7 +66,10 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
         return;
     }
 
-    /* DMA to DMEM — only scan rspq prefetch region */
+    /* Notify CPU intercept of DMA for buffer address discovery */
+    t3d_cpu_on_dma_to_dmem(&g_cpu, phys_dram, pbus_addr, length);
+
+    /* DMA to DMEM — stream walker for overlay identification */
     if (pbus_addr >= 0x200 || length > 512 || length < 8) return;
 
     /* Identify rdpq overlay slot on early buffers */
@@ -84,6 +90,24 @@ void t3d_hle_on_rsp_dma(uint32_t dram_addr, uint32_t pbus_addr,
         T3D_LOG(&g_hle, "T3D_DMA", "target=DMEM dram=0x%08X len=%u t3d=%d rdpq=%d t3d_slot=%d",
                 phys_dram, length, t3d_found, g_ovl_map.rdpq_slot, g_ovl_map.t3d_slot);
     }
+}
+
+/* ----------------------------------------------------------------
+ * on_sp_status — CPU writes to SP_STATUS register
+ * ---------------------------------------------------------------- */
+
+void t3d_hle_on_sp_status(uint32_t data) {
+    if (!g_initialized || !g_rdram) return;
+
+    /* Sync overlay knowledge from stream walker to cpu intercept */
+    if (g_ovl_map.rdpq_confirmed && g_cpu.rdpq_slot < 0) {
+        g_cpu.rdpq_slot = g_ovl_map.rdpq_slot;
+    }
+    if (g_ovl_map.t3d_confirmed && g_cpu.t3d_slot < 0) {
+        g_cpu.t3d_slot = g_ovl_map.t3d_slot;
+    }
+
+    t3d_cpu_on_sp_status_write(&g_cpu, &g_hle, data, g_rdram, g_rdram_size);
 }
 
 /* ----------------------------------------------------------------
