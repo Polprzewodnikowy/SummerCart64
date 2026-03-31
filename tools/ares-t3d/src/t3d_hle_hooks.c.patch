@@ -1,0 +1,5 @@
+
+--- One-time RDRAM scan for VERT_LOAD in blocks ---
+On frame 80 (after level load), scan ALL of RDRAM for the pattern:
+  word N:   0x14XXXXXX where XXXXXX is multiple of 16 and <= 1120
+  word N+1: valid RDRAM heap address (0x10000-0x800000)

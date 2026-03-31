@@ -156,6 +156,7 @@ static tr_parse_result_t parse_rooms(tr_reader_t *r, tr_level_t *level) {
             quad_buf[f].vertices[3] = r_u16(r);
             quad_buf[f].texture = r_u16(r);
             quad_buf[f].vertex_count = 4;
+            quad_buf[f].flags = 0;
         }
 
         int16_t num_tris = r_s16(r);
@@ -171,6 +172,7 @@ static tr_parse_result_t parse_rooms(tr_reader_t *r, tr_level_t *level) {
             tri_buf[f].vertices[3] = tri_buf[f].vertices[2]; /* Degenerate */
             tri_buf[f].texture = r_u16(r);
             tri_buf[f].vertex_count = 3;
+            tri_buf[f].flags = 0;
         }
 
         /* Merge quads + tris into single face array */
@@ -327,6 +329,7 @@ static tr_parse_result_t parse_meshes(tr_reader_t *r, tr_level_t *level) {
                 tex_quads[f].vertices[3] = r_u16(&mr);
                 tex_quads[f].texture = r_u16(&mr);
                 tex_quads[f].vertex_count = 4;
+                tex_quads[f].flags = 0;
             }
         }
 
@@ -342,6 +345,7 @@ static tr_parse_result_t parse_meshes(tr_reader_t *r, tr_level_t *level) {
                 tex_tris[f].vertices[3] = tex_tris[f].vertices[2];
                 tex_tris[f].texture = r_u16(&mr);
                 tex_tris[f].vertex_count = 3;
+                tex_tris[f].flags = 0;
             }
         }
 
@@ -357,6 +361,7 @@ static tr_parse_result_t parse_meshes(tr_reader_t *r, tr_level_t *level) {
                 flat_quads[f].vertices[3] = r_u16(&mr);
                 flat_quads[f].texture = r_u16(&mr) | 0x8000; /* Flag as flat */
                 flat_quads[f].vertex_count = 4;
+                flat_quads[f].flags = 0;
             }
         }
 
@@ -372,6 +377,7 @@ static tr_parse_result_t parse_meshes(tr_reader_t *r, tr_level_t *level) {
                 flat_tris[f].vertices[3] = flat_tris[f].vertices[2];
                 flat_tris[f].texture = r_u16(&mr) | 0x8000;
                 flat_tris[f].vertex_count = 3;
+                flat_tris[f].flags = 0;
             }
         }
 
@@ -746,18 +752,12 @@ tr_parse_result_t tr_level_parse(const uint8_t *level_data,
         level->sample_data_size = 0;
     }
 
-    /* Now go back and read texture pages */
-    tr_reader_t tex_r = {
-        .data = level_data,
-        .size = level_size,
-        .pos = tex_pages_offset,
-    };
-    if (level->tex_page_count > 0) {
-        uint32_t total = 256 * 256 * level->tex_page_count;
-        level->tex_pages = alloc(total);
-        if (level->tex_pages) {
-            r_read(&tex_r, level->tex_pages, total);
-        }
+    /* Point tex_pages directly at the source data in level_data —
+     * no copy.  Saves ~704 KB of heap (11 pages × 64 KB).
+     * Safe because level_data lives in the bump heap (never freed). */
+    if (level->tex_page_count > 0 &&
+        tex_pages_offset + (uint32_t)(256 * 256 * level->tex_page_count) <= level_size) {
+        level->tex_pages = (uint8_t *)(level_data + tex_pages_offset);
     }
 
     return TR_PARSE_OK;

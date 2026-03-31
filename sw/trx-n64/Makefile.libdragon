@@ -1,10 +1,13 @@
 N64_INST = /opt/libdragon
+T3D_INST = $(N64_INST)
 include $(N64_INST)/include/n64.mk
+include $(T3D_INST)/include/t3d.mk
 
 CFLAGS += -Isrc -I../asset_streaming/src -I$(BUILD_DIR) -DN64_TARGET -Wno-unused-variable -Wno-comment -Wno-format -Wno-deprecated-declarations
 # Add -DN64_EMULATOR_MODE for ares testing (skips SC64 register access)
 # Remove this flag when building for real SC64 hardware
 CFLAGS += -DN64_EMULATOR_MODE
+LDFLAGS += --allow-multiple-definition
 
 src = src/main_libdragon.c \
       src/level/tr_level_parse.c \
@@ -20,13 +23,14 @@ BAKE_DIR = $(BUILD_DIR)/baked
 all: trx-n64.z64
 .PHONY: all
 
-# Full ROM with baked data: bake → build → combine
-fullrom: $(BUILD_DIR)/level1.baked trx-n64.z64
-	@echo "Building full ROM with baked chunk data..."
+# Full ROM with baked data + CI8 tiles: bake → build → combine
+fullrom: $(BUILD_DIR)/level1.baked $(BUILD_DIR)/level1.atx trx-n64.z64
+	@echo "Building full ROM with baked chunk data + CI8 tiles..."
 	python3 tools/build_full_rom.py trx-n64.z64 \
 		$$(ls ../asset_streaming/build/tr1_assets.bin 2>/dev/null || ls build/tr1_assets.bin 2>/dev/null || echo "MISSING_ASSETS") \
 		$(BUILD_DIR)/trx-n64-full.z64 \
-		$(BUILD_DIR)/level1.baked
+		$(BUILD_DIR)/level1.baked \
+		$(BUILD_DIR)/level1.ci8tiles
 	@echo "Full ROM: $(BUILD_DIR)/trx-n64-full.z64"
 .PHONY: fullrom
 
@@ -45,6 +49,19 @@ $(BAKE_DIR):
 # Auto-bake Level 1 before building ROM (always available for testing)
 $(BUILD_DIR)/level1.baked: $(LEVEL_DIR)/LEVEL1.PHD tools/bake_chunks.py | $(BAKE_DIR)
 	python3 tools/bake_chunks.py $< $@
+
+# AegisTex — CI4/CI8 format-chosen per-face tiles
+$(BUILD_DIR)/level1.atx: $(LEVEL_DIR)/LEVEL1.PHD tools/aegistex_pack.py | $(BAKE_DIR)
+	python3 tools/aegistex_pack.py $< $@
+
+# Legacy CI8 tiles (generated as side-effect of aegistex_pack)
+$(BUILD_DIR)/level1.ci8tiles: $(BUILD_DIR)/level1.atx
+
+# Emulator test: build ROM then boot in ares under Xvfb, capture screenshot
+EMU_DIR = ../../tools/emulator
+test: trx-n64.z64
+	@$(EMU_DIR)/run_test.sh trx-n64.z64 180 /tmp/trx_test.png
+.PHONY: test
 
 # Build depends on baked data
 $(BUILD_DIR)/trx-n64.elf: $(src:%.c=$(BUILD_DIR)/%.o)

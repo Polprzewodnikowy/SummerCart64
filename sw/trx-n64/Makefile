@@ -44,7 +44,7 @@ CFLAGS = -Os -Wall -Wno-unused-function -ffunction-sections -fdata-sections \
          -ffreestanding -MMD -MP \
          -DN64_TARGET -DASSET_DEBUG
 INCLUDES = -I$(BOOTLOADER_SRC) -I$(ASSET_SRC) -Iinclude \
-           -I$(TRX_SRC)/..
+           -I$(TRX_SRC)/.. -Ibuild
 LDFLAGS = -lc -lm -nostartfiles -Wl,--gc-sections
 
 # ---- Source files ----

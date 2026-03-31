@@ -37,11 +37,19 @@ typedef struct {
  * Face (10 bytes for quad, 8 bytes for tri)
  * ------------------------------------------------------------------- */
 
+/* Face classification flags (computed once at load) */
+#define FACE_FLAG_ESSENTIAL  0x01  /* Boundary/silhouette — never decimate */
+#define FACE_FLAG_FLOOR      0x02  /* Horizontal floor surface */
+#define FACE_FLAG_CEILING    0x04  /* Horizontal ceiling surface */
+#define FACE_FLAG_WALL       0x08  /* Vertical wall at room edge */
+#define FACE_FLAG_PORTAL_ADJ 0x10  /* Near a portal opening */
+#define FACE_FLAG_DETAIL     0x80  /* Small detail — safe to skip */
+
 typedef struct {
     uint16_t vertices[4];   /* Vertex indices (3rd==4th for triangles) */
     uint16_t texture;       /* Bits 0-14: texture index, bit 15: double-sided */
     uint8_t  vertex_count;  /* 3 or 4 */
-    uint8_t  pad;
+    uint8_t  flags;         /* FACE_FLAG_* classification */
 } tr_face_t;
 
 /* -------------------------------------------------------------------

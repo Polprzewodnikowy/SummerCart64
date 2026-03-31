@@ -65,6 +65,16 @@ typedef struct {
     float min_y, max_y;      /* TR1 Y: positive = down                    */
     float min_z, max_z;
 
+    /* Per-room thresholds (computed once at load from room size).
+     * Small rooms get tighter thresholds, large rooms get wider. */
+    float max_draw_dist2;    /* Squared max draw distance                 */
+    float near_dist2;        /* Threshold: NEAR → MID transition          */
+    float fog_start_dist2;   /* Distance where fog begins                 */
+    int   size_class;        /* 0=small, 1=medium, 2=large, 3=open        */
+
+    /* Per-room fog color (computed once from ambient + water flag) */
+    float fog_r, fog_g, fog_b;
+
     /* Updated per frame */
     int   lod;               /* CHUNK_LOD_NEAR or CHUNK_LOD_FAR           */
     float dist_sq;           /* Squared XZ distance from camera           */

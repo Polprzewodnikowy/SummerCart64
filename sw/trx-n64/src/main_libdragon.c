@@ -13,11 +13,11 @@
 #define __LIBDRAGON_ASSET_H  /* Prevent libdragon's asset.h from loading */
 
 #include <libdragon.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/gl_integration.h>
+#include <malloc.h>
 #include <rdpq_tri.h>
 #include <rdpq_tex.h>
+#include <t3d/t3d.h>
+#include <t3d/t3dmath.h>
 #include <rdpq_mode.h>
 #include <mixer.h>
 #include <audio.h>
@@ -214,11 +214,151 @@ static int          g_cluster_count = 0;
 #define CACHE_BASE      ((uint8_t *)0xB1000000)
 #define CACHE_SIZE      (3 * 1024 * 1024)
 #define SLOT_SIZE       (512 * 1024)
-static uint8_t staging[512 * 1024] __attribute__((aligned(16)));
+/* staging[512KB] removed — was never referenced */
 
 /* -------------------------------------------------------------------
  * Chunk management — builds AABB/sphere for each room once at load
  * ------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------
+ * Face classification — run once after level parse.
+ * Tags each face as ESSENTIAL (never skip) or DETAIL (safe to skip).
+ *
+ * Essential: floors, ceilings, boundary walls, portal-adjacent faces.
+ * Detail: small faces, interior tessellation, decorative geometry.
+ * ------------------------------------------------------------------- */
+static void classify_faces(tr_level_t *level) {
+    for (int ri = 0; ri < level->room_count; ri++) {
+        tr_room_t *room = &level->rooms[ri];
+
+        /* Room AABB for boundary detection (1-sector margin) */
+        float rx_min = (float)room->x + 512.0f;
+        float rx_max = (float)(room->x + room->sectors_x * 1024) - 512.0f;
+        float rz_min = (float)room->z + 512.0f;
+        float rz_max = (float)(room->z + room->sectors_z * 1024) - 512.0f;
+        float ry_floor = (float)room->min_floor;
+        float ry_ceil  = (float)room->max_ceiling;
+
+        /* Collect portal vertex positions for proximity check */
+        float portal_pts[64][3];
+        int portal_pt_count = 0;
+        for (int p = 0; p < room->portal_count && portal_pt_count < 60; p++) {
+            for (int pv = 0; pv < 4 && portal_pt_count < 64; pv++) {
+                portal_pts[portal_pt_count][0] = (float)(room->x + room->portals[p].vertices[pv].x);
+                portal_pts[portal_pt_count][1] = (float)room->portals[p].vertices[pv].y;
+                portal_pts[portal_pt_count][2] = (float)(room->z + room->portals[p].vertices[pv].z);
+                portal_pt_count++;
+            }
+        }
+
+        for (int f = 0; f < room->mesh.face_count; f++) {
+            tr_face_t *face = &room->mesh.faces[f];
+            int nv = face->vertex_count;
+            if (nv < 3) { face->flags = FACE_FLAG_DETAIL; continue; }
+
+            /* Compute face center + approximate normal + area */
+            float cx = 0, cy = 0, cz = 0;
+            for (int v = 0; v < nv; v++) {
+                uint16_t vi = face->vertices[v];
+                if (vi >= room->mesh.vertex_count) continue;
+                tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                cx += (float)(room->x + rv->x);
+                cy += (float)rv->y;
+                cz += (float)(room->z + rv->z);
+            }
+            cx /= nv; cy /= nv; cz /= nv;
+
+            /* Normal from cross product of first two edges */
+            tr_room_vertex_t *v0 = &room->mesh.vertices[face->vertices[0]];
+            tr_room_vertex_t *v1 = &room->mesh.vertices[face->vertices[1]];
+            tr_room_vertex_t *v2 = &room->mesh.vertices[face->vertices[2]];
+            float e1x = v1->x - v0->x, e1y = v1->y - v0->y, e1z = v1->z - v0->z;
+            float e2x = v2->x - v0->x, e2y = v2->y - v0->y, e2z = v2->z - v0->z;
+            float nx = e1y * e2z - e1z * e2y;
+            float ny = e1z * e2x - e1x * e2z;
+            float nz = e1x * e2y - e1y * e2x;
+
+            /* Approximate face area (half cross product magnitude) */
+            float area = 0.5f * sqrtf(nx*nx + ny*ny + nz*nz);
+
+            /* Normalize normal */
+            float nlen = sqrtf(nx*nx + ny*ny + nz*nz);
+            if (nlen > 0.001f) { nx /= nlen; ny /= nlen; nz /= nlen; }
+
+            uint8_t flags = 0;
+
+            /* Floor/ceiling: mostly horizontal (|ny| > 0.7) */
+            if (ny > 0.7f || ny < -0.7f) {
+                if (cy > (ry_floor - 128.0f)) {
+                    flags |= FACE_FLAG_FLOOR | FACE_FLAG_ESSENTIAL;
+                } else if (cy < (ry_ceil + 128.0f)) {
+                    flags |= FACE_FLAG_CEILING | FACE_FLAG_ESSENTIAL;
+                } else {
+                    /* Interior horizontal — essential if large */
+                    if (area > 100000.0f) flags |= FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            /* Wall at room boundary: vertical face near AABB edge */
+            if (fabsf(ny) < 0.3f) {
+                if (cx < rx_min || cx > rx_max ||
+                    cz < rz_min || cz > rz_max) {
+                    flags |= FACE_FLAG_WALL | FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            /* Portal-adjacent: face center within 512 units of any
+             * portal vertex.  These define doorway/opening shapes. */
+            for (int pp = 0; pp < portal_pt_count; pp++) {
+                float pdx = cx - portal_pts[pp][0];
+                float pdy = cy - portal_pts[pp][1];
+                float pdz = cz - portal_pts[pp][2];
+                if (pdx*pdx + pdy*pdy + pdz*pdz < 512.0f * 512.0f) {
+                    flags |= FACE_FLAG_PORTAL_ADJ | FACE_FLAG_ESSENTIAL;
+                    break;
+                }
+            }
+
+            /* Small faces are detail (safe to skip) unless already
+             * marked essential by position/orientation tests. */
+            if (!(flags & FACE_FLAG_ESSENTIAL)) {
+                if (area < 50000.0f) {
+                    flags |= FACE_FLAG_DETAIL;
+                } else {
+                    /* Large interior face — keep it essential */
+                    flags |= FACE_FLAG_ESSENTIAL;
+                }
+            }
+
+            face->flags = flags;
+        }
+    }
+}
+
+/* Sort room faces by texture index (insertion sort — small arrays).
+ * Groups same-texture faces together to minimize GL bind changes.
+ * Run once after classify_faces. */
+static void sort_faces_by_texture(tr_level_t *level) {
+    for (int ri = 0; ri < level->room_count; ri++) {
+        tr_room_t *room = &level->rooms[ri];
+        int n = room->mesh.face_count;
+        tr_face_t *faces = room->mesh.faces;
+        if (!faces || n < 2) continue;
+
+        /* Insertion sort by texture index — stable, in-place,
+         * good for small N (TR1 rooms: ~50-400 faces) */
+        for (int i = 1; i < n; i++) {
+            tr_face_t key = faces[i];
+            uint16_t key_tex = key.texture & 0x7FFF;
+            int j = i - 1;
+            while (j >= 0 && (faces[j].texture & 0x7FFF) > key_tex) {
+                faces[j + 1] = faces[j];
+                j--;
+            }
+            faces[j + 1] = key;
+        }
+    }
+}
 
 static void build_chunks(const tr_level_t *level) {
     g_chunk_count = 0;
@@ -248,6 +388,77 @@ static void build_chunks(const tr_level_t *level) {
         float dy = c->max_y - c->min_y;
         float dz = c->max_z - c->min_z;
         c->radius = sqrtf(dx*dx + dy*dy + dz*dz) * 0.5f;
+
+        /* Per-room max draw distance based on room size.
+         * Larger rooms stay visible further. Scale the largest
+         * XZ dimension by a multiplier — a room should be drawable
+         * until it would be just a few pixels on screen.
+         * Clamp to [g_dist_mid_sq .. g_dist_xxfar_sq]. */
+        /* Room size class + scaled thresholds.
+         * Computed once at load, stable for the room's lifetime.
+         *
+         * Classes:
+         *   SMALL  (< 2 sectors): tight thresholds, fast falloff
+         *   MEDIUM (2-4 sectors): normal TR1 ladder
+         *   LARGE  (4-8 sectors): stretched thresholds
+         *   OPEN   (> 8 sectors): full range, distant tiers matter */
+        float max_dim = dx > dz ? dx : dz;
+        float room_sectors = max_dim / 1024.0f;
+
+        #define SIZE_SMALL  0
+        #define SIZE_MEDIUM 1
+        #define SIZE_LARGE  2
+        #define SIZE_OPEN   3
+
+        /* Openness bias: rooms with more portals have longer
+         * sightlines through openings.  Pushes thresholds out
+         * slightly so fog/LOD transitions happen further away. */
+        float openness = 1.0f + r->portal_count * 0.15f;
+        if (openness > 2.0f) openness = 2.0f;
+
+        if (room_sectors < 2.0f) {
+            c->size_class = SIZE_SMALL;
+            c->near_dist2     = 2048.0f * 2048.0f * openness;
+            c->fog_start_dist2 = 1536.0f * 1536.0f * openness;
+        } else if (room_sectors < 4.0f) {
+            c->size_class = SIZE_MEDIUM;
+            c->near_dist2     = 4096.0f * 4096.0f * openness;
+            c->fog_start_dist2 = 3072.0f * 3072.0f * openness;
+        } else if (room_sectors < 8.0f) {
+            c->size_class = SIZE_LARGE;
+            c->near_dist2     = 6144.0f * 6144.0f * openness;
+            c->fog_start_dist2 = 4096.0f * 4096.0f * openness;
+        } else {
+            c->size_class = SIZE_OPEN;
+            c->near_dist2     = 8192.0f * 8192.0f * openness;
+            c->fog_start_dist2 = 6144.0f * 6144.0f * openness;
+        }
+
+        /* Max draw distance from size + connectivity */
+        float draw_dist = max_dim * 8.0f;
+        draw_dist += r->portal_count * 1024.0f;
+        if (draw_dist < 7168.0f) draw_dist = 7168.0f;
+        if (draw_dist > 16384.0f) draw_dist = 16384.0f;
+        c->max_draw_dist2 = draw_dist * draw_dist;
+
+        /* Per-room fog color from ambient light + water flag.
+         * Dark rooms get darker fog, water rooms get blue tint.
+         * TR1 ambient: 0 = bright, 8191 = dark. */
+        float amb = 1.0f - ((float)r->ambient / 8191.0f);
+        if (amb < 0.0f) amb = 0.0f;
+        if (amb > 1.0f) amb = 1.0f;
+        bool is_water = (r->flags & 1) != 0;
+        if (is_water) {
+            /* Blue-green underwater haze */
+            c->fog_r = 0.08f + amb * 0.10f;
+            c->fog_g = 0.15f + amb * 0.15f;
+            c->fog_b = 0.25f + amb * 0.20f;
+        } else {
+            /* Cave fog: darker rooms get darker, warmer fog */
+            c->fog_r = 0.20f + amb * 0.15f;
+            c->fog_g = 0.18f + amb * 0.14f;
+            c->fog_b = 0.22f + amb * 0.18f;
+        }
 
         c->lod        = CHUNK_LOD_NEAR;
         c->dist_sq    = 0.0f;
@@ -478,7 +689,6 @@ int main(void) {
         uint8_t *level_data = NULL;
 
         if (is_compressed) {
-            /* Use system malloc for temp compressed buffer (freed after decompress) */
             uint8_t *comp_buf = (uint8_t *)malloc(read_bytes + 16);
             level_data = (uint8_t *)n64_mem_alloc(level_size + 4096);
             printf("  Compressed: %u KB -> %u KB\n",
@@ -589,15 +799,16 @@ int main(void) {
 
                 /* Allocate texture pixel data via uncached malloc (not from
                  * the bump heap — it's full with level data + parser allocs).
-                 * Requires expansion pak (8MB) for the extra RDRAM. */
+                 * tex_tiles is temporary — freed after CI8 generation below.
+                 * tex_surfs (RGBA16 surfaces) no longer needed (all rendering
+                 * uses CI8 now), so we skip that allocation entirely. */
                 uint16_t *tex_tiles = (uint16_t *)malloc_uncached_aligned(
                     64, num_otex * TEX_TILE_BYTES);
-                surface_t *tex_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
                 /* Per-tile UV mapping: u0, v0, scale_s, scale_t */
                 float *tex_uv_map = (float *)n64_mem_alloc(num_otex * 4 * sizeof(float));
 
-                if (tex_tiles && tex_surfs && tex_uv_map) {
-                    printf("  Converting %d textures to 16x16 RGBA16...\n", num_otex);
+                if (tex_tiles && tex_uv_map) {
+                    printf("  Converting %d textures to RGBA16 (temp)...\n", num_otex);
                     console_render();
                     for (int i = 0; i < num_otex; i++) {
                         tr_object_texture_t *otex = &g_level.object_textures[i];
@@ -618,13 +829,13 @@ int main(void) {
                         if (tw < 1) tw = 1;
                         if (th < 1) th = 1;
 
-                        /* Store UV mapping */
+                        /* Store UV mapping (used by CI8 generation + render loop) */
                         tex_uv_map[i*4+0] = (float)u0;
                         tex_uv_map[i*4+1] = (float)v0;
                         tex_uv_map[i*4+2] = (float)TEX_TILE_DIM / (float)tw;
                         tex_uv_map[i*4+3] = (float)TEX_TILE_DIM / (float)th;
 
-                        /* Convert CI8 tile to RGBA16, subsample to 16x16.
+                        /* Convert CI8 tile to RGBA16, subsample to TEX_TILE_DIM.
                          * Writing through uncached pointer — goes straight to RDRAM. */
                         if (otex->tex_page < num_tex_pages) {
                             uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
@@ -643,29 +854,298 @@ int main(void) {
                                 tile[p] = 0x8421;
                         }
 
-                        /* Uncached memory — no flush needed */
-                        tex_surfs[i] = surface_make_linear(tile, FMT_RGBA16,
+                    }
+                }
+
+                /* Build CI8 tiles for the RDPQ textured pass.
+                 * TR1 source textures ARE already CI8 (palette-indexed), so
+                 * we just read raw palette indices instead of converting to
+                 * RGBA16.  Paired with the global pal16 TLUT uploaded once
+                 * per frame: CI8 32×32 = 1 KB TMEM (vs 2 KB for RGBA16). */
+                uint8_t *ci8_tiles = NULL;
+                surface_t *ci8_surfs = NULL;
+                if (num_otex > 0) {
+                    ci8_tiles = (uint8_t *)malloc_uncached_aligned(
+                        64, num_otex * TEX_TILE_DIM * TEX_TILE_DIM);
+                    ci8_surfs = (surface_t *)n64_mem_alloc(num_otex * sizeof(surface_t));
+                }
+                if (ci8_tiles && ci8_surfs) {
+                    for (int i = 0; i < num_otex; i++) {
+                        tr_object_texture_t *otex = &g_level.object_textures[i];
+                        uint8_t *ctile = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                        int u0 = (int)tex_uv_map[i*4+0];
+                        int v0 = (int)tex_uv_map[i*4+1];
+                        int tw = (int)(TEX_TILE_DIM / tex_uv_map[i*4+2] + 0.5f);
+                        int th = (int)(TEX_TILE_DIM / tex_uv_map[i*4+3] + 0.5f);
+                        if (tw < 1) tw = 1;
+                        if (th < 1) th = 1;
+                        if (otex->tex_page < num_tex_pages) {
+                            uint8_t *page = g_level.tex_pages + otex->tex_page * 256 * 256;
+                            for (int y = 0; y < TEX_TILE_DIM; y++) {
+                                int sy = v0 + y * th / TEX_TILE_DIM;
+                                if (sy > 255) sy = 255;
+                                for (int x = 0; x < TEX_TILE_DIM; x++) {
+                                    int sx = u0 + x * tw / TEX_TILE_DIM;
+                                    if (sx > 255) sx = 255;
+                                    ctile[y * TEX_TILE_DIM + x] = page[sy * 256 + sx];
+                                }
+                            }
+                        } else {
+                            memset(ctile, 0, TEX_TILE_DIM * TEX_TILE_DIM);
+                        }
+                        ci8_surfs[i] = surface_make_linear(ctile, FMT_CI8,
                                                            TEX_TILE_DIM, TEX_TILE_DIM);
                     }
                 }
-                printf("  %d/%d textures ready (%d KB). Heap: %u KB left.\n",
+                /* Free RGBA16 tex_tiles — no longer needed (all rendering
+                 * uses CI8 now). This reclaims ~1.8 MB of uncached RDRAM. */
+                if (tex_tiles) {
+                    free_uncached(tex_tiles);
+                    tex_tiles = NULL;
+                    printf("  Freed RGBA16 tex_tiles: %d KB uncached\n",
+                           num_otex * TEX_TILE_BYTES / 1024);
+                }
+
+                /* level_data stays in bump heap — can't free but stable. */
+
+                printf("  %d/%d CI8 textures ready (%d KB). Heap: %u KB left.\n",
                        num_otex, (int)g_level.object_texture_count,
-                       num_otex * TEX_TILE_BYTES / 1024,
+                       num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024,
                        n64_mem_available() / 1024);
 
-                /* ---- Memory audit ----
-                 * Print allocation totals so we can track what's consuming
-                 * RDRAM.  Mip textures are NOT allocated — 560 KB uncached
-                 * for all ~880 textures doesn't fit alongside the base
-                 * textures + framebuffers + RSPQ blocks. */
+                /* Load AegisTex .atx from ROM — per-tile CI4/CI8 format data.
+                 * Contains pre-quantized CI4 tiles with local palettes. */
+                #define CI4_TILE_TEXELS (TEX_TILE_DIM * TEX_TILE_DIM / 2) /* 512 bytes */
+                #define CI4_PAL_SIZE   16
+                #define CI4_PAYLOAD    (CI4_PAL_SIZE * 2 + CI4_TILE_TEXELS) /* 544 bytes */
+                /* Include baked_offsets.h early for ATX_ROM_OFFSET */
+                #if __has_include("baked_offsets.h")
+                #include "baked_offsets.h"
+                #elif __has_include("../build/baked_offsets.h")
+                #include "../build/baked_offsets.h"
+                #endif
+                #if !defined(ATX_ROM_OFFSET)
+                #define ATX_ROM_OFFSET 0u
+                #define ATX_ROM_SIZE   0u
+                #endif
+                #define ATX_HEADER_SIZE 32
+                #define ATX_RECORD_SIZE 4
+
+                uint8_t  *ci4_tiles = NULL;
+                uint16_t *ci4_pals  = NULL;
+                surface_t *ci4_surfs = NULL;
+                uint8_t  *atx_tile_modes = NULL; /* 0=CI8, 1=CI4 per tile */
+
+                if (ATX_ROM_OFFSET > 0 && ATX_ROM_SIZE > ATX_HEADER_SIZE && num_otex > 0) {
+                    /* Read ATX header */
+                    static uint8_t atx_hdr[32] __attribute__((aligned(16)));
+                    dma_read(atx_hdr, ROM_CART_BASE + ATX_ROM_OFFSET, 32);
+
+                    if (atx_hdr[0]=='A' && atx_hdr[1]=='T' &&
+                        atx_hdr[2]=='X' && atx_hdr[3]=='1') {
+                        int atx_count = atx_hdr[4] | (atx_hdr[5] << 8);
+                        int atx_ci8_n = atx_hdr[8] | (atx_hdr[9] << 8);
+                        int atx_ci4_n = atx_hdr[10] | (atx_hdr[11] << 8);
+                        printf("  ATX: %d tiles (%d CI8, %d CI4)\n",
+                               atx_count, atx_ci8_n, atx_ci4_n);
+
+                        /* Read per-tile records */
+                        int records_size = (atx_count * ATX_RECORD_SIZE + 15) & ~15;
+                        uint8_t *atx_records = (uint8_t *)n64_mem_alloc(records_size + 16);
+                        if (atx_records) {
+                            dma_read(atx_records,
+                                     ROM_CART_BASE + ATX_ROM_OFFSET + ATX_HEADER_SIZE,
+                                     records_size);
+                            data_cache_hit_writeback_invalidate(atx_records, records_size);
+
+                            /* Allocate CI4 tile storage */
+                            atx_tile_modes = (uint8_t *)n64_mem_alloc(atx_count);
+                            ci4_tiles = (uint8_t *)malloc_uncached_aligned(
+                                64, atx_ci4_n * CI4_TILE_TEXELS);
+                            ci4_pals = (uint16_t *)malloc_uncached_aligned(
+                                64, atx_ci4_n * CI4_PAL_SIZE * sizeof(uint16_t));
+                            ci4_surfs = (surface_t *)n64_mem_alloc(
+                                atx_count * sizeof(surface_t));
+
+                            if (ci4_tiles && ci4_pals && ci4_surfs && atx_tile_modes) {
+                                /* Load CI4 payloads from ROM */
+                                uint32_t payload_base = ATX_ROM_OFFSET + ATX_HEADER_SIZE + records_size;
+                                int ci4_idx = 0;
+                                for (int i = 0; i < atx_count && i < num_otex; i++) {
+                                    uint8_t mode = atx_records[i * ATX_RECORD_SIZE];
+                                    uint16_t payload_off16 = atx_records[i * ATX_RECORD_SIZE + 2] |
+                                                             (atx_records[i * ATX_RECORD_SIZE + 3] << 8);
+                                    atx_tile_modes[i] = mode;
+
+                                    if (mode == 1 && ci4_idx < atx_ci4_n) {
+                                        /* CI4: DMA payload (544 bytes, 16-aligned) */
+                                        uint32_t rom_off = ROM_CART_BASE + payload_base + payload_off16 * 16;
+                                        uint8_t *dest_pal = (uint8_t *)(ci4_pals + ci4_idx * CI4_PAL_SIZE);
+                                        uint8_t *dest_tex = ci4_tiles + ci4_idx * CI4_TILE_TEXELS;
+
+                                        /* DMA palette (32 bytes) + texels (512 bytes) together */
+                                        static uint8_t ci4_buf[560] __attribute__((aligned(16)));
+                                        dma_read(ci4_buf, rom_off, 544);
+                                        data_cache_hit_writeback_invalidate(ci4_buf, 544);
+
+                                        /* Copy palette to uncached */
+                                        for (int p = 0; p < CI4_PAL_SIZE; p++)
+                                            ci4_pals[ci4_idx * CI4_PAL_SIZE + p] =
+                                                ci4_buf[p*2] | (ci4_buf[p*2+1] << 8);
+
+                                        /* Copy texels to uncached */
+                                        memcpy(dest_tex, ci4_buf + 32, CI4_TILE_TEXELS);
+
+                                        ci4_surfs[i] = surface_make_linear(
+                                            dest_tex, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                                        ci4_idx++;
+                                    } else {
+                                        /* CI8: no CI4 surface, use CI8 at runtime */
+                                        atx_tile_modes[i] = 0;
+                                        ci4_surfs[i] = (surface_t){0}; /* null surface */
+                                    }
+                                }
+                                printf("  Loaded %d CI4 tiles from ROM\n", ci4_idx);
+                            }
+                        }
+                    }
+                }
+                /* Fallback: if ATX not available, generate CI4 at runtime */
+                if (!ci4_tiles && num_otex > 0 && ci8_tiles) {
+                    printf("  ATX not in ROM — generating CI4 at runtime...\n");
+                    ci4_tiles = (uint8_t *)malloc_uncached_aligned(
+                        64, num_otex * CI4_TILE_TEXELS);
+                    ci4_pals = (uint16_t *)malloc_uncached_aligned(
+                        64, num_otex * CI4_PAL_SIZE * sizeof(uint16_t));
+                    ci4_surfs = (surface_t *)n64_mem_alloc(
+                        num_otex * sizeof(surface_t));
+                    atx_tile_modes = (uint8_t *)n64_mem_alloc(num_otex);
+                    if (ci4_tiles && ci4_pals && ci4_surfs && atx_tile_modes) {
+                        for (int i = 0; i < num_otex; i++) {
+                            uint8_t *src = ci8_tiles + i * TEX_TILE_DIM * TEX_TILE_DIM;
+                            uint8_t *dst = ci4_tiles + i * CI4_TILE_TEXELS;
+                            uint16_t *pal = ci4_pals + i * CI4_PAL_SIZE;
+                            uint16_t freq[256] = {0};
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p++)
+                                freq[src[p]]++;
+                            uint8_t top16[16] = {0};
+                            for (int t = 0; t < 16; t++) {
+                                int best = 0, bf = -1;
+                                for (int c = 0; c < 256; c++) {
+                                    if ((int)freq[c] > bf) {
+                                        bool dup = false;
+                                        for (int tt = 0; tt < t; tt++)
+                                            if (top16[tt] == c) { dup = true; break; }
+                                        if (!dup) { best = c; bf = freq[c]; }
+                                    }
+                                }
+                                top16[t] = best;
+                            }
+                            for (int t = 0; t < 16; t++) pal[t] = pal16[top16[t]];
+                            uint8_t remap[256];
+                            for (int c = 0; c < 256; c++) {
+                                int bc = 0, bd = 999999;
+                                uint16_t s = pal16[c];
+                                int sr=(s>>11)&0x1F, sg=(s>>6)&0x1F, sb=(s>>1)&0x1F;
+                                for (int t = 0; t < 16; t++) {
+                                    int pr=(pal[t]>>11)&0x1F, pg=(pal[t]>>6)&0x1F, pb=(pal[t]>>1)&0x1F;
+                                    int d=(sr-pr)*(sr-pr)+(sg-pg)*(sg-pg)+(sb-pb)*(sb-pb);
+                                    if (d < bd) { bd = d; bc = t; }
+                                }
+                                remap[c] = bc;
+                            }
+                            for (int p = 0; p < TEX_TILE_DIM * TEX_TILE_DIM; p += 2)
+                                dst[p/2] = (remap[src[p]] << 4) | remap[src[p+1]];
+                            ci4_surfs[i] = surface_make_linear(dst, FMT_CI4, TEX_TILE_DIM, TEX_TILE_DIM);
+                            atx_tile_modes[i] = 1; /* all CI4 in fallback */
+                        }
+                        printf("  CI4 fallback: %d tiles generated\n", num_otex);
+                    }
+                }
+
+                /* ============================================================
+                 * T3D LARA — Convert TR1 meshes to T3DVertPacked + record blocks.
+                 * Done once at load time. Per frame: just build bone matrices
+                 * and rspq_block_run(). Moves ~40ms of CPU work to RSP.
+                 * ============================================================ */
+                #define T3D_LARA_MAX_MESHES 15
+                #define T3D_LARA_MAX_VERTS  70 /* T3D vertex buffer limit */
+                T3DVertPacked *t3d_lara_verts[T3D_LARA_MAX_MESHES] = {0};
+                rspq_block_t  *t3d_lara_blocks[T3D_LARA_MAX_MESHES] = {0};
+                int t3d_lara_vert_counts[T3D_LARA_MAX_MESHES] = {0};
+                int t3d_lara_mesh_count = 0;
+                bool t3d_lara_ready = false;
+
+                /* Frame memory pool for per-frame T3D matrices (double-buffered) */
+                #define T3D_FRAME_POOL_SIZE (16 * 1024) /* 16 KB per pool */
+                static uint64_t t3d_frame_pool_mem[2][T3D_FRAME_POOL_SIZE / 8] __attribute__((aligned(16)));
+                static int t3d_frame_pool_idx = 0;
+                static int t3d_frame_pool_pos = 0;
+
+                /* t3d_frame_alloc defined as macro to avoid nested function */
+                #define t3d_frame_alloc(bytes) ({ \
+                    int _b = ((bytes) + 15) & ~15; \
+                    void *_p = &t3d_frame_pool_mem[t3d_frame_pool_idx][t3d_frame_pool_pos / 8]; \
+                    t3d_frame_pool_pos += _b; \
+                    _p; \
+                })
+
+                /* Fill T3D vertex buffers for Lara (doesn't need T3D init).
+                 * Block recording deferred to after t3d_init(). */
+                {
+                    tr_object_def_t *lobj = NULL;
+                    for (int i = 0; i < g_level.object_count; i++)
+                        if (g_level.objects[i].object_id == 0) { lobj = &g_level.objects[i]; break; }
+
+                    if (lobj && lobj->mesh_count > 0) {
+                        int mc = lobj->mesh_count;
+                        if (mc > T3D_LARA_MAX_MESHES) mc = T3D_LARA_MAX_MESHES;
+                        t3d_lara_mesh_count = mc;
+
+                        for (int mi = 0; mi < mc; mi++) {
+                            int gmi = lobj->mesh_idx + mi;
+                            if (gmi >= g_level.mesh_count) continue;
+                            tr_object_mesh_t *mesh = &g_level.meshes[gmi];
+
+                            int nv = mesh->vertex_count;
+                            if (nv > T3D_LARA_MAX_VERTS) nv = T3D_LARA_MAX_VERTS;
+                            int packed_count = (nv + 1) / 2;
+                            T3DVertPacked *vp = malloc_uncached(sizeof(T3DVertPacked) * packed_count);
+                            if (!vp) continue;
+                            memset(vp, 0, sizeof(T3DVertPacked) * packed_count);
+
+                            for (int v = 0; v < nv; v++) {
+                                int16_t *pos = t3d_vertbuffer_get_pos(vp, v);
+                                uint8_t *rgba = t3d_vertbuffer_get_rgba(vp, v);
+                                int16_t *uv = t3d_vertbuffer_get_uv(vp, v);
+                                pos[0] = mesh->vertices[v].x;
+                                pos[1] = mesh->vertices[v].y;
+                                pos[2] = mesh->vertices[v].z;
+                                rgba[0] = rgba[1] = rgba[2] = 180;
+                                rgba[3] = 255;
+                                uint16_t *norm = t3d_vertbuffer_get_norm(vp, v);
+                                *norm = t3d_vert_pack_normal(&(T3DVec3){{0, 1, 0}});
+                                uv[0] = 0;
+                                uv[1] = 0;
+                            }
+                            data_cache_hit_writeback(vp, sizeof(T3DVertPacked) * packed_count);
+
+                            t3d_lara_verts[mi] = vp;
+                            t3d_lara_vert_counts[mi] = nv;
+                        }
+                        printf("  T3D Lara: %d meshes, vertex buffers ready\n", mc);
+                    }
+                }
+
+                /* ---- Memory audit ---- */
                 printf("\n=== MEMORY AUDIT ===\n");
                 printf("  Bump heap:  %u KB used, %u KB free (of %u KB)\n",
                        (GAME_HEAP_SIZE - n64_mem_available()) / 1024,
                        n64_mem_available() / 1024,
                        GAME_HEAP_SIZE / 1024);
-                printf("  Base textures: %d × %dx%d RGBA16 = %d KB (uncached)\n",
+                printf("  CI8 textures: %d × %dx%d CI8 = %d KB (uncached)\n",
                        num_otex, TEX_TILE_DIM, TEX_TILE_DIM,
-                       num_otex * TEX_TILE_BYTES / 1024);
+                       num_otex * TEX_TILE_DIM * TEX_TILE_DIM / 1024);
                 printf("  Framebuffers: 2 × 320×240 × 16bpp = %d KB\n", 2*320*240*2/1024);
                 printf("  Z-buffer: 320×240 × 16bpp = %d KB\n", 320*240*2/1024);
                 printf("  Tex surfs: %d × %d = %d KB (heap)\n",
@@ -685,6 +1165,27 @@ int main(void) {
                     white_surf = surface_make_linear(white_px, FMT_RGBA16, 1, 1);
                 }
 
+                /* Debug distance-tier visualization: 5 solid-color 1×1 textures.
+                 * Toggle via pause menu → global budgets page.
+                 * Colors: Near=GREEN, MidFar=CYAN, Far=YELLOW, XFar=ORANGE, XXFar=RED */
+                bool g_debug_dist_colors = false;
+                /* Force all rooms to render as a specific tier (0=off, 1-5=tier) */
+                int g_debug_force_tier = 0;
+                /* Each debug pixel needs its own 8-byte aligned address
+                 * for rdpq_tex_upload. Allocate 5 × 8 bytes = 40 bytes. */
+                uint16_t *dbg_tier_px = (uint16_t *)malloc_uncached_aligned(8, 5 * 8);
+                surface_t dbg_tier_surf[5] = {{0}};
+                if (dbg_tier_px) {
+                    /* RGBA16: RRRRR GGGGG BBBBB A — each at 8-byte stride */
+                    dbg_tier_px[0*4] = (0<<11)|(31<<6)|(0<<1)|1;   /* near:    green */
+                    dbg_tier_px[1*4] = (0<<11)|(31<<6)|(31<<1)|1;  /* mid-far: cyan */
+                    dbg_tier_px[2*4] = (31<<11)|(31<<6)|(0<<1)|1;  /* far:     yellow */
+                    dbg_tier_px[3*4] = (31<<11)|(16<<6)|(0<<1)|1;  /* x-far:   orange */
+                    dbg_tier_px[4*4] = (31<<11)|(0<<6)|(0<<1)|1;   /* xx-far:  red */
+                    for (int i = 0; i < 5; i++)
+                        dbg_tier_surf[i] = surface_make_linear(&dbg_tier_px[i*4], FMT_RGBA16, 1, 1);
+                }
+
                 /* On-demand mip buffer — one reusable 16×16 RGBA16 surface.
                  * Instead of pre-allocating mips for all 880 textures,
                  * box-filter on-the-fly for the ~8 uploads per frame.
@@ -692,7 +1193,7 @@ int main(void) {
                 /* ---- Pre-baked room tiles (Lambert-style) ----
                  * Load per-room baked textures from ROM if available.
                  * Each room has 3 mip levels: 32×32, 16×16, 8×8.
-                 * Far pass uploads pre-baked tile = zero runtime filtering.
+                 * Baked pass uploads pre-baked tile = zero runtime filtering.
                  *
                  * Falls back to on-demand box filtering if baked data
                  * is not in ROM (for development without full pipeline). */
@@ -708,16 +1209,16 @@ int main(void) {
                 #define BAKED_LOAD_PER_ROOM (MIP1_DIM*MIP1_DIM*2 + MIP2_DIM*MIP2_DIM*2)
                 #define BAKED_HEADER_SIZE 16
 
-                /* Baked RGBA16 tile offsets from ROM.
-                 * Pixels loaded into CACHED heap (not uncached) to avoid
-                 * competing with RSPQ block memory. Cache written back
-                 * once after DMA so rdpq_tex_upload reads correct data. */
-                #if __has_include("baked_offsets.h")
-                #include "baked_offsets.h"
-                #else
+                /* Baked tile offsets — already included earlier for ATX.
+                 * Just need BAKED_ROM_OFFSET fallback if header was missing. */
+                #if !defined(BAKED_ROM_OFFSET)
                 #define BAKED_ROM_OFFSET 0u
                 #define BAKED_ROM_SIZE   0u
                 #endif
+
+                printf("  Baked ROM: offset=0x%X size=%u\n",
+                       (unsigned)BAKED_ROM_OFFSET, (unsigned)BAKED_ROM_SIZE);
+                console_render();
 
                 int baked_room_count = 0;
                 /* BAK3: 5 mip tiers per room — CI8, CI4, IA8, IA4 */
@@ -784,7 +1285,10 @@ int main(void) {
                                 bkd_m4_surf[bi] = surface_make_linear(
                                     d + off, FMT_IA4, 4, 4);
                             }
-                            data_cache_hit_writeback(baked_data, total_load);
+                            /* Invalidate cache — DMA wrote directly to RDRAM,
+                             * CPU cache has stale data. Must invalidate so
+                             * rdpq_tex_upload reads the DMA'd baked tiles. */
+                            data_cache_hit_writeback_invalidate(baked_data, total_load);
                             printf("  BAK3 loaded: %d KB cached\n",
                                    total_load / 1024);
                         } else {
@@ -799,26 +1303,8 @@ int main(void) {
                     printf("  No baked data in ROM\n");
                 }
 
-                /* Fallback: on-demand mip buffers (used when no baked data) */
-                uint16_t *mip1_buf = NULL, *mip2_buf = NULL;
-                surface_t mip1_surf = {0}, mip2_surf = {0};
-                if (baked_room_count == 0) {
-                    mip1_buf = (uint16_t *)malloc_uncached_aligned(
-                        64, MIP1_DIM * MIP1_DIM * 2);
-                    mip2_buf = (uint16_t *)malloc_uncached_aligned(
-                        64, MIP2_DIM * MIP2_DIM * 2);
-                    if (mip1_buf)
-                        mip1_surf = surface_make_linear(mip1_buf, FMT_RGBA16, MIP1_DIM, MIP1_DIM);
-                    if (mip2_buf)
-                        mip2_surf = surface_make_linear(mip2_buf, FMT_RGBA16, MIP2_DIM, MIP2_DIM);
-                }
-
-                /* GL texture objects — created after gl_init() */
-                GLuint *gl_textures = NULL;
-                GLuint gl_white_tex = 0;
-                if (num_otex > 0 && tex_surfs) {
-                    gl_textures = (GLuint *)n64_mem_alloc(num_otex * sizeof(GLuint));
-                }
+                /* CPU mip buffers removed — baked pass now uses baked room tiles
+                 * as the default for all far rooms (no per-face mip generation). */
 
                 /* ============================================
                  * AUDIO INIT
@@ -896,7 +1382,9 @@ int main(void) {
                     }
                 }
 
-                /* Build chunk array (one per room) for frustum/LOD queries */
+                /* Classify faces, sort by texture, build chunks/clusters */
+                classify_faces(&g_level);
+                sort_faces_by_texture(&g_level);
                 build_chunks(&g_level);
                 build_clusters(&g_level);
                 printf("  %d chunks, %d clusters built.\n",
@@ -921,13 +1409,54 @@ int main(void) {
                  * Flat-shaded room triangles via rdpq.
                  */
 
-                /* Close console, init display + OpenGL for RSP T&L */
+                /* Close console, init display.  Pure RDPQ pipeline — no GL. */
                 console_close();
                 display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, FILTERS_RESAMPLE_ANTIALIAS);
                 rdpq_init();
-                gl_init();
-                bool has_zbuf = true;  /* GL manages zbuf internally */
-                bool gl_setup_done = false;  /* Defer GL state to first frame */
+                t3d_init((T3DInitParams){});
+
+                /* Record T3D rspq_blocks for Lara meshes (needs t3d_init first) */
+                {
+                    tr_object_def_t *lobj = NULL;
+                    for (int i = 0; i < g_level.object_count; i++)
+                        if (g_level.objects[i].object_id == 0) { lobj = &g_level.objects[i]; break; }
+
+                    if (lobj && t3d_lara_mesh_count > 0) {
+                        for (int mi = 0; mi < t3d_lara_mesh_count; mi++) {
+                            if (!t3d_lara_verts[mi]) continue;
+                            int nv = t3d_lara_vert_counts[mi];
+                            int gmi = lobj->mesh_idx + mi;
+                            if (gmi >= g_level.mesh_count) continue;
+                            tr_object_mesh_t *mesh = &g_level.meshes[gmi];
+
+                            rspq_block_begin();
+                            t3d_state_set_drawflags(T3D_FLAG_DEPTH | T3D_FLAG_SHADED);
+                            t3d_vert_load(t3d_lara_verts[mi], 0, nv);
+                            for (int f = 0; f < mesh->face_count; f++) {
+                                tr_face_t *face = &mesh->faces[f];
+                                if (face->vertex_count < 3) continue;
+                                uint16_t v0 = face->vertices[0];
+                                uint16_t v1 = face->vertices[1];
+                                uint16_t v2 = face->vertices[2];
+                                if (v0 >= nv || v1 >= nv || v2 >= nv) continue;
+                                t3d_tri_draw(v0, v2, v1);
+                                if (face->vertex_count == 4) {
+                                    uint16_t v3 = face->vertices[3];
+                                    if (v3 < nv)
+                                        t3d_tri_draw(v0, v3, v2);
+                                }
+                            }
+                            t3d_tri_sync();
+                            t3d_lara_blocks[mi] = rspq_block_end();
+                        }
+                        t3d_lara_ready = true;
+                        (void)t3d_lara_verts;
+                        (void)t3d_lara_mesh_count;
+                        printf("  T3D Lara: %d blocks recorded\n", t3d_lara_mesh_count);
+                    }
+                }
+
+                bool has_zbuf = true;  /* all passes use z-buffer */
 
                 /* Camera state */
                 float cam_x = 0, cam_y = 0, cam_z = 0;
@@ -946,28 +1475,17 @@ int main(void) {
                 }
                 cam_x = spawn_x; cam_y = spawn_y; cam_z = spawn_z; cam_rot_y = spawn_rot;
 
-                /* Check if camera offset is still within Lara's item room.
-                 * Only search for a different room if it's truly outside. */
-                {
-                    int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
-                    tr_room_t *lr = &g_level.rooms[lara_room];
-                    int32_t rx = icx - lr->x, rz = icz - lr->z;
-                    if (!(rx >= 0 && rx < lr->sectors_x * 1024 &&
-                          rz >= 0 && rz < lr->sectors_z * 1024)) {
-                        /* Camera outside Lara's room — search portals first */
-                        bool sf = false;
-                        for (int p = 0; p < lr->portal_count && !sf; p++) {
-                            int d = lr->portals[p].room;
-                            if (d < 0 || d >= g_level.room_count) continue;
-                            tr_room_t *pr = &g_level.rooms[d];
-                            rx = icx - pr->x; rz = icz - pr->z;
-                            if (rx >= 0 && rx < pr->sectors_x * 1024 &&
-                                rz >= 0 && rz < pr->sectors_z * 1024) {
-                                lara_room = d; sf = true;
-                            }
-                        }
-                    }
-                }
+                /* Sector grid accessor — used by room tracking, collision,
+                 * and spawn room resolution.  TR1 layout: X-major order. */
+                #define SECTOR_AT(_room, _lx, _lz) \
+                    (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
+
+                /* Keep lara_room as Lara's item room at spawn.
+                 * The camera is offset (600 behind + 768 up) which may
+                 * land in a different room, but portal visibility must
+                 * start from Lara's actual room — matching the original
+                 * TRX engine behavior.  Per-frame tracking will adjust
+                 * as the camera moves. */
 
                 /* Use proper sin/cos (Taylor approximations break at large angles) */
                 #define WRAP_ANGLE(a) ((a) > 3.14159f ? (a) - 6.28318f : ((a) < -3.14159f ? (a) + 6.28318f : (a)))
@@ -979,17 +1497,154 @@ int main(void) {
                 bool collision_on = false;  /* L = tcl toggle */
                 int speed_level = 1;
 
+                /* ============================================================
+                 * BUDGET SYSTEM — 2-tier: global + per-room
+                 *
+                 * Global budgets are the defaults (adjustable via pause menu).
+                 * Per-room budgets override globals but are clamped to never
+                 * exceed the global max. A per-room value of -1 means "use global."
+                 * Effective budget = (per_room >= 0) ? min(per_room, global) : global
+                 *
+                 * Shippable: per-room budgets can be tuned in-game and exported
+                 * as a per-level budget table for final builds.
+                 * ============================================================ */
+
+                /* Global budgets (runtime-adjustable, seeded from compile-time defaults) */
+                int g_bkd_tri_budget      = 1250;
+                int g_bkd_upload_budget    = 16;
+                int g_tex_tri_budget      = 600;
+                int g_tex_face_budget     = 600;
+                int g_tex_upload_budget    = 96;
+
+                /* View distance thresholds (runtime-adjustable, in world units).
+                 * Stored as linear distance; squared at comparison time.
+                 * Tier boundaries:
+                 *   Near < mid_dist → CI8 per-face textured pass
+                 *   mid_dist..very_far → CI8 16×16 baked (mid-far)
+                 *   very_far..xfar    → CI4 8×8 baked (far)
+                 *   xfar..xxfar       → IA8 8×8 baked (extra-far)
+                 *   > xxfar           → IA4 4×4 baked (extreme-far) */
+                /* Strictly monotonic: mid < vfar < xfar < xxfar.
+                 * Enforced in the UI — each threshold must be > the one before it. */
+                float g_dist_mid     = 7168.0f;   /* near→mid-far boundary */
+                float g_dist_vfar    = 21889.0f;  /* mid-far→far boundary */
+                float g_dist_xfar   = 13312.0f;  /* far→extra-far boundary */
+                float g_dist_xxfar  = 16384.0f;  /* extra-far→extreme-far boundary */
+
+                /* Baked pass depth bias: push baked vertices slightly away from
+                 * camera to prevent Z-fighting with textured pass geometry.
+                 * Added to rz during baked pass projection. Tunable per-level. */
+                float g_baked_z_bias = 8.0f;
+
+                /* Per-face max draw distance — geometry beyond this distance
+                 * from the camera is culled regardless of room visibility.
+                 * Works on top of the room-based tier system. Tunable. */
+                float g_max_draw_dist = 33000.0f;
+                float g_max_draw_dist_sq = 33000.0f * 33000.0f;
+
+                /* Squared versions recomputed when thresholds change */
+                float g_dist_mid_sq, g_dist_vfar_sq, g_dist_xfar_sq, g_dist_xxfar_sq;
+                #define RECOMPUTE_DIST_SQ() do { \
+                    g_dist_mid_sq   = g_dist_mid   * g_dist_mid;   \
+                    g_dist_vfar_sq  = g_dist_vfar  * g_dist_vfar;  \
+                    g_dist_xfar_sq  = g_dist_xfar  * g_dist_xfar;  \
+                    g_dist_xxfar_sq = g_dist_xxfar * g_dist_xxfar;  \
+                } while(0)
+                RECOMPUTE_DIST_SQ();
+
+                /* Per-room budget overrides (-1 = inherit global) */
+                #define ROOM_BUDGET_INHERIT (-1)
+                typedef struct {
+                    int16_t tex_face_budget;
+                    int16_t tex_tri_budget;
+                    int16_t bkd_tri_budget;
+                } room_budget_t;
+                static room_budget_t room_budgets[256]; /* up to 256 rooms */
+                /* Initialize all to inherit */
+                for (int i = 0; i < 256; i++) {
+                    room_budgets[i].tex_face_budget = (int16_t)g_tex_face_budget;
+                    room_budgets[i].tex_tri_budget  = (int16_t)g_tex_tri_budget;
+                    room_budgets[i].bkd_tri_budget   = (int16_t)g_bkd_tri_budget;
+                }
+
+                /* ============================================================
+                 * PER-ROOM TIER STATE — hysteresis + sticky residency
+                 *
+                 * Tiers: 0=Near, 1=MidFar, 2=Far, 3=XFar, 4=XXFar, 5=Culled
+                 * Each room tracks its current rendering tier and resists
+                 * switching until the new tier is stable for TIER_HOLD frames.
+                 * Hysteresis band: a room must cross threshold + HYSTERESIS
+                 * to promote, or threshold - HYSTERESIS to demote.
+                 * ============================================================ */
+                #define TIER_NEAR   0
+                #define TIER_MIDFAR 1
+                #define TIER_FAR    2
+                #define TIER_XFAR   3
+                #define TIER_XXFAR  4
+                #define TIER_CULLED 5
+                #define TIER_HOLD_FRAMES 4  /* frames to hold before switching */
+                #define TIER_HYSTERESIS  0.15f /* 15% of threshold as dead zone */
+
+                typedef struct {
+                    uint8_t current_tier;
+                    uint8_t target_tier;
+                    uint8_t hold_count;   /* frames target has been stable */
+                    uint8_t fallback_tier; /* cheapest valid fallback */
+                } room_tier_state_t;
+                static room_tier_state_t room_tiers[256];
+                for (int i = 0; i < 256; i++) {
+                    room_tiers[i].current_tier = TIER_NEAR;
+                    room_tiers[i].target_tier = TIER_NEAR;
+                    room_tiers[i].hold_count = TIER_HOLD_FRAMES;
+                    room_tiers[i].fallback_tier = TIER_XXFAR;
+                }
+
+                /* Effective budget helpers — computed per frame from current room */
+                #define EFF_BUDGET(per_room, global) \
+                    ((per_room) >= 0 ? ((per_room) < (global) ? (per_room) : (global)) : (global))
+                int eff_tex_face_budget = 600, eff_tex_tri_budget = 1400, eff_bkd_tri_budget = 200;
+
+                /* Legacy #defines for code that still references them (pause display) */
+                #define BKD_TRI_BUDGET      eff_bkd_tri_budget
+                #define BKD_UPLOAD_BUDGET   g_bkd_upload_budget
+                #define TEX_TRI_BUDGET     eff_tex_tri_budget
+                #define TEX_FACE_BUDGET    eff_tex_face_budget
+                #define TEX_UPLOAD_BUDGET  g_tex_upload_budget
+
                 /* Per-frame perf counters (updated each frame, shown on pause) */
-                int perf_far_rooms = 0;
-                int perf_far_faces __attribute__((unused)) = 0;
-                int perf_far_tris = 0;
-                int perf_far_uploads = 0;
-                int perf_near_rooms = 0;
-                int perf_near_faces __attribute__((unused)) = 0;
-                int perf_near_binds = 0;
+                /* Per-frame performance counters — reset each frame,
+                 * displayed on pause screen for diagnostics. */
+                int perf_bkd_rooms = 0;
+                int perf_ring_counts[6] = {0}; /* rooms found per ring depth */
+                int perf_bkd_tris = 0;
+                int perf_bkd_uploads = 0;
+                int perf_bkd_baked = 0;     /* rooms using baked tile */
+                int perf_tex_rooms = 0;
+                int perf_tex_tris = 0;
+                int perf_tex_binds = 0;
+                int perf_tex_culled = 0;   /* faces back-culled */
+                int perf_tex_detail_skip = 0; /* detail faces skipped */
+                int perf_tex_faces = 0;    /* total face iterations (including culled) */
+                int perf_vis_total = 0;     /* total visible rooms */
+                int perf_vis_ring1 = 0;     /* ring 1 rooms */
+                int perf_vis_ring2 = 0;     /* ring 2 rooms */
+                uint32_t perf_frame_start = 0;
+                uint32_t perf_frame_us = 0; /* last frame time in µs */
+                uint32_t perf_bkd_us = 0;   /* CPU time: baked pass */
+                uint32_t perf_tex_us = 0;  /* CPU time: textured pass */
+                uint32_t perf_rsp_us = 0;   /* RSP sync stall at frame end */
+                uint32_t perf_tex_room_us = 0;  /* near sub-timing: rooms */
+                uint32_t perf_tex_sm_us = 0;    /* near sub-timing: static meshes */
+                uint32_t perf_tex_lara_us = 0;  /* near sub-timing: Lara */
+                uint32_t perf_tex_item_us = 0;  /* near sub-timing: items */
+
+                /* Active fog color — lerps toward current room's fog.
+                 * Starts at neutral cave fog. */
+                float active_fog_r = 0.35f;
+                float active_fog_g = 0.32f;
+                float active_fog_b = 0.40f;
 
                 /* Render loop */
-                render_loop:
                 while (1) {
                     /* Update FPS every 30 frames */
                     fps_frames++;
@@ -1043,12 +1698,7 @@ int main(void) {
                     }
 
                     /* ===== SECTOR COLLISION SYSTEM =====
-                     * TR1 sector grid: X-major order.
-                     * Index = x_local * sectors_z + z_local
                      * Floor/ceiling: value * 256 = world Y (positive = down) */
-                    #define SECTOR_AT(_room, _lx, _lz) \
-                        (&(_room)->sectors[(_lx) * (_room)->sectors_z + (_lz)])
-
                     #define GET_SECTOR_HEIGHTS(wx, wz, wy, out_floor, out_ceil) do { \
                         int32_t _ix=(int32_t)(wx), _iz=(int32_t)(wz), _iy=(int32_t)(wy); \
                         int _best_room = lara_room; \
@@ -1176,10 +1826,14 @@ int main(void) {
                         cam_x += dx; cam_y += dy; cam_z += dz;
                     }
 
-                    /* Room tracking */
+                    /* Room tracking — Y-aware using sector floor/ceiling.
+                     * First find room by XZ (current → portals → 2-deep),
+                     * then resolve vertically via pit_room / sky_room so
+                     * overlapping rooms (e.g. cave + area above) are
+                     * disambiguated correctly. */
                     {
                         int cam_room = lara_room;
-                        int32_t icx = (int32_t)cam_x, icz = (int32_t)cam_z;
+                        int32_t icx = (int32_t)cam_x, icy = (int32_t)cam_y, icz = (int32_t)cam_z;
                         tr_room_t *cur = &g_level.rooms[lara_room];
                         int32_t rx = icx - cur->x, rz = icz - cur->z;
                         bool found = (rx>=0 && rx<cur->sectors_x*1024 && rz>=0 && rz<cur->sectors_z*1024);
@@ -1199,52 +1853,593 @@ int main(void) {
                                 }
                             }
                         }
+
+                        /* Resolve vertical: walk sector pit/sky portals
+                         * until camera Y is between floor and ceiling. */
+                        for (int iter = 0; iter < 8; iter++) {
+                            tr_room_t *rm = &g_level.rooms[cam_room];
+                            if (!rm->sectors) break;
+                            int sx = (icx - rm->x) >> 10, sz = (icz - rm->z) >> 10;
+                            if (sx < 0) { sx = 0; } if (sx >= rm->sectors_x) { sx = rm->sectors_x - 1; }
+                            if (sz < 0) { sz = 0; } if (sz >= rm->sectors_z) { sz = rm->sectors_z - 1; }
+                            tr_sector_t *s = SECTOR_AT(rm, sx, sz);
+                            int32_t fl = s->floor * 256, cl = s->ceiling * 256;
+                            if (icy > fl && s->pit_room != 255 && s->pit_room < g_level.room_count) {
+                                cam_room = s->pit_room;
+                            } else if (icy < cl && s->sky_room != 255 && s->sky_room < g_level.room_count) {
+                                cam_room = s->sky_room;
+                            } else {
+                                break;
+                            }
+                        }
+
                         lara_room = cam_room;
                     }
 
-                    /* Start: pause with debug overlay */
+                    /* ============================================================
+                     * PAUSE MENU — Multi-page diagnostics + budget sliders
+                     *
+                     * Page 0: Hardware diagnostics (read-only)
+                     * Page 1: Global budget sliders (adjustable)
+                     * Page 2: Per-room budget sliders (adjustable, clamped to global)
+                     *
+                     * Navigation: L=prev page  R=next page  Start=unpause
+                     * On slider pages: D-up/D-down=select  D-left/D-right=adjust
+                     * ============================================================ */
                     if (pressed.start) {
-                        /* End current GL context so we can draw text */
-                        gl_context_end();
+                        static int pause_page = 0;
+                        static int slider_sel = 0;
+                        int hold_timer = 0; /* throttle held d-pad adjustments */
 
-                        /* Get the framebuffer we just rendered to and draw text on it */
-                        surface_t *pause_disp = display_get();
-                        graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                        /* Snapshot current budgets — edits happen on copies,
+                         * applied only on unpause */
+                        int edit_g_tex_face   = g_tex_face_budget;
+                        int edit_g_tex_tri    = g_tex_tri_budget;
+                        int edit_g_tex_upload = g_tex_upload_budget;
+                        int edit_g_bkd_tri     = g_bkd_tri_budget;
+                        int edit_g_bkd_upload  = g_bkd_upload_budget;
+                        bool edit_debug_dist   = g_debug_dist_colors;
+                        int  edit_force_tier   = g_debug_force_tier;
+                        float edit_dist_mid    = g_dist_mid;
+                        float edit_dist_vfar   = g_dist_vfar;
+                        float edit_dist_xfar   = g_dist_xfar;
+                        float edit_dist_xxfar  = g_dist_xxfar;
+                        float edit_z_bias      = g_baked_z_bias;
+                        float edit_max_draw    = g_max_draw_dist;
+                        room_budget_t edit_room_budgets[256];
+                        memcpy(edit_room_budgets, room_budgets, sizeof(room_budgets));
 
-                        char buf[64];
-                        graphics_draw_text(pause_disp, 8, 8, "PAUSED - Press START");
-                        snprintf(buf, sizeof(buf), "Cam: %.0f, %.0f, %.0f", cam_x, cam_y, cam_z);
-                        graphics_draw_text(pause_disp, 8, 20, buf);
-                        snprintf(buf, sizeof(buf), "FPS: %d  Room: %d", fps_display, lara_room);
-                        graphics_draw_text(pause_disp, 8, 32, buf);
-                        snprintf(buf, sizeof(buf), "Coll: %s", collision_on ? "ON" : "OFF");
-                        graphics_draw_text(pause_disp, 8, 44, buf);
-                        snprintf(buf, sizeof(buf), "Audio: %d samples", parsed_samples);
-                        graphics_draw_text(pause_disp, 8, 56, buf);
-                        {
-                            int32_t pfl, pcl;
-                            GET_SECTOR_HEIGHTS(cam_x, cam_z, cam_y, pfl, pcl);
-                            snprintf(buf, sizeof(buf), "Floor: %d  Ceil: %d", pfl, pcl);
-                            graphics_draw_text(pause_disp, 8, 68, buf);
-                        }
-                        snprintf(buf, sizeof(buf), "Far: %dr %dt %du",
-                                 perf_far_rooms, perf_far_tris, perf_far_uploads);
-                        graphics_draw_text(pause_disp, 8, 80, buf);
-                        snprintf(buf, sizeof(buf), "Near: %dr %db",
-                                 perf_near_rooms, perf_near_binds);
-                        graphics_draw_text(pause_disp, 8, 92, buf);
-                        snprintf(buf, sizeof(buf), "Heap: %uKB free",
-                                 n64_mem_available() / 1024);
-                        graphics_draw_text(pause_disp, 8, 104, buf);
+                        bool paused = true;
+                        while (paused) {
+                            surface_t *pause_disp = display_get();
+                            /* Clear entire framebuffer to black manually.
+                             * graphics_fill_screen may not work on all libdragon builds,
+                             * and we need every double-buffered surface cleared. */
+                            {
+                                uint16_t *fb = (uint16_t *)pause_disp->buffer;
+                                int npx = pause_disp->width * pause_disp->height;
+                                for (int px = 0; px < npx; px++) fb[px] = 0x0001;
+                            }
+                            graphics_set_color(0xFFFFFFFF, 0x00000000);
+                            char buf[80];
+                            int y = 14;
+                            #define STAT(fmt, ...) do { \
+                                snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+                                graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
+                            } while(0)
+                            #define STAT_HL(sel, idx, fmt, ...) do { \
+                                if ((sel) == (idx)) graphics_set_color(0x00FF00FF, 0x000000C0); \
+                                snprintf(buf, sizeof(buf), fmt, ##__VA_ARGS__); \
+                                graphics_draw_text(pause_disp, 8, y, buf); y += 10; \
+                                if ((sel) == (idx)) graphics_set_color(0xFFFFFFFF, 0x000000C0); \
+                            } while(0)
 
-                        display_show(pause_disp);
+                            /* Page header */
+                            STAT("=== PAUSE [L<] Page %d/7 [>R] ===", pause_page);
 
-                        /* Wait for START to unpause */
-                        while (1) {
+                            if (pause_page == 0) {
+                                /* ---- PAGE 0: DIAGNOSTICS ---- */
+                                STAT("FPS:%d Frame:%uus (%.0f%%)",
+                                     fps_display, perf_frame_us,
+                                     (float)perf_frame_us / 33333.0f * 100.0f);
+                                {
+                                    uint32_t other_us = perf_frame_us > perf_bkd_us + perf_tex_us
+                                        ? perf_frame_us - perf_bkd_us - perf_tex_us : 0;
+                                    STAT("Far:%uus Near:%uus Misc:%uus",
+                                         perf_bkd_us, perf_tex_us, other_us);
+                                }
+                                STAT("RSP stall:%uus (%s)", perf_rsp_us,
+                                     perf_rsp_us > 4000 ? "RDP" :
+                                     perf_rsp_us > 1000 ? "RSP" : "CPU");
+                                STAT("Room:%d Vis:%d r1:%d ext:%d",
+                                     lara_room, perf_vis_total,
+                                     perf_vis_ring1, perf_vis_ring2);
+                                STAT("Rings:%d/%d/%d/%d/%d",
+                                     perf_ring_counts[0],
+                                     perf_ring_counts[1], perf_ring_counts[2],
+                                     perf_ring_counts[3], perf_ring_counts[4]);
+                                /* Show actual distances for debugging tier thresholds */
+                                {
+                                    /* Find nearest non-lara visible room's dist_sq */
+                                    float min_d = 999999999.0f, max_d = 0;
+                                    for (int ri = 0; ri < g_chunk_count; ri++) {
+                                        if (ri == lara_room || !g_chunks[ri].visible) continue;
+                                        float d = g_chunks[ri].dist_sq;
+                                        if (d < min_d) min_d = d;
+                                        if (d > max_d) max_d = d;
+                                    }
+                                    STAT("VisDist:%.0f-%.0f", sqrtf(min_d), sqrtf(max_d));
+                                    STAT("mid_th:%.0f mid_sq:%.0f", g_dist_mid, g_dist_mid_sq);
+                                }
+                                STAT("--- TEXTURED (rooms:%d) ---", perf_tex_rooms);
+                                STAT("Tris:%d/%d Faces:%d/%d",
+                                     perf_tex_tris, TEX_TRI_BUDGET,
+                                     perf_tex_faces, TEX_FACE_BUDGET);
+                                STAT("Binds:%d Cull:%d DSkip:%d",
+                                     perf_tex_binds, perf_tex_culled,
+                                     perf_tex_detail_skip);
+                                STAT("Rm:%uus SM:%uus La:%uus It:%uus",
+                                     perf_tex_room_us, perf_tex_sm_us,
+                                     perf_tex_lara_us, perf_tex_item_us);
+                                STAT("--- BAKED ---");
+                                STAT("Rooms:%d Bk:%d/%d Tri:%d/%d",
+                                     perf_bkd_rooms, perf_bkd_baked,
+                                     baked_room_count,
+                                     perf_bkd_tris, BKD_TRI_BUDGET);
+                                STAT("--- MEM ---");
+                                {
+                                    uint32_t hf = n64_mem_available();
+                                    STAT("Heap:%uKB/%uKB free:%uKB",
+                                         (GAME_HEAP_SIZE-hf)/1024,
+                                         GAME_HEAP_SIZE/1024, hf/1024);
+                                }
+                                STAT("Pos:%.0f %.0f %.0f", cam_x, cam_y, cam_z);
+
+                            } else if (pause_page == 1) {
+                                /* ---- PAGE 1: GLOBAL BUDGET SLIDERS ---- */
+                                STAT("=== GLOBAL BUDGETS ===");
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Tex Face Budget: %d", edit_g_tex_face);
+                                STAT_HL(slider_sel, 1, "Tex Tri Budget:  %d", edit_g_tex_tri);
+                                STAT_HL(slider_sel, 2, "Tex Upload Cap:  %d", edit_g_tex_upload);
+                                STAT_HL(slider_sel, 3, "Bkd Tri Budget:   %d", edit_g_bkd_tri);
+                                STAT_HL(slider_sel, 4, "Bkd Upload Cap:   %d", edit_g_bkd_upload);
+                                STAT("");
+                                STAT_HL(slider_sel, 5, "Dist Debug Colors: %s",
+                                        edit_debug_dist ? "ON" : "OFF");
+                                {
+                                    static const char *tier_names[] = {
+                                        "OFF", "Near", "MidFar", "Far", "XFar", "XXFar"
+                                    };
+                                    STAT_HL(slider_sel, 6, "Force All Tier: %s",
+                                            tier_names[edit_force_tier]);
+                                }
+                                if (edit_debug_dist || edit_force_tier) {
+                                    STAT(" GREEN=Near CYAN=MidFar");
+                                    STAT(" YELLOW=Far ORANGE=XFar RED=XXFar");
+                                }
+                                STAT("");
+                                STAT("(applied on unpause)");
+
+                            } else if (pause_page == 2) {
+                                /* ---- PAGE 2: PER-ROOM BUDGET SLIDERS ---- */
+                                int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                                STAT("=== ROOM %d BUDGETS ===", ri);
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("(-1 = inherit global)");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Tex Face: %d (global:%d)",
+                                        (int)edit_room_budgets[ri].tex_face_budget, edit_g_tex_face);
+                                STAT_HL(slider_sel, 1, "Tex Tri:  %d (global:%d)",
+                                        (int)edit_room_budgets[ri].tex_tri_budget, edit_g_tex_tri);
+                                STAT_HL(slider_sel, 2, "Bkd Tri:   %d (global:%d)",
+                                        (int)edit_room_budgets[ri].bkd_tri_budget, edit_g_bkd_tri);
+                                STAT("");
+                                STAT("Effective:");
+                                STAT("  Face:   %d",
+                                     EFF_BUDGET(edit_room_budgets[ri].tex_face_budget, edit_g_tex_face));
+                                STAT("  Tri:    %d",
+                                     EFF_BUDGET(edit_room_budgets[ri].tex_tri_budget, edit_g_tex_tri));
+                                STAT("  FarTri: %d",
+                                     EFF_BUDGET(edit_room_budgets[ri].bkd_tri_budget, edit_g_bkd_tri));
+                                STAT("");
+                                STAT("Room size: %s",
+                                     ri < g_chunk_count ?
+                                     (g_chunks[ri].size_class == 0 ? "small" :
+                                      g_chunks[ri].size_class == 1 ? "medium" :
+                                      g_chunks[ri].size_class == 2 ? "large" : "open") : "?");
+                            } else if (pause_page == 3) {
+                                /* ---- PAGE 3: VIEW DISTANCE THRESHOLDS ---- */
+                                STAT("=== VIEW DISTANCE TIERS ===");
+                                STAT("D-pad Up/Down=select Left/Right=adjust");
+                                STAT("(units = TR1 world units)");
+                                STAT("");
+                                STAT_HL(slider_sel, 0, "Near->MidFar: %.0f", edit_dist_mid);
+                                STAT_HL(slider_sel, 1, "MidFar->Far:  %.0f", edit_dist_vfar);
+                                STAT_HL(slider_sel, 2, "Far->XFar:    %.0f", edit_dist_xfar);
+                                STAT_HL(slider_sel, 3, "XFar->XXFar:  %.0f", edit_dist_xxfar);
+                                STAT("");
+                                STAT_HL(slider_sel, 4, "Baked Z-Bias: %.0f", edit_z_bias);
+                                STAT_HL(slider_sel, 5, "Max Draw Dist: %.0f", edit_max_draw);
+                                STAT("");
+                                STAT("Tier colors (debug):");
+                                STAT(" <%.0f        GREEN  Near", edit_dist_mid);
+                                STAT(" %.0f-%.0f   CYAN   MidFar", edit_dist_mid, edit_dist_vfar);
+                                STAT(" %.0f-%.0f  YELLOW Far", edit_dist_vfar, edit_dist_xfar);
+                                STAT(" %.0f-%.0f  ORANGE XFar", edit_dist_xfar, edit_dist_xxfar);
+                                STAT(" >%.0f       RED    XXFar", edit_dist_xxfar);
+
+                            } else if (pause_page == 4) {
+                                /* ---- PAGE 4: ROOM VISIBILITY DUMP ---- */
+                                STAT("=== VISIBLE ROOMS ===");
+                                STAT("Tex:%d Bkd:%d Total:%d",
+                                     perf_tex_rooms, perf_bkd_rooms, perf_vis_total);
+                                STAT("T=tex B=bkd *=lara");
+                                for (int ri = 0; ri < g_chunk_count && y < 230; ri++) {
+                                    if (!g_chunks[ri].visible) continue;
+                                    float dist = sqrtf(g_chunks[ri].dist_sq);
+                                    const char *pass = (g_chunks[ri].lod == CHUNK_LOD_NEAR) ? "T" : "B";
+                                    const char *mark = (ri == lara_room) ? "*" : " ";
+                                    STAT("%s%s R%d d:%.0f", mark, pass, ri, dist);
+                                }
+
+                            } else if (pause_page == 5) {
+                                /* ---- PAGE 5: T3D PIPELINE STATUS ---- */
+                                /* Claude auto-test: verify T3D is active */
+                                STAT("=== T3D PIPELINE ===");
+                                STAT("");
+                                STAT("t3d_init:    %s", "YES");
+                                STAT("t3d_ready:   %s", t3d_lara_ready ? "YES" : "NO");
+                                STAT("");
+                                STAT("--- Lara Meshes ---");
+                                {
+                                    int total_verts = 0, total_blocks = 0;
+                                    for (int mi = 0; mi < T3D_LARA_MAX_MESHES; mi++) {
+                                        if (t3d_lara_blocks[mi]) total_blocks++;
+                                        total_verts += t3d_lara_vert_counts[mi];
+                                    }
+                                    STAT("Blocks:   %d/%d", total_blocks, T3D_LARA_MAX_MESHES);
+                                    STAT("Verts:    %d (max %d/mesh)",
+                                         total_verts, T3D_LARA_MAX_VERTS);
+                                }
+                                STAT("");
+                                STAT("--- Frame Pool ---");
+                                STAT("Pool size: %d bytes", T3D_FRAME_POOL_SIZE);
+                                STAT("Pool idx:  %d", t3d_frame_pool_idx);
+                                STAT("Pool used: %d bytes", t3d_frame_pool_pos);
+                                STAT("Pool free: %d bytes",
+                                     T3D_FRAME_POOL_SIZE - t3d_frame_pool_pos);
+                                STAT("");
+                                STAT("--- Viewport ---");
+                                STAT("FOV: 60deg  Near:10 Far:32000");
+                                STAT("");
+                                STAT("--- Lara Timing ---");
+                                STAT("La: %uus", perf_tex_lara_us);
+                                STAT("Target: <5000us (T3D)");
+                                if (perf_tex_lara_us > 10000) {
+                                    graphics_set_color(0xFF4444FF, 0x000000C0);
+                                    STAT("!! T3D NOT ACTIVE !!");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                } else if (perf_tex_lara_us > 5000) {
+                                    graphics_set_color(0xFFFF44FF, 0x000000C0);
+                                    STAT("WARN: above target");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                } else {
+                                    graphics_set_color(0x44FF44FF, 0x000000C0);
+                                    STAT("OK: T3D active");
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+
+                            } else if (pause_page == 6) {
+                                /* ---- PAGE 6: TIMING WATERFALL ---- */
+                                /* Claude auto-test: visual timing breakdown */
+                                STAT("=== TIMING WATERFALL ===");
+                                STAT("(33333us = 30fps budget)");
+                                STAT("");
+                                /* Each bar: label, time, visual bar */
+                                #define TBAR(label, us) do { \
+                                    int bw = (int)((float)(us) / 33333.0f * 30.0f); \
+                                    if (bw > 30) bw = 30; \
+                                    char bar[32]; \
+                                    for (int b=0; b<bw; b++) bar[b]='#'; \
+                                    bar[bw] = 0; \
+                                    STAT("%-8s %5uus |%s", label, (unsigned)(us), bar); \
+                                } while(0)
+                                TBAR("Rooms", perf_tex_room_us);
+                                TBAR("StMesh", perf_tex_sm_us);
+                                TBAR("Lara", perf_tex_lara_us);
+                                TBAR("Items", perf_tex_item_us);
+                                TBAR("Baked", perf_bkd_us);
+                                TBAR("RSP", perf_rsp_us);
+                                STAT("------   ------  ---------30fps--");
+                                {
+                                    uint32_t total = perf_tex_room_us + perf_tex_sm_us
+                                        + perf_tex_lara_us + perf_tex_item_us
+                                        + perf_bkd_us + perf_rsp_us;
+                                    TBAR("SUM", total);
+                                    uint32_t other = perf_frame_us > total
+                                        ? perf_frame_us - total : 0;
+                                    TBAR("Other", other);
+                                }
+                                STAT("");
+                                TBAR("FRAME", perf_frame_us);
+                                STAT("");
+                                STAT("FPS: %d  Frame: %uus", fps_display, perf_frame_us);
+                                STAT("Budget: 33333us (30fps)");
+                                {
+                                    float pct = (float)perf_frame_us / 33333.0f * 100.0f;
+                                    if (pct <= 100.0f) {
+                                        graphics_set_color(0x44FF44FF, 0x000000C0);
+                                        STAT("Usage: %.0f%% -- ON BUDGET", pct);
+                                    } else {
+                                        graphics_set_color(0xFF4444FF, 0x000000C0);
+                                        STAT("Usage: %.0f%% -- OVER BUDGET", pct);
+                                    }
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+                                #undef TBAR
+
+                            } else if (pause_page == 7) {
+                                /* ---- PAGE 7: AUTO-TUNE TARGETS ---- */
+                                /* 3-tier: GREEN=pass YELLOW=warn RED=fail */
+                                STAT("=== PERF TARGETS (G/Y/R) ===");
+                                STAT("");
+                                /* Helper: 3-tier threshold display */
+                                #define T3(label, val, green, yellow, unit, higher_is_better) do { \
+                                    int _v = (int)(val); \
+                                    int _state; \
+                                    if (higher_is_better) \
+                                        _state = (_v >= (int)(green)) ? 0 : (_v >= (int)(yellow)) ? 1 : 2; \
+                                    else \
+                                        _state = (_v <= (int)(green)) ? 0 : (_v <= (int)(yellow)) ? 1 : 2; \
+                                    const char *_tag = _state==0 ? "PASS" : _state==1 ? "WARN" : "FAIL"; \
+                                    uint32_t _col = _state==0 ? 0x44FF44FF : _state==1 ? 0xFFFF44FF : 0xFF4444FF; \
+                                    graphics_set_color(_col, 0x000000C0); \
+                                    STAT("%-12s %5d%-2s %s", label, _v, unit, _tag); \
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0); \
+                                } while(0)
+                                T3("Frame(us)", perf_frame_us, 33333, 45000, "us", 0);
+                                T3("FPS", fps_display, 20, 15, "", 1);
+                                T3("Lara(us)", perf_tex_lara_us, 5000, 10000, "us", 0);
+                                T3("T3D", t3d_lara_ready?1:0, 1, 1, "", 1);
+                                T3("Rooms(us)", perf_tex_room_us, 15000, 25000, "us", 0);
+                                T3("StMesh(us)", perf_tex_sm_us, 5000, 8000, "us", 0);
+                                T3("Items(us)", perf_tex_item_us, 3000, 6000, "us", 0);
+                                T3("Baked(us)", perf_bkd_us, 10000, 18000, "us", 0);
+                                T3("RSP(us)", perf_rsp_us, 4000, 8000, "us", 0);
+                                T3("TexTri", perf_tex_tris, TEX_TRI_BUDGET, TEX_TRI_BUDGET*3/2, "", 0);
+                                T3("BkdTri", perf_bkd_tris, BKD_TRI_BUDGET, BKD_TRI_BUDGET*3/2, "", 0);
+                                {
+                                    uint32_t hfree = n64_mem_available();
+                                    T3("HeapKB", hfree/1024, 256, 128, "KB", 1);
+                                }
+                                STAT("");
+                                /* Bottleneck diagnosis */
+                                {
+                                    const char *bn = "none";
+                                    const char *fix = "all clear";
+                                    uint32_t worst = 0;
+                                    if (perf_tex_lara_us > 5000 && perf_tex_lara_us > worst)
+                                        { worst = perf_tex_lara_us; bn = "LARA"; fix = "verify T3D active"; }
+                                    if (perf_tex_room_us > 15000 && perf_tex_room_us > worst)
+                                        { worst = perf_tex_room_us; bn = "ROOMS"; fix = "tighten vis/budgets"; }
+                                    if (perf_bkd_us > 10000 && perf_bkd_us > worst)
+                                        { worst = perf_bkd_us; bn = "BAKED"; fix = "reduce bkd budget"; }
+                                    if (perf_tex_sm_us > 5000 && perf_tex_sm_us > worst)
+                                        { worst = perf_tex_sm_us; bn = "STMESH"; fix = "cull/LOD statics"; }
+                                    if (perf_rsp_us > 8000 && perf_rsp_us > worst)
+                                        { worst = perf_rsp_us; bn = "RSP"; fix = "reduce tri count"; }
+                                    if (n64_mem_available() < 256*1024)
+                                        { bn = "MEMORY"; fix = "lower upload cap"; }
+                                    graphics_set_color(0x44CCFFFF, 0x000000C0);
+                                    STAT("Bottleneck: %s", bn);
+                                    STAT("Action:     %s", fix);
+                                    graphics_set_color(0xFFFFFFFF, 0x000000C0);
+                                }
+                                #undef T3
+                            }
+
+                            #undef STAT
+                            #undef STAT_HL
+                            display_show(pause_disp);
+
+                            /* Input handling */
                             joypad_poll();
-                            if (joypad_get_buttons_pressed(JOYPAD_PORT_1).start) break;
+                            joypad_buttons_t bp = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+                            joypad_buttons_t bh = joypad_get_buttons(JOYPAD_PORT_1);
+
+                            /* Throttle held d-pad: only adjust every 6 frames (~200ms at 30fps) */
+                            bool hold_tick = false;
+                            if (bh.d_left || bh.d_right) {
+                                hold_timer++;
+                                if (hold_timer >= 6) { hold_tick = true; hold_timer = 0; }
+                            } else {
+                                hold_timer = 0;
+                            }
+                            /* First press always triggers immediately */
+                            if (bp.d_left || bp.d_right) hold_tick = true;
+
+                            /* Page navigation */
+                            {
+                                int prev_page = pause_page;
+                                if (bp.r) { pause_page++; slider_sel = 0; if (pause_page > 7) pause_page = 7; }
+                                if (bp.l) { pause_page--; slider_sel = 0; if (pause_page < 0) pause_page = 0; }
+                                /* Dump page data to debug console on page change
+                                 * (parseable by automated test pipeline) */
+                                if (pause_page != prev_page) {
+                                    if (pause_page == 5) {
+                                        int tv = 0, tb = 0;
+                                        for (int m = 0; m < T3D_LARA_MAX_MESHES; m++) {
+                                            if (t3d_lara_blocks[m]) tb++;
+                                            tv += t3d_lara_vert_counts[m];
+                                        }
+                                        printf("T3D|ready=%d|blocks=%d|verts=%d|pool_used=%d|pool_size=%d|la_us=%u\n",
+                                               t3d_lara_ready?1:0, tb, tv,
+                                               t3d_frame_pool_pos, T3D_FRAME_POOL_SIZE,
+                                               perf_tex_lara_us);
+                                    } else if (pause_page == 7) {
+                                        printf("TARGETS|frame=%u|fps=%d|la=%u|t3d=%d"
+                                               "|rm=%u|sm=%u|it=%u|bkd=%u"
+                                               "|ttri=%d/%d|tface=%d/%d|btri=%d/%d"
+                                               "|heap_free=%u\n",
+                                               perf_frame_us, fps_display,
+                                               perf_tex_lara_us, t3d_lara_ready?1:0,
+                                               perf_tex_room_us, perf_tex_sm_us,
+                                               perf_tex_item_us, perf_bkd_us,
+                                               perf_tex_tris, TEX_TRI_BUDGET,
+                                               perf_tex_faces, TEX_FACE_BUDGET,
+                                               perf_bkd_tris, BKD_TRI_BUDGET,
+                                               n64_mem_available());
+                                    }
+                                }
+                            }
+                            if (bp.start) { paused = false; }
+
+                            /* Slider navigation + adjustment (edits copies only) */
+                            if (pause_page == 1) {
+                                int max_sel = 6; /* 0-4=budgets, 5=debug colors, 6=force tier */
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                /* Toggle for debug dist colors */
+                                if (slider_sel == 5 && (bp.d_left || bp.d_right))
+                                    edit_debug_dist = !edit_debug_dist;
+                                /* Cycle force tier: OFF→Near→MidFar→Far→XFar→XXFar→OFF */
+                                if (slider_sel == 6 && bp.d_right)
+                                    { edit_force_tier++; if (edit_force_tier > 5) edit_force_tier = 0; }
+                                if (slider_sel == 6 && bp.d_left)
+                                    { edit_force_tier--; if (edit_force_tier < 0) edit_force_tier = 5; }
+
+                                int delta = 0;
+                                if (hold_tick && bh.d_right) delta = 50;
+                                if (hold_tick && bh.d_left)  delta = -50;
+
+                                if (delta) {
+                                    switch (slider_sel) {
+                                        case 0: edit_g_tex_face += delta;
+                                                if (edit_g_tex_face < 50)   edit_g_tex_face = 50;
+                                                if (edit_g_tex_face > 5000) edit_g_tex_face = 5000;
+                                                break;
+                                        case 1: edit_g_tex_tri += delta;
+                                                if (edit_g_tex_tri < 50)    edit_g_tex_tri = 50;
+                                                if (edit_g_tex_tri > 5000)  edit_g_tex_tri = 5000;
+                                                break;
+                                        case 2: edit_g_tex_upload += delta / 10;
+                                                if (edit_g_tex_upload < 4)  edit_g_tex_upload = 4;
+                                                if (edit_g_tex_upload > 128) edit_g_tex_upload = 128;
+                                                break;
+                                        case 3: edit_g_bkd_tri += delta;
+                                                if (edit_g_bkd_tri < 50)     edit_g_bkd_tri = 50;
+                                                if (edit_g_bkd_tri > 2000)   edit_g_bkd_tri = 2000;
+                                                break;
+                                        case 4: edit_g_bkd_upload += delta / 10;
+                                                if (edit_g_bkd_upload < 2)   edit_g_bkd_upload = 2;
+                                                if (edit_g_bkd_upload > 32)  edit_g_bkd_upload = 32;
+                                                break;
+                                    }
+                                }
+                            } else if (pause_page == 2) {
+                                int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                                int max_sel = 2;
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                int delta = 0;
+                                if (hold_tick && bh.d_right) delta = 50;
+                                if (hold_tick && bh.d_left)  delta = -50;
+
+                                if (delta) {
+                                    int16_t *target = NULL;
+                                    int gmax = 0;
+                                    switch (slider_sel) {
+                                        case 0: target = &edit_room_budgets[ri].tex_face_budget;
+                                                gmax = edit_g_tex_face; break;
+                                        case 1: target = &edit_room_budgets[ri].tex_tri_budget;
+                                                gmax = edit_g_tex_tri; break;
+                                        case 2: target = &edit_room_budgets[ri].bkd_tri_budget;
+                                                gmax = edit_g_bkd_tri; break;
+                                    }
+                                    if (target) {
+                                        int val = (int)*target + delta;
+                                        if (val < -1) val = -1;
+                                        if (val > gmax) val = gmax;
+                                        if (val >= 0 && val < 50) val = 50;
+                                        *target = (int16_t)val;
+                                    }
+                                }
+                            } else if (pause_page == 3) {
+                                int max_sel = 5; /* 0-3=distances, 4=z-bias, 5=draw dist */
+                                if (bp.d_up && slider_sel > 0) slider_sel--;
+                                if (bp.d_down && slider_sel < max_sel) slider_sel++;
+
+                                /* Z-bias adjustment (slider 4) */
+                                if (slider_sel == 4) {
+                                    if (hold_tick && bh.d_right) edit_z_bias += 2.0f;
+                                    if (hold_tick && bh.d_left)  edit_z_bias -= 2.0f;
+                                    if (edit_z_bias < 0.0f) edit_z_bias = 0.0f;
+                                    if (edit_z_bias > 128.0f) edit_z_bias = 128.0f;
+                                }
+                                /* Max draw distance (slider 5) */
+                                if (slider_sel == 5 && hold_tick) {
+                                    float step = (edit_max_draw < 2000) ? 100.0f :
+                                                 (edit_max_draw < 8000) ? 500.0f : 1000.0f;
+                                    if (bh.d_right) edit_max_draw += step;
+                                    if (bh.d_left)  edit_max_draw -= step;
+                                    if (edit_max_draw < 500.0f) edit_max_draw = 500.0f;
+                                    if (edit_max_draw > 65536.0f) edit_max_draw = 65536.0f;
+                                }
+
+                                /* Step scales with current value for fine control at low ranges */
+                                float fdelta = 0;
+                                if (hold_tick && slider_sel < 4) {
+                                    float *t[] = { &edit_dist_mid, &edit_dist_vfar,
+                                                   &edit_dist_xfar, &edit_dist_xxfar };
+                                    float cur = *t[slider_sel];
+                                    float step = (cur < 1024) ? 64.0f : (cur < 4096) ? 128.0f : 256.0f;
+                                    if (bh.d_right) fdelta = step;
+                                    if (bh.d_left)  fdelta = -step;
+                                }
+
+                                if (fdelta != 0 && slider_sel < 4) {
+                                    float *tt[] = { &edit_dist_mid, &edit_dist_vfar,
+                                                    &edit_dist_xfar, &edit_dist_xxfar };
+                                    *tt[slider_sel] += fdelta;
+                                    /* Clamp: min 1 (essentially zero), max 65536 */
+                                    if (*tt[slider_sel] < 1.0f)  *tt[slider_sel] = 1.0f;
+                                    if (*tt[slider_sel] > 65536.0f) *tt[slider_sel] = 65536.0f;
+                                    /* Enforce monotonic: mid < vfar < xfar < xxfar.
+                                     * Push neighbors apart by 256 minimum gap. */
+                                    for (int k = slider_sel; k < 3; k++)
+                                        if (*tt[k+1] <= *tt[k]) *tt[k+1] = *tt[k] + 128.0f;
+                                    for (int k = slider_sel; k > 0; k--)
+                                        if (*tt[k-1] >= *tt[k]) *tt[k-1] = *tt[k] - 128.0f;
+                                    /* Re-clamp after push */
+                                    for (int k = 0; k < 4; k++) {
+                                        if (*tt[k] < 1.0f)  *tt[k] = 1.0f;
+                                        if (*tt[k] > 65536.0f) *tt[k] = 65536.0f;
+                                    }
+                                }
+                            }
                         }
-                        /* Resume — next iteration will call display_get + gl_context_begin */
+
+                        /* Apply edits on unpause */
+                        g_tex_face_budget   = edit_g_tex_face;
+                        g_tex_tri_budget    = edit_g_tex_tri;
+                        g_tex_upload_budget = edit_g_tex_upload;
+                        g_bkd_tri_budget     = edit_g_bkd_tri;
+                        g_bkd_upload_budget  = edit_g_bkd_upload;
+                        g_debug_dist_colors  = edit_debug_dist;
+                        g_debug_force_tier   = edit_force_tier;
+                        g_dist_mid   = edit_dist_mid;
+                        g_dist_vfar  = edit_dist_vfar;
+                        g_dist_xfar  = edit_dist_xfar;
+                        g_dist_xxfar = edit_dist_xxfar;
+                        g_baked_z_bias = edit_z_bias;
+                        g_max_draw_dist = edit_max_draw;
+                        g_max_draw_dist_sq = edit_max_draw * edit_max_draw;
+                        RECOMPUTE_DIST_SQ();
+                        memcpy(room_budgets, edit_room_budgets, sizeof(room_budgets));
                         continue;
                     }
 
@@ -1252,19 +2447,38 @@ int main(void) {
                      * Frame order:
                      *   1. rdpq_attach (framebuffer + zbuf)
                      *   2. rdpq_clear (color + depth)
-                     *   3. RDPQ far pass (outside GL — future, empty stub now)
-                     *   4. gl_context_begin()
-                     *   5. GL near pass (existing RSP T&L pipeline)
-                     *   6. gl_context_end()
-                     *   7. rdpq_detach_show()
+                     *   3. RDPQ baked pass  (CI8/IA4 baked tiles, no zbuf)
+                     *   4. RDPQ textured pass (CI8 per-face, zbuf on)
+                     *   5. rdpq_detach_show()
                      *
-                     * This split lets the far pass use raw RDPQ texture
-                     * uploads without competing for GL object/RSPQ memory. */
-                    /* Reset per-frame perf counters */
-                    perf_far_rooms = 0; perf_far_faces = 0;
-                    perf_far_tris = 0;  perf_far_uploads = 0;
-                    perf_near_rooms = 0; perf_near_faces = 0;
-                    perf_near_binds = 0;
+                     * All geometry uses pure RDPQ.  No GL. */
+                    /* Compute effective budgets for this frame's room */
+                    {
+                        int ri = (lara_room >= 0 && lara_room < 256) ? lara_room : 0;
+                        eff_tex_face_budget = EFF_BUDGET(room_budgets[ri].tex_face_budget, g_tex_face_budget);
+                        eff_tex_tri_budget  = EFF_BUDGET(room_budgets[ri].tex_tri_budget,  g_tex_tri_budget);
+                        eff_bkd_tri_budget   = EFF_BUDGET(room_budgets[ri].bkd_tri_budget,   g_bkd_tri_budget);
+                    }
+
+                    /* Dynamic MidFar→Far floor: ensure the current room's
+                     * farthest wall always renders with full CI8 textures.
+                     * Uses room bounding sphere × 2 as the minimum threshold. */
+                    float eff_dist_vfar_sq = g_dist_vfar_sq;
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        float room_radius = g_chunks[lara_room].radius;
+                        float room_floor = room_radius * 2.0f;
+                        float room_floor_sq = room_floor * room_floor;
+                        if (room_floor_sq > eff_dist_vfar_sq)
+                            eff_dist_vfar_sq = room_floor_sq;
+                    }
+
+                    /* Reset per-frame counters + start frame timer */
+                    perf_bkd_rooms = 0; perf_bkd_tris = 0;
+                    perf_bkd_uploads = 0; perf_bkd_baked = 0;
+                    perf_tex_rooms = 0; perf_tex_tris = 0;
+                    perf_tex_binds = 0; perf_tex_culled = 0;
+                    perf_tex_detail_skip = 0; perf_tex_faces = 0;
+                    perf_frame_start = TICKS_READ();
 
                     surface_t *disp = display_get();
                     rdpq_attach(disp, display_get_zbuf());
@@ -1272,12 +2486,25 @@ int main(void) {
                     /* Clear color + depth via proper rdpq API.
                      * Using rdpq_clear instead of manual set_mode_fill +
                      * fill_rectangle to avoid RDP mode tracking conflicts
-                     * with the subsequent set_mode_standard for the far pass. */
+                     * with the subsequent set_mode_standard for the baked pass. */
                     /* Clear to fog color (not black) so sub-pixel gaps
                      * between triangles blend in instead of showing stark
                      * black seams.  Matches the far-pass fog target color. */
                     /* Clear to fog color so gaps/undrawn areas blend in */
-                    rdpq_clear(RGBA32(89, 82, 102, 0xFF));
+                    /* Lerp active fog toward current room's fog color.
+                     * Slow blend (0.08/frame) prevents harsh snapping. */
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        float lr = 0.08f; /* lerp rate */
+                        active_fog_r += (g_chunks[lara_room].fog_r - active_fog_r) * lr;
+                        active_fog_g += (g_chunks[lara_room].fog_g - active_fog_g) * lr;
+                        active_fog_b += (g_chunks[lara_room].fog_b - active_fog_b) * lr;
+                    }
+
+                    /* Clear to active fog color so void matches the fog */
+                    rdpq_clear(RGBA32(
+                        (uint8_t)(active_fog_r * 255.0f),
+                        (uint8_t)(active_fog_g * 255.0f),
+                        (uint8_t)(active_fog_b * 255.0f), 0xFF));
                     rdpq_clear_z(0xFFFC);
 
                     /* Precompute pitch sin/cos for CPU projection */
@@ -1285,163 +2512,358 @@ int main(void) {
                     float cp = cosf(cam_rot_x);
 
                     /* =====================================================
-                     * VISIBILITY: Portal-clipped traversal + LOD
+                     * VISIBILITY + STREAMING
                      *
-                     * Proper TR1 portal visibility: each room carries a
-                     * screen-space clip rect.  Only rooms visible through
-                     * a chain of portals from the camera get drawn.
-                     * Rooms behind walls are automatically excluded.
+                     * Render policy (authoritative — never drops geometry):
+                     *   1. Current room: ALWAYS visible.
+                     *   2. Connected rooms: ALWAYS visible.
                      *
-                     * Each portal's 4 vertices are projected to screen,
-                     * the bounding rect is intersected with the parent
-                     * room's clip rect.  If non-empty, the destination
-                     * room is added with the clipped rect.
+                     * Streaming policy (portal-driven priority hints):
+                     *   Portal on screen / near center → HIGH priority
+                     *   Portal near frustum edge       → MEDIUM
+                     *   Portal behind camera            → LOW
+                     *   Used for texture tier prewarming, not visibility.
+                     *
+                     * LOD policy: separate from both.
                      * =================================================== */
-                    #define MAX_VIS_ROOMS 48
-
-                    typedef struct {
-                        int16_t room_idx;
-                        int16_t cl, ct, cr, cb; /* clip rect (screen space) */
-                    } vis_entry_t;
-
-                    vis_entry_t vis_queue[MAX_VIS_ROOMS];
+                    #define MAX_DRAW_ROOMS 32
+                    #define STREAM_PRI_HIGH   2
+                    #define STREAM_PRI_MED    1
+                    #define STREAM_PRI_LOW    0
+                    int vis_rooms[MAX_DRAW_ROOMS];
                     int vis_count = 0;
-                    bool vis_visited[256];
-                    memset(vis_visited, 0, sizeof(vis_visited));
+                    int vis_stream_pri[MAX_DRAW_ROOMS];
+                    (void)vis_stream_pri;
 
-                    /* Seed: camera room with full viewport */
-                    vis_queue[0].room_idx = lara_room;
-                    vis_queue[0].cl = 0; vis_queue[0].ct = 0;
-                    vis_queue[0].cr = 320; vis_queue[0].cb = 240;
-                    vis_count = 1;
-                    vis_visited[lara_room] = true;
+                    /* Per-room portal scissor: screen-space AABB of the portal
+                     * through which this room is visible. Current room = full screen. */
+                    typedef struct { int x0, y0, x1, y1; } scissor_t;
+                    scissor_t room_scissor[256];
+                    for (int i = 0; i < 256; i++) {
+                        room_scissor[i].x0 = 0; room_scissor[i].y0 = 0;
+                        room_scissor[i].x1 = 320; room_scissor[i].y1 = 240;
+                    }
 
-                    for (int qi = 0; qi < vis_count && vis_count < MAX_VIS_ROOMS; qi++) {
-                        int ri = vis_queue[qi].room_idx;
-                        int16_t pcl = vis_queue[qi].cl, pct = vis_queue[qi].ct;
-                        int16_t pcr = vis_queue[qi].cr, pcb = vis_queue[qi].cb;
-                        if (ri < 0 || ri >= g_level.room_count) continue;
-                        tr_room_t *room = &g_level.rooms[ri];
+                    /* Rule 1: current room — full screen scissor */
+                    if (lara_room >= 0 && lara_room < g_chunk_count) {
+                        g_chunks[lara_room].dist_sq = 0.0f;
+                        g_chunks[lara_room].visible = true;
+                        vis_rooms[vis_count] = lara_room;
+                        vis_stream_pri[vis_count] = STREAM_PRI_HIGH;
+                        /* Current room: full screen */
+                        room_scissor[lara_room].x0 = 0;
+                        room_scissor[lara_room].y0 = 0;
+                        room_scissor[lara_room].x1 = 320;
+                        room_scissor[lara_room].y1 = 240;
+                        vis_count++;
+                    }
 
-                        for (int p = 0; p < room->portal_count &&
-                                        vis_count < MAX_VIS_ROOMS; p++) {
-                            tr_portal_t *portal = &room->portals[p];
+                    /* Rule 2: connected rooms — always visible.
+                     * Portal check sets streaming priority only. */
+                    if (lara_room >= 0 && lara_room < g_level.room_count) {
+                        tr_room_t *lr = &g_level.rooms[lara_room];
+                        for (int p = 0; p < lr->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
+                            tr_portal_t *portal = &lr->portals[p];
                             int dest = portal->room;
-                            if (dest < 0 || dest >= g_level.room_count) continue;
-                            if (vis_visited[dest]) continue;
+                            if (dest < 0 || dest >= g_chunk_count) continue;
 
-                            /* Project portal's 4 vertices to screen space */
-                            int16_t pmin_x = 320, pmin_y = 240;
-                            int16_t pmax_x = 0, pmax_y = 0;
-                            int verts_behind = 0, verts_front = 0;
+                            /* Avoid duplicates */
+                            bool dup = false;
+                            for (int vi = 0; vi < vis_count; vi++) {
+                                if (vis_rooms[vi] == dest) { dup = true; break; }
+                            }
+                            if (dup) continue;
+
+                            /* Streaming hint: check portal camera visibility
+                             * to set priority (HIGH/MED/LOW). This does NOT
+                             * affect whether the room renders. */
+                            int priority = STREAM_PRI_LOW;
+                            int verts_in_front = 0;
+                            float pmin_sx = 320, pmax_sx = 0;
+                            float pmin_sy = 240, pmax_sy = 0;
+
                             for (int pv = 0; pv < 4; pv++) {
-                                float px_w = (float)(room->x + portal->vertices[pv].x);
-                                float py_w = (float)portal->vertices[pv].y;
-                                float pz_w = (float)(room->z + portal->vertices[pv].z);
-                                float cx_p = px_w - cam_x;
-                                float cy_p = py_w - cam_y;
-                                float cz_p = pz_w - cam_z;
-                                float rx_p = cx_p * cy - cz_p * sy;
-                                float rz_yaw = cx_p * sy + cz_p * cy;
-                                float ry_p = cy_p * cp - rz_yaw * sp;
-                                float rz_p = cy_p * sp + rz_yaw * cp;
-                                if (rz_p < 4.0f) {
-                                    verts_behind++;
-                                    continue;
+                                float px = (float)(lr->x + portal->vertices[pv].x) - cam_x;
+                                float py = (float)(portal->vertices[pv].y) - cam_y;
+                                float pz = (float)(lr->z + portal->vertices[pv].z) - cam_z;
+                                float rx_p = px * cy - pz * sy;
+                                float rz_yaw = px * sy + pz * cy;
+                                float ry_p = py * cp - rz_yaw * sp;
+                                float rz_p = py * sp + rz_yaw * cp;
+
+                                if (rz_p > 1.0f) {
+                                    verts_in_front++;
+                                    float inv = 256.0f / rz_p;
+                                    float sx_p = 160.0f + rx_p * inv;
+                                    float sy_p = 120.0f + ry_p * inv;
+                                    if (sx_p < pmin_sx) pmin_sx = sx_p;
+                                    if (sx_p > pmax_sx) pmax_sx = sx_p;
+                                    if (sy_p < pmin_sy) pmin_sy = sy_p;
+                                    if (sy_p > pmax_sy) pmax_sy = sy_p;
                                 }
-                                verts_front++;
-                                float inv_z = 256.0f / rz_p;
-                                int16_t sx = (int16_t)(160.0f + rx_p * inv_z);
-                                int16_t sy2 = (int16_t)(120.0f + ry_p * inv_z);
-                                if (sx < 0) sx = 0;
-                                if (sx > 320) sx = 320;
-                                if (sy2 < 0) sy2 = 0;
-                                if (sy2 > 240) sy2 = 240;
-                                if (sx < pmin_x) pmin_x = sx;
-                                if (sx > pmax_x) pmax_x = sx;
-                                if (sy2 < pmin_y) pmin_y = sy2;
-                                if (sy2 > pmax_y) pmax_y = sy2;
-                            }
-                            if (verts_front == 0) {
-                                /* All behind camera — use full parent clip */
-                                pmin_x = pcl; pmin_y = pct;
-                                pmax_x = pcr; pmax_y = pcb;
-                            } else if (verts_behind > 0) {
-                                /* Portal crosses near plane — expand rect to
-                                 * parent clip bounds on any edge that has a
-                                 * behind-camera vertex.  Conservative: just
-                                 * use parent clip rect (the portal is very
-                                 * close and spans a wide angle). */
-                                pmin_x = pcl; pmin_y = pct;
-                                pmax_x = pcr; pmax_y = pcb;
                             }
 
-                            /* Clip portal rect against parent's clip rect */
-                            int16_t cl2 = pmin_x > pcl ? pmin_x : pcl;
-                            int16_t ct2 = pmin_y > pct ? pmin_y : pct;
-                            int16_t cr2 = pmax_x < pcr ? pmax_x : pcr;
-                            int16_t cb2 = pmax_y < pcb ? pmax_y : pcb;
-
-                            /* Non-empty clip rect = portal is visible */
-                            if (cl2 < cr2 && ct2 < cb2) {
-                                vis_visited[dest] = true;
-                                vis_queue[vis_count].room_idx = dest;
-                                vis_queue[vis_count].cl = cl2;
-                                vis_queue[vis_count].ct = ct2;
-                                vis_queue[vis_count].cr = cr2;
-                                vis_queue[vis_count].cb = cb2;
-                                vis_count++;
+                            if (verts_in_front > 0) {
+                                if (verts_in_front < 4) {
+                                    /* Crosses near plane — very close */
+                                    priority = STREAM_PRI_HIGH;
+                                } else if (pmax_sx > -32 && pmin_sx < 352) {
+                                    /* On screen */
+                                    priority = STREAM_PRI_HIGH;
+                                } else if (pmax_sx > -128 && pmin_sx < 448) {
+                                    /* Near screen edge */
+                                    priority = STREAM_PRI_MED;
+                                }
                             }
+
+                            tr_chunk_t *c = &g_chunks[dest];
+                            float ddx = c->cx - cam_x;
+                            float ddz = c->cz - cam_z;
+                            c->dist_sq = ddx * ddx + ddz * ddz;
+                            c->visible = true;
+                            vis_rooms[vis_count] = dest;
+                            vis_stream_pri[vis_count] = priority;
+                            /* Store portal screen AABB as scissor for this room.
+                             * Clamp to screen bounds. If portal crosses near plane,
+                             * use full screen (can't compute reliable bounds). */
+                            if (dest < 256) {
+                                if (verts_in_front < 4) {
+                                    /* Crosses near plane — full screen */
+                                    room_scissor[dest].x0 = 0;
+                                    room_scissor[dest].y0 = 0;
+                                    room_scissor[dest].x1 = 320;
+                                    room_scissor[dest].y1 = 240;
+                                } else {
+                                    int sx0 = (int)pmin_sx; if (sx0 < 0) sx0 = 0;
+                                    int sy0 = (int)pmin_sy; if (sy0 < 0) sy0 = 0;
+                                    int sx1 = (int)pmax_sx + 1; if (sx1 > 320) sx1 = 320;
+                                    int sy1 = (int)pmax_sy + 1; if (sy1 > 240) sy1 = 240;
+                                    room_scissor[dest].x0 = sx0;
+                                    room_scissor[dest].y0 = sy0;
+                                    room_scissor[dest].x1 = sx1;
+                                    room_scissor[dest].y1 = sy1;
+                                }
+                            }
+                            vis_count++;
                         }
                     }
 
-                    /* LOD classify visible rooms */
-                    #define MAX_DRAW_ROOMS 32
-                    int near_rooms[MAX_DRAW_ROOMS], near_count = 0;
-                    int far_rooms [MAX_DRAW_ROOMS], far_count  = 0;
+                    /* Extended ring: recurse through portals up to N hops deep.
+                     * Each hop adds rooms connected to the previous ring.
+                     * Only adds rooms whose portal has at least 1 vertex
+                     * in front of the camera. Fills the void between near
+                     * and the farthest visible rooms. */
+                    int ring1_end = vis_count;
+                    #define MAX_RING_DEPTH 5
+                    int ring_start = 0;
+                    perf_ring_counts[0] = vis_count; /* ring 0 = current + ring1 */
+                    for (int ring = 0; ring < MAX_RING_DEPTH && vis_count < MAX_DRAW_ROOMS; ring++) {
+                        int ring_end = vis_count;
+                        for (int vi = ring_start; vi < ring_end && vis_count < MAX_DRAW_ROOMS; vi++) {
+                            int r1 = vis_rooms[vi];
+                            if (r1 < 0 || r1 >= g_level.room_count) continue;
+                            tr_room_t *r1r = &g_level.rooms[r1];
+                            for (int p = 0; p < r1r->portal_count && vis_count < MAX_DRAW_ROOMS; p++) {
+                                tr_portal_t *portal = &r1r->portals[p];
+                                int dest = portal->room;
+                                if (dest < 0 || dest >= g_chunk_count) continue;
+                                bool dup = false;
+                                for (int vi2 = 0; vi2 < vis_count; vi2++) {
+                                    if (vis_rooms[vi2] == dest) { dup = true; break; }
+                                }
+                                if (dup) continue;
+
+                                /* Portal frustum check: project portal vertices to screen.
+                                 * Only add room if portal overlaps the screen area.
+                                 * This prevents adding rooms behind/beside the camera. */
+                                int front = 0;
+                                float pmin_sx = 320, pmax_sx = 0;
+                                float pmin_sy = 240, pmax_sy = 0;
+                                for (int pv = 0; pv < 4; pv++) {
+                                    float px = (float)(r1r->x + portal->vertices[pv].x) - cam_x;
+                                    float py = (float)(portal->vertices[pv].y) - cam_y;
+                                    float pz = (float)(r1r->z + portal->vertices[pv].z) - cam_z;
+                                    float rx_p = px * cy - pz * sy;
+                                    float rz_yaw = px * sy + pz * cy;
+                                    float ry_p = py * cp - rz_yaw * sp;
+                                    float rz_p = py * sp + rz_yaw * cp;
+                                    if (rz_p > 1.0f) {
+                                        front++;
+                                        float inv = 256.0f / rz_p;
+                                        float sx = 160.0f + rx_p * inv;
+                                        float sy_p = 120.0f + ry_p * inv;
+                                        if (sx < pmin_sx) pmin_sx = sx;
+                                        if (sx > pmax_sx) pmax_sx = sx;
+                                        if (sy_p < pmin_sy) pmin_sy = sy_p;
+                                        if (sy_p > pmax_sy) pmax_sy = sy_p;
+                                    }
+                                }
+                                /* Skip if entirely behind camera */
+                                if (front == 0) continue;
+                                /* Skip if portal projects entirely off-screen
+                                 * (with generous margin for partially visible portals) */
+                                if (front == 4 && (pmax_sx < -100 || pmin_sx > 420 ||
+                                    pmax_sy < -100 || pmin_sy > 340)) continue;
+
+                                tr_chunk_t *c = &g_chunks[dest];
+                                float ddx = c->cx - cam_x;
+                                float ddz = c->cz - cam_z;
+                                c->dist_sq = ddx * ddx + ddz * ddz;
+                                c->visible = true;
+                                vis_rooms[vis_count] = dest;
+                                vis_stream_pri[vis_count] = STREAM_PRI_LOW;
+                                /* Store portal scissor — intersect with parent room's scissor */
+                                if (dest < 256) {
+                                    scissor_t parent_sc = (r1 < 256) ? room_scissor[r1] :
+                                        (scissor_t){0, 0, 320, 240};
+                                    if (front < 4) {
+                                        room_scissor[dest] = parent_sc; /* near plane: use parent */
+                                    } else {
+                                        int sx0 = (int)pmin_sx; if (sx0 < 0) sx0 = 0;
+                                        int sy0 = (int)pmin_sy; if (sy0 < 0) sy0 = 0;
+                                        int sx1 = (int)pmax_sx + 1; if (sx1 > 320) sx1 = 320;
+                                        int sy1 = (int)pmax_sy + 1; if (sy1 > 240) sy1 = 240;
+                                        /* Intersect with parent scissor */
+                                        if (sx0 < parent_sc.x0) sx0 = parent_sc.x0;
+                                        if (sy0 < parent_sc.y0) sy0 = parent_sc.y0;
+                                        if (sx1 > parent_sc.x1) sx1 = parent_sc.x1;
+                                        if (sy1 > parent_sc.y1) sy1 = parent_sc.y1;
+                                        room_scissor[dest].x0 = sx0;
+                                        room_scissor[dest].y0 = sy0;
+                                        room_scissor[dest].x1 = sx1;
+                                        room_scissor[dest].y1 = sy1;
+                                    }
+                                }
+                                vis_count++;
+                            }
+                        }
+                        ring_start = ring_end;
+                        perf_ring_counts[ring+1] = vis_count - ring_end; /* new rooms in this ring */
+                    }
+
+                    /* Track visibility for diagnostics */
+                    perf_vis_ring1 = ring1_end;
+                    perf_vis_ring2 = vis_count - ring1_end;
+                    /* ring2 now includes rings 2-5 */
+                    perf_vis_total = vis_count;
+
+                    /* LOD classification with HYSTERESIS.
+                     * Each room tracks current/target tier. Tier only switches
+                     * after target is stable for TIER_HOLD_FRAMES. Hysteresis
+                     * band prevents flapping at boundaries. */
+                    int tex_rooms[MAX_DRAW_ROOMS], tex_count = 0;
+                    int bkd_rooms [MAX_DRAW_ROOMS], bkd_count  = 0;
+
+                    /* Dynamic baked-pass draw distance clamp */
+                    {
+                        static float dynamic_clamp = 30000.0f;
+                        float farthest = 0;
+                        for (int vi = 0; vi < vis_count; vi++) {
+                            int ri = vis_rooms[vi];
+                            if (ri < 0 || ri >= g_chunk_count) continue;
+                            float d = sqrtf(g_chunks[ri].dist_sq) + g_chunks[ri].radius;
+                            if (d > farthest) farthest = d;
+                        }
+                        float target = farthest + 4096.0f;
+                        if (target > dynamic_clamp)
+                            dynamic_clamp += (target - dynamic_clamp) * 0.3f;
+                        else
+                            dynamic_clamp += (target - dynamic_clamp) * 0.05f;
+                        float eff_max = g_max_draw_dist;
+                        if (dynamic_clamp < eff_max) eff_max = dynamic_clamp;
+                        g_max_draw_dist_sq = eff_max * eff_max;
+                    }
+
+                    /* Threshold array for tier classification */
+                    float tier_thresholds_sq[4] = {
+                        g_dist_mid_sq, g_dist_vfar_sq,
+                        g_dist_xfar_sq, g_dist_xxfar_sq
+                    };
 
                     for (int vi = 0; vi < vis_count; vi++) {
-                        int ri = vis_queue[vi].room_idx;
-                        if (ri < 0 || ri >= g_chunk_count) continue;
+                        int ri = vis_rooms[vi];
                         tr_chunk_t *c = &g_chunks[ri];
 
-                        float ddx = c->cx - cam_x;
-                        float ddz = c->cz - cam_z;
-                        c->dist_sq = ddx*ddx + ddz*ddz;
-
-                        /* Three-tier LOD with overlap at mid/far boundary.
-                         *
-                         * NEAR (< 4 sectors): GL, no fog
-                         * MID  (4-7 sectors): GL, with fog in vertex color
-                         * FAR  (> 7 sectors): RDPQ CPU projection, fog
-                         *
-                         * Mid/far overlap band: rooms drawn in both RDPQ
-                         * far pass and GL near pass to hide the seam. */
-                        #define LOD_MID_FAR_INNER (CHUNK_MID_DIST2 * 0.85f)
-                        #define LOD_MID_FAR_OUTER (CHUNK_MID_DIST2 * 1.1f)
-
-                        if (c->dist_sq < CHUNK_NEAR_DIST2) {
-                            /* NEAR — GL, no fog */
+                        /* Force tier override */
+                        if (g_debug_force_tier == 1) {
                             c->lod = CHUNK_LOD_NEAR;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
-                        } else if (c->dist_sq < LOD_MID_FAR_INNER) {
-                            /* MID — GL with fog */
-                            c->lod = CHUNK_LOD_MID;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
-                        } else if (c->dist_sq > LOD_MID_FAR_OUTER) {
-                            /* FAR — RDPQ only */
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
+                            continue;
+                        } else if (g_debug_force_tier >= 2) {
                             c->lod = CHUNK_LOD_FAR;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
+                            if (bkd_count < MAX_DRAW_ROOMS)
+                                bkd_rooms[bkd_count++] = ri;
+                            continue;
+                        }
+
+                        /* Current room always Near */
+                        if (ri == lara_room) {
+                            room_tiers[ri].current_tier = TIER_NEAR;
+                            room_tiers[ri].target_tier = TIER_NEAR;
+                            room_tiers[ri].hold_count = TIER_HOLD_FRAMES;
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
+                            continue;
+                        }
+
+                        /* Determine raw target tier from distance */
+                        float dist = sqrtf(c->dist_sq);
+                        int raw_tier = TIER_NEAR;
+                        float eff_vfar = sqrtf(eff_dist_vfar_sq);
+                        float thresholds[4] = {
+                            g_dist_mid, eff_vfar, g_dist_xfar, g_dist_xxfar
+                        };
+                        for (int t = 0; t < 4; t++) {
+                            /* Hysteresis: need to cross threshold + band to promote,
+                             * threshold - band to demote */
+                            float band = thresholds[t] * TIER_HYSTERESIS;
+                            float promote_at = thresholds[t] + band;
+                            float demote_at  = thresholds[t] - band;
+                            if (room_tiers[ri].current_tier <= t && dist > promote_at)
+                                raw_tier = t + 1;
+                            else if (room_tiers[ri].current_tier > t && dist > demote_at)
+                                raw_tier = t + 1;
+                        }
+                        /* Max draw distance cull */
+                        if (dist > g_max_draw_dist) raw_tier = TIER_CULLED;
+
+                        /* Update target + hold counter */
+                        if (raw_tier != room_tiers[ri].target_tier) {
+                            room_tiers[ri].target_tier = raw_tier;
+                            room_tiers[ri].hold_count = 0;
+                        } else if (room_tiers[ri].hold_count < TIER_HOLD_FRAMES) {
+                            room_tiers[ri].hold_count++;
+                        }
+
+                        /* Switch current tier only when target is stable */
+                        if (room_tiers[ri].hold_count >= TIER_HOLD_FRAMES) {
+                            room_tiers[ri].current_tier = room_tiers[ri].target_tier;
+                        }
+
+                        int tier = room_tiers[ri].current_tier;
+
+                        /* Culled rooms don't render */
+                        if (tier >= TIER_CULLED) continue;
+
+                        /* Ring-1 rooms (directly connected): never worse than CI4.
+                         * Portal scissor clips to doorway opening — only the
+                         * visible slice pays the CI4 cost. */
+                        if (vi < ring1_end && tier > TIER_FAR) {
+                            tier = TIER_FAR;
+                            room_tiers[ri].current_tier = TIER_FAR;
+                        }
+
+                        /* Near (tier 0) goes to textured pass, all others to baked */
+                        if (tier == TIER_NEAR) {
+                            c->lod = CHUNK_LOD_NEAR;
+                            if (tex_count < MAX_DRAW_ROOMS)
+                                tex_rooms[tex_count++] = ri;
                         } else {
-                            /* Mid/far overlap — both passes */
-                            c->lod = CHUNK_LOD_MID;
-                            if (far_count < MAX_DRAW_ROOMS)
-                                far_rooms[far_count++] = ri;
-                            if (near_count < MAX_DRAW_ROOMS)
-                                near_rooms[near_count++] = ri;
+                            c->lod = CHUNK_LOD_FAR;
+                            if (bkd_count < MAX_DRAW_ROOMS)
+                                bkd_rooms[bkd_count++] = ri;
                         }
                     }
 
@@ -1454,40 +2876,72 @@ int main(void) {
                         cl->dist_sq = cdx*cdx + cdz*cdz;
                         if (cl->dist_sq < CHUNK_FAR_DIST2)
                             cl->face_skip = 1;       /* near: all faces */
-                        else if (cl->dist_sq < CHUNK_VERY_FAR_DIST2)
+                        else if (cl->dist_sq < g_dist_vfar_sq)
                             cl->face_skip = 2;       /* far: every 2nd face */
                         else
                             cl->face_skip = 4;       /* very far: every 4th */
                     }
 
-                    /* Bubble-sort far rooms back-to-front (prep for Phase 2 far pass).
-                     * Small list so insertion sort is fine. */
-                    for (int i = 1; i < far_count; i++) {
-                        int key = far_rooms[i];
+                    /* Sort baked rooms front-to-back (closest first).
+                     * Ensures close rooms render before budget fires.
+                     * Z-fighting possible without zbuf but acceptable. */
+                    for (int i = 1; i < bkd_count; i++) {
+                        int key = bkd_rooms[i];
                         float key_d = g_chunks[key].dist_sq;
                         int j = i - 1;
-                        while (j >= 0 && g_chunks[far_rooms[j]].dist_sq < key_d) {
-                            far_rooms[j + 1] = far_rooms[j];
+                        while (j >= 0 && g_chunks[bkd_rooms[j]].dist_sq > key_d) {
+                            bkd_rooms[j + 1] = bkd_rooms[j];
                             j--;
                         }
-                        far_rooms[j + 1] = key;
+                        bkd_rooms[j + 1] = key;
                     }
+
+                    /* Helper: upload best available texture for a tile index.
+                     * Uses CI4 if AegisTex flagged it, else CI8. */
+                    #define UPLOAD_BEST_TEX(tidx, last_tex_var) do { \
+                        if (atx_tile_modes && atx_tile_modes[tidx] == 1 && \
+                            ci4_surfs && ci4_surfs[tidx].buffer) { \
+                            rdpq_mode_tlut(TLUT_RGBA16); \
+                            rdpq_tex_upload_tlut(ci4_pals + (tidx) * CI4_PAL_SIZE, 0, 16); \
+                            rdpq_tex_upload(TILE0, &ci4_surfs[tidx], NULL); \
+                        } else if (ci8_surfs) { \
+                            if ((last_tex_var) == -2) rdpq_mode_tlut(TLUT_RGBA16); \
+                            rdpq_tex_upload(TILE0, &ci8_surfs[tidx], NULL); \
+                        } \
+                        (last_tex_var) = (int)(tidx); \
+                    } while(0)
 
                     /* Merge: near rooms first, then far rooms */
                     int rooms_to_draw[MAX_DRAW_ROOMS * 2];
                     int num_draw = 0;
-                    for (int i = 0; i < near_count; i++)
-                        rooms_to_draw[num_draw++] = near_rooms[i];
-                    for (int i = 0; i < far_count; i++)
-                        rooms_to_draw[num_draw++] = far_rooms[i];
+                    for (int i = 0; i < tex_count; i++)
+                        rooms_to_draw[num_draw++] = tex_rooms[i];
+                    for (int i = 0; i < bkd_count; i++)
+                        rooms_to_draw[num_draw++] = bkd_rooms[i];
 
-                    /* ===== RDPQ FAR PASS (performance-optimized) =====
+                    /* Shared vertex cache — used by both far and textured passes.
+                     * Transform all room vertices once per room, reuse for faces. */
+                    #define VTX_CACHE_MAX 600
+                    static struct { float rx, ry, rz, r, g, b; } vtx_cache[VTX_CACHE_MAX];
+
+                    /* Guard band for screen-space rejection.
+                     * Must be tight enough for RDP fixed-point precision
+                     * but wide enough that near-edge faces don't vanish.
+                     * Screen is 320×240; allow ~500px margin each side. */
+                    #define GUARD_LO_X (-500.0f)
+                    #define GUARD_HI_X (820.0f)
+                    #define GUARD_LO_Y (-380.0f)
+                    #define GUARD_HI_Y (620.0f)
+
+                    uint32_t perf_bkd_t0 = TICKS_READ(); /* start baked pass timer */
+
+                    /* ===== RDPQ BAKED PASS (performance-optimized) =====
                      * CPU-projected, textured + shaded triangles via rdpq.
                      * Key perf choices:
                      *   - rspq_flush (non-blocking) not rspq_wait (blocking)
-                     *   - Flush every 80 tris (not 20) to reduce sync overhead
+                     *   - Flush every 128 tris to reduce sync overhead
                      *   - Per-face centroid back-cull before vertex projection
-                     *   - Cap far rooms at 16 to limit total far-pass work
+                     *   - Baked tile is default; no per-face RGBA16 fallback
                      *   - Room origin pre-computed as float outside face loop */
                     {
                         rdpq_set_mode_standard();
@@ -1495,488 +2949,811 @@ int main(void) {
                         rdpq_mode_blender(0);
                         rdpq_mode_filter(FILTER_BILINEAR);
 
-                        int far_last_tex = -1;
-                        int far_tris = 0;
-                        int far_rooms_max = far_count; /* no room cap — tri budget limits work */
-                        #define FAR_TRI_BUDGET   300
-                        #define FAR_UPLOAD_BUDGET  8
+                        #define NEAR_Z 600.0f  /* near clip plane */
+                        int bkd_last_tex = -1;
+                        int bkd_tris = 0;
+                        int bkd_rooms_max = bkd_count; /* no room cap — tri budget limits work */
+                        /* BKD_TRI_BUDGET / BKD_UPLOAD_BUDGET defined at function scope */
 
-                        for (int fi = 0; fi < far_rooms_max; fi++) {
-                            int room_idx = far_rooms[fi];
+                        for (int fi = 0; fi < bkd_rooms_max; fi++) {
+                            int room_idx = bkd_rooms[fi];
                             if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                             tr_room_t *room = &g_level.rooms[room_idx];
 
-                            /* Pre-baked room tile: upload once per room.
-                             * Choose mip level by distance.  When baked data
-                             * is available, this replaces ALL per-face uploads
-                             * for this room — one upload instead of many. */
+                            /* ---- Per-room constants (hoisted out of face loop) ---- */
+                            float room_d = (room_idx < g_chunk_count)
+                                ? g_chunks[room_idx].dist_sq : 0.0f;
+
+                            /* TR1-style per-room fog: uses the room's own fog start
+                             * and max draw distance from the level data. Dark rooms
+                             * have tighter fog, bright rooms see further.
+                             * Blended with tier fog weights for smooth transitions. */
+                            float fog_start_d2 = (room_idx < g_chunk_count) ?
+                                g_chunks[room_idx].fog_start_dist2 : 4096.0f * 4096.0f;
+                            float max_draw_d2 = (room_idx < g_chunk_count) ?
+                                g_chunks[room_idx].max_draw_dist2 : 16384.0f * 16384.0f;
+                            float fog_range_d2 = max_draw_d2 - fog_start_d2;
+                            if (fog_range_d2 < 1.0f) fog_range_d2 = 1.0f;
+
+                            /* Per-room distance fog (TR1 linear ramp) */
+                            float room_fog = (room_d - fog_start_d2) / fog_range_d2;
+                            if (room_fog < 0.0f) room_fog = 0.0f;
+                            if (room_fog > 0.9f) room_fog = 0.9f;
+
+                            /* Tier fog minimum (ensures farther tiers always have some fog) */
+                            int rm_tier = (room_idx < 256) ? room_tiers[room_idx].current_tier : TIER_MIDFAR;
+                            float tier_mins[5] = { 0.0f, 0.1f, 0.25f, 0.5f, 0.75f };
+                            float tier_min = (rm_tier < 5) ? tier_mins[rm_tier] : 0.75f;
+                            float fog = room_fog > tier_min ? room_fog : tier_min;
+
+                            /* Use per-room fog color (already lerped into active_fog) */
+                            float fog_scale  = 1.0f - fog;
+                            float fog_add_r  = active_fog_r * fog;
+                            float fog_add_g  = active_fog_g * fog;
+                            float fog_add_b  = active_fog_b * fog;
+
+                            /* (room_uv_scale removed — UV now computed from room footprint) */
+
+                            /* Baked room tile — DEFAULT for all far rooms.
+                             * Tier chosen by distance.  Ring 2 always gets IA4.
+                             * No per-face uploads happen when room_baked=true. */
                             bool room_baked = false;
-                            float room_uv_scale = 1.0f;
-                            if (baked_room_count > 0 && room_idx < baked_room_count) {
-                                float rd = (room_idx < g_chunk_count)
-                                    ? g_chunks[room_idx].dist_sq : 0.0f;
-                                /* Only use baked tiles for rooms clearly in FAR zone.
-                                 * Rooms in the overlap band (also drawn by GL near
-                                 * pass) should use per-face textures, not baked. */
-                                if (rd < CHUNK_MID_DIST2) goto skip_baked;
+                            /* Use actual room distance for tier selection.
+                             * (is_ring2 override removed — distance-based tiers now) */
+                            float rd = room_d;
+
+                            /* Use the room's assigned tier from hysteresis system */
+                            int bkd_tier;
+                            if (g_debug_force_tier >= 2)
+                                bkd_tier = g_debug_force_tier - 1;
+                            else if (room_idx < 256)
+                                bkd_tier = room_tiers[room_idx].current_tier;
+                            else
+                                bkd_tier = TIER_MIDFAR;
+
+                            /* Debug colors: apply to ALL far rooms */
+                            if (g_debug_dist_colors && dbg_tier_px) {
                                 rspq_flush();
-                                if (rd > CHUNK_XXFAR_DIST2 && bkd_m4_surf) {
-                                    /* IA4 extreme far: 4×4 silhouette, no TLUT */
+                                rdpq_mode_tlut(TLUT_NONE);
+                                rdpq_tex_upload(TILE0, &dbg_tier_surf[bkd_tier], NULL);
+                                room_baked = true;
+                                bkd_last_tex = -99;
+                            } else if (bkd_tier == TIER_MIDFAR) {
+                                /* MidFar: CI8 per-face textures */
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
+                                /* room_baked stays false → face loop uses per-face CI8 */
+                                bkd_last_tex = -99;
+                            } else if (bkd_tier == TIER_FAR) {
+                                /* Far: CI4 per-face textures (half TMEM, 16-color palette) */
+                                /* room_baked stays false → face loop uses per-face CI4 */
+                                bkd_last_tex = -99;
+                            } else if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                /* Far/XFar/XXFar: use baked tiles */
+                                rspq_flush();
+                                if (bkd_tier >= TIER_XXFAR && bkd_m4_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
-                                    room_uv_scale = 4.0f / 32.0f;
-                                } else if (rd > CHUNK_XFAR_DIST2 && bkd_m3_surf) {
-                                    /* IA8 extra far: 8×8 grayscale, no TLUT */
+                                } else if (bkd_tier >= TIER_XFAR && bkd_m3_surf) {
                                     rdpq_mode_tlut(TLUT_NONE);
                                     rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
-                                    room_uv_scale = 8.0f / 32.0f;
-                                } else if (rd > CHUNK_VERY_FAR_DIST2 && bkd_m2_surf) {
-                                    /* CI4 far: 8×8 + 16-color TLUT */
+                                } else if (bkd_tier >= TIER_FAR && bkd_m2_surf) {
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
                                     rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
-                                    room_uv_scale = 8.0f / 32.0f;
                                 } else if (bkd_m1_surf) {
-                                    /* CI8 mid-far: 16×16 + 256-color TLUT */
                                     rdpq_mode_tlut(TLUT_RGBA16);
                                     rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
                                     rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
-                                    room_uv_scale = 16.0f / 32.0f;
                                 }
                                 room_baked = true;
-                                far_last_tex = -99;
-                                perf_far_uploads++;
+                                bkd_last_tex = -99;
+                                perf_bkd_uploads++;
                             }
-                            skip_baked:;
-                            bool is_water = (room->flags & 1) != 0;
-                            perf_far_rooms++;
+                            /* Non-baked fallback: flat faces use white_surf (uploaded
+                             * on demand below); textured faces use last-bound tile. */
 
-                            /* Pre-compute room origin offset (avoid per-vertex int→float) */
+                            /* (sphere-in-front test removed — always clip when any_behind) */
+
+                            bool is_water = (room->flags & 1) != 0;
+                            perf_bkd_rooms++;
+                            if (room_baked) perf_bkd_baked++;
+
+                            /* Set portal scissor — clips rendering to the portal opening */
+                            if (room_idx < 256) {
+                                scissor_t sc = room_scissor[room_idx];
+                                if (sc.x1 > sc.x0 && sc.y1 > sc.y0)
+                                    rdpq_set_scissor(sc.x0, sc.y0, sc.x1, sc.y1);
+                            }
+
+                            /* ---- Baked pass vertex cache ---- */
                             float room_ox = (float)room->x - cam_x;
                             float room_oz = (float)room->z - cam_z;
 
-                            for (int f = 0; f < room->mesh.face_count; f++) {
-                                tr_face_t *face = &room->mesh.faces[f];
-                                int nv = face->vertex_count;
-                                if (nv < 3) continue;
-
-                                /* Quick centroid back-cull: check if face center
-                                 * is behind camera using first vertex only (cheap). */
-                                {
-                                    uint16_t v0i = face->vertices[0];
-                                    if (v0i < room->mesh.vertex_count) {
-                                        tr_room_vertex_t *rv0 = &room->mesh.vertices[v0i];
-                                        float cz0 = (room_ox + rv0->x) * sy +
-                                                     (room_oz + rv0->z) * cy;
-                                        if (cz0 < -512.0f) continue; /* behind camera */
-                                    }
-                                }
-
-                                /* Texture: skip per-face upload if room has baked tile */
-                                uint16_t tex_idx = face->texture & 0x7FFF;
-                                bool is_flat = (face->texture & 0x8000) != 0;
-                                if (room_baked) goto far_skip_upload;
-
-                                if (!is_flat && tex_idx < num_otex && tex_surfs) {
-                                    if ((int)tex_idx != far_last_tex) {
-                                        /* Lambert LOD: choose mip from projected size.
-                                         * Estimate screen area from room distance.
-                                         * lod ≈ 1/2 * log2(screenPixelArea)
-                                         * Simplified: use room dist_sq thresholds. */
-                                        float rd = (room_idx < g_chunk_count)
-                                            ? g_chunks[room_idx].dist_sq : 0.0f;
-                                        /* mip_level: 0=32×32, 1=16×16, 2=8×8 */
-                                        int mip_level = 0;
-                                        if (rd > CHUNK_VERY_FAR_DIST2) mip_level = 2;
-                                        else if (rd > CHUNK_MID_DIST2) mip_level = 1;
-
-                                        /* Fallback chain (Lambert):
-                                         * If upload budget exceeded, try lower mip.
-                                         * If still over budget, skip face. */
-                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET) {
-                                            if (mip_level < 2) mip_level = 2; /* try 8×8 */
-                                            else continue; /* already lowest, skip */
-                                        }
-
-                                        rspq_flush();
-                                        uint16_t *src = tex_tiles + tex_idx * TEX_TILE_DIM * TEX_TILE_DIM;
-
-                                        if (mip_level == 2 && mip2_buf) {
-                                            /* 32→8: 4×4 box filter */
-                                            for (int my = 0; my < MIP2_DIM; my++)
-                                                for (int mx = 0; mx < MIP2_DIM; mx++) {
-                                                    int bx = mx*4, by = my*4;
-                                                    int sr=0,sg=0,sb=0,sa=0;
-                                                    for (int dy=0;dy<4;dy++)
-                                                        for (int dx=0;dx<4;dx++) {
-                                                            uint16_t p = src[(by+dy)*TEX_TILE_DIM+(bx+dx)];
-                                                            sr+=p>>11; sg+=(p>>6)&0x1F;
-                                                            sb+=(p>>1)&0x1F; sa|=p&1;
-                                                        }
-                                                    mip2_buf[my*MIP2_DIM+mx] =
-                                                        (((sr+8)>>4)<<11)|(((sg+8)>>4)<<6)|(((sb+8)>>4)<<1)|sa;
-                                                }
-                                            rdpq_tex_upload(TILE0, &mip2_surf, NULL);
-                                        } else if (mip_level == 1 && mip1_buf) {
-                                            /* 32→16: 2×2 box filter */
-                                            for (int my = 0; my < MIP1_DIM; my++)
-                                                for (int mx = 0; mx < MIP1_DIM; mx++) {
-                                                    int bx = mx*2, by = my*2;
-                                                    uint16_t p00 = src[by*TEX_TILE_DIM+bx];
-                                                    uint16_t p10 = src[by*TEX_TILE_DIM+bx+1];
-                                                    uint16_t p01 = src[(by+1)*TEX_TILE_DIM+bx];
-                                                    uint16_t p11 = src[(by+1)*TEX_TILE_DIM+bx+1];
-                                                    int ar = ((p00>>11)+(p10>>11)+(p01>>11)+(p11>>11)+2)>>2;
-                                                    int ag = (((p00>>6)&0x1F)+((p10>>6)&0x1F)+((p01>>6)&0x1F)+((p11>>6)&0x1F)+2)>>2;
-                                                    int ab = (((p00>>1)&0x1F)+((p10>>1)&0x1F)+((p01>>1)&0x1F)+((p11>>1)&0x1F)+2)>>2;
-                                                    int aa = (p00|p10|p01|p11)&1;
-                                                    mip1_buf[my*MIP1_DIM+mx] = (ar<<11)|(ag<<6)|(ab<<1)|aa;
-                                                }
-                                            rdpq_tex_upload(TILE0, &mip1_surf, NULL);
-                                        } else {
-                                            /* Level 0: full 32×32 base */
-                                            rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        }
-                                        far_last_tex = (int)tex_idx;
-                                        perf_far_uploads++;
-                                    }
-                                } else if (is_flat) {
-                                    if (white_px && far_last_tex != -2) {
-                                        if (perf_far_uploads >= FAR_UPLOAD_BUDGET)
-                                            continue;
-                                        rspq_flush();
-                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        far_last_tex = -2;
-                                        perf_far_uploads++;
-                                    }
-                                } else continue;
-
-                                far_skip_upload:;
-                                tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
-                                    ? &g_level.object_textures[tex_idx] : NULL;
-
-                                /* CPU transform + project */
-                                float sv[4][9];
-                                bool visible = true;
-                                for (int v = 0; v < nv; v++) {
-                                    uint16_t vi = face->vertices[v];
-                                    if (vi >= room->mesh.vertex_count) { visible = false; break; }
-                                    tr_room_vertex_t *rv = &room->mesh.vertices[vi];
-
-                                    float cx_v = room_ox + rv->x;
-                                    float cy_v = (float)rv->y - cam_y;
-                                    float cz_v = room_oz + rv->z;
-
-                                    float rx = cx_v * cy - cz_v * sy;
-                                    float rz_yaw = cx_v * sy + cz_v * cy;
-                                    float ry = cy_v * cp - rz_yaw * sp;
-                                    float rz = cy_v * sp + rz_yaw * cp;
-
-                                    if (rz < 128.0f) { visible = false; break; }
-
-                                    float inv_z = 256.0f / rz;
-                                    float scx = 160.0f + rx * inv_z;
-                                    float scy = 120.0f + ry * inv_z;
-                                    /* Clamp to RDP-safe range. Reject faces with
-                                     * any vertex wildly off-screen (distortion) */
-                                    if (scx < -400 || scx > 720 ||
-                                        scy < -300 || scy > 540) {
-                                        visible = false; break;
-                                    }
-
-                                    /* Lighting (simplified: no per-vertex fog for perf) */
-                                    float bright = 1.0f - ((float)rv->light / 8191.0f);
-                                    if (bright < 0.0f) bright = 0.0f;
-                                    if (bright > 1.0f) bright = 1.0f;
-                                    bright = 0.4f + bright * 0.6f;
-                                    float r = is_water ? bright * 0.4f : bright;
-                                    float g = is_water ? bright * 0.6f : bright;
-                                    float b = is_water ? bright * 1.0f : bright;
-
-                                    /* Simplified fog: per-room, not per-vertex */
-                                    float room_d = (room_idx < g_chunk_count)
-                                        ? g_chunks[room_idx].dist_sq : 0.0f;
-                                    float fog = (room_d - 16777216.0f) / 383223784.0f;
-                                    if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 0.85f) fog = 0.85f;
-                                    r = r * (1.0f - fog) + 0.35f * fog;
-                                    g = g * (1.0f - fog) + 0.32f * fog;
-                                    b = b * (1.0f - fog) + 0.40f * fog;
-
-                                    /* Tex coords scaled for active mip level */
-                                    float ts = 0, tt = 0;
-                                    if (room_baked) {
-                                        /* Baked tile: UVs tile across the baked texture.
-                                         * Use face vertex position to generate simple UVs. */
-                                        float baked_dim = MIP0_DIM * room_uv_scale;
-                                        ts = ((float)(v % 2)) * baked_dim;
-                                        tt = ((float)(v / 2)) * baked_dim;
-                                    } else if (otex && tex_uv_map) {
-                                        float tu = (float)(otex->uv[v].u >> 8);
-                                        float tv = (float)(otex->uv[v].v >> 8);
-                                        float rd_uv = (room_idx < g_chunk_count)
-                                            ? g_chunks[room_idx].dist_sq : 0.0f;
-                                        float uv_s = 1.0f;
-                                        if (mip2_buf && rd_uv > CHUNK_VERY_FAR_DIST2) uv_s = 0.25f;
-                                        else if (mip1_buf && rd_uv > CHUNK_MID_DIST2) uv_s = 0.5f;
-                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2] * uv_s;
-                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3] * uv_s;
-                                    }
-
-                                    sv[v][0] = scx;  sv[v][1] = scy;
-                                    sv[v][2] = r;    sv[v][3] = g;
-                                    sv[v][4] = b;    sv[v][5] = 1.0f;
-                                    sv[v][6] = ts;   sv[v][7] = tt;
-                                    sv[v][8] = 1.0f / rz;
-                                }
-                                if (!visible) continue;
-
-                                int num_tris = nv - 2;
-                                for (int tri = 0; tri < num_tris; tri++) {
-                                    rdpq_triangle(&TRIFMT_SHADE_TEX,
-                                        sv[0], sv[tri+1], sv[tri+2]);
-                                    far_tris++;
-                                    perf_far_tris = far_tris;
-                                    if ((far_tris & 79) == 0)
-                                        rspq_flush();
-                                    if (far_tris >= FAR_TRI_BUDGET)
-                                        goto far_pass_done;
-                                }
-                            }
-                        }
-                    }
-                    far_pass_done:
-
-                    /* Flush far pass commands before GL context begins.
-                     * Non-blocking — far pass is now light enough (8 uploads,
-                     * 300 tri cap) that queue backlog is not a risk. */
-                    /* Reset RDPQ state before entering GL — the far pass
-                     * may have set TLUT mode for CI8/CI4 textures which
-                     * could corrupt GL's RGBA16 texture interpretation. */
-                    rdpq_mode_tlut(TLUT_NONE);
-                    rspq_flush();
-
-                    /* ===== GL NEAR PASS ===== */
-                    gl_context_begin();
-
-                    /* One-time GL state setup on first frame */
-                    if (!gl_setup_done) {
-                        gl_setup_done = true;
-
-                        #define WORLD_SCALE (1.0f / 32.0f)
-
-                        float near_p = 4.0f;
-                        float far_p = 350.0f;
-                        float fov_half = 30.0f * 3.14159f / 180.0f;
-                        float top = near_p * tanf(fov_half);
-                        float right = top * (320.0f / 240.0f);
-                        glMatrixMode(GL_PROJECTION);
-                        glLoadIdentity();
-                        glFrustum(-right, right, -top, top, near_p, far_p);
-
-                        glEnable(GL_DEPTH_TEST);
-                        glDepthFunc(GL_LESS);
-                        glDisable(GL_CULL_FACE);
-                        glShadeModel(GL_SMOOTH);
-
-                        glEnable(GL_TEXTURE_2D);
-                        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-                        glDisable(GL_LIGHTING);
-                        glDisable(GL_FOG);
-
-                        if (gl_textures) {
-                            glGenTextures(num_otex, gl_textures);
-                            for (int i = 0; i < num_otex; i++) {
-                                glBindTexture(GL_TEXTURE_2D, gl_textures[i]);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-                                glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &tex_surfs[i], NULL);
-                            }
-                        }
-                        if (white_px) {
-                            glGenTextures(1, &gl_white_tex);
-                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                            glSurfaceTexImageN64(GL_TEXTURE_2D, 0, &white_surf, NULL);
-                        }
-                    }
-
-                    glClear(GL_DEPTH_BUFFER_BIT);
-
-                    glMatrixMode(GL_MODELVIEW);
-                    glLoadIdentity();
-                    glRotatef(cam_rot_x * 180.0f / 3.14159f, 1, 0, 0);
-                    glRotatef(cam_rot_y * 180.0f / 3.14159f, 0, 1, 0);
-
-                    /* ===== GL NEAR PASS — interleaved vertex array ===== */
-                    /* Interleaved: pos(3f) + color(4ub) + texcoord(2f) = 24 bytes/vert */
-                    typedef struct {
-                        float x, y, z;
-                        uint8_t r, g, b, a;
-                        float s, t;
-                    } gl_vert_t;
-                    #define MAX_GL_VERTS 4000
-                    static gl_vert_t gl_verts[MAX_GL_VERTS] __attribute__((aligned(16)));
-                    int gl_vc = 0;
-                    int cur_tex = -1;
-                    #define VERT_STRIDE sizeof(gl_vert_t)
-
-                    #define FLUSH_GL() do { \
-                        if (gl_vc > 0) { \
-                            data_cache_hit_writeback(gl_verts, gl_vc * VERT_STRIDE); \
-                            glEnableClientState(GL_VERTEX_ARRAY); \
-                            glEnableClientState(GL_COLOR_ARRAY); \
-                            glEnableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            glVertexPointer(3, GL_FLOAT, VERT_STRIDE, &gl_verts[0].x); \
-                            glColorPointer(4, GL_UNSIGNED_BYTE, VERT_STRIDE, &gl_verts[0].r); \
-                            glTexCoordPointer(2, GL_FLOAT, VERT_STRIDE, &gl_verts[0].s); \
-                            glDrawArrays(GL_TRIANGLES, 0, gl_vc); \
-                            glDisableClientState(GL_VERTEX_ARRAY); \
-                            glDisableClientState(GL_COLOR_ARRAY); \
-                            glDisableClientState(GL_TEXTURE_COORD_ARRAY); \
-                            gl_vc = 0; \
-                        } \
-                    } while(0)
-
-                    /* ===== GL NEAR PASS ONLY =====
-                     * Far pass moved to RDPQ (before gl_context_begin).
-                     * Near rooms are in rooms_to_draw[0 .. near_count-1]. */
-                    {
-                        int loop_start = 0;
-                        int loop_end   = near_count;
-                        int pass       = 1;  /* near pass identifier for fog logic */
-
-                    for (int ri = loop_start; ri < loop_end; ri++) {
-                        int room_idx = rooms_to_draw[ri];
-                        if (room_idx < 0 || room_idx >= g_level.room_count) continue;
-                        tr_room_t *room = &g_level.rooms[room_idx];
-                        bool is_water = (room->flags & 1) != 0;
-                        perf_near_rooms++;
-                        int max_faces = room->mesh.face_count;
-                        for (int f = 0; f < max_faces; f++) {
-                            tr_face_t *face = &room->mesh.faces[f];
-                            int nv = face->vertex_count;
-                            if (nv < 3) continue;
-
-                            uint16_t tex_idx = face->texture & 0x7FFF;
-                            bool is_flat = (face->texture & 0x8000) != 0;
-                            int want_tex;
-                            if (is_flat) {
-                                want_tex = -2;
-                            } else if (tex_idx < num_otex && gl_textures) {
-                                want_tex = (int)tex_idx;
-                            } else continue;
-
-                            if (want_tex != cur_tex) {
-                                FLUSH_GL();
-                                if (want_tex == -2 && gl_white_tex)
-                                    glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                else if (want_tex >= 0)
-                                    glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                cur_tex = want_tex;
-                                perf_near_binds++;
-                            }
-
-                            tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
-                                ? &g_level.object_textures[tex_idx] : NULL;
-
-                            int num_tris = nv - 2;
-                            if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                            /* Build per-face vertex data */
-                            float px[4], py[4], pz[4], fs[4], ft[4];
-                            uint8_t cr[4], cg[4], cb[4];
-                            bool ok = true;
-                            for (int v = 0; v < nv; v++) {
-                                uint16_t vi = face->vertices[v];
-                                if (vi >= room->mesh.vertex_count) { ok = false; break; }
+                            int bkd_nv = room->mesh.vertex_count;
+                            if (bkd_nv > VTX_CACHE_MAX) bkd_nv = VTX_CACHE_MAX;
+                            for (int vi = 0; vi < bkd_nv; vi++) {
                                 tr_room_vertex_t *rv = &room->mesh.vertices[vi];
-
-                                float vx_w = (float)(room->x + rv->x);
-                                float vy_w = (float)rv->y;
-                                float vz_w = (float)(room->z + rv->z);
-                                px[v] = (vx_w - cam_x) * WORLD_SCALE;
-                                py[v] = -(vy_w - cam_y) * WORLD_SCALE;
-                                pz[v] = -(vz_w - cam_z) * WORLD_SCALE;
+                                float cx_v = room_ox + rv->x;
+                                float cy_v = (float)rv->y - cam_y;
+                                float cz_v = room_oz + rv->z;
+                                float rx = cx_v * cy - cz_v * sy;
+                                float rz_yaw = cx_v * sy + cz_v * cy;
+                                vtx_cache[vi].rx = rx;
+                                vtx_cache[vi].ry = cy_v * cp - rz_yaw * sp;
+                                vtx_cache[vi].rz = cy_v * sp + rz_yaw * cp;
 
                                 float bright = 1.0f - ((float)rv->light / 8191.0f);
                                 if (bright < 0.0f) bright = 0.0f;
                                 if (bright > 1.0f) bright = 1.0f;
                                 bright = 0.4f + bright * 0.6f;
-                                float r = is_water ? bright * 0.4f : bright;
-                                float g = is_water ? bright * 0.6f : bright;
-                                float b = is_water ? bright * 1.0f : bright;
-
-                                /* Apply fog for MID LOD rooms (GL near pass)
-                                 * and far pass. NEAR rooms have no fog. */
-                                bool apply_fog = (room_idx < g_chunk_count &&
-                                    g_chunks[room_idx].lod >= CHUNK_LOD_MID);
-                                if (apply_fog) {
-                                    float fdx = vx_w - cam_x;
-                                    float fdz = vz_w - cam_z;
-                                    float d2 = fdx*fdx + fdz*fdz;
-                                    float fog = (d2 - 16777216.0f) / 383223784.0f;
-                                    /* 16777216 = 4096² (near/mid boundary)
-                                     * 400000000 = 20000² (far world clip)
-                                     * divisor = end² - start² */
-                                    /* Vertical bias: lower = more fog (TR1 Y-down) */
-                                    float y_bias = (vy_w - cam_y) * 0.00004f;
-                                    if (y_bias < 0.0f) y_bias = 0.0f;
-                                    if (y_bias > 0.2f) y_bias = 0.2f;
-                                    fog += y_bias;
-                                    if (fog < 0.0f) fog = 0.0f;
-                                    if (fog > 0.85f) fog = 0.85f; /* never fully opaque */
-                                    /* Cave fog: dark blue-gray but visible */
-                                    r = r * (1.0f - fog) + 0.35f * fog;
-                                    g = g * (1.0f - fog) + 0.32f * fog;
-                                    b = b * (1.0f - fog) + 0.40f * fog;
-                                }
-
-                                cr[v] = (uint8_t)(r * 255.0f);
-                                cg[v] = (uint8_t)(g * 255.0f);
-                                cb[v] = (uint8_t)(b * 255.0f);
-
-                                if (otex && tex_uv_map) {
-                                    float tu = (float)(otex->uv[v].u >> 8);
-                                    float tv = (float)(otex->uv[v].v >> 8);
-                                    float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                    float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                    /* Normalize to 0-1, inset by half texel */
-                                    float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                    float base_s = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                    float base_t = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-
-                                    fs[v] = base_s;
-                                    ft[v] = base_t;
-                                } else {
-                                    fs[v] = 0; ft[v] = 0;
-                                }
+                                vtx_cache[vi].r = (is_water ? bright * 0.4f : bright) * fog_scale + fog_add_r;
+                                vtx_cache[vi].g = (is_water ? bright * 0.6f : bright) * fog_scale + fog_add_g;
+                                vtx_cache[vi].b = (is_water ? bright * 1.0f : bright) * fog_scale + fog_add_b;
                             }
-                            if (!ok) continue;
 
-                            for (int tri = 0; tri < num_tris; tri++) {
-                                int idx[3] = {0, tri+1, tri+2};
-                                for (int k = 0; k < 3; k++) {
-                                    int i = idx[k];
-                                    gl_vert_t *vp = &gl_verts[gl_vc++];
-                                    vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                    vp->r = cr[i]; vp->g = cg[i]; vp->b = cb[i]; vp->a = 255;
-                                    vp->s = fs[i]; vp->t = ft[i];
+                            for (int f = 0; f < room->mesh.face_count; f++) {
+                                if (!g_debug_force_tier && bkd_tris >= BKD_TRI_BUDGET) goto bkd_pass_done;
+                                /* (face skip removed — vertex cache makes per-face cost cheap enough) */
+                                tr_face_t *face = &room->mesh.faces[f];
+                                int nv = face->vertex_count;
+                                if (nv < 3) continue;
+
+                                /* Back-cull + distance cull from cache */
+                                {
+                                    uint16_t v0i = face->vertices[0];
+                                    if (v0i < bkd_nv) {
+                                        if (vtx_cache[v0i].rz < -512.0f) continue;
+                                        float dx = vtx_cache[v0i].rx;
+                                        float dz = vtx_cache[v0i].rz;
+                                        if (dx*dx + dz*dz > g_max_draw_dist_sq) continue;
+                                    }
+                                }
+
+                                uint16_t tex_idx = face->texture & 0x7FFF;
+                                bool is_flat = (face->texture & 0x8000) != 0;
+                                if (!room_baked) {
+                                    /* Per-face textures: CI4 for Far, CI8 for MidFar */
+                                    if (!is_flat && tex_idx < num_otex) {
+                                        if ((int)tex_idx != bkd_last_tex) {
+                                            UPLOAD_BEST_TEX(tex_idx, bkd_last_tex);
+                                            perf_bkd_uploads++;
+                                        }
+                                    } else if (is_flat) {
+                                        if (white_px && bkd_last_tex != -2) {
+                                            rdpq_mode_tlut(TLUT_NONE);
+                                            rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                            bkd_last_tex = -2;
+                                            perf_bkd_uploads++;
+                                        }
+                                    } else continue;
+                                }
+
+                                tr_object_texture_t *otex = (!is_flat && !room_baked &&
+                                    tex_idx < g_level.object_texture_count)
+                                    ? &g_level.object_textures[tex_idx] : NULL;
+
+                                /* Look up cached vertices */
+                                float cv[4][8];
+                                bool visible = true;
+                                bool any_behind = false, all_behind = true;
+
+                                for (int v = 0; v < nv; v++) {
+                                    uint16_t vi = face->vertices[v];
+                                    if (vi >= bkd_nv) { visible = false; break; }
+
+                                    cv[v][0] = vtx_cache[vi].rx;
+                                    cv[v][1] = vtx_cache[vi].ry;
+                                    cv[v][2] = vtx_cache[vi].rz;
+
+                                    if (cv[v][2] < NEAR_Z) any_behind = true;
+                                    else all_behind = false;
+
+                                    cv[v][3] = vtx_cache[vi].r;
+                                    cv[v][4] = vtx_cache[vi].g;
+                                    cv[v][5] = vtx_cache[vi].b;
+
+                                    float ts = 0, tt = 0;
+                                    if (room_baked && room_idx < g_chunk_count) {
+                                        /* Map baked tile across room footprint.
+                                         * UV from vertex world XZ position within room bounds. */
+                                        tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                        float wx = (float)(room->x + rv->x);
+                                        float wz = (float)(room->z + rv->z);
+                                        tr_chunk_t *ck = &g_chunks[room_idx];
+                                        float room_w = ck->max_x - ck->min_x;
+                                        float room_d = ck->max_z - ck->min_z;
+                                        if (room_w < 1.0f) room_w = 1.0f;
+                                        if (room_d < 1.0f) room_d = 1.0f;
+                                        float tile_dim = (bkd_tier >= TIER_XXFAR) ? 4.0f :
+                                                         (bkd_tier >= TIER_XFAR) ? 8.0f :
+                                                         (bkd_tier >= TIER_FAR) ? 8.0f : 16.0f;
+                                        ts = ((wx - ck->min_x) / room_w) * tile_dim;
+                                        tt = ((wz - ck->min_z) / room_d) * tile_dim;
+                                        /* Clamp to valid tile range */
+                                        if (ts < 0) ts = 0;
+                                        if (ts > tile_dim) ts = tile_dim;
+                                        if (tt < 0) tt = 0;
+                                        if (tt > tile_dim) tt = tile_dim;
+                                    } else if (otex && tex_uv_map) {
+                                        float tu = (float)(otex->uv[v].u >> 8);
+                                        float tv = (float)(otex->uv[v].v >> 8);
+                                        ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                        tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                    }
+                                    cv[v][6] = ts; cv[v][7] = tt;
+                                }
+                                if (!visible || all_behind) continue;
+
+                                /* Near-plane clip (Sutherland-Hodgman, z=NEAR_Z).
+                                 * Skipped for rooms whose sphere is fully in front. */
+                                float clipped[6][8];
+                                int clip_nv = nv;
+                                if (any_behind) {
+                                    clip_nv = 0;
+                                    for (int i = 0; i < nv; i++) {
+                                        int j = (i + 1) % nv;
+                                        float zi = cv[i][2], zj = cv[j][2];
+                                        bool i_in = (zi >= NEAR_Z), j_in = (zj >= NEAR_Z);
+                                        if (i_in) {
+                                            for (int k = 0; k < 8; k++)
+                                                clipped[clip_nv][k] = cv[i][k];
+                                            clip_nv++;
+                                        }
+                                        if (i_in != j_in) {
+                                            float t = (NEAR_Z - zi) / (zj - zi);
+                                            for (int k = 0; k < 8; k++)
+                                                clipped[clip_nv][k] = cv[i][k] + t * (cv[j][k] - cv[i][k]);
+                                            clip_nv++;
+                                        }
+                                        if (clip_nv >= 6) break;
+                                    }
+                                    if (clip_nv < 3) continue;
+                                } else {
+                                    for (int v = 0; v < nv; v++)
+                                        for (int k = 0; k < 8; k++)
+                                            clipped[v][k] = cv[v][k];
+                                }
+
+                                /* Project to screen space (with Z-bias to prevent
+                                 * Z-fighting against textured pass at same depth) */
+                                float sv_raw[8][9];
+                                bool any_outside = false;
+                                for (int v = 0; v < clip_nv; v++) {
+                                    float rz = clipped[v][2] + g_baked_z_bias;
+                                    float inv_z = 256.0f / rz;
+                                    float scx = 160.0f + clipped[v][0] * inv_z;
+                                    float scy = 120.0f + clipped[v][1] * inv_z;
+                                    if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y)
+                                        any_outside = true;
+                                    sv_raw[v][0] = scx;  sv_raw[v][1] = scy;
+                                    sv_raw[v][2] = clipped[v][3]; sv_raw[v][3] = clipped[v][4];
+                                    sv_raw[v][4] = clipped[v][5]; sv_raw[v][5] = 1.0f;
+                                    sv_raw[v][6] = clipped[v][6]; sv_raw[v][7] = clipped[v][7];
+                                    sv_raw[v][8] = 1.0f; /* affine */
+                                }
+
+                                /* Screen-space S-H clip against guard band (4 edges) */
+                                float (*sv_src)[9] = sv_raw;
+                                int sv_nv = clip_nv;
+                                float sv_t1[8][9], sv_t2[8][9];
+                                if (any_outside) {
+                                    /* Left */
+                                    int n1 = 0;
+                                    for (int i = 0; i < sv_nv; i++) {
+                                        int j = (i+1) % sv_nv;
+                                        bool ii = sv_src[i][0] >= GUARD_LO_X, ji = sv_src[j][0] >= GUARD_LO_X;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t1[n1][k]=sv_src[i][k]; n1++; }
+                                        if (ii!=ji) { float t=(GUARD_LO_X-sv_src[i][0])/(sv_src[j][0]-sv_src[i][0]); for(int k=0;k<9;k++) sv_t1[n1][k]=sv_src[i][k]+t*(sv_src[j][k]-sv_src[i][k]); n1++; }
+                                        if (n1>=8) break;
+                                    }
+                                    /* Right */
+                                    int n2 = 0;
+                                    for (int i = 0; i < n1; i++) {
+                                        int j = (i+1) % n1;
+                                        bool ii = sv_t1[i][0] <= GUARD_HI_X, ji = sv_t1[j][0] <= GUARD_HI_X;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]; n2++; }
+                                        if (ii!=ji) { float t=(GUARD_HI_X-sv_t1[i][0])/(sv_t1[j][0]-sv_t1[i][0]); for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]+t*(sv_t1[j][k]-sv_t1[i][k]); n2++; }
+                                        if (n2>=8) break;
+                                    }
+                                    /* Top */
+                                    n1 = 0;
+                                    for (int i = 0; i < n2; i++) {
+                                        int j = (i+1) % n2;
+                                        bool ii = sv_t2[i][1] >= GUARD_LO_Y, ji = sv_t2[j][1] >= GUARD_LO_Y;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t1[n1][k]=sv_t2[i][k]; n1++; }
+                                        if (ii!=ji) { float t=(GUARD_LO_Y-sv_t2[i][1])/(sv_t2[j][1]-sv_t2[i][1]); for(int k=0;k<9;k++) sv_t1[n1][k]=sv_t2[i][k]+t*(sv_t2[j][k]-sv_t2[i][k]); n1++; }
+                                        if (n1>=8) break;
+                                    }
+                                    /* Bottom */
+                                    n2 = 0;
+                                    for (int i = 0; i < n1; i++) {
+                                        int j = (i+1) % n1;
+                                        bool ii = sv_t1[i][1] <= GUARD_HI_Y, ji = sv_t1[j][1] <= GUARD_HI_Y;
+                                        if (ii) { for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]; n2++; }
+                                        if (ii!=ji) { float t=(GUARD_HI_Y-sv_t1[i][1])/(sv_t1[j][1]-sv_t1[i][1]); for(int k=0;k<9;k++) sv_t2[n2][k]=sv_t1[i][k]+t*(sv_t1[j][k]-sv_t1[i][k]); n2++; }
+                                        if (n2>=8) break;
+                                    }
+                                    sv_src = sv_t2;
+                                    sv_nv = n2;
+                                    if (sv_nv < 3) continue;
+                                }
+
+                                int num_tris = sv_nv - 2;
+                                for (int tri = 0; tri < num_tris; tri++) {
+                                    rdpq_triangle(&TRIFMT_SHADE_TEX,
+                                        sv_src[0], sv_src[tri+1], sv_src[tri+2]);
+                                    bkd_tris++;
+                                    perf_bkd_tris = bkd_tris;
+                                    if ((bkd_tris & 7) == 0)
+                                        rspq_flush();
+                                    if (!g_debug_force_tier && bkd_tris >= BKD_TRI_BUDGET)
+                                        goto bkd_pass_done;
                                 }
                             }
                         }
                     }
-                    FLUSH_GL();
+                    bkd_pass_done:
+                    /* Reset scissor to full screen */
+                    rdpq_set_scissor(0, 0, 320, 240);
 
-                    /* ===== GL STATIC MESHES (near rooms only) =====
-                     * Z-bias: scale static mesh positions slightly closer
-                     * to camera (0.999×) to win Z-test against coplanar
-                     * room walls.  glPolygonOffset not available in libdragon. */
-                    #define SM_Z_BIAS 0.997f  /* stronger bias to reduce Z-fighting flicker */
-                    for (int ri = 0; ri < near_count; ri++) {
+                    /* Record baked pass CPU time */
+                    {
+                        uint32_t d = TICKS_DISTANCE(perf_bkd_t0, TICKS_READ());
+                        perf_bkd_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
+
+                    /* Flush baked pass + reset TLUT before textured pass.
+                     * Baked pass uses CI4/CI8 baked tiles with TLUT;
+                     * textured pass re-enables it with the global pal16. */
+                    rdpq_mode_tlut(TLUT_NONE);
+                    rspq_flush();
+
+                    /* T3D viewport setup (used by Lara rendering) */
+                    static T3DViewport t3d_vp;
+                    static bool t3d_vp_init = false;
+                    if (!t3d_vp_init) {
+                        t3d_vp = t3d_viewport_create();
+                        t3d_vp_init = true;
+                    }
+                    t3d_viewport_set_projection(&t3d_vp, T3D_DEG_TO_RAD(60.0f), 10.0f, 32000.0f);
+                    /* Camera: build view matrix from cam rotation.
+                     * Position zeroed — subtracted from each object's matrix instead
+                     * (camera-relative rendering for fixed-point precision). */
+                    {
+                        T3DVec3 cam_eye = {{0, 0, 0}};
+                        float cp_t = cosf(cam_rot_x);
+                        T3DVec3 cam_tgt = {{
+                            sinf(cam_rot_y) * cp_t,
+                            sinf(cam_rot_x),
+                            cosf(cam_rot_y) * cp_t
+                        }};
+                        T3DVec3 cam_up = {{0, 1, 0}};
+                        t3d_viewport_look_at(&t3d_vp, &cam_eye, &cam_tgt, &cam_up);
+                    }
+
+                    /* Flip frame pool for double-buffered T3D matrices */
+                    t3d_frame_pool_idx ^= 1;
+                    t3d_frame_pool_pos = 0;
+
+                    uint32_t perf_tex_t0 = TICKS_READ(); /* start textured pass timer */
+
+                    /* ===== RDPQ TEXTURED PASS — ring 1, CI8 textures, z-buffered =====
+                     * Pure CPU transform + rdpq_triangle, same paradigm as baked pass. */
+
+                    /* RDPQ textured pass state:
+                     *  - CI8 + global pal16 TLUT (1 KB/tex vs 2 KB RGBA16)
+                     *  - TLUT uploaded once per frame; only tile re-uploads per change
+                     *  - Z-buffer: compare + write (depth clear already done above)
+                     *  - Bilinear filter for textured faces */
+                    rdpq_set_mode_standard();
+                    rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+                    rdpq_mode_blender(0);
+                    rdpq_mode_filter(FILTER_BILINEAR);
+                    rdpq_mode_zbuf(true, true);
+
+                    /* Upload the global CI8 palette once for the whole pass */
+                    rdpq_mode_tlut(TLUT_RGBA16);
+                    rdpq_tex_upload_tlut((uint16_t *)pal16, 0, 256);
+
+                    int tex_last_tex = -99; /* force first upload */
+                    int tex_uploads = 0;
+
+                    /* Debug: override textured pass with solid green */
+                    if (g_debug_dist_colors && dbg_tier_px) {
+                        rdpq_mode_tlut(TLUT_NONE);
+                        rdpq_tex_upload(TILE0, &dbg_tier_surf[0], NULL); /* green = near */
+                        tex_last_tex = -99;
+                    }
+
+                    /* ===== TEXTURED PASS: ROOM FACES ===== */
+                    { uint32_t _nr_t0 = TICKS_READ();
+                    /* CPU transform + near-plane clip + project → rdpq_triangle.
+                     * CI8 tiles (1 KB each) with shared pal16 TLUT.
+                     * Z-buffer already cleared above. */
+                    /* Fallback state persists across rooms — once budget fires,
+                     * ALL remaining near rooms use baked tiles instead of CI8. */
+                    bool tex_fallback_active = false;
+
+                    for (int ri = 0; ri < tex_count; ri++) {
+                        int room_idx = rooms_to_draw[ri];
+                        if (room_idx < 0 || room_idx >= g_level.room_count) continue;
+                        tr_room_t *room = &g_level.rooms[room_idx];
+                        bool is_water = (room->flags & 1) != 0;
+                        perf_tex_rooms++;
+
+                        /* Set portal scissor */
+                        if (room_idx < 256) {
+                            scissor_t sc = room_scissor[room_idx];
+                            if (sc.x1 > sc.x0 && sc.y1 > sc.y0)
+                                rdpq_set_scissor(sc.x0, sc.y0, sc.x1, sc.y1);
+                        }
+
+                        bool do_decimate = false;
+                        if (room_idx != lara_room && room_idx < g_chunk_count) {
+                            tr_chunk_t *c = &g_chunks[room_idx];
+                            if (c->dist_sq > c->near_dist2) do_decimate = true;
+                        }
+
+                        /* If already in fallback mode, upload this room's baked tile */
+                        if (tex_fallback_active &&
+                            baked_room_count > 0 && room_idx < baked_room_count) {
+                            float rd = (room_idx < g_chunk_count) ? g_chunks[room_idx].dist_sq : 0;
+                            rdpq_mode_tlut(TLUT_NONE);
+                            if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
+                            } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
+                                rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
+                            } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
+                                rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
+                            } else if (bkd_m1_surf) {
+                                rdpq_mode_tlut(TLUT_RGBA16);
+                                rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
+                                rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
+                            }
+                            tex_last_tex = -99;
+                        }
+
+                        float room_ox = (float)room->x - cam_x;
+                        float room_oz = (float)room->z - cam_z;
+
+                        /* ---- Vertex cache: transform all room vertices once ---- */
+                        int nv_room = room->mesh.vertex_count;
+                        if (nv_room > VTX_CACHE_MAX) nv_room = VTX_CACHE_MAX;
+
+                        /* TR1-style per-room fog — uses each room's own fog start
+                         * and max draw distance from level data. Per-vertex in the
+                         * vertex cache. Current room gets no fog. */
+                        bool room_has_fog = (room_idx != lara_room);
+                        float fog_near_sq = 0, fog_range_inv = 0;
+                        if (room_has_fog && room_idx < g_chunk_count) {
+                            fog_near_sq = g_chunks[room_idx].fog_start_dist2;
+                            float fr = g_chunks[room_idx].max_draw_dist2 - fog_near_sq;
+                            if (fr < 1.0f) fr = 1.0f;
+                            fog_range_inv = 1.0f / fr;
+                        }
+
+                        for (int vi = 0; vi < nv_room; vi++) {
+                            tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                            float cx_v = room_ox + rv->x;
+                            float cy_v = (float)rv->y - cam_y;
+                            float cz_v = room_oz + rv->z;
+                            float rx = cx_v * cy - cz_v * sy;
+                            float rz_yaw = cx_v * sy + cz_v * cy;
+                            vtx_cache[vi].rx = rx;
+                            vtx_cache[vi].ry = cy_v * cp - rz_yaw * sp;
+                            vtx_cache[vi].rz = cy_v * sp + rz_yaw * cp;
+
+                            float bright = 1.0f - ((float)rv->light / 8191.0f);
+                            if (bright < 0.0f) bright = 0.0f;
+                            if (bright > 1.0f) bright = 1.0f;
+                            bright = 0.4f + bright * 0.6f;
+                            float r = is_water ? bright * 0.4f : bright;
+                            float g = is_water ? bright * 0.6f : bright;
+                            float b = is_water ? bright * 1.0f : bright;
+
+                            if (room_has_fog) {
+                                float vx_w = room->x + rv->x;
+                                float vz_w = room->z + rv->z;
+                                float d2 = (vx_w-cam_x)*(vx_w-cam_x) + (vz_w-cam_z)*(vz_w-cam_z);
+                                float fog = (d2 - fog_near_sq) * fog_range_inv;
+                                if (fog < 0.0f) fog = 0.0f;
+                                if (fog > 0.85f) fog = 0.85f;
+                                float inv_fog = 1.0f - fog;
+                                r = r * inv_fog + active_fog_r * fog;
+                                g = g * inv_fog + active_fog_g * fog;
+                                b = b * inv_fog + active_fog_b * fog;
+                            }
+                            vtx_cache[vi].r = r;
+                            vtx_cache[vi].g = g;
+                            vtx_cache[vi].b = b;
+                        }
+
+                        /* ---- Face loop: index into cached vertices ---- */
+                        for (int f = 0; f < room->mesh.face_count; f++) {
+                            /* Check budget — switch to fallback instead of goto */
+                            if (!tex_fallback_active &&
+                                (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                 perf_tex_faces >= TEX_FACE_BUDGET)) {
+                                tex_fallback_active = true;
+                                /* Upload this room's baked tile as fallback.
+                                 * Pick tier by room distance. */
+                                if (baked_room_count > 0 && room_idx < baked_room_count) {
+                                    float rd = g_chunks[room_idx].dist_sq;
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    if (rd > g_dist_xxfar_sq && bkd_m4_surf) {
+                                        rdpq_tex_upload(TILE0, &bkd_m4_surf[room_idx], NULL);
+                                    } else if (rd > g_dist_xfar_sq && bkd_m3_surf) {
+                                        rdpq_tex_upload(TILE0, &bkd_m3_surf[room_idx], NULL);
+                                    } else if (rd > g_dist_vfar_sq && bkd_m2_surf) {
+                                        rdpq_mode_tlut(TLUT_RGBA16);
+                                        rdpq_tex_upload_tlut(bkd_m2_pal[room_idx], 0, 16);
+                                        rdpq_tex_upload(TILE0, &bkd_m2_surf[room_idx], NULL);
+                                    } else if (bkd_m1_surf) {
+                                        rdpq_mode_tlut(TLUT_RGBA16);
+                                        rdpq_tex_upload_tlut(bkd_m1_pal[room_idx], 0, 256);
+                                        rdpq_tex_upload(TILE0, &bkd_m1_surf[room_idx], NULL);
+                                    } else if (white_px) {
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    }
+                                    tex_last_tex = -99;
+                                } else if (white_px) {
+                                    /* No baked data — use white as last resort */
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    tex_last_tex = -2;
+                                }
+                            }
+
+                            perf_tex_faces++;
+                            tr_face_t *face = &room->mesh.faces[f];
+                            int nv = face->vertex_count;
+                            if (nv < 3) continue;
+
+                            if (do_decimate && (face->flags & FACE_FLAG_DETAIL)) {
+                                perf_tex_detail_skip++;
+                                continue;
+                            }
+
+                            /* Back-cull + distance cull from cache */
+                            {
+                                uint16_t v0i = face->vertices[0];
+                                if (v0i < nv_room) {
+                                    if (vtx_cache[v0i].rz < -1024.0f) {
+                                        perf_tex_culled++; continue;
+                                    }
+                                    float dx = vtx_cache[v0i].rx;
+                                    float dz = vtx_cache[v0i].rz;
+                                    if (dx*dx + dz*dz > g_max_draw_dist_sq) continue;
+                                }
+                            }
+
+                            uint16_t tex_idx = face->texture & 0x7FFF;
+                            bool is_flat = (face->texture & 0x8000) != 0;
+
+                            /* Texture upload on change.
+                             * In fallback mode: skip per-face uploads, use baked tile.
+                             * In debug mode: keep solid green. */
+                            if (tex_fallback_active || g_debug_dist_colors) {
+                                /* fallback/debug: use whatever tile is already bound */
+                            } else if (!is_flat && tex_idx < num_otex && ci8_surfs) {
+                                if ((int)tex_idx != tex_last_tex &&
+                                    tex_uploads < TEX_UPLOAD_BUDGET) {
+                                    UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
+                                    tex_last_tex = (int)tex_idx;
+                                    tex_uploads++;
+                                    perf_tex_binds++;
+                                }
+                            } else if (is_flat) {
+                                if (white_px && tex_last_tex != -2 &&
+                                    tex_uploads < TEX_UPLOAD_BUDGET) {
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    tex_last_tex = -2;
+                                    tex_uploads++;
+                                }
+                            } else continue;
+
+                            tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
+                                ? &g_level.object_textures[tex_idx] : NULL;
+
+                            /* Look up cached vertices — no per-face transform */
+                            float cv[4][8];
+                            bool any_behind = false, all_behind = true;
+                            bool ok = true;
+                            for (int v = 0; v < nv; v++) {
+                                uint16_t vi = face->vertices[v];
+                                if (vi >= nv_room) { ok = false; break; }
+
+                                cv[v][0] = vtx_cache[vi].rx;
+                                cv[v][1] = vtx_cache[vi].ry;
+                                cv[v][2] = vtx_cache[vi].rz;
+
+                                if (cv[v][2] < NEAR_Z) any_behind = true;
+                                else all_behind = false;
+
+                                /* Color from cache (already lit + fogged) */
+                                float r = vtx_cache[vi].r;
+                                float g = vtx_cache[vi].g;
+                                float b = vtx_cache[vi].b;
+
+                                /* UV computation */
+                                float ts = 0, tt = 0;
+                                if (tex_fallback_active && room_idx < g_chunk_count) {
+                                    /* Fallback: map baked tile across room footprint */
+                                    tr_room_vertex_t *rv = &room->mesh.vertices[vi];
+                                    float wx = (float)(room->x + rv->x);
+                                    float wz = (float)(room->z + rv->z);
+                                    tr_chunk_t *ck = &g_chunks[room_idx];
+                                    float rw = ck->max_x - ck->min_x;
+                                    float rd = ck->max_z - ck->min_z;
+                                    if (rw < 1.0f) rw = 1.0f;
+                                    if (rd < 1.0f) rd = 1.0f;
+                                    ts = ((wx - ck->min_x) / rw) * 16.0f;
+                                    tt = ((wz - ck->min_z) / rd) * 16.0f;
+                                    if (ts < 0) ts = 0;
+                                    if (ts > 16.0f) ts = 16.0f;
+                                    if (tt < 0) tt = 0;
+                                    if (tt > 16.0f) tt = 16.0f;
+                                } else if (otex && tex_uv_map) {
+                                    float tu = (float)(otex->uv[v].u >> 8);
+                                    float tv = (float)(otex->uv[v].v >> 8);
+                                    ts = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
+                                    tt = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
+                                } else if (is_flat) {
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    r = (float)g_level.palette[ci*3+0] / 63.0f;
+                                    g = (float)g_level.palette[ci*3+1] / 63.0f;
+                                    b = (float)g_level.palette[ci*3+2] / 63.0f;
+                                }
+
+                                cv[v][0] = vtx_cache[vi].rx;
+                                cv[v][1] = vtx_cache[vi].ry;
+                                cv[v][2] = vtx_cache[vi].rz;
+                                cv[v][3] = r; cv[v][4] = g; cv[v][5] = b;
+                                cv[v][6] = ts; cv[v][7] = tt;
+                            }
+                            if (!ok || all_behind) continue;
+
+                            /* Near-plane clip — ALWAYS clip if any vertex is behind,
+                             * even if the sphere test said the room is in front.
+                             * The sphere is approximate; individual vertices can
+                             * still be behind NEAR_Z, causing wild perspective
+                             * distortion (texture swimming) if not clipped. */
+                            float clipped[6][8];
+                            int clip_nv = nv;
+                            if (any_behind) {
+                                clip_nv = 0;
+                                for (int i = 0; i < nv; i++) {
+                                    int j = (i + 1) % nv;
+                                    float zi = cv[i][2], zj = cv[j][2];
+                                    bool i_in = (zi >= NEAR_Z), j_in = (zj >= NEAR_Z);
+                                    if (i_in) {
+                                        for (int k=0;k<8;k++) clipped[clip_nv][k]=cv[i][k];
+                                        clip_nv++;
+                                    }
+                                    if (i_in != j_in) {
+                                        float t = (NEAR_Z - zi) / (zj - zi);
+                                        for (int k=0;k<8;k++)
+                                            clipped[clip_nv][k]=cv[i][k]+t*(cv[j][k]-cv[i][k]);
+                                        clip_nv++;
+                                    }
+                                }
+                                if (clip_nv < 3) continue;
+                            } else {
+                                for (int i=0;i<nv;i++)
+                                    for (int k=0;k<8;k++) clipped[i][k]=cv[i][k];
+                            }
+
+                            /* Project to screen space */
+                            float sv_raw[8][10];
+                            bool any_outside = false;
+                            for (int v = 0; v < clip_nv; v++) {
+                                float rz = clipped[v][2];
+                                float inv_z = 256.0f / rz;
+                                float scx = 160.0f + clipped[v][0] * inv_z;
+                                float scy = 120.0f + clipped[v][1] * inv_z;
+                                if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                    scy < GUARD_LO_Y || scy > GUARD_HI_Y)
+                                    any_outside = true;
+                                sv_raw[v][0]=scx;   sv_raw[v][1]=scy;
+                                sv_raw[v][2]=rz/32768.0f; if(sv_raw[v][2]>1.0f) sv_raw[v][2]=1.0f;
+                                sv_raw[v][3]=clipped[v][3]; sv_raw[v][4]=clipped[v][4];
+                                sv_raw[v][5]=clipped[v][5]; sv_raw[v][6]=1.0f;
+                                sv_raw[v][7]=clipped[v][6]; sv_raw[v][8]=clipped[v][7];
+                                sv_raw[v][9]=1.0f; /* affine texturing (PS1 style) — stable, no swimming */
+                            }
+
+                            /* Screen-space S-H clip against guard band (4 edges).
+                             * Only runs for faces with vertices outside the band. */
+                            float (*sv_src)[10] = sv_raw;
+                            int sv_nv = clip_nv;
+                            float sv_tmp1[8][10], sv_tmp2[8][10];
+                            if (any_outside) {
+                                /* Clip left (x >= GUARD_LO_X) */
+                                int out_nv = 0;
+                                for (int i = 0; i < sv_nv; i++) {
+                                    int j = (i+1) % sv_nv;
+                                    bool ii = sv_src[i][0] >= GUARD_LO_X;
+                                    bool ji = sv_src[j][0] >= GUARD_LO_X;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_src[i][k]; out_nv++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_LO_X-sv_src[i][0])/(sv_src[j][0]-sv_src[i][0]);
+                                        for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_src[i][k]+t*(sv_src[j][k]-sv_src[i][k]);
+                                        out_nv++;
+                                    }
+                                    if (out_nv >= 8) break;
+                                }
+                                /* Clip right (x <= GUARD_HI_X) */
+                                int out2 = 0;
+                                for (int i = 0; i < out_nv; i++) {
+                                    int j = (i+1) % out_nv;
+                                    bool ii = sv_tmp1[i][0] <= GUARD_HI_X;
+                                    bool ji = sv_tmp1[j][0] <= GUARD_HI_X;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]; out2++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_HI_X-sv_tmp1[i][0])/(sv_tmp1[j][0]-sv_tmp1[i][0]);
+                                        for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]+t*(sv_tmp1[j][k]-sv_tmp1[i][k]);
+                                        out2++;
+                                    }
+                                    if (out2 >= 8) break;
+                                }
+                                /* Clip top (y >= GUARD_LO_Y) */
+                                out_nv = 0;
+                                for (int i = 0; i < out2; i++) {
+                                    int j = (i+1) % out2;
+                                    bool ii = sv_tmp2[i][1] >= GUARD_LO_Y;
+                                    bool ji = sv_tmp2[j][1] >= GUARD_LO_Y;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_tmp2[i][k]; out_nv++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_LO_Y-sv_tmp2[i][1])/(sv_tmp2[j][1]-sv_tmp2[i][1]);
+                                        for(int k=0;k<10;k++) sv_tmp1[out_nv][k]=sv_tmp2[i][k]+t*(sv_tmp2[j][k]-sv_tmp2[i][k]);
+                                        out_nv++;
+                                    }
+                                    if (out_nv >= 8) break;
+                                }
+                                /* Clip bottom (y <= GUARD_HI_Y) */
+                                out2 = 0;
+                                for (int i = 0; i < out_nv; i++) {
+                                    int j = (i+1) % out_nv;
+                                    bool ii = sv_tmp1[i][1] <= GUARD_HI_Y;
+                                    bool ji = sv_tmp1[j][1] <= GUARD_HI_Y;
+                                    if (ii) { for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]; out2++; }
+                                    if (ii!=ji) {
+                                        float t=(GUARD_HI_Y-sv_tmp1[i][1])/(sv_tmp1[j][1]-sv_tmp1[i][1]);
+                                        for(int k=0;k<10;k++) sv_tmp2[out2][k]=sv_tmp1[i][k]+t*(sv_tmp1[j][k]-sv_tmp1[i][k]);
+                                        out2++;
+                                    }
+                                    if (out2 >= 8) break;
+                                }
+                                sv_src = sv_tmp2;
+                                sv_nv = out2;
+                                if (sv_nv < 3) continue;
+                            }
+
+                            int num_tris = sv_nv - 2;
+                            for (int tri = 0; tri < num_tris; tri++) {
+                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv_src[0], sv_src[tri+1], sv_src[tri+2]);
+                                perf_tex_tris++;
+                                if ((perf_tex_tris & 7) == 0) rspq_flush();
+                            }
+                        }
+                    }
+
+                    /* Reset scissor for Lara/items/shadow (not room-clipped) */
+                    rdpq_set_scissor(0, 0, 320, 240);
+                    perf_tex_room_us = (uint32_t)((float)TICKS_DISTANCE(_nr_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end room faces timing */
+
+                    /* ===== TEXTURED PASS: STATIC MESHES ===== */
+                    { uint32_t _sm_t0 = TICKS_READ();
+                    /* Z-bias: pull mesh slightly toward camera to win Z-test
+                     * against coplanar room walls (no glPolygonOffset in RDPQ). */
+                    #define SM_Z_BIAS 0.997f
+                    for (int ri = 0; ri < tex_count; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
                         tr_room_t *room = &g_level.rooms[room_idx];
@@ -1984,17 +3761,13 @@ int main(void) {
                         for (int si = 0; si < room->static_mesh_count; si++) {
                             tr_room_static_mesh_t *sm = &room->static_meshes[si];
 
-                            /* Quick frustum cull */
                             float sdx = (float)sm->pos.x - cam_x;
                             float sdz = (float)sm->pos.z - cam_z;
                             float sm_rz = sdx * sy + sdz * cy;
                             if (sm_rz < -1024) continue;
                             float sm_rx = sdx * cy - sdz * sy;
-                            /* Only apply horizontal frustum cull at distance —
-                             * when close, the mesh is visible even if off-center */
-                            if (sm_rz > 1024) { float l = sm_rz * 3.0f; if (sm_rx > l || sm_rx < -l) continue; }
+                            if (sm_rz > 1024) { float l=sm_rz*3.0f; if(sm_rx>l||sm_rx<-l) continue; }
 
-                            /* Find static object definition */
                             int mesh_idx = -1;
                             for (int oi = 0; oi < g_level.static_object_count; oi++) {
                                 if (g_level.static_objects[oi].object_id == sm->static_mesh_id) {
@@ -2009,100 +3782,124 @@ int main(void) {
                             float sm_bright = 1.0f - (float)sm->shade / 8191.0f;
                             if (sm_bright < 0.1f) sm_bright = 0.1f;
                             if (sm_bright > 1.0f) sm_bright = 1.0f;
-
                             float sm_yaw = (float)sm->rotation * 3.14159f / 32768.0f;
                             float sm_sy_r = sinf(sm_yaw), sm_cy_r = cosf(sm_yaw);
 
                             for (int f = 0; f < mesh->face_count && f < 100; f++) {
+                                if (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                    perf_tex_faces >= TEX_FACE_BUDGET) goto near_pass_done;
+                                perf_tex_faces++;
                                 tr_face_t *face = &mesh->faces[f];
                                 int nv = face->vertex_count;
                                 if (nv < 3) continue;
 
                                 uint16_t tex_idx = face->texture & 0x7FFF;
                                 bool is_flat = (face->texture & 0x8000) != 0;
-                                int want_tex;
-                                uint8_t sm_fr = (uint8_t)(sm_bright * 255.0f);
-                                uint8_t sm_fg = sm_fr, sm_fb = sm_fr;
-                                if (is_flat) {
-                                    want_tex = -2;
-                                    uint8_t ci = tex_idx & 0xFF;
-                                    sm_fr = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * sm_bright * 255.0f);
-                                    sm_fg = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * sm_bright * 255.0f);
-                                    sm_fb = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * sm_bright * 255.0f);
-                                } else if (tex_idx < num_otex && gl_textures) {
-                                    want_tex = (int)tex_idx;
-                                } else continue;
+                                float sm_fr, sm_fg, sm_fb;
 
-                                if (want_tex != cur_tex) {
-                                    FLUSH_GL();
-                                    if (want_tex == -2 && gl_white_tex)
-                                        glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                    else if (want_tex >= 0)
-                                        glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                    cur_tex = want_tex;
-                                }
+                                if (is_flat) {
+                                    uint8_t ci = tex_idx & 0xFF;
+                                    sm_fr = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
+                                    sm_fg = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
+                                    sm_fb = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
+                                    if (white_px && tex_last_tex != -2) {
+                                        rdpq_mode_tlut(TLUT_NONE);
+                                        rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                        tex_last_tex = -2;
+                                    }
+                                } else if (tex_idx < num_otex && ci8_surfs) {
+                                    sm_fr = sm_fg = sm_fb = sm_bright;
+                                    if ((int)tex_idx != tex_last_tex) {
+                                        UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
+                                        tex_last_tex = (int)tex_idx;
+                                    }
+                                } else continue;
 
                                 tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
                                     ? &g_level.object_textures[tex_idx] : NULL;
 
-                                int num_tris = nv - 2;
-                                if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                                float px[4], py[4], pz[4], fs[4], ft[4];
+                                float sv[4][10];
                                 bool ok = true;
+                                float sm_cv[4][8];
+                                bool sm_any_behind = false, sm_all_behind = true;
                                 for (int v = 0; v < nv; v++) {
                                     uint16_t vi = face->vertices[v];
                                     if (vi >= mesh->vertex_count) { ok = false; break; }
-
-                                    /* Local → world: rotate by yaw + translate */
                                     float lx = (float)mesh->vertices[vi].x;
                                     float lz = (float)mesh->vertices[vi].z;
-                                    float wx = (float)sm->pos.x + lx * sm_cy_r - lz * sm_sy_r;
+                                    float wx = (float)sm->pos.x + lx*sm_cy_r - lz*sm_sy_r;
                                     float wy = (float)sm->pos.y + (float)mesh->vertices[vi].y;
-                                    float wz = (float)sm->pos.z + lx * sm_sy_r + lz * sm_cy_r;
-
-                                    /* Camera-relative (CPU subtract, RSP rotates).
-                                     * SM_Z_BIAS pulls mesh slightly toward camera
-                                     * to win Z-test against coplanar room walls. */
-                                    px[v] = (wx - cam_x) * WORLD_SCALE * SM_Z_BIAS;
-                                    py[v] = -(wy - cam_y) * WORLD_SCALE * SM_Z_BIAS;
-                                    pz[v] = -(wz - cam_z) * WORLD_SCALE * SM_Z_BIAS;
-
-                                    /* Palette color for flat, uniform shade for textured */
-
+                                    float wz = (float)sm->pos.z + lx*sm_sy_r + lz*sm_cy_r;
+                                    /* Z-bias: shrink toward camera */
+                                    wx = cam_x + (wx - cam_x) * SM_Z_BIAS;
+                                    wy = cam_y + (wy - cam_y) * SM_Z_BIAS;
+                                    wz = cam_z + (wz - cam_z) * SM_Z_BIAS;
+                                    float cx_v=wx-cam_x, cy_v=wy-cam_y, cz_v=wz-cam_z;
+                                    float rx=cx_v*cy-cz_v*sy;
+                                    float rz_yaw=cx_v*sy+cz_v*cy;
+                                    float ry=cy_v*cp-rz_yaw*sp;
+                                    float rz=cy_v*sp+rz_yaw*cp;
+                                    if (rz < NEAR_Z) sm_any_behind=true; else sm_all_behind=false;
+                                    float ts=0, tt=0;
                                     if (otex && tex_uv_map) {
-                                        float tu = (float)(otex->uv[v].u >> 8);
-                                        float tv = (float)(otex->uv[v].v >> 8);
-                                        float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                        float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                        float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                        fs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                        ft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                    } else {
-                                        fs[v] = 0; ft[v] = 0;
+                                        float tu=(float)(otex->uv[v].u>>8);
+                                        float tv=(float)(otex->uv[v].v>>8);
+                                        ts=(tu-tex_uv_map[tex_idx*4+0])*tex_uv_map[tex_idx*4+2];
+                                        tt=(tv-tex_uv_map[tex_idx*4+1])*tex_uv_map[tex_idx*4+3];
                                     }
+                                    sm_cv[v][0]=rx; sm_cv[v][1]=ry; sm_cv[v][2]=rz;
+                                    sm_cv[v][3]=sm_fr; sm_cv[v][4]=sm_fg; sm_cv[v][5]=sm_fb;
+                                    sm_cv[v][6]=ts; sm_cv[v][7]=tt;
                                 }
-                                if (!ok) continue;
+                                if (!ok || sm_all_behind) continue;
 
-                                for (int tri = 0; tri < num_tris; tri++) {
-                                    int idx[3] = {0, tri+1, tri+2};
-                                    for (int k = 0; k < 3; k++) {
-                                        int i = idx[k];
-                                        gl_vert_t *vp = &gl_verts[gl_vc++];
-                                        vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                        vp->r = sm_fr; vp->g = sm_fg; vp->b = sm_fb; vp->a = 255;
-                                        vp->s = fs[i]; vp->t = ft[i];
+                                float sm_cl[6][8]; int sm_cnv = nv;
+                                if (sm_any_behind) {
+                                    sm_cnv = 0;
+                                    for (int i=0;i<nv;i++) {
+                                        int j=(i+1)%nv;
+                                        float zi=sm_cv[i][2],zj=sm_cv[j][2];
+                                        bool ii=(zi>=NEAR_Z),ji=(zj>=NEAR_Z);
+                                        if (ii){for(int k=0;k<8;k++)sm_cl[sm_cnv][k]=sm_cv[i][k];sm_cnv++;}
+                                        if(ii!=ji){float t=(NEAR_Z-zi)/(zj-zi);for(int k=0;k<8;k++)sm_cl[sm_cnv][k]=sm_cv[i][k]+t*(sm_cv[j][k]-sm_cv[i][k]);sm_cnv++;}
                                     }
+                                    if(sm_cnv<3) continue;
+                                } else { for(int i=0;i<nv;i++) for(int k=0;k<8;k++) sm_cl[i][k]=sm_cv[i][k]; }
+
+                                bool sm_guard_ok = true;
+                                for (int v=0;v<sm_cnv;v++) {
+                                    float rz=sm_cl[v][2];
+                                    float inv_z=256.0f/rz;
+                                    float scx=160.0f+sm_cl[v][0]*inv_z;
+                                    float scy=120.0f+sm_cl[v][1]*inv_z;
+                                    if (scx < GUARD_LO_X || scx > GUARD_HI_X ||
+                                        scy < GUARD_LO_Y || scy > GUARD_HI_Y) {
+                                        sm_guard_ok = false; break;
+                                    }
+                                    sv[v][0]=scx; sv[v][1]=scy;
+                                    sv[v][2]=rz/32768.0f; if(sv[v][2]>1.0f)sv[v][2]=1.0f;
+                                    sv[v][3]=sm_cl[v][3]; sv[v][4]=sm_cl[v][4]; sv[v][5]=sm_cl[v][5];
+                                    sv[v][6]=1.0f;
+                                    sv[v][7]=sm_cl[v][6]; sv[v][8]=sm_cl[v][7];
+                                    sv[v][9]=1.0f; /* affine */
+                                }
+                                if (!sm_guard_ok) continue;
+                                int num_tris = sm_cnv - 2;
+                                for (int tri=0;tri<num_tris;tri++) {
+                                    rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[tri+1], sv[tri+2]);
+                                    perf_tex_tris++;
+                                    if ((perf_tex_tris & 7) == 0) rspq_flush();
                                 }
                             }
                         }
                     }
-                    FLUSH_GL();
-
                     #undef SM_Z_BIAS
+                    perf_tex_sm_us = (uint32_t)((float)TICKS_DISTANCE(_sm_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end static meshes timing */
 
-                    /* ===== GL LARA ===== */
-                    {
+                    /* ===== TEXTURED PASS: LARA (T3D) ===== */
+                    { uint32_t _la_t0 = TICKS_READ();
+                    if (t3d_lara_ready) {
                         static tr_object_def_t *lara_obj = NULL;
                         static tr_item_t *lara_item = NULL;
                         static bool lara_found = false;
@@ -2115,13 +3912,24 @@ int main(void) {
                         }
 
                         if (lara_obj && lara_item && lara_obj->mesh_count > 0) {
+                            /* ---- T3D Lara rendering ----
+                             * CPU: builds per-bone world matrix (same bone traversal)
+                             * RSP: vertex transform + clipping + triangle rasterization
+                             * Cost: ~1-4ms vs ~40ms CPU-projected */
+                            static bool t3d_lara_once = false;
+                            if (!t3d_lara_once) {
+                                printf("T3D Lara: rendering %d meshes via RSP\n", lara_obj->mesh_count);
+                                t3d_lara_once = true;
+                            }
+
                             int mc = lara_obj->mesh_count;
-                            if (mc > 15) mc = 15;
+                            if (mc > T3D_LARA_MAX_MESHES) mc = T3D_LARA_MAX_MESHES;
                             int frame_size = 9 + mc * 2;
                             int base_off = lara_obj->frame_offset / 2;
                             int16_t *lfr = (g_level.anim_frames && base_off + frame_size <= g_level.anim_frame_count)
                                          ? &g_level.anim_frames[base_off] : NULL;
 
+                            /* Bone traversal — same push/pop as before */
                             float ps[8][3]; int psp = 0;
                             float bx = (float)lara_item->pos.x;
                             float by = (float)lara_item->pos.y;
@@ -2136,7 +3944,7 @@ int main(void) {
                                 bz += ox * lsy_r + oz * lcy_r;
                             }
 
-                            /* Dynamic lighting from room */
+                            /* Dynamic lighting */
                             float lara_shade = 1.0f;
                             if (lara_room >= 0 && lara_room < g_level.room_count) {
                                 tr_room_t *rm = &g_level.rooms[lara_room];
@@ -2150,16 +3958,42 @@ int main(void) {
                                     float ldz = bz - (float)rm->lights[li].pos.z;
                                     float ld2 = ldx*ldx + ldy*ldy + ldz*ldz;
                                     float lfo = (float)rm->lights[li].falloff;
-                                    float lfo2 = lfo * lfo;
-                                    if (lfo > 0 && ld2 < lfo2)
-                                        light_add += ((float)rm->lights[li].intensity / 8191.0f) * (1.0f - ld2 / lfo2);
+                                    if (lfo > 0 && ld2 < lfo*lfo)
+                                        light_add += ((float)rm->lights[li].intensity / 8191.0f) * (1.0f - ld2 / (lfo*lfo));
                                 }
                                 lara_shade = amb + light_add;
                                 if (lara_shade > 1.0f) lara_shade = 1.0f;
                                 if (lara_shade < 0.1f) lara_shade = 0.1f;
                             }
-                            uint8_t lshade = (uint8_t)(lara_shade * 255.0f);
 
+                            /* Set up T3D for Lara rendering.
+                             * Do NOT call t3d_frame_start() — it resets rdpq mode
+                             * and would clear everything already drawn this frame.
+                             * Just attach the viewport and set T3D state directly. */
+                            rspq_flush();
+                            t3d_viewport_attach(&t3d_vp);
+                            rdpq_set_mode_standard();
+                            rdpq_mode_combiner(RDPQ_COMBINER_SHADE);
+                            rdpq_mode_zbuf(true, true);
+                            t3d_state_set_drawflags(T3D_FLAG_DEPTH | T3D_FLAG_SHADED);
+
+                            /* Set ambient light to Lara's computed shade */
+                            uint8_t shade8 = (uint8_t)(lara_shade * 255.0f);
+                            uint8_t ambient[4] = { shade8, shade8, shade8, 0xFF };
+                            t3d_light_set_ambient(ambient);
+                            t3d_light_set_count(0);
+
+                            /* Frame pool: reset for this frame's matrices */
+                            t3d_frame_pool_pos = 0;
+
+                            /* Camera-relative: subtract camera pos from Lara pos
+                             * to prevent fixed-point overflow in T3D matrices */
+                            float lara_rel_x = bx - cam_x;
+                            float lara_rel_y = by - cam_y;
+                            float lara_rel_z = bz - cam_z;
+
+                            /* Build per-mesh world matrix and render */
+                            t3d_matrix_push_pos(1);
                             for (int mi = 0; mi < mc; mi++) {
                                 if (mi > 0) {
                                     int bi = lara_obj->bone_idx + (mi - 1);
@@ -2172,164 +4006,35 @@ int main(void) {
                                         by += (float)bone->y;
                                         bz += ox*lsy_r + oz*lcy_r;
                                     }
+                                    lara_rel_x = bx - cam_x;
+                                    lara_rel_y = by - cam_y;
+                                    lara_rel_z = bz - cam_z;
                                 }
 
-                                int gmi = lara_obj->mesh_idx + mi;
-                                if (gmi >= g_level.mesh_count) continue;
-                                tr_object_mesh_t *mesh = &g_level.meshes[gmi];
+                                if (!t3d_lara_blocks[mi]) continue;
 
-                                for (int f = 0; f < mesh->face_count; f++) {
-                                    tr_face_t *face = &mesh->faces[f];
-                                    int nv = face->vertex_count;
-                                    if (nv < 3) continue;
+                                /* Build model matrix: rotation + camera-relative translation */
+                                T3DMat4FP *mtx = UncachedAddr(t3d_frame_alloc(sizeof(T3DMat4FP)));
+                                t3d_mat4fp_from_srt_euler(mtx,
+                                    (float[3]){1.0f, 1.0f, 1.0f},
+                                    (float[3]){0, lyaw, 0},
+                                    (float[3]){lara_rel_x, lara_rel_y, lara_rel_z});
 
-                                    uint16_t tex_idx = face->texture & 0x7FFF;
-                                    bool is_flat = (face->texture & 0x8000) != 0;
-                                    int want_tex;
-                                    /* Flat-colored face: look up palette color */
-                                    uint8_t flat_r = lshade, flat_g = lshade, flat_b = lshade;
-                                    if (is_flat) {
-                                        want_tex = -2;
-                                        uint8_t ci = tex_idx & 0xFF;
-                                        flat_r = (uint8_t)((float)g_level.palette[ci*3+0] / 63.0f * lara_shade * 255.0f);
-                                        flat_g = (uint8_t)((float)g_level.palette[ci*3+1] / 63.0f * lara_shade * 255.0f);
-                                        flat_b = (uint8_t)((float)g_level.palette[ci*3+2] / 63.0f * lara_shade * 255.0f);
-                                    } else if (tex_idx < num_otex && gl_textures) {
-                                        want_tex = (int)tex_idx;
-                                    } else continue;
-
-                                    if (want_tex != cur_tex) {
-                                        FLUSH_GL();
-                                        if (want_tex == -2 && gl_white_tex)
-                                            glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                        else if (want_tex >= 0)
-                                            glBindTexture(GL_TEXTURE_2D, gl_textures[want_tex]);
-                                        cur_tex = want_tex;
-                                    }
-
-                                    tr_object_texture_t *otex = (!is_flat && tex_idx < g_level.object_texture_count)
-                                        ? &g_level.object_textures[tex_idx] : NULL;
-
-                                    int num_tris = nv - 2;
-                                    if (gl_vc + num_tris * 3 > MAX_GL_VERTS) FLUSH_GL();
-
-                                    float px[4], py[4], pz[4], ffs[4], fft[4];
-                                    bool ok = true;
-                                    for (int v = 0; v < nv; v++) {
-                                        uint16_t vi = face->vertices[v];
-                                        if (vi >= mesh->vertex_count) { ok = false; break; }
-                                        float vx = (float)mesh->vertices[vi].x;
-                                        float vz = (float)mesh->vertices[vi].z;
-                                        float wx = bx + vx*lcy_r - vz*lsy_r;
-                                        float wy = by + (float)mesh->vertices[vi].y;
-                                        float wz = bz + vx*lsy_r + vz*lcy_r;
-
-                                        px[v] = (wx - cam_x) * WORLD_SCALE;
-                                        py[v] = -(wy - cam_y) * WORLD_SCALE;
-                                        pz[v] = -(wz - cam_z) * WORLD_SCALE;
-
-                                        if (otex && tex_uv_map) {
-                                            float tu = (float)(otex->uv[v].u >> 8);
-                                            float tv = (float)(otex->uv[v].v >> 8);
-                                            float s_px = (tu - tex_uv_map[tex_idx*4+0]) * tex_uv_map[tex_idx*4+2];
-                                            float t_px = (tv - tex_uv_map[tex_idx*4+1]) * tex_uv_map[tex_idx*4+3];
-                                            float half_t = 0.5f / (float)TEX_TILE_DIM;
-                                            ffs[v] = s_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                            fft[v] = t_px / (float)TEX_TILE_DIM * (1.0f - 2.0f*half_t) + half_t;
-                                        } else {
-                                            ffs[v] = 0; fft[v] = 0;
-                                        }
-                                    }
-                                    if (!ok) continue;
-
-                                    for (int tri = 0; tri < num_tris; tri++) {
-                                        int idx[3] = {0, tri+1, tri+2};
-                                        for (int k = 0; k < 3; k++) {
-                                            int i = idx[k];
-                                            gl_vert_t *vp = &gl_verts[gl_vc++];
-                                            vp->x = px[i]; vp->y = py[i]; vp->z = pz[i];
-                                            vp->r = is_flat ? flat_r : lshade;
-                                            vp->g = is_flat ? flat_g : lshade;
-                                            vp->b = is_flat ? flat_b : lshade;
-                                            vp->a = 255;
-                                            vp->s = ffs[i]; vp->t = fft[i];
-                                        }
-                                    }
-                                }
+                                t3d_matrix_set(mtx, true);
+                                rspq_block_run(t3d_lara_blocks[mi]);
+                                perf_tex_tris += t3d_lara_vert_counts[mi]; /* approximate */
                             }
-                        }
-                    }
-                    FLUSH_GL();
+                            t3d_matrix_pop(1);
 
-                    /* ===== LARA SHADOW (dark circle on floor) ===== */
-                    {
-                        /* Use Lara's item position directly */
-                        tr_item_t *shadow_item = NULL;
-                        for (int i = 0; i < g_level.item_count; i++)
-                            if (g_level.items[i].object_id == 0) { shadow_item = &g_level.items[i]; break; }
-
-                        if (shadow_item) {
-                            int32_t shadow_fl, shadow_cl;
-                            GET_SECTOR_HEIGHTS(shadow_item->pos.x, shadow_item->pos.z,
-                                               shadow_item->pos.y, shadow_fl, shadow_cl);
-                            float shadow_y = (float)shadow_fl + 4.0f;
-                            float shadow_rad = 120.0f;
-                            float shadow_cx_w = (float)shadow_item->pos.x;
-                            float shadow_cz_w = (float)shadow_item->pos.z;
-
-                            if (gl_white_tex) {
-                                FLUSH_GL();
-                                glBindTexture(GL_TEXTURE_2D, gl_white_tex);
-                                cur_tex = -2;
-                            }
-
-                            glEnable(GL_BLEND);
-                            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                            glDepthMask(GL_FALSE);
-
-                            float sc_x = (shadow_cx_w - cam_x) * WORLD_SCALE;
-                            float sc_y = -(shadow_y - cam_y) * WORLD_SCALE;
-                            float sc_z = -(shadow_cz_w - cam_z) * WORLD_SCALE;
-
-                            #define SHADOW_PTS 12
-                            float rim_x[SHADOW_PTS], rim_z2[SHADOW_PTS];
-                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
-                                float a = (float)sp3 * 6.28318f / (float)SHADOW_PTS;
-                                float wx = shadow_cx_w + shadow_rad * sinf(a);
-                                float wz = shadow_cz_w + shadow_rad * cosf(a);
-                                rim_x[sp3] = (wx - cam_x) * WORLD_SCALE;
-                                rim_z2[sp3] = -(wz - cam_z) * WORLD_SCALE;
-                            }
-
-                            for (int sp3 = 0; sp3 < SHADOW_PTS; sp3++) {
-                                int next = (sp3 + 1) % SHADOW_PTS;
-                                if (gl_vc + 3 > MAX_GL_VERTS) FLUSH_GL();
-                                gl_vert_t *v0 = &gl_verts[gl_vc++];
-                                v0->x = sc_x; v0->y = sc_y; v0->z = sc_z;
-                                v0->r = 0; v0->g = 0; v0->b = 0; v0->a = 160;
-                                v0->s = 0; v0->t = 0;
-                                gl_vert_t *v1 = &gl_verts[gl_vc++];
-                                v1->x = rim_x[sp3]; v1->y = sc_y; v1->z = rim_z2[sp3];
-                                v1->r = 0; v1->g = 0; v1->b = 0; v1->a = 80;
-                                v1->s = 0; v1->t = 0;
-                                gl_vert_t *v2 = &gl_verts[gl_vc++];
-                                v2->x = rim_x[next]; v2->y = sc_y; v2->z = rim_z2[next];
-                                v2->r = 0; v2->g = 0; v2->b = 0; v2->a = 80;
-                                v2->s = 0; v2->t = 0;
-                            }
-                            FLUSH_GL();
-
-                            glDisable(GL_BLEND);
-                            glDepthMask(GL_TRUE);
-                            #undef SHADOW_PTS
+                            /* Restore rdpq state for remaining textured pass */
+                            rdpq_set_mode_standard();
+                            rdpq_mode_combiner(RDPQ_COMBINER_TEX_SHADE);
+                            rdpq_mode_zbuf(true, true);
+                            rdpq_mode_filter(FILTER_BILINEAR);
                         }
                     }
 
-                    } /* end GL near pass */
-
-                    #undef FLUSH_GL
-
-#if 0 /* TODO: Convert these to GL (phase 2) — rdpq conflicts with GL context */
+#if 0 /* ROOM SPRITES — disabled (out-of-scope loop variable) */
                         /* ===== ROOM SPRITES (billboarded quads) ===== */
                         for (int si = 0; si < room->mesh.sprite_count && si < 20; si++) {
                             uint16_t svi = room->mesh.sprite_vertices[si];
@@ -2375,9 +4080,9 @@ int main(void) {
                             spr_bright *= (1.0f - rz_s / 16384.0f);
                             if (spr_bright < 0) spr_bright = 0;
 
-                            if (white_px && last_tex_idx != -2) {
+                            if (white_px && tex_last_tex != -2) {
                                 rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                last_tex_idx = -2;
+                                tex_last_tex = -2;
                             }
 
                             float sv[4][10];
@@ -2390,14 +4095,16 @@ int main(void) {
                             for (int v = 0; v < 4; v++) {
                                 sv[v][3]=spr_bright; sv[v][4]=spr_bright*0.9f;
                                 sv[v][5]=spr_bright*0.7f; sv[v][6]=1.0f;
-                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=1.0f/rz_s;
+                                sv[v][7]=0; sv[v][8]=0; sv[v][9]=1.0f; /* affine */
                             }
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
                             rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
                         }
                     }
 
-                    /* ===== DRAW STATIC OBJECTS ===== */
+#endif /* ROOM SPRITES disabled */
+
+#if 0 /* DRAW STATIC OBJECTS — superseded by TEXTURED PASS: STATIC MESHES (CI8, z-bias) */
                     for (int ri = 0; ri < num_draw; ri++) {
                         int room_idx = rooms_to_draw[ri];
                         if (room_idx < 0 || room_idx >= g_level.room_count) continue;
@@ -2449,15 +4156,15 @@ int main(void) {
                                     fr_r = (float)g_level.palette[ci*3+0] / 63.0f * sm_bright;
                                     fr_g = (float)g_level.palette[ci*3+1] / 63.0f * sm_bright;
                                     fr_b = (float)g_level.palette[ci*3+2] / 63.0f * sm_bright;
-                                    if (white_px && last_tex_idx != -2) {
+                                    if (white_px && tex_last_tex != -2) {
                                         rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                        last_tex_idx = -2;
+                                        tex_last_tex = -2;
                                     }
                                 } else if (tex_idx < num_otex) {
                                     otex = &g_level.object_textures[tex_idx];
-                                    if ((int)tex_idx != last_tex_idx) {
+                                    if ((int)tex_idx != tex_last_tex) {
                                         rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                        last_tex_idx = (int)tex_idx;
+                                        tex_last_tex = (int)tex_idx;
                                     }
                                 } else continue;
 
@@ -2518,8 +4225,13 @@ int main(void) {
                             }
                         }
                     }
+#endif /* DRAW STATIC OBJECTS disabled */
+
+                    perf_tex_lara_us = (uint32_t)((float)TICKS_DISTANCE(_la_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end Lara timing */
 
                     /* ===== DRAW PLACED ITEMS (pickups, enemies, doors) ===== */
+                    { uint32_t _it_t0 = TICKS_READ();
                     for (int ii = 0; ii < g_level.item_count && ii < 30; ii++) {
                         tr_item_t *item = &g_level.items[ii];
                         if (item->object_id == 0) continue; /* Skip Lara */
@@ -2562,6 +4274,9 @@ int main(void) {
                         float isy = sinf(iyaw), icy = cosf(iyaw);
 
                         for (int f = 0; f < mesh->face_count && f < 50; f++) {
+                            if (perf_tex_tris >= TEX_TRI_BUDGET ||
+                                perf_tex_faces >= TEX_FACE_BUDGET) goto near_pass_done;
+                            perf_tex_faces++;
                             tr_face_t *face = &mesh->faces[f];
                             if (face->vertex_count < 3) continue;
                             bool is_flat = (face->texture & 0x8000) != 0;
@@ -2574,10 +4289,17 @@ int main(void) {
                                 ifr = (float)g_level.palette[ci*3+0]/63.0f*item_shade;
                                 ifg = (float)g_level.palette[ci*3+1]/63.0f*item_shade;
                                 ifb = (float)g_level.palette[ci*3+2]/63.0f*item_shade;
-                                if (white_px && last_tex_idx != -2) { rdpq_tex_upload(TILE0, &white_surf, NULL); last_tex_idx = -2; }
-                            } else if (tex_idx < num_otex) {
+                                if (white_px && tex_last_tex != -2) {
+                                    rdpq_mode_tlut(TLUT_NONE);
+                                    rdpq_tex_upload(TILE0, &white_surf, NULL);
+                                    tex_last_tex = -2;
+                                }
+                            } else if (tex_idx < num_otex && ci8_surfs) {
                                 otex = &g_level.object_textures[tex_idx];
-                                if ((int)tex_idx != last_tex_idx) { rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL); last_tex_idx = (int)tex_idx; }
+                                if ((int)tex_idx != tex_last_tex) {
+                                    UPLOAD_BEST_TEX(tex_idx, tex_last_tex);
+                                    tex_last_tex = (int)tex_idx;
+                                }
                             } else continue;
 
                             float sv[4][10]; bool vis = true;
@@ -2614,13 +4336,19 @@ int main(void) {
                                 sv[v][9] = 1.0f/rz;
                             }
                             if (!vis) continue;
-                            rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[1], sv[2]);
-                            if (face->vertex_count == 4)
-                                rdpq_triangle(has_zbuf ? &TRIFMT_ZBUF_SHADE_TEX : &TRIFMT_SHADE_TEX, sv[0], sv[2], sv[3]);
+                            rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[1], sv[2]);
+                            perf_tex_tris++;
+                            if (face->vertex_count == 4) {
+                                rdpq_triangle(&TRIFMT_ZBUF_SHADE_TEX, sv[0], sv[2], sv[3]);
+                                perf_tex_tris++;
+                            }
+                            if ((perf_tex_tris & 7) == 0) rspq_flush();
                         }
                     }
+                    perf_tex_item_us = (uint32_t)((float)TICKS_DISTANCE(_it_t0, TICKS_READ()) / (float)TICKS_PER_SECOND * 1000000.0f);
+                    } /* end items timing */
 
-                    /* ===== DRAW LARA ===== */
+#if 0 /* DRAW LARA — superseded by TEXTURED PASS: LARA (CI8 textures above) */
                     {
                         /* Find Lara's object + item (cached after first frame) */
                         static tr_object_def_t *lara_obj = NULL;
@@ -2716,15 +4444,15 @@ int main(void) {
                                         fr = (float)g_level.palette[ci*3+0] / 63.0f * lara_shade;
                                         fg = (float)g_level.palette[ci*3+1] / 63.0f * lara_shade;
                                         fb = (float)g_level.palette[ci*3+2] / 63.0f * lara_shade;
-                                        if (white_px && last_tex_idx != -2) {
+                                        if (white_px && tex_last_tex != -2) {
                                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                                            last_tex_idx = -2;
+                                            tex_last_tex = -2;
                                         }
                                     } else if (tex_idx < num_otex) {
                                         otex = &g_level.object_textures[tex_idx];
-                                        if ((int)tex_idx != last_tex_idx) {
+                                        if ((int)tex_idx != tex_last_tex) {
                                             rdpq_tex_upload(TILE0, &tex_surfs[tex_idx], NULL);
-                                            last_tex_idx = (int)tex_idx;
+                                            tex_last_tex = (int)tex_idx;
                                         }
                                     } else continue;
 
@@ -2779,6 +4507,7 @@ int main(void) {
                             }
                         }
                     }
+#endif /* DRAW LARA disabled */
 
                     /* ===== SHADOW CIRCLE under Lara ===== */
                     {
@@ -2790,9 +4519,9 @@ int main(void) {
                         float sy_pos = (float)shadow_item->pos.y + 10.0f;
                         float sz_pos = (float)shadow_item->pos.z;
 
-                        if (white_px && last_tex_idx != -2) {
+                        if (white_px && tex_last_tex != -2) {
                             rdpq_tex_upload(TILE0, &white_surf, NULL);
-                            last_tex_idx = -2;
+                            tex_last_tex = -2;
                         }
 
                         /* Enable semi-transparent blending for shadow */
@@ -2836,14 +4565,74 @@ int main(void) {
                         }
                         rdpq_mode_pop();
                     }}
-#endif /* phase 2 rdpq renderers */
+                    near_pass_done:
+                    /* End textured pass — record CPU time, measure RSP stall, detach */
+                    rdpq_mode_tlut(TLUT_NONE);
+                    {
+                        uint32_t d = TICKS_DISTANCE(perf_tex_t0, TICKS_READ());
+                        perf_tex_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
+                    /* Measure how long CPU stalls waiting for RSP/RDP to drain.
+                     * Large value = RSP/RDP is the bottleneck.
+                     * Near zero = CPU is the bottleneck (RSP always idle). */
+                    {
+                        uint32_t rsp_t0 = TICKS_READ();
+                        rspq_wait();
+                        uint32_t d = TICKS_DISTANCE(rsp_t0, TICKS_READ());
+                        perf_rsp_us = (uint32_t)((float)d / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
 
-                    /* FPS display disabled during GL migration */
-
-                    /* Show frame (no glFinish — upload/tri caps prevent
-                     * queue backlog without blocking the CPU). */
-                    gl_context_end();
                     rdpq_detach_show();
+
+                    /* Capture frame time */
+                    {
+                        uint32_t frame_end = TICKS_READ();
+                        uint32_t delta = TICKS_DISTANCE(perf_frame_start, frame_end);
+                        perf_frame_us = (uint32_t)((float)delta / (float)TICKS_PER_SECOND * 1000000.0f);
+                    }
+
+                    /* Periodic performance dump to debug console (every 60 frames).
+                     * Outputs PERF| metrics + ADVICE| bottleneck diagnosis. */
+                    {
+                        static int perf_dump_counter = 0;
+                        if (++perf_dump_counter >= 60) {
+                            perf_dump_counter = 0;
+                            printf("PERF|fps=%d|frame=%u|tex=%u|bkd=%u|rsp=%u"
+                                   "|rm=%u|sm=%u|la=%u|it=%u"
+                                   "|ttri=%d/%d|tface=%d/%d|btri=%d/%d"
+                                   "|rooms=%d|bkdrooms=%d|t3d=%d"
+                                   "|heap_free=%u\n",
+                                   fps_display, perf_frame_us,
+                                   perf_tex_us, perf_bkd_us, perf_rsp_us,
+                                   perf_tex_room_us, perf_tex_sm_us,
+                                   perf_tex_lara_us, perf_tex_item_us,
+                                   perf_tex_tris, TEX_TRI_BUDGET,
+                                   perf_tex_faces, TEX_FACE_BUDGET,
+                                   perf_bkd_tris, BKD_TRI_BUDGET,
+                                   perf_tex_rooms, perf_bkd_rooms,
+                                   t3d_lara_ready ? 1 : 0,
+                                   n64_mem_available());
+
+                            /* Bottleneck diagnosis — identify primary offender */
+                            const char *bottleneck = "none";
+                            const char *suggest = "none";
+                            uint32_t worst = 0;
+                            if (perf_tex_lara_us > 5000 && perf_tex_lara_us > worst)
+                                { worst = perf_tex_lara_us; bottleneck = "LARA"; suggest = "verify_t3d_active"; }
+                            if (perf_tex_room_us > 15000 && perf_tex_room_us > worst)
+                                { worst = perf_tex_room_us; bottleneck = "ROOMS"; suggest = "tighten_vis_or_budgets"; }
+                            if (perf_bkd_us > 10000 && perf_bkd_us > worst)
+                                { worst = perf_bkd_us; bottleneck = "BAKED"; suggest = "reduce_bkd_tri_budget"; }
+                            if (perf_tex_sm_us > 5000 && perf_tex_sm_us > worst)
+                                { worst = perf_tex_sm_us; bottleneck = "STATICMESH"; suggest = "cull_or_lod_statics"; }
+                            if (perf_rsp_us > 8000 && perf_rsp_us > worst)
+                                { worst = perf_rsp_us; bottleneck = "RSP"; suggest = "reduce_tri_count"; }
+                            if (n64_mem_available() < 256 * 1024)
+                                { bottleneck = "MEMORY"; suggest = "lower_upload_cap"; }
+                            printf("ADVICE|bottleneck=%s|suggest=%s|worst_us=%u\n",
+                                   bottleneck, suggest, worst);
+                        }
+                    }
 
                     /* Audio: mix and submit to AI */
                     if (audio_can_write()) {
