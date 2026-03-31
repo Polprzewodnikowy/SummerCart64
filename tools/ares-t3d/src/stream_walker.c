@@ -118,6 +118,14 @@ int t3d_stream_walk(T3DHLEState *state,
             /* Follow CALL targets to scan blocks */
             if (cmd == 0x3 && pos + 7 < end) { /* CALL */
                 uint32_t call_addr = t3d_hle_read32(rdram, rdram_size, pos + 4) & 0x1FFFFFFF;
+                static int call_log = 0;
+                if (call_log < 10) {
+                    T3D_LOG(state, "T3D_WALK_CALL",
+                        "w0=0x%08X addr=0x%08X valid=%d",
+                        w0, call_addr,
+                        (call_addr > 0x1000 && call_addr + 64 < rdram_size) ? 1 : 0);
+                    call_log++;
+                }
                 if (call_addr > 0x1000 && call_addr + 64 < rdram_size) {
                     /* Recursively walk the block (limited depth) */
                     int block_t3d = t3d_stream_walk(state, rdram, rdram_size,
