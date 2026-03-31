@@ -303,13 +303,28 @@ void t3d_hle_on_vblank(void) {
                     (input_size % 16) == 0 &&
                     phys > 0x10000 && phys < g_rdram_size) {
                     hits++;
+
+                    /* Use the FIRST hit to set the T3D overlay slot.
+                     * This is ground truth — VERT_LOAD with sane args
+                     * can only come from the real T3D overlay. */
+                    if (hits == 1) {
+                        g_ovl_map.t3d_slot = ovl;
+                        g_ovl_map.t3d_confirmed = true;
+                        g_hle.detect.overlay_id = ovl;
+                        g_hle.detect.confirmed = true;
+                        g_hle.detect.confidence = 99;
+                        g_cpu.t3d_slot = ovl;
+                        T3D_LOG(&g_hle, "T3D_SCAN",
+                            "event=t3d_overlay_found slot=%d via=VERT_LOAD_scan", ovl);
+                    }
+
                     if (hits <= 20) {
                         uint32_t w2 = t3d_hle_read32(g_rdram, g_rdram_size, addr + 8);
                         T3D_LOG(&g_hle, "T3D_SCAN_HIT",
                             "addr=0x%08X w0=0x%08X w1=0x%08X w2=0x%08X "
-                            "verts=%u rdram_addr=0x%08X",
+                            "ovl=%d verts=%u rdram_addr=0x%08X",
                             addr, w0, w1, w2,
-                            input_size / 16, phys);
+                            ovl, input_size / 16, phys);
                     }
                 }
             }
