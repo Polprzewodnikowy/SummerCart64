@@ -317,16 +317,22 @@ analyze_source(source_texture):
     color_variance  = spatial_variance_lab(source)     // how much color changes across the surface
     residual_energy = high_pass_energy(source)         // how much high-frequency structure exists
     unique_regions  = count_perceptually_distinct_cells(source, coarsest_grid)
+    peak_local_de   = max_cell_delta_e(source, coarsest_grid)  // highest single-cell deviation
 
     if color_variance < TRIVIAL_COLOR_THRESHOLD
-       and residual_energy < TRIVIAL_RESIDUAL_THRESHOLD:
+       and residual_energy < TRIVIAL_RESIDUAL_THRESHOLD
+       and peak_local_de < TRIVIAL_PEAK_THRESHOLD:
         classify as SINGLE_VARIANT
         determine best_variant from unique_regions:
             if unique_regions <= 1:  best = Minimal  (2x2 field, no overlay)
             elif unique_regions <= 4: best = Low     (4x4 field, weak/no overlay)
             else:                     best = Mid     (8x8 field, light overlay)
+        log reason code (see below)
         store only best_variant
         skip full variant generation entirely
+    else:
+        classify as MULTI_VARIANT
+        proceed to full pipeline
 ```
 
 This catches the extreme cases:
@@ -346,15 +352,79 @@ a human classification. The `unique_regions` count determines *which* single
 variant is sufficient — a perfectly flat texture gets Minimal, a slightly
 varied one gets Low or Mid.
 
-Textures that pass the complexity thresholds proceed to the full pipeline.
+**Peak local deviation check:** The `peak_local_de` guard prevents the fast
+path from swallowing textures that have low *overall* variance but contain one
+small, visually important feature — a scratch across an otherwise flat wall, a
+single dark stain on clean plaster, a thin mortar line in uniform brick. These
+have low global color variance and low total HF energy, but one cell will have
+a noticeably high Delta E. The peak check catches this and routes the texture
+to the full pipeline where the multi-variant pass can represent the feature
+properly in finer variants.
 
-Default thresholds:
+Textures that pass all three complexity thresholds proceed to the full pipeline.
+
+Default thresholds (conservative — prefer false negatives over false positives):
 - `TRIVIAL_COLOR_THRESHOLD`: spatial color variance < Delta E 2.0 across all
   cells at the coarsest grid (the surface is essentially one color)
 - `TRIVIAL_RESIDUAL_THRESHOLD`: high-pass energy < 5% of total signal energy
   (the surface has almost no structure)
+- `TRIVIAL_PEAK_THRESHOLD`: max single-cell Delta E < 4.0 (no cell stands out
+  meaningfully from its neighbors)
 
-These are build configuration parameters.
+These are build configuration parameters. Start conservative and loosen only
+after validating on a representative texture corpus — it is better to over-
+generate variants (wasting some ROM) than to under-represent a texture that
+needed the full pass.
+
+#### Fast path reason logging
+
+The compiler logs a structured reason code for every fast path decision:
+
+```
+FAST_PATH reason codes:
+  TRIVIAL_FLAT         low variance + low HF + low peak  → Minimal
+  TRIVIAL_GRADIENT     low variance + low HF + gradient  → Low
+  TRIVIAL_GRAIN        low variance + measurable HF      → Mid
+  REJECTED_PEAK        low variance but peak_local_de exceeded threshold
+  REJECTED_HF          low variance but residual_energy exceeded threshold
+  REJECTED_VARIANCE    color_variance exceeded threshold
+```
+
+Rejection codes are logged even when the fast path is not taken, so the build
+report shows *why* a texture went to the full pipeline. This makes threshold
+tuning straightforward: sort by rejection reason, visually inspect the
+borderline textures, adjust thresholds.
+
+#### Build diagnostic output
+
+The compiler emits per-material diagnostics in the build report (and optionally
+in a sidecar JSON file for tooling). These are not shipped in the `.atm` blob.
+
+```
+Per-material diagnostic record:
+  source_name:        string    texture identifier
+  color_variance:     f32       measured spatial variance (Delta E)
+  residual_energy:    f32       high-pass energy ratio (0.0-1.0)
+  peak_local_de:      f32       max single-cell Delta E
+  unique_regions:     u8        distinct perceptual regions at coarsest grid
+  classification:     enum      SINGLE_VARIANT | MULTI_VARIANT | FALLBACK
+  fast_path_reason:   enum      reason code (or N/A if full pipeline)
+  variants_generated: u8        how many candidates were built
+  variants_stored:    u8        how many survived pruning
+  variant_list:       array     which variants stored + byte cost each
+  overlay_shared:     bool      whether overlay was deduplicated
+  fit_score:          f32       0.0-1.0
+  total_rom_bytes:    u32       final blob size
+```
+
+Aggregate build report summary:
+- Total textures processed
+- Fast path rate (% of textures short-circuited)
+- Classification distribution (single-variant / multi-variant / fallback)
+- Average variants per material
+- Total ROM: AegisTex vs. equivalent CI8 baseline
+- Overlay dedup ratio
+- List of textures that were borderline (within 20% of any threshold)
 
 #### Full pruning: multi-variant materials
 
