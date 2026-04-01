@@ -307,8 +307,59 @@ identical at Quality+ and Quality. A uniform dirt texture might collapse
 further — Quality, Mid, and Low are indistinguishable. Storing redundant
 variants wastes ROM for zero visual benefit.
 
-The compiler prunes variants after generating all 5 candidates, working from
-finest to coarsest:
+#### Fast path: trivially simple textures
+
+Before generating any variants, the compiler measures source texture complexity
+to short-circuit materials that don't benefit from multi-variant representation:
+
+```
+analyze_source(source_texture):
+    color_variance  = spatial_variance_lab(source)     // how much color changes across the surface
+    residual_energy = high_pass_energy(source)         // how much high-frequency structure exists
+    unique_regions  = count_perceptually_distinct_cells(source, coarsest_grid)
+
+    if color_variance < TRIVIAL_COLOR_THRESHOLD
+       and residual_energy < TRIVIAL_RESIDUAL_THRESHOLD:
+        classify as SINGLE_VARIANT
+        determine best_variant from unique_regions:
+            if unique_regions <= 1:  best = Minimal  (2x2 field, no overlay)
+            elif unique_regions <= 4: best = Low     (4x4 field, weak/no overlay)
+            else:                     best = Mid     (8x8 field, light overlay)
+        store only best_variant
+        skip full variant generation entirely
+```
+
+This catches the extreme cases:
+- **Plain snow/sand/ice:** near-zero color variance, near-zero structure.
+  Single Minimal variant (8 bytes). The 2x2 color field captures any slight
+  color gradient across the tile; no overlay needed because there's no
+  structure to correct for.
+- **Uniform concrete/plaster:** very low variance with faint surface noise.
+  Single Low variant (~544 bytes). The 4x4 field handles subtle color
+  zoning; residual is weak enough to threshold away.
+- **Simple single-tone stone:** low variance but some visible grain.
+  Single Mid variant (~2176 bytes). The 8x8 field is dense enough for
+  the grain pattern; overlay carries the remaining structure.
+
+The fast path selection is based on the source texture's actual content, not
+a human classification. The `unique_regions` count determines *which* single
+variant is sufficient — a perfectly flat texture gets Minimal, a slightly
+varied one gets Low or Mid.
+
+Textures that pass the complexity thresholds proceed to the full pipeline.
+
+Default thresholds:
+- `TRIVIAL_COLOR_THRESHOLD`: spatial color variance < Delta E 2.0 across all
+  cells at the coarsest grid (the surface is essentially one color)
+- `TRIVIAL_RESIDUAL_THRESHOLD`: high-pass energy < 5% of total signal energy
+  (the surface has almost no structure)
+
+These are build configuration parameters.
+
+#### Full pruning: multi-variant materials
+
+For textures that are not trivially simple, the compiler generates all 5
+candidates and then prunes, working from finest to coarsest:
 
 ```
 for each adjacent pair (finer_variant, coarser_variant):
@@ -348,9 +399,11 @@ The Minimal variant (coarsest, 2x2 field, no overlay) is always stored as the
 guaranteed floor — it costs 8 bytes and ensures the system never has nothing
 to bind.
 
-Example pruning outcomes:
-- Flat brown plaster: Quality+ ≈ Quality ≈ Mid → stores Mid, Low, Minimal (3 variants)
-- Uniform grey dirt: all variants nearly identical → stores Quality, Minimal (2 variants)
+Example outcomes (fast path + full pruning combined):
+- Plain snow tile: trivially simple → single Minimal variant (8 bytes)
+- Uniform sand: trivially simple, slight gradient → single Low variant (544 bytes)
+- Flat brown plaster: passes fast path, but Quality+ ≈ Quality ≈ Mid → stores Mid, Low, Minimal (3 variants)
+- Uniform grey dirt: passes fast path barely, all variants nearly identical → stores Quality, Minimal (2 variants)
 - Complex mortared stone: each step visibly better → stores all 5 variants
 - Moderate stone with subtle grain: Quality+ ≈ Quality → stores Quality, Mid, Low, Minimal (4 variants)
 
