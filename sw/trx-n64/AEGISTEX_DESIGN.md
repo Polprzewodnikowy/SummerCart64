@@ -300,6 +300,63 @@ as ATM_FLAG_FALLBACK and the traditional pipeline handles it.
 
 This threshold is a build configuration parameter, not hardcoded.
 
+### Variant pruning (build-time)
+
+Not every material needs 5 quality variants. A flat brown cave wall may look
+identical at Quality+ and Quality. A uniform dirt texture might collapse
+further — Quality, Mid, and Low are indistinguishable. Storing redundant
+variants wastes ROM for zero visual benefit.
+
+The compiler prunes variants after generating all 5 candidates, working from
+finest to coarsest:
+
+```
+for each adjacent pair (finer_variant, coarser_variant):
+    error_delta = perceptual_error(finer) - perceptual_error(coarser)
+    cost_delta  = rom_bytes(finer) - rom_bytes(coarser)
+
+    if error_delta < PRUNE_PERCEPTUAL_THRESHOLD:
+        drop finer variant (coarser already looks the same)
+
+    elif error_delta < PRUNE_COST_THRESHOLD
+         and cost_delta > (equivalent_ci8_size * PRUNE_COST_RATIO):
+        drop finer variant (marginal improvement not worth the ROM)
+```
+
+Default thresholds:
+- `PRUNE_PERCEPTUAL_THRESHOLD`: Delta E 1.5 (below human perception for
+  non-side-by-side comparison at intended viewing distance)
+- `PRUNE_COST_THRESHOLD`: Delta E 3.0 (noticeable but mild)
+- `PRUNE_COST_RATIO`: 0.5 (variant costs more than half a CI8 tile for
+  marginal improvement)
+
+All thresholds are build configuration parameters.
+
+The `.atm` blob's per-variant `stored` flag (0 or 1) already supports sparse
+variants. At runtime, when a requested variant is not stored, the bind function
+falls through to the next coarser stored variant:
+
+```
+resolve_variant(material, requested_index):
+    for i = requested_index .. NUM_VARIANTS-1:
+        if material->variants[i].stored:
+            return i
+    return VARIANT_MINIMAL  // always stored as a guaranteed floor
+```
+
+The Minimal variant (coarsest, 2x2 field, no overlay) is always stored as the
+guaranteed floor — it costs 8 bytes and ensures the system never has nothing
+to bind.
+
+Example pruning outcomes:
+- Flat brown plaster: Quality+ ≈ Quality ≈ Mid → stores Mid, Low, Minimal (3 variants)
+- Uniform grey dirt: all variants nearly identical → stores Quality, Minimal (2 variants)
+- Complex mortared stone: each step visibly better → stores all 5 variants
+- Moderate stone with subtle grain: Quality+ ≈ Quality → stores Quality, Mid, Low, Minimal (4 variants)
+
+The build report includes per-material variant count and total ROM savings from
+pruning vs. the naive 5-variant-per-material baseline.
+
 ### Phase 1 subdivision ratios (uniform grid)
 
 Color field dimensions are expressed as ratios of source texture dimensions:
