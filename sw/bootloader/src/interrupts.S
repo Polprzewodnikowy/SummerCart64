@@ -1,7 +1,7 @@
 #include "vr4300.h"
 
 
-#define WATCHDOG_TIMEOUT    (5 * (93750000UL / 2))
+#define WATCHDOG_TIMEOUT    (10 * (93750000UL / 2))
 
 
 .section .text.interrupts
