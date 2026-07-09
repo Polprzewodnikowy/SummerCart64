@@ -57,7 +57,7 @@ void interrupts_handler (uint8_t interrupts) {
 
         version_print();
         display_printf("[ Watchdog timeout ]\n");
-        display_printf("SC64 bootloader did not finish loading in 5 seconds\n");
+        display_printf("SC64 bootloader did not finish loading in 10 seconds\n");
 
         while (true);
     }
