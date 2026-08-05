@@ -564,6 +564,13 @@ void hw_adc_read_voltage_temperature (uint16_t *voltage, int16_t *temperature) {
     ) + (TEMP_CAL_POINT_1 * TEMP_SCALE);
 }
 
+void hw_get_uid (uint32_t uid[3]) {
+    // STM32G030 unique device ID: 96-bit at 0x1FFF7590
+    uid[0] = *((volatile uint32_t *) 0x1FFF7590UL);
+    uid[1] = *((volatile uint32_t *) 0x1FFF7594UL);
+    uid[2] = *((volatile uint32_t *) 0x1FFF7598UL);
+}
+
 
 static void hw_led_init (void) {
     hw_gpio_init(GPIO_ID_LED, GPIO_OUTPUT, GPIO_PP, GPIO_SPEED_VLOW, GPIO_PULL_NONE, GPIO_AF_0, 0);

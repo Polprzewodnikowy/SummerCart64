@@ -21,7 +21,7 @@ typedef enum packet_cmd {
 typedef struct usb_tx_info {
     uint8_t cmd;
     uint32_t data_length;
-    uint32_t data[4];
+    uint32_t data[8];
     uint32_t dma_length;
     uint32_t dma_address;
     void (*done_callback)(void);

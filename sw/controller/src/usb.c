@@ -25,7 +25,7 @@
 #define DEBUG_WRITE_TIMEOUT_MS  (1000)
 
 #define DIAGNOSTIC_DATA_MARKER  (1 << 31)
-#define DIAGNOSTIC_DATA_VERSION (1)
+#define DIAGNOSTIC_DATA_VERSION (2)
 
 
 enum rx_state {
@@ -568,14 +568,18 @@ static void usb_rx_process (void) {
             case '%': {
                 uint16_t voltage;
                 int16_t temperature;
+                uint32_t uid[3];
                 hw_adc_read_voltage_temperature(&voltage, &temperature);
+                hw_get_uid(uid);
                 p.rx_state = RX_STATE_IDLE;
                 p.response_pending = true;
-                p.response_info.data_length = 16;
+                p.response_info.data_length = 24;
                 p.response_info.data[0] = (DIAGNOSTIC_DATA_MARKER | DIAGNOSTIC_DATA_VERSION);
                 p.response_info.data[1] = (uint32_t) (voltage);
                 p.response_info.data[2] = (uint32_t) (temperature);
-                p.response_info.data[3] = 0;
+                p.response_info.data[3] = uid[0];
+                p.response_info.data[4] = uid[1];
+                p.response_info.data[5] = uid[2];
                 break;
             }
 

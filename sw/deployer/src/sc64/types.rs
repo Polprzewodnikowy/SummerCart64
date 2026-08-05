@@ -1271,9 +1271,16 @@ pub struct DiagnosticDataV1 {
     pub temperature: f32,
 }
 
+pub struct DiagnosticDataV2 {
+    pub voltage: f32,
+    pub temperature: f32,
+    pub uid: [u32; 3],
+}
+
 pub enum DiagnosticData {
     V0(DiagnosticDataV0),
     V1(DiagnosticDataV1),
+    V2(DiagnosticDataV2),
     Unknown,
 }
 
@@ -1311,6 +1318,23 @@ impl TryFrom<Vec<u8>> for DiagnosticData {
                     temperature: raw_temperature / 10.0,
                 }))
             }
+            2 => {
+                if value.len() != 24 {
+                    return Err(Error::new("Invalid data length for V2 diagnostic data"));
+                }
+                let raw_voltage = u32::from_be_bytes(value[4..8].try_into().unwrap()) as f32;
+                let raw_temperature = u32::from_be_bytes(value[8..12].try_into().unwrap()) as f32;
+                let uid = [
+                    u32::from_be_bytes(value[12..16].try_into().unwrap()),
+                    u32::from_be_bytes(value[16..20].try_into().unwrap()),
+                    u32::from_be_bytes(value[20..24].try_into().unwrap()),
+                ];
+                Ok(DiagnosticData::V2(DiagnosticDataV2 {
+                    voltage: raw_voltage / 1000.0,
+                    temperature: raw_temperature / 10.0,
+                    uid,
+                }))
+            }
             _ => Ok(DiagnosticData::Unknown),
         }
     }
@@ -1331,6 +1355,10 @@ impl Display for DiagnosticData {
             DiagnosticData::V1(d) => f.write_fmt(format_args!(
                 "{:.03} V / {:.01} °C",
                 d.voltage, d.temperature
+            )),
+            DiagnosticData::V2(d) => f.write_fmt(format_args!(
+                "{:.03} V / {:.01} °C / UID: {:08X}{:08X}{:08X}",
+                d.voltage, d.temperature, d.uid[0], d.uid[1], d.uid[2]
             )),
             DiagnosticData::Unknown => f.write_str("Unknown"),
         }

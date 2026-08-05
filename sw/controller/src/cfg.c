@@ -94,6 +94,9 @@ typedef enum {
 
 typedef enum {
     DIAGNOSTIC_ID_VOLTAGE_TEMPERATURE = 0,
+    DIAGNOSTIC_ID_UID_WORD_0 = 1,
+    DIAGNOSTIC_ID_UID_WORD_1 = 2,
+    DIAGNOSTIC_ID_UID_WORD_2 = 3,
 } diagnostic_id_t;
 
 typedef enum {
@@ -298,6 +301,14 @@ static bool cfg_read_diagnostic_data (uint32_t *args) {
             int16_t temperature;
             hw_adc_read_voltage_temperature(&voltage, &temperature);
             args[1] = ((uint32_t) (voltage) << 16) | ((uint32_t) (temperature));
+            break;
+        }
+        case DIAGNOSTIC_ID_UID_WORD_0:
+        case DIAGNOSTIC_ID_UID_WORD_1:
+        case DIAGNOSTIC_ID_UID_WORD_2: {
+            uint32_t uid[3];
+            hw_get_uid(uid);
+            args[1] = uid[args[0] - DIAGNOSTIC_ID_UID_WORD_0];
             break;
         }
         default:

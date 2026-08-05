@@ -29,3 +29,12 @@
 | `p` | **FLASH_WAIT_BUSY**   | wait          | ---          | erase_block_size | ---            | Wait until flash ready / get block erase size                |
 | `P` | **FLASH_ERASE_BLOCK** | pi_address    | ---          | ---              | ---            | Start flash block erase                                      |
 | `%` | **DIAGNOSTIC_GET**    | diagnostic_id | ---          | ---              | value          | Get diagnostic data                                          |
+
+### `DIAGNOSTIC_GET` IDs
+
+| diagnostic_id | name                        | value description                                       |
+| ------------- | --------------------------- | ------------------------------------------------------- |
+| `0x00`        | VOLTAGE_TEMPERATURE         | `[31:16]` VDD voltage in mV, `[15:0]` temperature ×10 °C |
+| `0x01`        | UID_WORD_0                  | STM32 unique device ID bits [31:0] (wafer X/Y)          |
+| `0x02`        | UID_WORD_1                  | STM32 unique device ID bits [63:32] (lot number)        |
+| `0x03`        | UID_WORD_2                  | STM32 unique device ID bits [95:64] (lot + wafer)       |
