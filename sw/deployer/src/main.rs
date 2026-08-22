@@ -1066,7 +1066,13 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
             for (index, (local_path, remote_path)) in files.into_iter().enumerate() {
                 println!("SYNC {}/{} {}", index + 1, total, remote_path.display());
                 let mut src_file = std::fs::File::open(local_path)?;
-                let mut dst_file = ff.create(remote_path)?;
+                let is_catalog = remote_path.to_string_lossy().ends_with("menu/title.csv");
+                let write_path = if is_catalog {
+                    PathBuf::from(format!("{}.m64importer.tmp", remote_path.display()))
+                } else {
+                    remote_path.clone()
+                };
+                let mut dst_file = ff.create(&write_path)?;
                 loop {
                     match src_file.read(&mut buffer)? {
                         0 => break,
@@ -1074,6 +1080,14 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                     }
                 }
                 dst_file.flush()?;
+                drop(dst_file);
+                if is_catalog {
+                    match ff.delete(&remote_path) {
+                        Ok(()) | Err(sc64::ff::Error::NoFile) => {}
+                        Err(error) => return Err(error.into()),
+                    }
+                    ff.rename(&write_path, &remote_path)?;
+                }
             }
         }
         SDCommands::Format => {
