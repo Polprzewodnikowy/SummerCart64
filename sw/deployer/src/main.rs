@@ -1043,7 +1043,11 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
             if !src.is_dir() {
                 return Err(sc64::Error::new("Sync source is not a directory"));
             }
-            let mut directories = vec![];
+            let mut directories = if dst == std::path::Path::new("/") {
+                vec![]
+            } else {
+                vec![dst.clone()]
+            };
             let mut files = vec![];
             collect_sync_entries(src, src, dst, &mut directories, &mut files)?;
             directories.sort_by_key(|path| path.components().count());
@@ -1157,6 +1161,17 @@ mod sync_tests {
                 std::path::Path::new("menu\\title.csv")
             ),
             PathBuf::from("/menu/title.csv")
+        );
+    }
+
+    #[test]
+    fn non_root_destination_is_preserved() {
+        assert_eq!(
+            sync_destination(
+                std::path::Path::new("/m64-batch-test"),
+                std::path::Path::new("alpha.txt")
+            ),
+            PathBuf::from("/m64-batch-test/alpha.txt")
         );
     }
 
