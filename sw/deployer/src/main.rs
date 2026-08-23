@@ -298,6 +298,17 @@ enum SDCommands {
         dst: Option<PathBuf>,
     },
 
+    /// Upload a directory tree using one USB and SD card session
+    #[command(name = "sync")]
+    Sync {
+        /// Local directory containing the tree to upload
+        src: PathBuf,
+
+        /// Destination directory on the SD card
+        #[arg(default_value = "/")]
+        dst: PathBuf,
+    },
+
     /// Format the SD card
     #[command(name = "mkfs")]
     Format,
@@ -1028,6 +1039,61 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
                 },
             )?;
         }
+        SDCommands::Sync { src, dst } => {
+            if !src.is_dir() {
+                return Err(sc64::Error::new("Sync source is not a directory"));
+            }
+            let mut directories = if dst == std::path::Path::new("/") {
+                vec![]
+            } else {
+                vec![dst.clone()]
+            };
+            let mut files = vec![];
+            collect_sync_entries(src, src, dst, &mut directories, &mut files)?;
+            directories.sort_by_key(|path| path.components().count());
+            sort_sync_files(&mut files);
+
+            for directory in directories {
+                if ff.mkdir(&directory).is_err() {
+                    match ff.stat(&directory) {
+                        Ok(entry) if matches!(entry.info, sc64::ff::EntryInfo::Directory) => {}
+                        Ok(_) => {
+                            return Err(sc64::Error::new("Sync destination collides with a file"))
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+            }
+
+            let total = files.len();
+            let mut buffer = vec![0; 128 * 1024];
+            for (index, (local_path, remote_path)) in files.into_iter().enumerate() {
+                println!("SYNC {}/{} {}", index + 1, total, remote_path.display());
+                let mut src_file = std::fs::File::open(local_path)?;
+                let is_catalog = remote_path.to_string_lossy().ends_with("menu/title.csv");
+                let write_path = if is_catalog {
+                    PathBuf::from(format!("{}.m64importer.tmp", remote_path.display()))
+                } else {
+                    remote_path.clone()
+                };
+                let mut dst_file = ff.create(&write_path)?;
+                loop {
+                    match src_file.read(&mut buffer)? {
+                        0 => break,
+                        bytes => dst_file.write_all(&buffer[0..bytes])?,
+                    }
+                }
+                dst_file.flush()?;
+                drop(dst_file);
+                if is_catalog {
+                    match ff.delete(&remote_path) {
+                        Ok(()) | Err(sc64::ff::Error::NoFile) => {}
+                        Err(error) => return Err(error.into()),
+                    }
+                    ff.rename(&write_path, &remote_path)?;
+                }
+            }
+        }
         SDCommands::Format => {
             let answer = prompt(format!(
                 "{}",
@@ -1042,6 +1108,86 @@ fn handle_sd_command(connection: Connection, command: &SDCommands) -> Result<(),
     }
 
     Ok(())
+}
+
+fn collect_sync_entries(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    destination: &std::path::Path,
+    directories: &mut Vec<PathBuf>,
+    files: &mut Vec<(PathBuf, PathBuf)>,
+) -> Result<(), std::io::Error> {
+    for entry in std::fs::read_dir(current)? {
+        let entry = entry?;
+        let path = entry.path();
+        let relative = path.strip_prefix(root).unwrap();
+        let remote = sync_destination(destination, relative);
+        if entry.file_type()?.is_dir() {
+            directories.push(remote);
+            collect_sync_entries(root, &path, destination, directories, files)?;
+        } else if entry.file_type()?.is_file() {
+            files.push((path, remote));
+        }
+    }
+    Ok(())
+}
+
+fn sync_destination(destination: &std::path::Path, relative: &std::path::Path) -> PathBuf {
+    let mut remote = destination.to_string_lossy().replace('\\', "/");
+    if !remote.ends_with('/') {
+        remote.push('/');
+    }
+    remote.push_str(&relative.to_string_lossy().replace('\\', "/"));
+    PathBuf::from(remote)
+}
+
+fn sort_sync_files(files: &mut [(PathBuf, PathBuf)]) {
+    files.sort_by(|a, b| {
+        let a_catalog = a.1.to_string_lossy().ends_with("menu/title.csv");
+        let b_catalog = b.1.to_string_lossy().ends_with("menu/title.csv");
+        a_catalog.cmp(&b_catalog).then_with(|| a.1.cmp(&b.1))
+    });
+}
+
+#[cfg(test)]
+mod sync_tests {
+    use super::*;
+
+    #[test]
+    fn remote_paths_use_forward_slashes() {
+        assert_eq!(
+            sync_destination(
+                std::path::Path::new("/"),
+                std::path::Path::new("menu\\title.csv")
+            ),
+            PathBuf::from("/menu/title.csv")
+        );
+    }
+
+    #[test]
+    fn non_root_destination_is_preserved() {
+        assert_eq!(
+            sync_destination(
+                std::path::Path::new("/m64-batch-test"),
+                std::path::Path::new("alpha.txt")
+            ),
+            PathBuf::from("/m64-batch-test/alpha.txt")
+        );
+    }
+
+    #[test]
+    fn catalog_is_published_last() {
+        let mut files = vec![
+            (PathBuf::from("catalog"), PathBuf::from("/menu/title.csv")),
+            (
+                PathBuf::from("sprite"),
+                PathBuf::from("/menu/title/A/A_e.sprite"),
+            ),
+            (PathBuf::from("rom"), PathBuf::from("/sc64menu.n64")),
+        ];
+        sort_sync_files(&mut files);
+        assert_eq!(files.last().unwrap().1, PathBuf::from("/menu/title.csv"));
+    }
 }
 
 fn handle_info_command(connection: Connection) -> Result<(), sc64::Error> {
