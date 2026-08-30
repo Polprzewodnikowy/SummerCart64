@@ -52,7 +52,8 @@ module n64_flashram (
                 3: reg_bus.rdata = FLASH_MODEL_ID[15:0];
             endcase
         end else if (reg_bus.address[1]) begin
-            reg_bus.rdata = {12'd0, status};
+            // Report WSM_READY while no erase or page-program operation is pending.
+            reg_bus.rdata = {8'd0, !n64_scb.flashram_pending, 3'd0, status};
         end
     end
 
@@ -62,8 +63,9 @@ module n64_flashram (
             status <= 4'b0000;
             erase_enabled <= 1'b0;
             n64_scb.flashram_pending <= 1'b0;
+            n64_scb.flashram_write_or_erase <= 1'b0;
         end else begin
-            if (n64_scb.flashram_done) begin
+            if (n64_scb.flashram_done && n64_scb.flashram_pending) begin
                 n64_scb.flashram_pending <= 1'b0;
                 if (n64_scb.flashram_write_or_erase) begin
                     status[ERASE_BUSY] <= 1'b0;
