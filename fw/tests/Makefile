@@ -20,11 +20,12 @@ TEST_FILES = $(shell find "./$(BENCHES_DIR)" -not -path "$(BUILD_DIR)/*" -type f
 TESTS = $(addprefix $(BUILD_DIR)/, $(basename $(TEST_FILES)))
 
 VERILATOR_FLAGS = --binary --trace --timescale 10ns/1ns -j --quiet $(INC_DIRS)
+VERILATOR_FLAGS_n64_flashram_tb = -Wno-CASEINCOMPLETE
 
 $(BUILD_DIR)/%: %.sv
 	@echo "[VERILATOR] $<"
 	@mkdir -p $@.obj
-	@verilator $(VERILATOR_FLAGS) -Mdir $@.obj $< > /dev/null
+	@verilator $(VERILATOR_FLAGS) $(VERILATOR_FLAGS_$(notdir $@)) -Mdir $@.obj $< > /dev/null
 	@$@.obj/V$(notdir $@)
 
 tests: $(TESTS)
