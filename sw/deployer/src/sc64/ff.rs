@@ -442,7 +442,7 @@ unsafe extern "C" fn get_fattime() -> fatfs::DWORD {
         | (day << 16)
         | (hour << 11)
         | (minute << 5)
-        | (second << 1)
+        | (second >> 1)
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
