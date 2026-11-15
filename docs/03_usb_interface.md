@@ -515,8 +515,8 @@ and save writeback operation is not pending. PC side lock is released when USB i
 #### Available SD card operations
 | operation | description                                                                                    |
 | --------- | ---------------------------------------------------------------------------------------------- |
-| `0`       | Init SD card                                                                                   |
-| `1`       | Deinit SD card                                                                                 |
+| `0`       | Deinit SD card                                                                                 |
+| `1`       | Init SD card                                                                                   |
 | `2`       | Get SD card status                                                                             |
 | `3`       | Get SD card info (loads CSD and CID registers to a specified address, data length is 32 bytes) |
 | `4`       | Turn on byte swap                                                                              |
