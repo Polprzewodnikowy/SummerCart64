@@ -86,6 +86,8 @@ To update SC64 firmware run `./sc64deployer firmware update sc64-firmware-{versi
 
 To print firmware metadata run `./sc64deployer firmware info sc64-firmware-{version}.bin`
 
+**Note:** The flashing process discards the metadata, the binary lengths, and the primer, which is only used for initial programming. For this reason, firmware backups have no metadata, no primer, and the binaries will appear longer, because unused space is also backed up. This is expected behavior and does not affect the backup's usefulness for re-flashing. Likewise, it is expected that `info` gives very different results for backed up firmware, compared to the released firmware, even for the exact same firmware release.
+
 ---
 
 # LED blink patters
